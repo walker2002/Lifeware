@@ -1,0 +1,8 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:4000",
+    "ANTHROPIC_API_KEY": "sk-dimmy-key",
+    "ANTHROPIC_MODEL": "qwen-plus",
+    "ANTHROPIC_SMALL_FAST_MODEL": "qwen-flash"
+  }
+}

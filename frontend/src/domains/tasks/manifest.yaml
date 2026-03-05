@@ -1,0 +1,65 @@
+# Domain Manifest - Tasks
+# Defines the Tasks domain capabilities and boundaries
+
+id: tasks-domain
+name: Tasks
+version: 1.0.0
+
+# Supported intents that this domain can handle
+supportedIntents:
+  - CreateTask
+  - UpdateTask
+  - CompleteTask
+  - ArchiveTask
+  - ScheduleTask
+
+# Required fields for each intent (validation by Intent Engine)
+requiredFields:
+  CreateTask:
+    - title
+    - optional: [description, priority, estimatedTime, dueDate]
+  UpdateTask:
+    - taskId
+    - optional: [title, description, priority, estimatedTime, dueDate, status]
+  CompleteTask:
+    - taskId
+    - optional: [actualTime, completionNote]
+  ScheduleTask:
+    - taskId
+    - startTime
+    - endTime
+
+# Events this domain subscribes to (handles via onEvent)
+subscribedEvents:
+  - TimeBoxStarted
+  - TimeBoxEnded
+  - HabitCompleted
+
+# Action surface templates for Action Surface Engine
+actionSurfaceTemplates:
+  - intent: CreateTask
+    type: guide
+    template: "创建新任务"
+    weight: 80
+  - intent: UpdateTask
+    type: tile
+    template: "编辑任务"
+    weight: 60
+  - intent: CompleteTask
+    type: tile
+    template: "完成任务"
+    weight: 100
+
+# Outbound connectors (optional, MVP not implemented)
+outboundConnectors:
+  - id: feishu_bot
+    trigger: TaskCompleted
+    optional: true
+
+# Inbound sources (optional, MVP not implemented)
+inboundSources:
+  primary: lifeware_internal
+  connectors:
+    - github_webhook
+    - slack_bot
+  fallback: manual_input
