@@ -1,190 +1,226 @@
-// USOM - Unified Semantic & Object Model
-// These types define the core objects that flow through the system
+// USOM Core Objects
+// Source: docs/usom-design.md Section 3
 
-// Base USOM Object Interface
-export interface USOMObject {
-  id: string;
-  createdAt: Date;
-  updatedAt: Date;
-  context?: Record<string, any>;
+import type {
+  USOM_ID, Timestamp, DateOnly, DurationMinutes, Notes, Tag,
+  Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
+  Chronotype, EnergyCurvePoint, EnergySensitivity,
+  ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
+  HabitLogStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
+} from './primitives'
+
+// ─── 3.1 User ─────────────────────────────────────────────────
+export interface User {
+  id: USOM_ID
+  email: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }
 
-// Task Object
-export interface Task extends USOMObject {
-  title: string;
-  description?: string;
-  status: TaskStatus;
-  priority: Priority;
-  estimatedTime?: number; // in minutes
-  actualTime?: number; // in minutes
-  dueDate?: Date;
-  completedAt?: Date;
+// ─── 3.2 UserCalibration ───────────────────────────────────────
+export interface UserCalibration {
+  userId: USOM_ID
+  afternoonStart: number
+  eveningStart: number
+  nightStart: number
+  peakEnergyStart: number
+  peakEnergyEnd: number
+  energyConfidence: number
+  chronotype: Chronotype
+  baselineCurve: EnergyCurvePoint[]
+  sensitivity: EnergySensitivity
+  lastEnergyCalibrationAt?: Timestamp
+  comfortableWipLimit: number
+  sustainableDeepWorkHours: number
+  habitRiskDays: number[]
+  habitPreferredTimeSlots: string[]
+  ruleOverrideHistory: Record<string, RuleOverrideEntry>
+  updatedAt: Timestamp
 }
 
-export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'completed' | 'archived';
-export type Priority = 'low' | 'medium' | 'high' | 'urgent';
-
-// Habit Object
-export interface Habit extends USOMObject {
-  name: string;
-  description?: string;
-  status: HabitStatus;
-  frequency: Frequency;
-  timeHint?: string;
-  duration?: number; // in minutes
-  streak: number;
-  startDate?: Date;
+export interface RuleOverrideEntry {
+  ruleKey: string
+  overrideAt: Timestamp
+  context: string
 }
 
-export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived';
-export type Frequency = 'daily' | 'weekly' | 'monthly' | 'custom';
-
-// TimeBox Object
-export interface TimeBox extends USOMObject {
-  title: string;
-  description?: string;
-  status: TimeBoxStatus;
-  startTime: Date;
-  endTime: Date;
-  duration: number; // in minutes
-  taskId?: string;
-  habitId?: string;
-  actualStartTime?: Date;
-  actualEndTime?: Date;
+// ─── 3.3 Intention ─────────────────────────────────────────────
+export interface Intention {
+  id: USOM_ID
+  status: IntentionStatus
+  rawInput: string
+  inputMode: 'natural_language' | 'template_form' | 'slash_command'
+  capturedAt: Timestamp
+  dissolvedAt?: Timestamp
+  sourceSnapshotId?: USOM_ID
+  notes?: Notes
 }
 
-export type TimeBoxStatus = 'planned' | 'running' | 'paused' | 'ended' | 'logged';
-
-// OKR Object
-export interface OKR extends USOMObject {
-  title: string;
-  description?: string;
-  period: string; // e.g., "2026-Q1", "monthly"
-  status: OKRStatus;
-  progress: number; // 0-100 percentage
-  dueDate?: Date;
-}
-
-export type OKRStatus = 'draft' | 'active' | 'completed' | 'archived';
-
-// KeyResult Object
-export interface KeyResult extends USOMObject {
-  okrId: string;
-  title: string;
-  description?: string;
-  status: KeyResultStatus;
-  progress: number; // 0-100 percentage
-}
-
-export type KeyResultStatus = 'draft' | 'active' | 'completed' | 'archived';
-
-// Review Object
-export interface Review extends USOMObject {
-  type: ReviewType;
-  period: string; // e.g., "2026-03-05", "2026-W10"
-  summary?: string;
-  insights?: string;
-}
-
-export type ReviewType = 'daily' | 'weekly' | 'monthly' | 'custom';
-
-// ContextSnapshot - Unified read-only snapshot
-export interface ContextSnapshot {
-  version: number;
-  timestamp: Date;
-  tasks: Task[];
-  habits: Habit[];
-  timeboxes: TimeBox[];
-  okrs: OKR[];
-  activeTimeBox?: TimeBox;
-  currentTask?: Task;
-  energyLevel?: number; // 1-10
-  focusMode?: boolean;
-}
-
-// Action Surface Types
-export interface ActionCandidate {
-  id: string;
-  type: 'guide' | 'tile' | 'cue';
-  category: string;
-  title: string;
-  description?: string;
-  action: () => void;
-  weight: number;
-  context?: Record<string, any>;
-}
-
-export interface ActionSurfaceSuggestion {
-  category: 'guide' | 'tile' | 'cue';
-  weight: number;
-  actions: ActionCandidate[];
-}
-
-// Intent Types
+// ─── 3.4 StructuredIntent ──────────────────────────────────────
 export interface StructuredIntent {
-  id: string;
-  type: string;
-  data: Record<string, any>;
-  confidence: number;
-  requiredFields: string[];
-  metadata?: Record<string, any>;
+  id: USOM_ID
+  intentionId: USOM_ID
+  targetDomain: string
+  action: string
+  fields: Record<string, unknown>
+  confidence: number
+  resolvedBy: 'ai' | 'template_form'
+  createdAt: Timestamp
 }
 
-// Event Types
-export interface SystemEvent {
-  id: string;
-  type: string;
-  payload: Record<string, any>;
-  timestamp: Date;
-  source: 'user' | 'system' | 'external';
+// ─── 3.5 Objective ────────────────────────────────────────────
+export interface Objective {
+  id: USOM_ID
+  status: ObjectiveStatus
+  title: string
+  description?: string
+  period: {
+    type: PeriodType
+    start: DateOnly
+    end: DateOnly
+  }
+  parentId?: USOM_ID
+  keyResultIds: USOM_ID[]
+  tags: Tag[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
 }
 
-// Memory Framework Types
-export interface MemoryItem {
-  id: string;
-  layer: 'L1_session' | 'L2_episode' | 'L3_procedural' | 'L4_semantic' | 'L5_core';
-  content: string;
-  metadata: Record<string, any>;
-  timestamp: Date;
-  tags?: string[];
+// ─── 3.6 KeyResult ────────────────────────────────────────────
+export interface KeyResult {
+  id: USOM_ID
+  objectiveId: USOM_ID
+  title: string
+  description?: string
+  targetValue: number
+  currentValue: number
+  unit: string
+  progressRate: number
+  status: KeyResultStatus
+  dueDate?: DateOnly
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }
 
-export interface DerivedSignal {
-  id: string;
-  type: string;
-  value: Record<string, any>;
-  timestamp: Date;
-  confidence?: number;
+// ─── 3.7 Task ─────────────────────────────────────────────────
+export interface Task {
+  id: USOM_ID
+  status: TaskStatus
+  title: string
+  description?: string
+  priority: Priority
+  energyRequired: EnergyLevel
+  estimatedDuration: DurationMinutes
+  actualDuration?: DurationMinutes
+  keyResultId?: USOM_ID
+  timeboxId?: USOM_ID
+  tags: Tag[]
+  dueDate?: DateOnly
+  recurrence?: RecurrenceRule
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
+  notes?: Notes
 }
 
-// Domain Manifest Types
-export interface DomainManifest {
-  id: string;
-  name: string;
-  version: string;
-  supportedIntents: string[];
-  requiredFields: Record<string, string[]>; // intent -> required fields
-  subscribedEvents: string[];
-  actionSurfaceTemplates: ActionSurfaceTemplate[];
-  outboundConnectors?: OutboundConnector[];
-  inboundSources?: InboundSource[];
+// MVP stub — type only, no business logic
+export interface RecurrenceRule {
+  frequency: 'daily' | 'weekly' | 'monthly'
+  interval: number
+  endDate?: DateOnly
 }
 
-export interface ActionSurfaceTemplate {
-  intent: string;
-  type: 'guide' | 'tile' | 'cue';
-  template: string;
-  weight: number;
+// ─── 3.8 Habit ────────────────────────────────────────────────
+export interface Habit {
+  id: USOM_ID
+  status: HabitStatus
+  title: string
+  description?: string
+  frequency: HabitFrequency
+  scheduledTime: string // HH:MM
+  duration: DurationMinutes
+  startDate: DateOnly
+  endDate?: DateOnly
+  keyResultId?: USOM_ID
+  streak: number
+  longestStreak: number
+  completionRate7d: number
+  tags: Tag[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  suspendedAt?: Timestamp
+  archivedAt?: Timestamp
+  notes?: Notes
 }
 
-export interface OutboundConnector {
-  id: string;
-  trigger: string;
-  optional: boolean;
+export interface HabitFrequency {
+  type: 'daily' | 'weekly' | 'custom'
+  daysOfWeek?: number[] // 0=Sunday ... 6=Saturday
 }
 
-export interface InboundSource {
-  primary: string;
-  connectors?: string[];
-  fallback: string;
+// ─── 3.9 HabitLog ─────────────────────────────────────────────
+export interface HabitLog {
+  id: USOM_ID
+  habitId: USOM_ID
+  date: DateOnly
+  status: HabitLogStatus
+  actualDuration?: DurationMinutes
+  note?: Notes
+  loggedAt: Timestamp
+  source: 'manual' | 'connector'
+}
+
+// ─── 3.10 Timebox ─────────────────────────────────────────────
+export interface Timebox {
+  id: USOM_ID
+  status: TimeboxStatus
+  title: string
+  startTime: Timestamp
+  endTime: Timestamp
+  taskIds: USOM_ID[]
+  habitIds: USOM_ID[]
+  isRecurring: boolean
+  recurrenceRule?: RecurrenceRule
+  tags: Tag[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  startedAt?: Timestamp
+  pausedAt?: Timestamp
+  endedAt?: Timestamp
+  loggedAt?: Timestamp
+  notes?: Notes
+}
+
+// ─── 3.11 Review ──────────────────────────────────────────────
+export interface Review {
+  id: USOM_ID
+  status: ReviewStatus
+  type: PeriodType
+  periodStart: DateOnly
+  periodEnd: DateOnly
+  generatedBy: 'ai' | 'manual'
+  sections: ReviewSection[]
+  metrics: ReviewMetrics
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
+}
+
+export interface ReviewSection {
+  key: string
+  title: string
+  content: string // Markdown
+}
+
+export interface ReviewMetrics {
+  tasksCompleted: number
+  tasksTotal: number
+  habitsCompleted: number
+  habitsTotal: number
+  timeboxedHours: number
+  focusScore?: number // 0-100
 }

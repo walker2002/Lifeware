@@ -1,5 +1,8 @@
 // USOM - Unified Semantic & Object Model
-// Export all types and interfaces
+// Re-exports all types and interfaces
 
-export * from './types/objects';
-export * from './interfaces/irepository';
+export * from './types/primitives'
+export * from './types/objects'
+export * from './types/process'
+export * from './types/summaries'
+export * from './interfaces/irepository'
