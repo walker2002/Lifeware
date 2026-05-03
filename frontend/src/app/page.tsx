@@ -3,13 +3,18 @@
 import { useState, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { IntentInput } from "@/components/intent-input";
+import { IntentForm } from "@/components/intent-form";
+import type { TemplateFormFields } from "@/components/intent-form";
 import { TimeboxList } from "@/components/timebox-list";
 import type { TimeboxSummary } from "@/usom/types/summaries";
-import { submitIntent } from "./actions/intent";
+import { submitIntent, submitTemplateIntent } from "./actions/intent";
 
 // ─── 初始数据（服务端加载会在 hydration 后覆盖） ──────────────────
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
+
+/** 输入模式：AI 自然语言 或 表单 */
+type InputMode = "ai" | "form";
 
 /**
  * Home — 主页面（客户端组件）
@@ -23,22 +28,20 @@ export default function Home() {
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [mode, setMode] = useState<InputMode>("ai");
 
+  /** AI 模式提交处理 */
   const handleSubmit = useCallback(async (rawInput: string) => {
-    // 清除上一次的错误
     setError(undefined);
     setIsLoading(true);
 
     try {
       const result = await submitIntent(rawInput);
-
-      // 无论成功失败都刷新时间盒列表
       setTimeboxes(result.timeboxes);
 
       if (!result.success) {
         setError(result.error ?? "提交失败，请重试");
       } else if (result.warnings && result.warnings.length > 0) {
-        // 有警告但不阻塞，可后续展示
         setError(undefined);
       }
     } catch (err) {
@@ -48,6 +51,35 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  /** 表单模式提交处理 */
+  const handleFormSubmit = useCallback(async (fields: TemplateFormFields) => {
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      const result = await submitTemplateIntent(fields);
+      setTimeboxes(result.timeboxes);
+
+      if (!result.success) {
+        setError(result.error ?? "提交失败，请重试");
+      } else if (result.warnings && result.warnings.length > 0) {
+        setError(undefined);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "网络错误，请重试",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /** 切换输入模式 */
+  const handleModeToggle = useCallback((newMode: InputMode) => {
+    setMode(newMode);
+    setError(undefined);
   }, []);
 
   return (
@@ -60,11 +92,47 @@ export default function Home() {
           <p className="text-sm text-muted">
             在这里与 AI 对话，管理你的时间安排。
           </p>
-          <IntentInput
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-            error={error}
-          />
+
+          {/* 模式切换按钮 */}
+          <div className="flex gap-1 rounded-md bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => handleModeToggle("ai")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "ai"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              AI 对话
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeToggle("form")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "form"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              表单填写
+            </button>
+          </div>
+
+          {/* 根据模式渲染不同输入组件 */}
+          {mode === "ai" ? (
+            <IntentInput
+              onSubmit={handleSubmit}
+              isLoading={isLoading}
+              error={error}
+            />
+          ) : (
+            <IntentForm
+              onSubmit={handleFormSubmit}
+              isLoading={isLoading}
+              error={error}
+            />
+          )}
         </div>
       }
       mainContent={
