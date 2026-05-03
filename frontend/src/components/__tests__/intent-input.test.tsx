@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { IntentInput } from "@/components/intent-input";
+import { IntentInput } from "../intent-input";
 
 describe("IntentInput", () => {
   it("渲染输入框和提交按钮", () => {
