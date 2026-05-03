@@ -12,10 +12,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@/lib": path.resolve(__dirname, "./src/lib"),
-      "@/usom": path.resolve(__dirname, "./src/usom"),
-      "@/nexus": path.resolve(__dirname, "./src/nexus"),
-      "@/domains": path.resolve(__dirname, "./src/domains"),
     },
   },
 })
