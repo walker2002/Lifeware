@@ -1,14 +1,17 @@
 import { defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
-import { fileURLToPath, URL } from "node:url"
+import { fileURLToPath } from "node:url"
+import path from "node:path"
 
-const srcDir = fileURLToPath(new URL("./src", import.meta.url))
+// vitest.config.ts 始终在 frontend/ 目录下
+// import.meta.url 在 vitest 加载此文件时解析为该文件的 URL
+const configDir = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": srcDir,
+      "@": path.resolve(configDir, "src"),
     },
   },
   test: {
@@ -18,8 +21,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     server: {
       deps: {
-        // Force Vite to process all source files through the alias resolver
-        inline: [srcDir],
+        inline: [path.resolve(configDir, "src")],
       },
     },
   },
