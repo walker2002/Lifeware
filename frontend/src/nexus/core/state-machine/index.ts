@@ -30,6 +30,7 @@ export interface TimeboxStateMachine {
   execute(
     proposal: StateProposal,
     eventBus: EventBus,
+    userId: USOM_ID,
   ): Promise<StateMachineResult>
 }
 
@@ -38,7 +39,7 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
   const { timeboxRepo, eventRepo } = deps
 
   return {
-    async execute(proposal, eventBus): Promise<StateMachineResult> {
+    async execute(proposal, eventBus, userId): Promise<StateMachineResult> {
       // 1. 查找转换规则
       //    创建时 fromState = null（没有已有对象）
       //    其余操作需要从 proposal.targetObject.id 加载当前对象获取 fromState
@@ -72,7 +73,7 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
       }
 
       // 3. 持久化 Timebox（R-01 Repository Pattern）
-      await timeboxRepo.save(timebox)
+      await timeboxRepo.save(timebox, userId)
 
       // 4. 构造 SystemEvent
       const event: SystemEvent = {
@@ -91,7 +92,7 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
       }
 
       // 5. 持久化事件
-      await eventRepo.append(event)
+      await eventRepo.append(event, userId)
 
       // 6. 发布事件到 EventBus
       eventBus.publish(event)

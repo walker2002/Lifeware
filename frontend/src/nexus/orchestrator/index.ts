@@ -12,8 +12,8 @@ import type {
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
-import { createTimeboxStateMachine } from '@/nexus/core/state-machine'
-import { createEventBus } from '@/nexus/infrastructure/event-bus'
+import { createTimeboxStateMachine } from '../core/state-machine'
+import { createEventBus } from '../infrastructure/event-bus'
 
 // ─── Stub 接口（未实现的组件）──────────────────────────────────
 
@@ -149,7 +149,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       // Step 5: 执行状态机
-      const smResult = await stateMachine.execute(proposal, eventBus)
+      const smResult = await stateMachine.execute(proposal, eventBus, userId)
       if (!smResult.success) {
         return { success: false, error: smResult.error }
       }

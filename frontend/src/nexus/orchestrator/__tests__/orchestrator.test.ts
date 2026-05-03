@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ContextSnapshot, SystemEvent } from '@/usom/types/process'
 import type { USOM_ID } from '@/usom/types/primitives'
-import { createOrchestrator } from '@/nexus/orchestrator'
+import { createOrchestrator } from '../index'
 
 // ─── 测试用 mock 工厂 ─────────────────────────────────────────
 
@@ -118,9 +118,9 @@ describe('createOrchestrator', () => {
     expect(ruleEngine.evaluate).toHaveBeenCalledTimes(1)
     expect(ruleEngine.evaluate).toHaveBeenCalledWith(mockIntent, expect.any(Object))
 
-    // Assert: 持久化被调用（StateMachine 内部调用，不传 userId — T-03）
-    expect(timeboxRepo.save).toHaveBeenCalledWith(timebox)
-    expect(eventRepo.append).toHaveBeenCalledWith(expect.any(Object))
+    // Assert: 持久化被调用（T-03: userId 由 Orchestrator 注入）
+    expect(timeboxRepo.save).toHaveBeenCalledWith(timebox, userId)
+    expect(eventRepo.append).toHaveBeenCalledWith(expect.any(Object), userId)
   })
 
   it('RuleEngine 返回 confirm → needsConfirmation=true，不创建 timebox', async () => {

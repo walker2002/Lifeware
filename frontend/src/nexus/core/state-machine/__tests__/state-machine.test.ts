@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StateProposal, SystemEvent } from '@/usom/types/process'
 import type { Timebox } from '@/usom/types/objects'
+import type { USOM_ID } from '@/usom/types/primitives'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import { createTimeboxStateMachine } from '../index'
@@ -134,6 +135,7 @@ describe('State Machine — transitions 表', () => {
 })
 
 describe('State Machine — execute', () => {
+  const userId = 'user-001' as USOM_ID
   // 1. 从 proposal 创建 timebox → 返回 planned timebox + TimeboxCreated event
   it('创建 timebox 后应返回 status=planned 的对象及 TimeboxCreated 事件', async () => {
     const { timeboxRepo, eventRepo, savedTimeboxes, savedEvents } = makeMockRepos()
@@ -141,7 +143,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
     const proposal = makeCreateProposal()
 
-    const result = await sm.execute(proposal, eventBus)
+    const result = await sm.execute(proposal, eventBus, userId)
 
     expect(result.success).toBe(true)
     expect(result.object).toBeDefined()
@@ -159,7 +161,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
 
     const proposal = makeCreateProposal({ action: 'destroy' })
-    const result = await sm.execute(proposal, eventBus)
+    const result = await sm.execute(proposal, eventBus, userId)
 
     expect(result.success).toBe(false)
     expect(result.error).toContain('destroy')
@@ -174,7 +176,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
     const proposal = makeCreateProposal()
 
-    const result = await sm.execute(proposal, eventBus)
+    const result = await sm.execute(proposal, eventBus, userId)
 
     const timebox = result.object!
     expect(timebox.title).toBe('专注写作')
@@ -203,7 +205,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
     const proposal = makeCreateProposal()
 
-    const result = await sm.execute(proposal, eventBus)
+    const result = await sm.execute(proposal, eventBus, userId)
 
     expect(eventBus.publish).toHaveBeenCalledOnce()
     expect(publishedEvents).toHaveLength(1)
@@ -219,7 +221,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
     const proposal = makeCreateProposal()
 
-    await sm.execute(proposal, eventBus)
+    await sm.execute(proposal, eventBus, userId)
 
     expect(timeboxRepo.save).toHaveBeenCalledOnce()
     expect(savedTimeboxes).toHaveLength(1)
@@ -233,7 +235,7 @@ describe('State Machine — execute', () => {
     const sm = createTimeboxStateMachine({ timeboxRepo, eventRepo })
     const proposal = makeCreateProposal()
 
-    await sm.execute(proposal, eventBus)
+    await sm.execute(proposal, eventBus, userId)
 
     expect(eventRepo.append).toHaveBeenCalledOnce()
     expect(savedEvents).toHaveLength(1)
