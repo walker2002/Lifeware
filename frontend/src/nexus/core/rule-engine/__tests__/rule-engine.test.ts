@@ -49,14 +49,14 @@ function makeSnapshot(): ContextSnapshot {
 // ─── 测试用例 ──────────────────────────────────────────────────
 
 describe('createRuleEngine', () => {
-  it('有效的 timebox intent → 评估通过（pass）', () => {
+  it('有效的 timebox intent → 评估通过（pass）', async () => {
     // Arrange
     const engine = createRuleEngine()
     const intent = makeIntent()
     const snapshot = makeSnapshot()
 
     // Act
-    const result = engine.evaluate(intent, snapshot)
+    const result = await engine.evaluate(intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('pass')
@@ -64,35 +64,35 @@ describe('createRuleEngine', () => {
     expect(result.confirmations).toEqual([])
   })
 
-  it('缺少必需字段的 intent → 返回 warning', () => {
+  it('缺少必需字段的 intent → 返回 warning', async () => {
     // Arrange
     const engine = createRuleEngine()
     const intent = makeIntent({ title: undefined })
     const snapshot = makeSnapshot()
 
     // Act
-    const result = engine.evaluate(intent, snapshot)
+    const result = await engine.evaluate(intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
-  it('时长超出范围的 intent → 返回 warning', () => {
+  it('时长超出范围的 intent → 返回 warning', async () => {
     // Arrange
     const engine = createRuleEngine()
     const intent = makeIntent({ duration: 500 })
     const snapshot = makeSnapshot()
 
     // Act
-    const result = engine.evaluate(intent, snapshot)
+    const result = await engine.evaluate(intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
-  it('过去时间的 intent → 返回 warning', () => {
+  it('过去时间的 intent → 返回 warning', async () => {
     // Arrange
     const engine = createRuleEngine()
     const intent = makeIntent({
@@ -101,13 +101,13 @@ describe('createRuleEngine', () => {
     const snapshot = makeSnapshot()
 
     // Act
-    const result = engine.evaluate(intent, snapshot)
+    const result = await engine.evaluate(intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
   })
 
-  it('多处违规 → 聚合所有 warning 消息', () => {
+  it('多处违规 → 聚合所有 warning 消息', async () => {
     // Arrange
     const engine = createRuleEngine()
     const intent = makeIntent({
@@ -118,11 +118,24 @@ describe('createRuleEngine', () => {
     const snapshot = makeSnapshot()
 
     // Act
-    const result = engine.evaluate(intent, snapshot)
+    const result = await engine.evaluate(intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
     // 至少 3 条 warning（字段完整性、时长范围、过去时间）
     expect(result.warnings.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('无 deps 参数时使用基础规则集（不含 TimeOverlapRule）', async () => {
+    // Arrange: 不传 deps，只有基础同步规则
+    const engine = createRuleEngine()
+    const intent = makeIntent()
+    const snapshot = makeSnapshot()
+
+    // Act: 应该正常工作，不会因为缺少 repo 而报错
+    const result = await engine.evaluate(intent, snapshot)
+
+    // Assert
+    expect(result.severity).toBe('pass')
   })
 })

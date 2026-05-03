@@ -20,8 +20,8 @@ interface ValidationErrors {
 }
 
 interface IntentFormProps {
-  /** 提交回调，接收已验证的表单字段 */
-  onSubmit: (fields: TemplateFormFields) => void;
+  /** 提交回调，接收已验证的表单字段和可选的确认标志 */
+  onSubmit: (fields: TemplateFormFields, confirmed?: boolean) => void;
   /** 是否正在加载 */
   isLoading: boolean;
   /** 服务端错误信息 */

@@ -61,7 +61,7 @@ describe('evaluateRules', () => {
   const intent = makeIntent()
   const snapshot = makeSnapshot()
 
-  it('所有规则通过 → 返回 pass', () => {
+  it('所有规则通过 → 返回 pass', async () => {
     // Arrange
     const rules: Rule[] = [
       createMockRule('规则A', { severity: 'pass' }),
@@ -69,7 +69,7 @@ describe('evaluateRules', () => {
     ]
 
     // Act
-    const result = evaluateRules(rules, intent, snapshot)
+    const result = await evaluateRules(rules, intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('pass')
@@ -77,7 +77,7 @@ describe('evaluateRules', () => {
     expect(result.confirmations).toEqual([])
   })
 
-  it('一条规则返回 warning → 返回 warning 并附带消息', () => {
+  it('一条规则返回 warning → 返回 warning 并附带消息', async () => {
     // Arrange
     const rules: Rule[] = [
       createMockRule('规则A', { severity: 'pass' }),
@@ -85,7 +85,7 @@ describe('evaluateRules', () => {
     ]
 
     // Act
-    const result = evaluateRules(rules, intent, snapshot)
+    const result = await evaluateRules(rules, intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
@@ -93,7 +93,7 @@ describe('evaluateRules', () => {
     expect(result.confirmations).toEqual([])
   })
 
-  it('一条规则返回 confirm → 返回 confirm 并附带消息', () => {
+  it('一条规则返回 confirm → 返回 confirm 并附带消息', async () => {
     // Arrange
     const rules: Rule[] = [
       createMockRule('规则A', { severity: 'pass' }),
@@ -101,7 +101,7 @@ describe('evaluateRules', () => {
     ]
 
     // Act
-    const result = evaluateRules(rules, intent, snapshot)
+    const result = await evaluateRules(rules, intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('confirm')
@@ -109,7 +109,7 @@ describe('evaluateRules', () => {
     expect(result.warnings).toEqual([])
   })
 
-  it('多条 warning → 返回最高严重级别 warning 并附带所有消息', () => {
+  it('多条 warning → 返回最高严重级别 warning 并附带所有消息', async () => {
     // Arrange
     const rules: Rule[] = [
       createMockRule('规则A', { severity: 'warning', message: '缺少标题' }),
@@ -118,7 +118,7 @@ describe('evaluateRules', () => {
     ]
 
     // Act
-    const result = evaluateRules(rules, intent, snapshot)
+    const result = await evaluateRules(rules, intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('warning')
@@ -126,7 +126,7 @@ describe('evaluateRules', () => {
     expect(result.confirmations).toEqual([])
   })
 
-  it('warning + confirm → confirm 为最高严重级别', () => {
+  it('warning + confirm → confirm 为最高严重级别', async () => {
     // Arrange
     const rules: Rule[] = [
       createMockRule('规则A', { severity: 'warning', message: '持续时间偏长' }),
@@ -134,7 +134,7 @@ describe('evaluateRules', () => {
     ]
 
     // Act
-    const result = evaluateRules(rules, intent, snapshot)
+    const result = await evaluateRules(rules, intent, snapshot)
 
     // Assert: confirm > warning
     expect(result.severity).toBe('confirm')
@@ -142,13 +142,32 @@ describe('evaluateRules', () => {
     expect(result.warnings).toEqual(['持续时间偏长'])
   })
 
-  it('空规则数组 → 返回 pass', () => {
+  it('空规则数组 → 返回 pass', async () => {
     // Act
-    const result = evaluateRules([], intent, snapshot)
+    const result = await evaluateRules([], intent, snapshot)
 
     // Assert
     expect(result.severity).toBe('pass')
     expect(result.warnings).toEqual([])
     expect(result.confirmations).toEqual([])
+  })
+
+  it('支持异步规则', async () => {
+    // Arrange
+    const asyncRule: Rule = {
+      name: 'AsyncRule',
+      evaluate: async () => {
+        // 模拟异步操作
+        await new Promise((r) => setTimeout(r, 1))
+        return { severity: 'warning', message: '异步警告' }
+      },
+    }
+
+    // Act
+    const result = await evaluateRules([asyncRule], intent, snapshot)
+
+    // Assert
+    expect(result.severity).toBe('warning')
+    expect(result.warnings).toEqual(['异步警告'])
   })
 })

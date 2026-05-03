@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 interface IntentInputProps {
-  /** 提交回调，接收用户原始输入 */
-  onSubmit: (rawInput: string) => void;
+  /** 提交回调，接收用户原始输入和可选的确认标志 */
+  onSubmit: (rawInput: string, confirmed?: boolean) => void;
   /** 是否正在加载 */
   isLoading: boolean;
   /** 错误信息，设置时显示在输入框下方 */

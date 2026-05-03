@@ -56,48 +56,48 @@ describe('FieldCompletenessRule', () => {
   const rule = FieldCompletenessRule
   const snapshot = makeSnapshot()
 
-  it('所有必需字段存在 → pass', () => {
+  it('所有必需字段存在 → pass', async () => {
     const intent = makeIntent()
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('缺少 title → warning', () => {
+  it('缺少 title → warning', async () => {
     const intent = makeIntent({ title: undefined })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('title')
     }
   })
 
-  it('缺少 startTime → warning', () => {
+  it('缺少 startTime → warning', async () => {
     const intent = makeIntent({ startTime: undefined })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('startTime')
     }
   })
 
-  it('缺少 duration → warning', () => {
+  it('缺少 duration → warning', async () => {
     const intent = makeIntent({ duration: undefined })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('duration')
     }
   })
 
-  it('title 为空字符串 → warning', () => {
+  it('title 为空字符串 → warning', async () => {
     const intent = makeIntent({ title: '' })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
   })
 
-  it('多个字段缺失 → warning 列出所有缺失字段', () => {
+  it('多个字段缺失 → warning 列出所有缺失字段', async () => {
     const intent = makeIntent({ title: undefined, duration: undefined })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('title')
@@ -112,51 +112,51 @@ describe('DurationRangeRule', () => {
   const rule = DurationRangeRule
   const snapshot = makeSnapshot()
 
-  it('有效时长 120 分钟 → pass', () => {
+  it('有效时长 120 分钟 → pass', async () => {
     const intent = makeIntent({ duration: 120 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('时长下界 5 分钟 → pass', () => {
+  it('时长下界 5 分钟 → pass', async () => {
     const intent = makeIntent({ duration: 5 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('时长上界 480 分钟 → pass', () => {
+  it('时长上界 480 分钟 → pass', async () => {
     const intent = makeIntent({ duration: 480 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('duration=0 → warning', () => {
+  it('duration=0 → warning', async () => {
     const intent = makeIntent({ duration: 0 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('duration')
     }
   })
 
-  it('duration=500 → warning（超过 480 分钟上限）', () => {
+  it('duration=500 → warning（超过 480 分钟上限）', async () => {
     const intent = makeIntent({ duration: 500 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('duration')
     }
   })
 
-  it('duration=-10 → warning（负值）', () => {
+  it('duration=-10 → warning（负值）', async () => {
     const intent = makeIntent({ duration: -10 })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
   })
 
-  it('duration 为非数字 → warning', () => {
+  it('duration 为非数字 → warning', async () => {
     const intent = makeIntent({ duration: 'abc' })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
   })
 })
@@ -167,34 +167,34 @@ describe('StartTimeInFutureRule', () => {
   const rule = StartTimeInFutureRule
   const snapshot = makeSnapshot()
 
-  it('未来时间 → pass', () => {
+  it('未来时间 → pass', async () => {
     const intent = makeIntent({
       startTime: new Date(Date.now() + 3600000).toISOString(),
     })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('过去时间 → warning', () => {
+  it('过去时间 → warning', async () => {
     const intent = makeIntent({
       startTime: new Date(Date.now() - 3600000).toISOString(),
     })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('startTime')
     }
   })
 
-  it('无效的 startTime 格式 → warning', () => {
+  it('无效的 startTime 格式 → warning', async () => {
     const intent = makeIntent({ startTime: 'not-a-date' })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
   })
 
-  it('startTime 缺失 → pass（由 FieldCompletenessRule 负责）', () => {
+  it('startTime 缺失 → pass（由 FieldCompletenessRule 负责）', async () => {
     const intent = makeIntent({ startTime: undefined })
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 })

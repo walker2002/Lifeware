@@ -15,7 +15,7 @@ export type RuleResult =
 /** 规则定义 */
 export interface Rule {
   name: string
-  evaluate(intent: StructuredIntent, snapshot: ContextSnapshot): RuleResult
+  evaluate(intent: StructuredIntent, snapshot: ContextSnapshot): RuleResult | Promise<RuleResult>
 }
 
 // ─── 聚合结果类型 ─────────────────────────────────────────────
@@ -54,7 +54,7 @@ function higherSeverity(
  * 顺序执行规则数组，聚合所有结果
  *
  * 评估逻辑：
- * 1. 逐条执行规则，收集 warning 和 confirm 消息
+ * 1. 逐条执行规则（支持异步），收集 warning 和 confirm 消息
  * 2. 返回最高严重级别作为聚合结果的 severity
  * 3. 即使遇到 confirm 也不中断，继续评估以收集所有问题
  *
@@ -63,17 +63,17 @@ function higherSeverity(
  * @param snapshot - 当前上下文快照
  * @returns 聚合评估结果
  */
-export function evaluateRules(
+export async function evaluateRules(
   rules: Rule[],
   intent: StructuredIntent,
   snapshot: ContextSnapshot,
-): AggregatedResult {
+): Promise<AggregatedResult> {
   let highestSeverity: 'pass' | 'warning' | 'confirm' = 'pass'
   const warnings: string[] = []
   const confirmations: string[] = []
 
   for (const rule of rules) {
-    const result = rule.evaluate(intent, snapshot)
+    const result = await rule.evaluate(intent, snapshot)
 
     switch (result.severity) {
       case 'warning':
