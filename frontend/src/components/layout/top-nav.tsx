@@ -1,21 +1,38 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
+
+interface TopNavProps {
+  /** 移动端菜单按钮回调（打开侧边面板） */
+  onMenuClick?: () => void;
+}
 
 /**
  * TopNav — 顶部导航栏（64px 固定高度）
  *
  * 显示 Lifeware 品牌标识和右侧图标导航按钮。
- * 使用 "use client" 标记，为后续交互功能预留。
+ * 移动端显示汉堡菜单按钮，点击展开 AI 面板。
  */
-export function TopNav() {
+export function TopNav({ onMenuClick }: TopNavProps) {
   return (
     <header
       className="flex h-16 items-center justify-between border-b border-hairline bg-canvas px-4"
       role="banner"
     >
-      {/* 左侧：品牌标识 */}
+      {/* 左侧：汉堡菜单（仅移动端）+ 品牌标识 */}
       <div className="flex items-center gap-2">
+        {onMenuClick && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="md:hidden"
+            onClick={onMenuClick}
+            aria-label="打开菜单"
+          >
+            <Menu className="size-5 text-muted" />
+          </Button>
+        )}
         <span
           className="font-display text-xl font-medium text-ink"
           aria-label="Lifeware"

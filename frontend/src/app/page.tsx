@@ -60,7 +60,14 @@ export default function Home() {
     setConfirmation(null);
 
     if (!result.success) {
-      setError(result.error ?? "提交失败，请重试");
+      // 检测 AI 解析失败，建议切换到表单模式
+      const errorMsg = result.error ?? "提交失败，请重试";
+      const isAiParseError = /解析|AI|无法理解|无法识别/.test(errorMsg) && mode === "ai";
+      if (isAiParseError) {
+        setError(`${errorMsg} — 解析失败，请尝试表单模式`);
+      } else {
+        setError(errorMsg);
+      }
     } else {
       setError(undefined);
     }
