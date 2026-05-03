@@ -36,7 +36,7 @@ interface RuleEngine {
 
 /** 动作面引擎 — 生成 ActionSurface */
 interface ActionSurfaceEngine {
-  generate(snapshot: ContextSnapshot, event?: SystemEvent): Promise<ActionSurface>
+  generate(snapshot: ContextSnapshot, event?: SystemEvent, userId?: USOM_ID): Promise<ActionSurface>
 }
 
 // ─── 结果类型 ─────────────────────────────────────────────────
@@ -114,10 +114,11 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
     /**
      * 执行 Nexus 管道
-     * @param rawInput 用户的原始输入文本
-     * @param userId 当前用户 ID
+     * @param rawInput  用户的原始输入文本
+     * @param userId    当前用户 ID
+     * @param confirmed 用户是否已确认（用于 confirm 结果后重新提交）
      */
-    async execute(rawInput: string, userId: USOM_ID): Promise<OrchestratorResult> {
+    async execute(rawInput: string, userId: USOM_ID, confirmed?: boolean): Promise<OrchestratorResult> {
       // Step 1: 解析意图
       const intent = await deps.intentEngine.parse(rawInput, userId)
 
@@ -127,7 +128,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // Step 3: 规则评估
       const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
 
-      if (ruleResult.result === 'confirm') {
+      if (ruleResult.result === 'confirm' && !confirmed) {
         return {
           success: false,
           needsConfirmation: true,
@@ -154,12 +155,16 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         return { success: false, error: smResult.error }
       }
 
-      // Step 6: (Phase 2) 生成 ActionSurface
-      // const actionSurface = await deps.actionSurfaceEngine?.generate(snapshot, smResult.event)
+      // Step 6: 生成 ActionSurface
+      let actionSurface: ActionSurface | undefined
+      if (deps.actionSurfaceEngine) {
+        actionSurface = await deps.actionSurfaceEngine.generate(snapshot, smResult.event, userId)
+      }
 
       return {
         success: true,
         timebox: smResult.object,
+        actionSurface,
         warnings: ruleResult.warnings,
       }
     },

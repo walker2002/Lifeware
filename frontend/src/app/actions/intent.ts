@@ -3,6 +3,7 @@
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { Timebox } from "@/usom/types/objects";
 import type { Timestamp } from "@/usom/types/primitives";
+import type { ActionSurface } from "@/usom/types/process";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { TimeboxRepository } from "@/lib/db/repositories/timebox.repository";
@@ -13,6 +14,8 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent } from "../../nexus/core/intent-engine";
 import { parseTemplateForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
+import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
+import { timeboxPlugin } from "../../domains/timebox";
 import { eq, desc } from "drizzle-orm";
 
 // ─── 类型定义 ───────────────────────────────────────────────────
@@ -22,12 +25,16 @@ export interface IntentSubmissionResult {
   success: boolean;
   /** 最新的时间盒列表（供前端刷新） */
   timeboxes: TimeboxSummary[];
+  /** 动作面（Action Surface Engine 生成） */
+  actionSurface?: ActionSurface;
   /** 错误信息 */
   error?: string;
   /** 规则引擎的警告 */
   warnings?: string[];
   /** 是否需要用户确认 */
   needsConfirmation?: boolean;
+  /** 确认提示消息 */
+  confirmationMessage?: string;
 }
 
 // ─── MVP 用户 ID ────────────────────────────────────────────────
@@ -93,6 +100,7 @@ async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
  */
 export async function submitIntent(
   rawInput: string,
+  confirmed?: boolean,
 ): Promise<IntentSubmissionResult> {
   try {
     // Step 1: 创建 Intention 记录
@@ -126,7 +134,7 @@ export async function submitIntent(
     // Step 3-4: 创建 Orchestrator 并执行管道
     const timeboxRepo = new TimeboxRepository();
     const eventRepo = new SystemEventRepository();
-    const ruleEngine = createRuleEngine();
+    const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
     const orchestrator = createOrchestrator({
       timeboxRepo,
@@ -137,7 +145,7 @@ export async function submitIntent(
       },
       ruleEngine: {
         evaluate: async (intent, snapshot) => {
-          const result = ruleEngine.evaluate(intent, snapshot);
+          const result = await ruleEngine.evaluate(intent, snapshot);
           return {
             result: result.severity,
             warnings: result.warnings,
@@ -145,9 +153,10 @@ export async function submitIntent(
           };
         },
       },
+      actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
     });
 
-    const result = await orchestrator.execute(rawInput, MVP_USER_ID);
+    const result = await orchestrator.execute(rawInput, MVP_USER_ID, confirmed);
 
     // Step 5: 获取最新时间盒列表
     const timeboxes = await fetchTimeboxSummaries();
@@ -158,12 +167,14 @@ export async function submitIntent(
         timeboxes,
         error: result.error,
         needsConfirmation: result.needsConfirmation,
+        confirmationMessage: result.confirmationMessage,
       };
     }
 
     return {
       success: true,
       timeboxes,
+      actionSurface: result.actionSurface,
       warnings: result.warnings,
     };
   } catch (err) {
@@ -187,6 +198,7 @@ export async function submitIntent(
  */
 export async function submitTemplateIntent(
   fields: TemplateFormFields,
+  confirmed?: boolean,
 ): Promise<IntentSubmissionResult> {
   try {
     // Step 1: 创建 Intention 记录
@@ -211,7 +223,7 @@ export async function submitTemplateIntent(
     // Step 3-4: 创建 Orchestrator 并执行管道
     const timeboxRepo = new TimeboxRepository();
     const eventRepo = new SystemEventRepository();
-    const ruleEngine = createRuleEngine();
+    const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
     const orchestrator = createOrchestrator({
       timeboxRepo,
@@ -222,7 +234,7 @@ export async function submitTemplateIntent(
       },
       ruleEngine: {
         evaluate: async (intentEval, snapshot) => {
-          const result = ruleEngine.evaluate(intentEval, snapshot);
+          const result = await ruleEngine.evaluate(intentEval, snapshot);
           return {
             result: result.severity,
             warnings: result.warnings,
@@ -230,11 +242,13 @@ export async function submitTemplateIntent(
           };
         },
       },
+      actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
     });
 
     const result = await orchestrator.execute(
       `[表单] ${fields.title}`,
       MVP_USER_ID,
+      confirmed,
     );
 
     // Step 5: 获取最新时间盒列表
@@ -246,12 +260,14 @@ export async function submitTemplateIntent(
         timeboxes,
         error: result.error,
         needsConfirmation: result.needsConfirmation,
+        confirmationMessage: result.confirmationMessage,
       };
     }
 
     return {
       success: true,
       timeboxes,
+      actionSurface: result.actionSurface,
       warnings: result.warnings,
     };
   } catch (err) {

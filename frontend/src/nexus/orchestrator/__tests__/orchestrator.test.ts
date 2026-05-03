@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import type { StructuredIntent } from '@/usom/types/objects'
-import type { ContextSnapshot, SystemEvent } from '@/usom/types/process'
+import type { ActionSurface, ContextSnapshot } from '@/usom/types/process'
 import type { USOM_ID } from '@/usom/types/primitives'
 import { createOrchestrator } from '../index'
 
@@ -151,6 +151,57 @@ describe('createOrchestrator', () => {
     expect(eventRepo.append).not.toHaveBeenCalled()
   })
 
+  it('confirm + confirmed=true → 继续创建 timebox', async () => {
+    // Arrange
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('confirm')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    // Act: 传入 confirmed=true
+    const result = await orchestrator.execute('安排时间盒', userId, true)
+
+    // Assert: 管道继续执行，成功创建 timebox
+    expect(result.success).toBe(true)
+    expect(result.timebox).toBeDefined()
+    expect(result.needsConfirmation).toBeFalsy()
+
+    // Assert: 持久化被调用
+    expect(timeboxRepo.save).toHaveBeenCalledTimes(1)
+    expect(eventRepo.append).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirm + confirmed=false → needsConfirmation=true，不创建 timebox', async () => {
+    // Arrange
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('confirm')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    // Act: 传入 confirmed=false
+    const result = await orchestrator.execute('安排时间盒', userId, false)
+
+    // Assert
+    expect(result.success).toBe(false)
+    expect(result.needsConfirmation).toBe(true)
+    expect(result.timebox).toBeUndefined()
+    expect(timeboxRepo.save).not.toHaveBeenCalled()
+  })
+
   it('State Machine 失败 → 返回错误', async () => {
     // Arrange: 创建一个会导致状态机失败的 intent（action 不是 create）
     const badIntent = createMockIntent({ action: 'start' })
@@ -202,5 +253,82 @@ describe('createOrchestrator', () => {
     // Assert: 后续步骤未被调用
     expect(ruleEngine.evaluate).not.toHaveBeenCalled()
     expect(timeboxRepo.save).not.toHaveBeenCalled()
+  })
+
+  it('ActionSurfaceEngine 可用时，成功结果包含 actionSurface', async () => {
+    // Arrange
+    const mockIntent = createMockIntent()
+    const intentEngine = createMockIntentEngine(mockIntent)
+    const ruleEngine = createMockRuleEngine('pass')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const mockActionSurface: ActionSurface = {
+      id: 'surface-001' as USOM_ID,
+      userId,
+      snapshotId: 'snapshot-001' as USOM_ID,
+      generatedAt: '2026-05-03T08:00:00Z',
+      guide: [],
+      tiles: [
+        {
+          id: 'action-001' as USOM_ID,
+          sourceObjectId: 'tb-001' as USOM_ID,
+          sourceObjectType: 'timebox',
+          label: '进行中: 专注工作',
+          actionType: 'start_timebox',
+          category: 'tile',
+          weight: 90,
+        },
+      ],
+      cues: [],
+    }
+
+    const actionSurfaceEngine = {
+      generate: vi.fn().mockResolvedValue(mockActionSurface),
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+      actionSurfaceEngine,
+    })
+
+    // Act
+    const result = await orchestrator.execute('明天早上9点到11点安排专注工作', userId)
+
+    // Assert
+    expect(result.success).toBe(true)
+    expect(result.actionSurface).toBeDefined()
+    expect(result.actionSurface!.tiles).toHaveLength(1)
+    expect(result.actionSurface!.tiles[0].label).toBe('进行中: 专注工作')
+
+    // Assert: actionSurfaceEngine.generate 被正确调用
+    expect(actionSurfaceEngine.generate).toHaveBeenCalledTimes(1)
+  })
+
+  it('ActionSurfaceEngine 不可用时，结果不含 actionSurface', async () => {
+    // Arrange
+    const mockIntent = createMockIntent()
+    const intentEngine = createMockIntentEngine(mockIntent)
+    const ruleEngine = createMockRuleEngine('pass')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+      // 不传 actionSurfaceEngine
+    })
+
+    // Act
+    const result = await orchestrator.execute('明天早上9点到11点安排专注工作', userId)
+
+    // Assert
+    expect(result.success).toBe(true)
+    expect(result.actionSurface).toBeUndefined()
   })
 })
