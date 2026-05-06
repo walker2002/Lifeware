@@ -222,3 +222,121 @@ T059: page.tsx 整合 → 依赖 T055, T058
 - react-big-calendar 需要额外的 CSS 导入（在 CalendarView 中处理）
 - 追踪日志默认关闭，不引入性能开销
 - 每个 Phase 完成后应提交 git commit
+
+---
+
+## Phase 8: Foundational Update — 三栏视图基础 (DateViewMode)
+
+**Purpose**: 更新类型定义，为三栏视图做准备
+
+**⚠️ CRITICAL**: 必须在三栏视图 User Story 工作开始前完成
+
+- [ ] T066 修改 `frontend/src/components/timebox/types.ts`：将 `ViewMode = 'today' | 'calendar'` 更新为 `DateViewMode = 'day' | 'week' | 'month'`，删除旧 ViewMode 类型
+- [ ] T067 [P] 修改 `frontend/src/app/actions/intent.ts`：扩展 `fetchTimeboxSummaries()` 为 `fetchTimeboxSummariesByRange(start: Timestamp, end: Timestamp)`，接受任意日期范围参数，原 `fetchTimeboxSummaries` 改为调用新函数并传入当天范围
+
+**Checkpoint**: DateViewMode 类型就绪，Server Action 支持按日期范围查询
+
+---
+
+## Phase 9: User Story 6 (spec.md) — 三栏时间盒视图 (Priority: P1)
+
+**Goal**: 将 MainContent 从"今日模式/日历模式"切换改为统一的日/周/月三模式视图。日视图三栏（列表 + 时间轴 + 小日历），周/月视图全宽日历。顶部 DateNav 日期导航支持翻页。
+
+**Independent Test**: 打开首页默认显示日视图三栏，切换周/月后显示对应日历，前后翻页切换日期范围
+
+### Implementation for US6 (spec.md)
+
+- [ ] T068 [P] [US6] 创建 DateNav 组件到 `frontend/src/components/timebox/date-nav.tsx`（接收 mode: DateViewMode、currentDate、onModeChange、onNavigate，左侧渲染前进/后退按钮 + 当前日期文本（日模式显示"YYYY年M月D日"、周模式显示"M月D日 - M月D日"、月模式显示"YYYY年M月"），右侧渲染日/周/月切换按钮，使用 DESIGN.md category-tab 样式）
+- [ ] T069 [P] [US6] 创建 MiniCalendar 组件到 `frontend/src/components/timebox/mini-calendar.tsx`（小型月历网格，接收 currentDate、selectedDate、timeboxes、onDateSelect，高亮当前日期和选中日期，有时间盒的日期显示小圆点标记，宽度适配右栏约 280px，使用 DESIGN.md 设计令牌颜色）
+- [ ] T070 [US6] 创建 DayView 组件到 `frontend/src/components/timebox/day-view.tsx`（CSS Grid 三栏 30%/40%/30%，左列渲染 TimeboxList(compact)，中列渲染 TimeboxTimeline，右列渲染 MiniCalendar，timeboxes 按 startTime 排序，接收 currentDate prop）
+- [ ] T071 [P] [US6] 创建 WeekView 组件到 `frontend/src/components/timebox/week-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar week view，接收 timeboxes + currentDate，计算当周周一至周日范围，事件块使用项目设计令牌颜色，高度 500px+）
+- [ ] T072 [P] [US6] 创建 MonthView 组件到 `frontend/src/components/timebox/month-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar month view，接收 timeboxes + currentDate，计算当月范围，事件块使用项目设计令牌颜色，高度 500px+）
+- [ ] T073 [US6] 重构 `frontend/src/app/page.tsx`：移除 ViewModeToggle/TodayView/CalendarView 引用，新增 dateMode(DateViewMode) 和 currentDate(Date) 状态（默认 'day' 和 new Date()），根据 dateMode 渲染 DayView/WeekView/MonthView，传入 DateNav + 视图组件，根据 dateMode 计算日期范围调用 Server Action 获取 timeboxes
+- [ ] T074 [US6] 删除不再需要的组件：`frontend/src/components/timebox/view-mode-toggle.tsx`、`frontend/src/components/timebox/today-view.tsx`，重构 `frontend/src/components/timebox/calendar-view.tsx` 为 WeekView + MonthView 的共享样式提取（或删除）
+
+**Checkpoint**: 打开首页显示日视图三栏（列表 + 时间轴 + 小日历），点击"周"切换到周日历，点击"月"切换到月日历，前后翻页切换日期
+
+---
+
+## Phase 10: 三栏视图 Polish
+
+**Purpose**: 响应式适配、边界处理、空状态
+
+- [ ] T075 实现三栏视图移动端响应式：DayView 三栏折叠为单栏（隐藏 MiniCalendar），DateNav 隐藏"周"选项（`< 768px` 时仅显示日/月），修改 `frontend/src/components/timebox/date-nav.tsx` 和 `frontend/src/components/timebox/day-view.tsx`
+- [ ] T076 [P] 添加三栏视图空状态处理：日视图无时间盒时列表和时间轴显示空提示，周/月视图无事件时显示空日历，MiniCalendar 无事件时不显示标记点
+- [ ] T077 更新 `specs/002-timebox-slice/quickstart.md`：扩展验证清单，覆盖三栏视图的日/周/月切换、翻页、移动端响应式验证项
+
+---
+
+## Dependencies & Execution Order (Updated)
+
+### Phase Dependencies (Full)
+
+- **Setup (Phase 1)**: 无依赖 — 已完成
+- **Foundational (Phase 2)**: 依赖 Phase 1 — 已完成
+- **US6-Tiles (Phase 3)**: 已完成
+- **US7-Today (Phase 4)**: 已完成
+- **US8-Calendar (Phase 5)**: 已完成
+- **US9-Trace (Phase 6)**: 已完成
+- **Polish (Phase 7)**: 已完成
+- **Foundational Update (Phase 8)**: 依赖 Phase 7 — BLOCKS Phase 9
+- **US6-TriColumn (Phase 9)**: 依赖 Phase 8 — 三栏视图实现
+- **TriColumn Polish (Phase 10)**: 依赖 Phase 9
+
+### User Story Dependencies (Updated)
+
+```
+Phase 1-7 (已完成)
+    ↓
+Phase 8 (Foundational Update: DateViewMode + 日期范围查询)
+    ↓
+Phase 9 (US6 三栏视图: DateNav + DayView + WeekView + MonthView + MiniCalendar)
+    ↓
+Phase 10 (TriColumn Polish: 响应式 + 空状态 + quickstart 更新)
+```
+
+### Parallel Opportunities (Phase 8-10)
+
+- T066, T067 可并行（不同文件）
+- T068, T069, T071, T072 可并行（四个独立新组件）
+- T075, T076 可并行（不同文件）
+
+---
+
+## Parallel Example: US6 三栏视图
+
+```bash
+# 并行创建独立组件:
+T068: DateNav → frontend/src/components/timebox/date-nav.tsx
+T069: MiniCalendar → frontend/src/components/timebox/mini-calendar.tsx
+T071: WeekView → frontend/src/components/timebox/week-view.tsx
+T072: MonthView → frontend/src/components/timebox/month-view.tsx
+
+# 顺序执行（有依赖）:
+T066: 类型更新 → types.ts (BLOCKS T068-T073)
+T067: 日期范围查询 → intent.ts (BLOCKS T073)
+T070: DayView → 依赖 T069 (MiniCalendar)
+T073: page.tsx 重构 → 依赖 T066, T067, T068, T070, T071, T072
+T074: 清理旧组件 → 依赖 T073
+```
+
+---
+
+## Implementation Strategy (Updated)
+
+### TriColumn Delivery
+
+1. Phase 8: 类型 + 查询更新
+2. Phase 9: 三栏视图实现（日视图 → 周视图 → 月视图 → page.tsx 整合）
+3. **STOP and VALIDATE**: 打开首页验证日视图三栏，切换周/月，翻页
+4. Phase 10: 移动端 + 空状态
+
+### Task Summary
+
+| Phase | Tasks | Status |
+|---|---|---|
+| Phase 1-7 (优化 v1) | T036-T065 (30) | 全部完成 |
+| Phase 8 (基础更新) | T066-T067 (2) | 待执行 |
+| Phase 9 (三栏视图) | T068-T074 (7) | 待执行 |
+| Phase 10 (Polish) | T075-T077 (3) | 待执行 |
+| **总计** | **T066-T077 (12)** | 新增任务 |

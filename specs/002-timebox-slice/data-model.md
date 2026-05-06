@@ -102,7 +102,7 @@
 
 State Machine 每次执行后刷新。MVP 只填充时间盒相关字段。
 
-## UI 组件层级（2026-05-06 更新）
+## UI 组件层级（2026-05-07 更新）
 
 ```
 AppShell
@@ -116,14 +116,36 @@ AppShell
 │   │   ├── IntentForm (表单模式)
 │   │   └── (DynamicTile 已移至 TilesBanner)
 │   └── MainContent (flex-1)
-│       ├── ViewModeToggle [今日模式 | 日历模式]
-│       ├── TodayView (今日模式)
-│       │   ├── TimeboxList (左列：列表视图)
-│       │   └── TimeboxTimeline (右列：可视化时间轴)
-│       └── CalendarView (日历模式：全宽日历组件)
+│       ├── DateNav [日 | 周 | 月] + 前进/后退 + 日期显示
+│       ├── DayView (日视图，默认)
+│       │   ├── TimeboxList (左列：列表视图，compact)
+│       │   ├── TimeboxTimeline (中列：小时时间轴)
+│       │   └── MiniCalendar (右列：月历小日历)
+│       ├── WeekView (周视图)
+│       │   └── 周日历时间表格 (react-big-calendar week view)
+│       └── MonthView (月视图)
+│           └── 月日历网格 (react-big-calendar month view)
 └── TracePanel (底部可折叠调试面板，默认隐藏)
     └── TraceStep[] (可展开的调用链步骤)
 ```
+
+### DateNav 日期导航
+
+| 属性 | 类型 | 说明 |
+|---|---|---|
+| mode | `'day' \| 'week' \| 'month'` | 当前浏览模式，默认 `'day'` |
+| currentDate | Date | 当前选中的日期 |
+| onModeChange | (mode) => void | 模式切换回调 |
+| onNavigate | (direction: 'prev' \| 'next') => void | 翻页回调 |
+| mobileHidden | boolean | 移动端隐藏"周"选项 |
+
+### 视图模式数据范围
+
+| 模式 | 数据范围 | 布局 |
+|---|---|---|
+| day | currentDate 00:00-23:59 | 三栏：列表 + 时间轴 + 小日历 |
+| week | currentDate 所在周一至周日 | 全宽：周日历时间表格 |
+| month | currentDate 所在月 1 日至月末 | 全宽：月日历网格 |
 
 ## 追踪日志数据模型（2026-05-06 新增）
 
