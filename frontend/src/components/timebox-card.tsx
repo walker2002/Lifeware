@@ -19,9 +19,6 @@ const STATUS_STYLES: Record<
 
 // ─── 辅助函数 ───────────────────────────────────────────────────
 
-/**
- * 将 ISO 时间戳格式化为 HH:MM 显示
- */
 function formatTime(timestamp: string): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString("zh-CN", {
@@ -31,20 +28,43 @@ function formatTime(timestamp: string): string {
   });
 }
 
+function formatDuration(start: string, end: string): string {
+  const mins = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+  if (mins < 60) return `${mins}分钟`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}小时${m}分钟` : `${h}小时`;
+}
+
 // ─── 组件 ───────────────────────────────────────────────────────
 
 interface TimeboxCardProps {
   timebox: TimeboxSummary;
+  /** 紧凑模式：单行显示，用于今日模式左列 */
+  compact?: boolean;
 }
 
-/**
- * TimeboxCard — 时间盒卡片组件
- *
- * 显示时间盒的标题、时间范围和状态徽章。
- * 使用 bg-surface-card 背景，圆角卡片样式。
- */
-export function TimeboxCard({ timebox }: TimeboxCardProps) {
+export function TimeboxCard({ timebox, compact = false }: TimeboxCardProps) {
   const statusStyle = STATUS_STYLES[timebox.status] ?? STATUS_STYLES.planned;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-hairline bg-canvas px-3 py-2">
+        <span className="text-xs text-body whitespace-nowrap">
+          {formatTime(timebox.startTime)}
+        </span>
+        <span className="flex-1 truncate text-sm font-medium text-ink">
+          {timebox.title}
+        </span>
+        <span className="text-xs text-body whitespace-nowrap">
+          {formatDuration(timebox.startTime, timebox.endTime)}
+        </span>
+        <Badge variant={statusStyle.variant} className="text-xs">
+          {statusStyle.label}
+        </Badge>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-surface-card p-4">
@@ -54,7 +74,7 @@ export function TimeboxCard({ timebox }: TimeboxCardProps) {
         </h3>
         <Badge variant={statusStyle.variant}>{statusStyle.label}</Badge>
       </div>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-body">
         {formatTime(timebox.startTime)} - {formatTime(timebox.endTime)}
       </p>
     </div>

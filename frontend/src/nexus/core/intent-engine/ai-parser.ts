@@ -6,8 +6,11 @@ import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
 
 // ─── 系统提示词 ─────────────────────────────────────────────────
 
-const TIMEBOX_SYSTEM_PROMPT = `
+const TIMEBOX_SYSTEM_PROMPT = (now: Date) => `
 你是 Lifeware 时间盒意图解析器。将用户的自然语言输入解析为结构化意图。
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
+时区：Asia/Shanghai (UTC+8)
 
 输出 JSON 格式：
 {
@@ -15,14 +18,14 @@ const TIMEBOX_SYSTEM_PROMPT = `
   "action": "create_timebox",
   "fields": {
     "title": "string",
-    "startTime": "ISO 8601",
+    "startTime": "ISO 8601（含时区，如 2026-05-04T09:00:00+08:00）",
     "duration": number（分钟）
   },
   "confidence": 0-1
 }
 
 规则：
-- "今天" → 当天日期
+- "今天" → ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}
 - "2小时" → 120 分钟
 - "上午9点" → 当天 09:00
 - 缺少必需字段时 confidence 设低
@@ -63,7 +66,7 @@ export async function parseWithAI(
     // 1. 调用 LLM
     const response = await chat(
       [
-        { role: 'system', content: TIMEBOX_SYSTEM_PROMPT },
+        { role: 'system', content: TIMEBOX_SYSTEM_PROMPT(new Date()) },
         { role: 'user', content: rawInput },
       ],
       { temperature: 0.3 },
@@ -107,13 +110,21 @@ export async function parseWithAI(
       }
     }
 
-    // 5. 构建 StructuredIntent 并返回
+    // 5. 补全 endTime（LLM 通常返回 duration 而非 endTime）
+    const fields = { ...parsed.fields }
+    if (!fields.endTime && fields.startTime && fields.duration) {
+      const start = new Date(fields.startTime as string)
+      start.setMinutes(start.getMinutes() + Number(fields.duration))
+      fields.endTime = start.toISOString()
+    }
+
+    // 6. 构建 StructuredIntent 并返回
     const intent: StructuredIntent = {
       id: generateUUID(),
       intentionId,
       targetDomain: parsed.targetDomain,
       action: parsed.action,
-      fields: parsed.fields,
+      fields,
       confidence: parsed.confidence,
       resolvedBy: 'ai',
       createdAt: new Date().toISOString() as Timestamp,

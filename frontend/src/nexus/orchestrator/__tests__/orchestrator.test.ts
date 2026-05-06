@@ -15,7 +15,7 @@ function createMockIntent(overrides?: Partial<StructuredIntent>): StructuredInte
     id: 'intent-001' as USOM_ID,
     intentionId: 'intention-001' as USOM_ID,
     targetDomain: 'timebox',
-    action: 'create',
+    action: 'create_timebox',
     fields: {
       title: '专注工作时间',
       startTime: '2026-05-03T09:00:00Z',
@@ -204,7 +204,7 @@ describe('createOrchestrator', () => {
 
   it('State Machine 失败 → 返回错误', async () => {
     // Arrange: 创建一个会导致状态机失败的 intent（action 不是 create）
-    const badIntent = createMockIntent({ action: 'start' })
+    const badIntent = createMockIntent({ action: 'delete_timebox' })
     const intentEngine = createMockIntentEngine(badIntent)
     const ruleEngine = createMockRuleEngine('pass')
     const timeboxRepo = createMockTimeboxRepo()

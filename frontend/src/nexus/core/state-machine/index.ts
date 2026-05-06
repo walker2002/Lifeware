@@ -88,7 +88,7 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
           fromStatus: fromState,
           toStatus: transition.to,
         },
-        snapshotId: proposal.id, // MVP: 使用 proposal id 作为快照引用
+        snapshotId: '' as USOM_ID, // MVP: 暂无 context_snapshot 记录
       }
 
       // 5. 持久化事件

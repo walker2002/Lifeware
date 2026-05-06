@@ -18,7 +18,19 @@
       "mcp__zread__get_repo_structure",
       "WebSearch",
       "Bash(claude plugin:*)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(mv \"document/00_overall/LW_methodology_方法论落地设计规范_2026_03_18.md\" mydocs/methodology/)",
+      "Bash(mv \"document/01_methodology/LW_methodology_冲突仲裁矩阵_2026_04_06.md\" \"document/01_methodology/LW_methodology_场景提示词设计方案_2026_04_06.md\" mydocs/methodology/)",
+      "Bash(mv \"document/00_overall/LW_USOM_详细设计_2026_03_21.md\" docs/usom-design.md)",
+      "Bash(mv \"document/00_overall/LW_database_数据库设计_2026_03_21.md\" docs/database-design.md)",
+      "Bash(rm \"document/00_overall/LW_USOM_详细设计_2026_03_19.md\" \"document/00_overall/LW_database_数据库设计_2026_03_20.md\")",
+      "Bash(mv \"document/00_overall/LW_overall_manifest.md\" manifest.md)",
+      "Bash(rmdir document/00_overall document/01_methodology document)",
+      "Bash(npm ls *)",
+      "Bash(node *)",
+      "Bash(curl -s \"https://api.github.com/repos/gorules/zen/git/trees/master?recursive=1\")",
+      "Bash(curl *)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(x['path']\\) for x in data.get\\('tree',[]\\) if 'test-data/graphs/' in x['path'] and x['path'].endswith\\('.json'\\)]\")"
     ]
   }
 }

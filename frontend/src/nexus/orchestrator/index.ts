@@ -12,6 +12,7 @@ import type {
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
+import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import { createTimeboxStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 
@@ -67,6 +68,23 @@ export interface OrchestratorDeps {
   ruleEngine: RuleEngine
   /** 可选，MVP 阶段不实现 */
   actionSurfaceEngine?: ActionSurfaceEngine
+  /** 可选，追踪日志回调（注入 TraceLogger） */
+  onTrace?: (step: TraceStep) => void
+}
+
+// ─── 动作映射 ─────────────────────────────────────────────────
+
+/** 意图引擎的领域动作 → 状态机生命周期动作 */
+function toLifecycleAction(domainAction: string): string {
+  const map: Record<string, string> = {
+    create_timebox: 'create',
+    start_timebox: 'start',
+    pause_timebox: 'pause',
+    resume_timebox: 'resume',
+    end_timebox: 'end',
+    log_timebox: 'log',
+  }
+  return map[domainAction] ?? domainAction
 }
 
 // ─── Stub 工具函数 ─────────────────────────────────────────────
@@ -99,6 +117,26 @@ function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
   }
 }
 
+// ─── 追踪辅助 ─────────────────────────────────────────────────
+
+function trace(
+  onTrace: OrchestratorDeps['onTrace'],
+  component: TraceComponent,
+  phase: TracePhase,
+  data: { input: Record<string, unknown>; output?: Record<string, unknown>; error?: string },
+): void {
+  if (!onTrace) return
+  onTrace({
+    id: 0,
+    component,
+    phase,
+    timestamp: new Date().toISOString() as Timestamp,
+    input: data.input,
+    output: data.output,
+    error: data.error,
+  })
+}
+
 // ─── 工厂函数 ─────────────────────────────────────────────────
 
 export function createOrchestrator(deps: OrchestratorDeps) {
@@ -114,19 +152,20 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
     /**
      * 执行 Nexus 管道
-     * @param rawInput  用户的原始输入文本
-     * @param userId    当前用户 ID
-     * @param confirmed 用户是否已确认（用于 confirm 结果后重新提交）
      */
     async execute(rawInput: string, userId: USOM_ID, confirmed?: boolean): Promise<OrchestratorResult> {
       // Step 1: 解析意图
+      trace(deps.onTrace, 'IntentEngine', 'start', { input: { rawInput } })
       const intent = await deps.intentEngine.parse(rawInput, userId)
+      trace(deps.onTrace, 'IntentEngine', 'end', { input: { rawInput }, output: { intent } })
 
       // Step 2: 构造最小快照（MVP 占位）
       const snapshot = createStubSnapshot(userId)
 
       // Step 3: 规则评估
+      trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
       const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
+      trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
 
       if (ruleResult.result === 'confirm' && !confirmed) {
         return {
@@ -136,30 +175,37 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // warning 模式：记录警告但继续执行
-
       // Step 4: 从 StructuredIntent 创建 StateProposal
       const proposal: StateProposal = {
         id: crypto.randomUUID() as USOM_ID,
         intentId: intent.id,
         targetObject: { type: 'timebox' },
-        action: intent.action,
+        action: toLifecycleAction(intent.action),
         payload: intent.fields,
         approvedAt: new Date().toISOString() as Timestamp,
         approvedBy: 'rule_engine',
       }
 
       // Step 5: 执行状态机
+      trace(deps.onTrace, 'StateMachine', 'start', { input: { proposal } })
       const smResult = await stateMachine.execute(proposal, eventBus, userId)
+      trace(deps.onTrace, 'StateMachine', 'end', {
+        input: { proposal },
+        output: { success: smResult.success, object: smResult.object },
+        error: smResult.error,
+      })
+
       if (!smResult.success) {
         return { success: false, error: smResult.error }
       }
 
       // Step 6: 生成 ActionSurface
+      trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot, event: smResult.event } })
       let actionSurface: ActionSurface | undefined
       if (deps.actionSurfaceEngine) {
         actionSurface = await deps.actionSurfaceEngine.generate(snapshot, smResult.event, userId)
       }
+      trace(deps.onTrace, 'ActionSurfaceEngine', 'end', { input: { snapshot }, output: { actionSurface } })
 
       return {
         success: true,

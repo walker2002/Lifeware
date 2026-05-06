@@ -77,11 +77,11 @@ describe('模式切换', () => {
 
     // 默认 AI 模式激活
     expect(aiButton.className).toContain('bg-background')
-    expect(formButton.className).toContain('text-muted-foreground')
+    expect(formButton.className).toContain('text-body')
 
     // 切换到表单
     await user.click(formButton)
     expect(formButton.className).toContain('bg-background')
-    expect(aiButton.className).toContain('text-muted-foreground')
+    expect(aiButton.className).toContain('text-body')
   })
 })
