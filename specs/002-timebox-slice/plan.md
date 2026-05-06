@@ -81,7 +81,7 @@ frontend/src/
 │   │   ├── mini-calendar.tsx             # 新增：月历小日历（日视图右侧）
 │   │   ├── view-mode-toggle.tsx          # 删除：被 date-nav.tsx 取代
 │   │   ├── today-view.tsx                # 删除：被 day-view.tsx 取代
-│   │   └── calendar-view.tsx             # 重构：拆分为 week-view + month-view
+│   │   └── calendar-view.tsx             # 删除：已被 week-view + month-view 取代
 │   ├── timebox-card.tsx                  # 已完成：compact 模式
 │   ├── timebox-list.tsx                  # 已完成：compact 模式
 │   ├── trace-panel.tsx                   # 已完成：底部调试面板

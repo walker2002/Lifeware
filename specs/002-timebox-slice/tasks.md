@@ -252,7 +252,7 @@ T059: page.tsx 整合 → 依赖 T055, T058
 - [ ] T071 [P] [US6] 创建 WeekView 组件到 `frontend/src/components/timebox/week-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar week view，接收 timeboxes + currentDate，计算当周周一至周日范围，事件块使用项目设计令牌颜色，高度 500px+）
 - [ ] T072 [P] [US6] 创建 MonthView 组件到 `frontend/src/components/timebox/month-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar month view，接收 timeboxes + currentDate，计算当月范围，事件块使用项目设计令牌颜色，高度 500px+）
 - [ ] T073 [US6] 重构 `frontend/src/app/page.tsx`：移除 ViewModeToggle/TodayView/CalendarView 引用，新增 dateMode(DateViewMode) 和 currentDate(Date) 状态（默认 'day' 和 new Date()），根据 dateMode 渲染 DayView/WeekView/MonthView，传入 DateNav + 视图组件，根据 dateMode 计算日期范围调用 Server Action 获取 timeboxes
-- [ ] T074 [US6] 删除不再需要的组件：`frontend/src/components/timebox/view-mode-toggle.tsx`、`frontend/src/components/timebox/today-view.tsx`，重构 `frontend/src/components/timebox/calendar-view.tsx` 为 WeekView + MonthView 的共享样式提取（或删除）
+- [ ] T074 [US6] 删除不再需要的组件：`frontend/src/components/timebox/view-mode-toggle.tsx`、`frontend/src/components/timebox/today-view.tsx`、`frontend/src/components/timebox/calendar-view.tsx`（已被 week-view.tsx 和 month-view.tsx 取代）
 
 **Checkpoint**: 打开首页显示日视图三栏（列表 + 时间轴 + 小日历），点击"周"切换到周日历，点击"月"切换到月日历，前后翻页切换日期
 

@@ -143,8 +143,10 @@ interface DateNavProps {
 }
 // 日期导航栏，位于 MainContent 顶部
 // 左侧：前进/后退箭头按钮 + 当前日期/周/月文本
+//   翻页单位：日模式±1天，周模式±1周，月模式±1月
+//   文本格式：日="YYYY年M月D日"，周="M月D日 - M月D日"，月="YYYY年M月"
 // 右侧：日/周/月三个切换按钮（DESIGN.md category-tab 样式）
-// 移动端隐藏"周"按钮
+// 移动端（<768px）：隐藏"周"按钮
 ```
 
 ### DayView（新增，取代 TodayView）
@@ -158,6 +160,7 @@ interface DayViewProps {
 // 左列：TimeboxList（compact 模式，按 startTime 排序）
 // 中列：TimeboxTimeline（小时时间轴 06:00-23:00）
 // 右列：MiniCalendar（月历小日历，高亮当前日期）
+// 空状态：无时间盒时，列表和时间轴显示空提示文本
 // 移动端折叠为单栏（时间轴在下，隐藏 MiniCalendar）
 ```
 
@@ -197,7 +200,7 @@ interface MiniCalendarProps {
   onDateSelect?: (date: Date) => void
 }
 // 小型月历组件（用于日视图右列）
-// 显示当月日历网格，有事件的日期显示标记点
+// 显示当月日历网格，有事件的日期显示标记点（primary色、4px圆点、日期数字下方居中）
 // 高亮当前日期和选中日期
 // 点击日期可选切换日视图的日期
 ```
