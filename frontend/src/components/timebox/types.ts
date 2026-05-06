@@ -1,3 +1,3 @@
-// 时间盒视图模式类型
+// 时间盒日期视图模式类型
 
-export type ViewMode = 'today' | 'calendar'
+export type DateViewMode = 'day' | 'week' | 'month'

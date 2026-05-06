@@ -60,19 +60,26 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
   };
 }
 
-async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
+async function fetchTimeboxSummariesByRange(
+  start: Date,
+  end: Date,
+): Promise<TimeboxSummary[]> {
   const timeboxRepo = new TimeboxRepository();
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
   const timeboxes = await timeboxRepo.findByDateRange(
-    startOfDay.toISOString() as Timestamp,
-    endOfDay.toISOString() as Timestamp,
+    start.toISOString() as Timestamp,
+    end.toISOString() as Timestamp,
     MVP_USER_ID,
   );
 
   return timeboxes.map(timeboxToSummary);
+}
+
+async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return fetchTimeboxSummariesByRange(startOfDay, endOfDay);
 }
 
 /** 创建并执行 Orchestrator 管道（提取公共逻辑） */
@@ -216,4 +223,11 @@ export async function submitTemplateIntent(
 
 export async function getTimeboxes(): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummaries();
+}
+
+export async function getTimeboxesByRange(
+  start: Date,
+  end: Date,
+): Promise<TimeboxSummary[]> {
+  return fetchTimeboxSummariesByRange(start, end);
 }

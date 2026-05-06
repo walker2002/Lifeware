@@ -8,11 +8,11 @@ import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { TimeboxStatus } from "@/usom/types/primitives"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
-interface CalendarViewProps {
+interface MonthViewProps {
   timeboxes: TimeboxSummary[]
+  currentDate: Date
 }
 
-// 状态颜色映射（内联样式）
 const STATUS_BG: Record<TimeboxStatus, string> = {
   planned: "#e6dfd8",
   running: "#cc785c",
@@ -39,12 +39,7 @@ const localizer = dateFnsLocalizer({
   locales,
 })
 
-/**
- * CalendarView — 日历模式视图
- *
- * 使用 react-big-calendar，支持月/周/日视图切换。
- */
-export function CalendarView({ timeboxes }: CalendarViewProps) {
+export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
   const events = useMemo<CalendarEvent[]>(
     () =>
       timeboxes.map((tb) => ({
@@ -62,9 +57,8 @@ export function CalendarView({ timeboxes }: CalendarViewProps) {
       <style>{`
         .rbc-calendar { font-family: "Inter", sans-serif; }
         .rbc-header { border-bottom-color: #e6dfd8; }
-        .rbc-month-view, .rbc-time-view { border-color: #e6dfd8; }
-        .rbc-day-bg + .rbc-day-bg, .rbc-month-row + .rbc-month-row,
-        .rbc-header + .rbc-header { border-color: #ebe6df; }
+        .rbc-month-view { border-color: #e6dfd8; }
+        .rbc-month-row + .rbc-month-row, .rbc-header + .rbc-header { border-color: #ebe6df; }
         .rbc-today { background: #f5f0e8; }
         .rbc-off-range-bg { background: #faf9f5; }
         .rbc-event { border: none; border-radius: 4px; font-size: 12px; }
@@ -74,6 +68,7 @@ export function CalendarView({ timeboxes }: CalendarViewProps) {
         events={events}
         startAccessor="start"
         endAccessor="end"
+        date={currentDate}
         style={{ height: 500 }}
         messages={{
           today: "今天",
@@ -90,8 +85,9 @@ export function CalendarView({ timeboxes }: CalendarViewProps) {
             color: event.status === "running" ? "#ffffff" : "#141413",
           },
         })}
-        views={["month", "week", "day"]}
+        views={["month"]}
         defaultView="month"
+        toolbar={false}
       />
     </div>
   )

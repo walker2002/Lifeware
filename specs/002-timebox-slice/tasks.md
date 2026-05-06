@@ -231,8 +231,8 @@ T059: page.tsx 整合 → 依赖 T055, T058
 
 **⚠️ CRITICAL**: 必须在三栏视图 User Story 工作开始前完成
 
-- [ ] T066 修改 `frontend/src/components/timebox/types.ts`：将 `ViewMode = 'today' | 'calendar'` 更新为 `DateViewMode = 'day' | 'week' | 'month'`，删除旧 ViewMode 类型
-- [ ] T067 [P] 修改 `frontend/src/app/actions/intent.ts`：扩展 `fetchTimeboxSummaries()` 为 `fetchTimeboxSummariesByRange(start: Timestamp, end: Timestamp)`，接受任意日期范围参数，原 `fetchTimeboxSummaries` 改为调用新函数并传入当天范围
+- [x] T066 修改 `frontend/src/components/timebox/types.ts`：将 `ViewMode = 'today' | 'calendar'` 更新为 `DateViewMode = 'day' | 'week' | 'month'`，删除旧 ViewMode 类型
+- [x] T067 [P] 修改 `frontend/src/app/actions/intent.ts`：扩展 `fetchTimeboxSummaries()` 为 `fetchTimeboxSummariesByRange(start: Timestamp, end: Timestamp)`，接受任意日期范围参数，原 `fetchTimeboxSummaries` 改为调用新函数并传入当天范围
 
 **Checkpoint**: DateViewMode 类型就绪，Server Action 支持按日期范围查询
 
@@ -246,13 +246,13 @@ T059: page.tsx 整合 → 依赖 T055, T058
 
 ### Implementation for US6 (spec.md)
 
-- [ ] T068 [P] [US6] 创建 DateNav 组件到 `frontend/src/components/timebox/date-nav.tsx`（接收 mode: DateViewMode、currentDate、onModeChange、onNavigate，左侧渲染前进/后退按钮 + 当前日期文本（日模式显示"YYYY年M月D日"、周模式显示"M月D日 - M月D日"、月模式显示"YYYY年M月"），右侧渲染日/周/月切换按钮，使用 DESIGN.md category-tab 样式）
-- [ ] T069 [P] [US6] 创建 MiniCalendar 组件到 `frontend/src/components/timebox/mini-calendar.tsx`（小型月历网格，接收 currentDate、selectedDate、timeboxes、onDateSelect，高亮当前日期和选中日期，有时间盒的日期显示小圆点标记，宽度适配右栏约 280px，使用 DESIGN.md 设计令牌颜色）
-- [ ] T070 [US6] 创建 DayView 组件到 `frontend/src/components/timebox/day-view.tsx`（CSS Grid 三栏 30%/40%/30%，左列渲染 TimeboxList(compact)，中列渲染 TimeboxTimeline，右列渲染 MiniCalendar，timeboxes 按 startTime 排序，接收 currentDate prop）
-- [ ] T071 [P] [US6] 创建 WeekView 组件到 `frontend/src/components/timebox/week-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar week view，接收 timeboxes + currentDate，计算当周周一至周日范围，事件块使用项目设计令牌颜色，高度 500px+）
-- [ ] T072 [P] [US6] 创建 MonthView 组件到 `frontend/src/components/timebox/month-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar month view，接收 timeboxes + currentDate，计算当月范围，事件块使用项目设计令牌颜色，高度 500px+）
-- [ ] T073 [US6] 重构 `frontend/src/app/page.tsx`：移除 ViewModeToggle/TodayView/CalendarView 引用，新增 dateMode(DateViewMode) 和 currentDate(Date) 状态（默认 'day' 和 new Date()），根据 dateMode 渲染 DayView/WeekView/MonthView，传入 DateNav + 视图组件，根据 dateMode 计算日期范围调用 Server Action 获取 timeboxes
-- [ ] T074 [US6] 删除不再需要的组件：`frontend/src/components/timebox/view-mode-toggle.tsx`、`frontend/src/components/timebox/today-view.tsx`、`frontend/src/components/timebox/calendar-view.tsx`（已被 week-view.tsx 和 month-view.tsx 取代）
+- [x] T068 [P] [US6] 创建 DateNav 组件到 `frontend/src/components/timebox/date-nav.tsx`（接收 mode: DateViewMode、currentDate、onModeChange、onNavigate，左侧渲染前进/后退按钮 + 当前日期文本（日模式显示"YYYY年M月D日"、周模式显示"M月D日 - M月D日"、月模式显示"YYYY年M月"），右侧渲染日/周/月切换按钮，使用 DESIGN.md category-tab 样式）
+- [x] T069 [P] [US6] 创建 MiniCalendar 组件到 `frontend/src/components/timebox/mini-calendar.tsx`（小型月历网格，接收 currentDate、selectedDate、timeboxes、onDateSelect，高亮当前日期和选中日期，有时间盒的日期显示小圆点标记，宽度适配右栏约 280px，使用 DESIGN.md 设计令牌颜色）
+- [x] T070 [US6] 创建 DayView 组件到 `frontend/src/components/timebox/day-view.tsx`（CSS Grid 三栏 30%/40%/30%，左列渲染 TimeboxList(compact)，中列渲染 TimeboxTimeline，右列渲染 MiniCalendar，timeboxes 按 startTime 排序，接收 currentDate prop）
+- [x] T071 [P] [US6] 创建 WeekView 组件到 `frontend/src/components/timebox/week-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar week view，接收 timeboxes + currentDate，计算当周周一至周日范围，事件块使用项目设计令牌颜色，高度 500px+）
+- [x] T072 [P] [US6] 创建 MonthView 组件到 `frontend/src/components/timebox/month-view.tsx`（从 calendar-view.tsx 拆出，基于 react-big-calendar month view，接收 timeboxes + currentDate，计算当月范围，事件块使用项目设计令牌颜色，高度 500px+）
+- [x] T073 [US6] 重构 `frontend/src/app/page.tsx`：移除 ViewModeToggle/TodayView/CalendarView 引用，新增 dateMode(DateViewMode) 和 currentDate(Date) 状态（默认 'day' 和 new Date()），根据 dateMode 渲染 DayView/WeekView/MonthView，传入 DateNav + 视图组件，根据 dateMode 计算日期范围调用 Server Action 获取 timeboxes
+- [x] T074 [US6] 删除不再需要的组件：`frontend/src/components/timebox/view-mode-toggle.tsx`、`frontend/src/components/timebox/today-view.tsx`、`frontend/src/components/timebox/calendar-view.tsx`（已被 week-view.tsx 和 month-view.tsx 取代）
 
 **Checkpoint**: 打开首页显示日视图三栏（列表 + 时间轴 + 小日历），点击"周"切换到周日历，点击"月"切换到月日历，前后翻页切换日期
 
@@ -262,9 +262,9 @@ T059: page.tsx 整合 → 依赖 T055, T058
 
 **Purpose**: 响应式适配、边界处理、空状态
 
-- [ ] T075 实现三栏视图移动端响应式：DayView 三栏折叠为单栏（隐藏 MiniCalendar），DateNav 隐藏"周"选项（`< 768px` 时仅显示日/月），修改 `frontend/src/components/timebox/date-nav.tsx` 和 `frontend/src/components/timebox/day-view.tsx`
-- [ ] T076 [P] 添加三栏视图空状态处理：日视图无时间盒时列表和时间轴显示空提示，周/月视图无事件时显示空日历，MiniCalendar 无事件时不显示标记点
-- [ ] T077 更新 `specs/002-timebox-slice/quickstart.md`：扩展验证清单，覆盖三栏视图的日/周/月切换、翻页、移动端响应式验证项
+- [x] T075 实现三栏视图移动端响应式：DayView 三栏折叠为单栏（隐藏 MiniCalendar），DateNav 隐藏"周"选项（`< 768px` 时仅显示日/月），修改 `frontend/src/components/timebox/date-nav.tsx` 和 `frontend/src/components/timebox/day-view.tsx`
+- [x] T076 [P] 添加三栏视图空状态处理：日视图无时间盒时列表和时间轴显示空提示，周/月视图无事件时显示空日历，MiniCalendar 无事件时不显示标记点
+- [x] T077 更新 `specs/002-timebox-slice/quickstart.md`：扩展验证清单，覆盖三栏视图的日/周/月切换、翻页、移动端响应式验证项
 
 ---
 

@@ -1,26 +1,55 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { IntentInput } from "@/components/intent-input";
 import { IntentForm } from "@/components/intent-form";
 import type { TemplateFormFields } from "@/components/intent-form";
-import { ViewModeToggle } from "@/components/timebox/view-mode-toggle";
-import type { ViewMode } from "@/components/timebox/types";
-import { TodayView } from "@/components/timebox/today-view";
-import { CalendarView } from "@/components/timebox/calendar-view";
+import { DateNav } from "@/components/timebox/date-nav";
+import type { DateViewMode } from "@/components/timebox/types";
+import { DayView } from "@/components/timebox/day-view";
+import { WeekView } from "@/components/timebox/week-view";
+import { MonthView } from "@/components/timebox/month-view";
 import { TracePanel } from "@/components/trace-panel";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import { submitIntent, submitTemplateIntent } from "./actions/intent";
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange } from "./actions/intent";
 import type { IntentSubmissionResult } from "./actions/intent";
 import { setTraceConfig, getTraceConfig } from "@/lib/config/trace-config";
 import { Button } from "@/components/ui/button";
+import {
+  startOfDay, endOfDay,
+  startOfWeek, endOfWeek,
+  startOfMonth, endOfMonth,
+  addDays, addWeeks, addMonths,
+} from "date-fns";
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 type InputMode = "ai" | "form";
+
+/** 根据视图模式计算日期范围 */
+function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
+  switch (mode) {
+    case 'day':
+      return { start: startOfDay(date), end: endOfDay(date) };
+    case 'week':
+      return { start: startOfWeek(date, { weekStartsOn: 1 }), end: endOfWeek(date, { weekStartsOn: 1 }) };
+    case 'month':
+      return { start: startOfMonth(date), end: endOfMonth(date) };
+  }
+}
+
+/** 翻页导航 */
+function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'): Date {
+  const delta = direction === 'next' ? 1 : -1;
+  switch (mode) {
+    case 'day': return addDays(date, delta);
+    case 'week': return addWeeks(date, delta);
+    case 'month': return addMonths(date, delta);
+  }
+}
 
 export default function Home() {
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
@@ -28,7 +57,8 @@ export default function Home() {
   const [error, setError] = useState<string | undefined>();
   const [mode, setMode] = useState<InputMode>("ai");
   const [actionSurface, setActionSurface] = useState<ActionSurface | undefined>();
-  const [viewMode, setViewMode] = useState<ViewMode>("today");
+  const [dateMode, setDateMode] = useState<DateViewMode>("day");
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
   // 追踪日志状态
   const [traceVisible, setTraceVisible] = useState(false);
@@ -40,6 +70,24 @@ export default function Home() {
     rawInput?: string;
     formFields?: TemplateFormFields;
   } | null>(null);
+
+  // 按日期范围加载时间盒
+  const loadTimeboxes = useCallback(async (modeParam?: DateViewMode, dateParam?: Date) => {
+    const m = modeParam ?? dateMode;
+    const d = dateParam ?? currentDate;
+    const { start, end } = getDateRange(m, d);
+    try {
+      const data = await getTimeboxesByRange(start, end);
+      setTimeboxes(data);
+    } catch {
+      // 静默失败，保持当前数据
+    }
+  }, [dateMode, currentDate]);
+
+  // 初始加载 + 日期/模式变化时重新加载
+  useEffect(() => {
+    loadTimeboxes();
+  }, [dateMode, currentDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleResult(result: IntentSubmissionResult) {
     setTimeboxes(result.timeboxes);
@@ -141,6 +189,19 @@ export default function Home() {
     }
   }, [traceEnabled]);
 
+  const handleDateModeChange = useCallback((newMode: DateViewMode) => {
+    setDateMode(newMode);
+  }, []);
+
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    setCurrentDate((prev) => navigateDate(dateMode, prev, direction));
+  }, [dateMode]);
+
+  const handleDateSelect = useCallback((date: Date) => {
+    setCurrentDate(date);
+    setDateMode('day');
+  }, []);
+
   return (
     <AppShell
       onSettingsClick={handleSettingsClick}
@@ -216,17 +277,21 @@ export default function Home() {
       }
       mainContent={
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h1 className="font-display text-2xl font-medium text-ink">
-              时间盒
-            </h1>
-            <ViewModeToggle mode={viewMode} onModeChange={setViewMode} />
-          </div>
+          <DateNav
+            mode={dateMode}
+            currentDate={currentDate}
+            onModeChange={handleDateModeChange}
+            onNavigate={handleNavigate}
+          />
 
-          {viewMode === "today" ? (
-            <TodayView timeboxes={timeboxes} />
-          ) : (
-            <CalendarView timeboxes={timeboxes} />
+          {dateMode === "day" && (
+            <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} />
+          )}
+          {dateMode === "week" && (
+            <WeekView timeboxes={timeboxes} currentDate={currentDate} />
+          )}
+          {dateMode === "month" && (
+            <MonthView timeboxes={timeboxes} currentDate={currentDate} />
           )}
         </div>
       }
