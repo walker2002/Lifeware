@@ -2,6 +2,7 @@
 
 import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { TimeboxStatus } from "@/usom/types/primitives"
+import { getCardBorderColor } from "@/lib/color-coding"
 
 interface TimeboxTimelineProps {
   timeboxes: TimeboxSummary[]
@@ -16,8 +17,9 @@ const HOURS = TIMELINE_END - TIMELINE_START
 const STATUS_COLORS: Record<TimeboxStatus, string> = {
   planned: "bg-hairline-soft border-hairline",
   running: "bg-primary/20 border-primary",
-  paused: "bg-warning/20 border-warning",
+  overtime: "bg-orange-500/20 border-orange-500",
   ended: "bg-hairline-soft border-hairline",
+  cancelled: "bg-gray-300/20 border-gray-300",
   logged: "bg-success/20 border-success",
 }
 
@@ -89,11 +91,12 @@ export function TimeboxTimeline({ timeboxes }: TimeboxTimelineProps) {
           const top = ((startH - TIMELINE_START) / HOURS) * 100
           const height = (durH / HOURS) * 100
           const colorClass = STATUS_COLORS[tb.status] ?? STATUS_COLORS.planned
+          const borderColor = getCardBorderColor(tb.executionRecord)
 
           return (
             <div
               key={tb.id}
-              className={`absolute left-12 right-2 rounded-md border px-2 py-1 ${colorClass}`}
+              className={`absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 ${colorClass} ${borderColor} border-t border-r border-b`}
               style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }}
             >
               <p className="truncate text-xs font-medium text-ink">{tb.title}</p>

@@ -12,7 +12,9 @@ import { SystemEventRepository } from "@/lib/db/repositories/system-event.reposi
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
-import { parse as parseIntent } from "../../nexus/core/intent-engine";
+import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
+import type { BatchIntentResult } from "../../nexus/core/intent-engine";
+export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { parseTemplateForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
@@ -57,6 +59,11 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
     endTime: timebox.endTime,
     taskIds: timebox.taskIds,
     habitIds: timebox.habitIds,
+    startedAt: timebox.startedAt,
+    overtimeAt: timebox.overtimeAt,
+    endedAt: timebox.endedAt,
+    loggedAt: timebox.loggedAt,
+    executionRecord: timebox.executionRecord,
   };
 }
 
@@ -221,8 +228,239 @@ export async function submitTemplateIntent(
   );
 }
 
+// ─── 执行记录结果类型 ─────────────────────────────────────────────
+
+export interface TransitionResult {
+  success: boolean
+  timebox?: TimeboxSummary
+  actionSurface?: ActionSurface
+  error?: string
+  warnings?: string[]
+  needsConfirmation?: boolean
+  confirmationMessage?: string
+}
+
+// ─── 状态转换 Server Action ──────────────────────────────────────
+
+export async function transitionTimebox(
+  timeboxId: string,
+  action: 'start' | 'end' | 'cancel' | 'log' | 'overtime',
+  executionRecord?: import("@/usom/types/objects").ExecutionRecord,
+  confirmed?: boolean,
+): Promise<TransitionResult> {
+  try {
+    const timeboxRepo = new TimeboxRepository();
+    const eventRepo = new SystemEventRepository();
+    const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error("not used") } },
+      ruleEngine: {
+        evaluate: async (intentEval, snapshot) => {
+          const result = await ruleEngine.evaluate(intentEval, snapshot);
+          return {
+            result: result.severity,
+            warnings: result.warnings,
+            confirmations: result.confirmations,
+          };
+        },
+      },
+      actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
+    });
+
+    const payload: Record<string, unknown> = {};
+    if (action === 'log' && executionRecord) {
+      payload.executionRecord = executionRecord;
+    }
+
+    const result = await orchestrator.executeTransition(
+      timeboxId,
+      action,
+      MVP_USER_ID,
+      payload,
+      confirmed,
+    );
+
+    // 获取更新后的时间盒用于返回摘要
+    const updatedTimebox = result.timebox;
+
+    return {
+      success: result.success,
+      timebox: updatedTimebox ? timeboxToSummary(updatedTimebox) : undefined,
+      actionSurface: result.actionSurface,
+      error: result.error,
+      warnings: result.warnings,
+      needsConfirmation: result.needsConfirmation,
+      confirmationMessage: result.confirmationMessage,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "未知错误";
+    return { success: false, error: message };
+  }
+}
+
 export async function getTimeboxes(): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummaries();
+}
+
+// ─── 执行意图结果类型 ─────────────────────────────────────────────
+
+export interface ExecutionIntentResult {
+  success: boolean;
+  timeboxes: TimeboxSummary[];
+  error?: string;
+  matchedTimeboxId?: string;
+}
+
+/** target 匹配：根据 AI 解析的 target 字段找到对应的时间盒 ID */
+function matchTarget(
+  target: { type: string; value: string },
+  timeboxes: TimeboxSummary[],
+): string | null {
+  if (target.type === "current" || target.value === "running") {
+    const running = timeboxes.find(t => t.status === "running");
+    return running?.id ?? null;
+  }
+
+  if (target.type === "index") {
+    const idx = parseInt(target.value, 10) - 1;
+    return timeboxes[idx]?.id ?? null;
+  }
+
+  // title 模糊匹配
+  const keyword = target.value.toLowerCase();
+  const match = timeboxes.find(t =>
+    t.title.toLowerCase().includes(keyword),
+  );
+  return match?.id ?? null;
+}
+
+// ─── 自然语言执行意图 Server Action ────────────────────────────────
+
+export async function submitExecutionIntent(
+  rawInput: string,
+): Promise<ExecutionIntentResult> {
+  try {
+    // 1. 创建 Intention
+    const intentionRepo = new IntentionRepository();
+    const intentionId = crypto.randomUUID();
+    const now = new Date().toISOString() as Timestamp;
+
+    await intentionRepo.save(
+      { id: intentionId, status: "captured", rawInput, inputMode: "natural_language", capturedAt: now },
+      MVP_USER_ID,
+    );
+
+    // 2. AI 解析
+    const parseResult = await parseIntent(rawInput, intentionId);
+    if (!parseResult.success || !parseResult.intent) {
+      const timeboxes = await fetchTimeboxSummaries();
+      return { success: false, timeboxes, error: parseResult.error ?? "解析失败" };
+    }
+
+    const intent = parseResult.intent;
+    const action = intent.action as string;
+
+    // 检查是否为执行动作
+    const executionActions = ["start_timebox", "end_timebox", "cancel_timebox", "log_timebox"];
+    if (!executionActions.includes(action)) {
+      const timeboxes = await fetchTimeboxSummaries();
+      return { success: false, timeboxes, error: "非执行意图" };
+    }
+
+    // 3. target 匹配
+    const target = intent.fields.target as { type: string; value: string } | undefined;
+    if (!target) {
+      const timeboxes = await fetchTimeboxSummaries();
+      return { success: false, timeboxes, error: "未指定目标时间盒" };
+    }
+
+    // 获取当天时间盒用于匹配
+    const timeboxRepo = new TimeboxRepository();
+    const allTimeboxes = await timeboxRepo.findByDateRange(
+      new Date(new Date().setHours(0, 0, 0, 0)).toISOString() as Timestamp,
+      new Date(new Date().setHours(23, 59, 59, 999)).toISOString() as Timestamp,
+      MVP_USER_ID,
+    );
+    const summaries = allTimeboxes.map(timeboxToSummary);
+
+    const matchedId = matchTarget(target, summaries);
+    if (!matchedId) {
+      return { success: false, timeboxes: summaries, error: `找不到匹配的时间盒："${target.value}"` };
+    }
+
+    // 4. 执行转换
+    const shortAction = action.replace("_timebox", "") as "start" | "end" | "cancel" | "log";
+    const result = await transitionTimebox(matchedId, shortAction);
+    const timeboxes = await fetchTimeboxSummaries();
+
+    return {
+      success: result.success,
+      timeboxes,
+      error: result.error,
+      matchedTimeboxId: matchedId,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "未知错误";
+    const timeboxes = await fetchTimeboxSummaries();
+    return { success: false, timeboxes, error: message };
+  }
+}
+
+// ─── 多任务批量创建 Server Action ─────────────────────────────────
+
+export async function submitBatchIntent(
+  rawInput: string,
+): Promise<BatchIntentResult> {
+  // 1. 创建 Intention
+  const intentionRepo = new IntentionRepository();
+  const intentionId = crypto.randomUUID();
+  const now = new Date().toISOString() as Timestamp;
+
+  await intentionRepo.save(
+    { id: intentionId, status: "captured", rawInput, inputMode: "natural_language", capturedAt: now },
+    MVP_USER_ID,
+  );
+
+  // 2. AI 批量解析
+  const parseResult = await parseBatch(rawInput, intentionId);
+  if (!parseResult.success || parseResult.intents.length === 0) {
+    return { results: [{ index: 0, title: rawInput.slice(0, 50), error: parseResult.error ?? "未识别到有效任务" }] };
+  }
+
+  // 3. 每个任务生成独立的自然语言描述，复用 submitIntent
+  const results: BatchIntentResult["results"] = [];
+  for (let i = 0; i < parseResult.intents.length; i++) {
+    const intent = parseResult.intents[i];
+    const title = (intent.fields.title as string) ?? `任务${i + 1}`;
+    const startTime = intent.fields.startTime as string;
+    const duration = intent.fields.duration as number;
+    const taskDesc = `${title} 开始时间${startTime} 持续${duration}分钟`;
+
+    try {
+      const result = await submitIntent(taskDesc, false, false);
+      if (result.success) {
+        const created = result.timeboxes.find(t => t.title === title);
+        results.push({ index: i, title, timeboxId: created?.id });
+      } else {
+        results.push({
+          index: i,
+          title,
+          error: result.error,
+          warning: result.warnings?.[0],
+          needsConfirmation: result.needsConfirmation,
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "未知错误";
+      results.push({ index: i, title, error: message });
+    }
+  }
+
+  // 4. 返回最终时间盒列表
+  return { results };
 }
 
 export async function getTimeboxesByRange(

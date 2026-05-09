@@ -217,7 +217,7 @@ export const timeboxes = pgTable('timeboxes', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['planned', 'running', 'paused', 'ended', 'logged'] }).notNull(),
+  status: text('status', { enum: ['planned', 'running', 'overtime', 'ended', 'cancelled', 'logged'] }).notNull(),
   title: text('title').notNull(),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
@@ -226,11 +226,13 @@ export const timeboxes = pgTable('timeboxes', {
   recurrenceRule: jsonb('recurrence_rule').$type<{ frequency: string; interval: number; endDate?: string }>(),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
 
+  executionRecord: jsonb('execution_record').$type<Record<string, unknown>>(),
+
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp('started_at', { withTimezone: true }),
-  pausedAt: timestamp('paused_at', { withTimezone: true }),
+  overtimeAt: timestamp('overtime_at', { withTimezone: true }),
   endedAt: timestamp('ended_at', { withTimezone: true }),
   loggedAt: timestamp('logged_at', { withTimezone: true }),
 }, (table) => [

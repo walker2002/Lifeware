@@ -13,6 +13,7 @@ import {
   FieldCompletenessRule,
   DurationRangeRule,
   StartTimeInFutureRule,
+  DelayedStartRule,
 } from './rules/timebox'
 import { createTimeOverlapRule } from './rules/timebox-overlap'
 
@@ -22,6 +23,7 @@ const BASE_RULES: Rule[] = [
   FieldCompletenessRule,
   DurationRangeRule,
   StartTimeInFutureRule,
+  DelayedStartRule,
 ]
 
 // ─── Rule Engine 接口 ─────────────────────────────────────────

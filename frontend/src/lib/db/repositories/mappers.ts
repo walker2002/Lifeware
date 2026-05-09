@@ -213,8 +213,9 @@ type TimeboxRow = {
   startTime: Date; endTime: Date;
   isRecurring: boolean; recurrenceRule: unknown;
   tags: string[]; notes: string | null;
+  executionRecord: Record<string, unknown> | null;
   createdAt: Date; updatedAt: Date;
-  startedAt: Date | null; pausedAt: Date | null;
+  startedAt: Date | null; overtimeAt: Date | null;
   endedAt: Date | null; loggedAt: Date | null;
 }
 
@@ -233,9 +234,10 @@ export function timeboxRowToUSOM(row: TimeboxRow, taskIds: USOM_ID[] = [], habit
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     startedAt: toISO(row.startedAt),
-    pausedAt: toISO(row.pausedAt),
+    overtimeAt: toISO(row.overtimeAt),
     endedAt: toISO(row.endedAt),
     loggedAt: toISO(row.loggedAt),
+    executionRecord: row.executionRecord as unknown as Timebox['executionRecord'] ?? undefined,
     notes: row.notes ?? undefined,
   }
 }
@@ -252,8 +254,9 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
     recurrenceRule: timebox.recurrenceRule ?? null,
     tags: timebox.tags,
     notes: timebox.notes ?? null,
+    executionRecord: timebox.executionRecord as unknown as Record<string, unknown> | null ?? null,
     startedAt: toDate(timebox.startedAt),
-    pausedAt: toDate(timebox.pausedAt),
+    overtimeAt: toDate(timebox.overtimeAt),
     endedAt: toDate(timebox.endedAt),
     loggedAt: toDate(timebox.loggedAt),
   }

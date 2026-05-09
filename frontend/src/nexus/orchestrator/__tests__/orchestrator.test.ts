@@ -55,6 +55,7 @@ function createMockTimeboxRepo() {
   return {
     findById: vi.fn().mockResolvedValue(null),
     findRunning: vi.fn().mockResolvedValue([]),
+    findByStatus: vi.fn().mockResolvedValue([]),
     findUpcoming: vi.fn().mockResolvedValue([]),
     findByDateRange: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),

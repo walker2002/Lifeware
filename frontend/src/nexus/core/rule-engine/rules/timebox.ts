@@ -144,3 +144,43 @@ export const StartTimeInFutureRule: Rule = {
     return { severity: 'pass' }
   },
 }
+
+// ─── 4. DelayedStartRule ──────────────────────────────────────
+// start 动作时，如果 startTime 已过超过 30 分钟，返回 warning
+
+const DELAYED_START_THRESHOLD_MS = 30 * 60 * 1000 // 30 分钟
+
+export const DelayedStartRule: Rule = {
+  name: 'DelayedStartRule',
+
+  evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
+    // 仅对非创建动作生效
+    const action = intent.action
+    if (action !== 'start_timebox') {
+      return { severity: 'pass' }
+    }
+
+    const startTime = getField(intent, 'startTime')
+    if (!isNonEmptyString(startTime)) {
+      return { severity: 'pass' }
+    }
+
+    const parsed = Date.parse(startTime as string)
+    if (isNaN(parsed)) {
+      return { severity: 'pass' }
+    }
+
+    const now = Date.now()
+    const delayMs = now - parsed
+
+    if (delayMs > DELAYED_START_THRESHOLD_MS) {
+      const delayMinutes = Math.round(delayMs / 60000)
+      return {
+        severity: 'warning',
+        message: `开始时间已过 ${delayMinutes} 分钟，确认要开始吗？`,
+      }
+    }
+
+    return { severity: 'pass' }
+  },
+}

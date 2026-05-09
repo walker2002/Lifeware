@@ -6,6 +6,8 @@ import { format, parse, startOfWeek, getDay } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { TimeboxStatus } from "@/usom/types/primitives"
+import type { ExecutionRecord } from "@/usom/types/objects"
+import { getCardBorderColor } from "@/lib/color-coding"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
 interface WeekViewProps {
@@ -16,9 +18,18 @@ interface WeekViewProps {
 const STATUS_BG: Record<TimeboxStatus, string> = {
   planned: "#e6dfd8",
   running: "#cc785c",
-  paused: "#d4a017",
+  overtime: "#f97316",
   ended: "#8e8b82",
+  cancelled: "#d1d5db",
   logged: "#5db872",
+}
+
+const BORDER_COLOR_MAP: Record<string, string> = {
+  "border-l-coral-400": "#e8a090",
+  "border-l-slate-400": "#94a3b8",
+  "border-l-amber-400": "#fbbf24",
+  "border-l-gray-400": "#9ca3af",
+  "border-l-transparent": "transparent",
 }
 
 interface CalendarEvent {
@@ -27,6 +38,7 @@ interface CalendarEvent {
   start: Date
   end: Date
   status: TimeboxStatus
+  executionRecord?: ExecutionRecord
 }
 
 const locales = { "zh-CN": zhCN }
@@ -48,12 +60,13 @@ export function WeekView({ timeboxes, currentDate }: WeekViewProps) {
         start: new Date(tb.startTime),
         end: new Date(tb.endTime),
         status: tb.status,
+        executionRecord: tb.executionRecord,
       })),
     [timeboxes],
   )
 
   return (
-    <div className="rounded-lg border border-hairline bg-surface-card p-4">
+    <div className="w-full rounded-lg border border-hairline bg-surface-card p-4">
       <style>{`
         .rbc-calendar { font-family: "Inter", sans-serif; }
         .rbc-header { border-bottom-color: #e6dfd8; }
@@ -83,6 +96,7 @@ export function WeekView({ timeboxes, currentDate }: WeekViewProps) {
           style: {
             backgroundColor: STATUS_BG[event.status] ?? STATUS_BG.planned,
             color: event.status === "running" ? "#ffffff" : "#141413",
+            borderLeft: `4px solid ${BORDER_COLOR_MAP[getCardBorderColor(event.executionRecord)] ?? "transparent"}`,
           },
         })}
         views={["week"]}

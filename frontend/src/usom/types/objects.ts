@@ -173,6 +173,27 @@ export interface HabitLog {
   source: 'manual' | 'connector'
 }
 
+// ─── Execution Record Types ──────────────────────────────────────
+export interface SimpleExecutionRecord {
+  mode: 'simple'
+  completionStatus: 'completed' | 'partially_completed' | 'not_completed'
+  actualDuration: number
+  plannedDuration: number
+  deviationMinutes: number
+  loggedAt: string
+}
+
+export interface DetailedExecutionRecord extends Omit<SimpleExecutionRecord, 'mode'> {
+  mode: 'detailed'
+  completionRating: number
+  actualOutput: string
+  deviationReasons?: string
+  energyLevel?: number
+  notes?: string
+}
+
+export type ExecutionRecord = SimpleExecutionRecord | DetailedExecutionRecord
+
 // ─── 3.10 Timebox ─────────────────────────────────────────────
 export interface Timebox {
   id: USOM_ID
@@ -188,9 +209,10 @@ export interface Timebox {
   createdAt: Timestamp
   updatedAt: Timestamp
   startedAt?: Timestamp
-  pausedAt?: Timestamp
+  overtimeAt?: Timestamp
   endedAt?: Timestamp
   loggedAt?: Timestamp
+  executionRecord?: ExecutionRecord
   notes?: Notes
 }
 

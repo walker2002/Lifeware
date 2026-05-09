@@ -1,5 +1,5 @@
 // Timebox Domain Plugin — 四钩子实现
-// 遵循 Constitution Principle VI: 纯粹被动组件，禁止直接写状态、自主执行、跨域访问
+// 遵循 Constitution Principle VI: 纯粹被动组件
 
 import type {
   DomainPlugin,
@@ -14,30 +14,26 @@ import type {
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 
-// ─── Manifest 定义 ───────────────────────────────────────────
-// 与 manifest.yaml 保持一致
 const timeboxManifest: DomainManifest = {
   domainId: 'timebox',
-  version: '0.1.0',
+  version: '0.2.0',
   requiredFields: ['title', 'startTime', 'duration'],
   subscribedEvents: [
     'TimeboxCreated',
     'TimeboxStarted',
-    'TimeboxPaused',
+    'TimeboxOvertime',
     'TimeboxEnded',
+    'TimeboxCancelled',
     'TimeboxLogged',
   ],
 }
 
-// ─── 订阅事件集合（用于快速查找） ───────────────────────────
 const SUBSCRIBED_EVENTS = new Set(timeboxManifest.subscribedEvents)
 
-// ─── 常量 ────────────────────────────────────────────────────
-const MIN_DURATION = 5   // 最短 5 分钟
-const MAX_DURATION = 480 // 最长 480 分钟（8 小时）
-const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000 // 15 分钟
+const MIN_DURATION = 5
+const MAX_DURATION = 480
+const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000
 
-// ─── onValidate: 结构性验证 ─────────────────────────────────
 function onValidate(
   intent: StructuredIntent,
   _snapshot: USOMSnapshot,
@@ -45,19 +41,16 @@ function onValidate(
   const errors: string[] = []
   const { fields } = intent
 
-  // title 非空
   const title = fields['title']
   if (!title || (typeof title === 'string' && title.trim() === '')) {
     errors.push('title 不能为空')
   }
 
-  // startTime 合法（ISO 8601）
   const startTime = fields['startTime']
   if (!startTime || typeof startTime !== 'string' || isNaN(Date.parse(startTime))) {
     errors.push('startTime 必须是有效的 ISO 8601 时间格式')
   }
 
-  // duration 合法（正整数，5 ≤ duration ≤ 480）
   const duration = fields['duration']
   if (
     typeof duration !== 'number' ||
@@ -71,81 +64,83 @@ function onValidate(
   return { valid: errors.length === 0, errors }
 }
 
-// ─── onEvent: 事件响应 ───────────────────────────────────────
 function onEvent(
   event: SystemEvent,
   _snapshot: USOMSnapshot,
 ): { metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] } {
-  // 未订阅事件直接返回空
   if (!SUBSCRIBED_EVENTS.has(event.type)) {
     return { metrics: [], suggestions: [] }
   }
 
   const title = (event.payload['title'] as string) || '未命名时间盒'
-
-  // MVP: metrics 暂不实现，返回空数组
   const metrics: MetricUpdate[] = []
 
-  // 根据事件类型生成 suggestion
   switch (event.type) {
     case 'TimeboxCreated':
       return {
         metrics,
-        suggestions: [
-          {
-            actionType: 'start_timebox',
-            label: `时间盒已创建: ${title}`,
-            weight: 60,
-          },
-        ],
+        suggestions: [{
+          actionType: 'start_timebox',
+          label: `时间盒已创建: ${title}`,
+          weight: 60,
+        }],
       }
 
     case 'TimeboxStarted':
       return {
         metrics,
-        suggestions: [
-          {
-            actionType: 'start_timebox',
-            label: `时间盒开始: ${title}`,
-            weight: 70,
-          },
-        ],
+        suggestions: [{
+          actionType: 'start_timebox',
+          label: `时间盒开始: ${title}`,
+          weight: 70,
+        }],
+      }
+
+    case 'TimeboxOvertime':
+      return {
+        metrics,
+        suggestions: [{
+          actionType: 'start_timebox',
+          label: `时间盒超时: ${title}`,
+          weight: 85,
+        }],
       }
 
     case 'TimeboxEnded':
       return {
         metrics,
-        suggestions: [
-          {
-            actionType: 'capture_intent',
-            label: '时间盒结束，请记录执行结果',
-            weight: 70,
-          },
-        ],
+        suggestions: [{
+          actionType: 'capture_intent',
+          label: '时间盒结束，请记录执行结果',
+          weight: 70,
+        }],
+      }
+
+    case 'TimeboxCancelled':
+      return {
+        metrics,
+        suggestions: [{
+          actionType: 'skip',
+          label: `时间盒已取消: ${title}`,
+          weight: 40,
+        }],
       }
 
     case 'TimeboxLogged':
       return {
         metrics,
-        suggestions: [
-          {
-            actionType: 'start_timebox',
-            label: `已记录: ${title}`,
-            weight: 50,
-          },
-        ],
+        suggestions: [{
+          actionType: 'start_timebox',
+          label: `已记录: ${title}`,
+          weight: 50,
+        }],
       }
-
-    case 'TimeboxPaused':
-      // MVP: 暂无特定建议
-      return { metrics, suggestions: [] }
 
     default:
       return { metrics, suggestions: [] }
   }
 }
 
-// ─── onActionSurfaceRequest: Action Surface 候选生成 ────────
 function onActionSurfaceRequest(
   snapshot: USOMSnapshot,
   _signals: Readonly<DerivedSignals>,
@@ -153,7 +148,22 @@ function onActionSurfaceRequest(
   const actions: ActionCandidate[] = []
   const now = new Date(snapshot.currentTime).getTime()
 
-  // 优先级 1: 有 running 时间盒 → tile, weight 90
+  // 优先级 0: overtime 时间盒 → tile, weight 95
+  if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'overtime') {
+    const tb = snapshot.currentTimebox
+    actions.push({
+      id: `action-${tb.id}-overtime` as USOM_ID,
+      sourceObjectId: tb.id,
+      sourceObjectType: 'timebox',
+      label: `已超时: ${tb.title}`,
+      actionType: 'start_timebox',
+      category: 'tile',
+      weight: 95,
+    })
+    return { actions, category: 'tile', weight: 95 }
+  }
+
+  // 优先级 1: running 时间盒 → tile, weight 90
   if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'running') {
     const tb = snapshot.currentTimebox
     actions.push({
@@ -165,11 +175,10 @@ function onActionSurfaceRequest(
       category: 'tile',
       weight: 90,
     })
-    // running 优先级最高，直接返回
     return { actions, category: 'tile', weight: 90 }
   }
 
-  // 优先级 2: 有 planned 时间盒且距 startTime < 15min → cue, weight 80
+  // 优先级 2: planned 即将开始 → cue, weight 80
   for (const tb of snapshot.upcomingTimeboxes) {
     if (tb.status === 'planned') {
       const startMs = new Date(tb.startTime).getTime()
@@ -191,7 +200,7 @@ function onActionSurfaceRequest(
     return { actions, category: 'cue', weight: 80 }
   }
 
-  // 优先级 3: 有 ended 时间盒 → cue, weight 70
+  // 优先级 3: ended 时间盒 → cue, weight 70
   if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'ended') {
     const tb = snapshot.currentTimebox
     actions.push({
@@ -206,15 +215,12 @@ function onActionSurfaceRequest(
     return { actions, category: 'cue', weight: 70 }
   }
 
-  // 无匹配条件
   return { actions, category: 'cue', weight: 0 }
 }
 
-// ─── 导出 Timebox Domain Plugin ─────────────────────────────
 export const timeboxPlugin: DomainPlugin = {
   manifest: timeboxManifest,
   onValidate,
   onEvent,
   onActionSurfaceRequest,
-  // onOutboundRequest: MVP 不实现
 }

@@ -77,7 +77,8 @@ export type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'arc
 export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'completed' | 'archived'
 export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived'
 export type HabitLogStatus = 'completed' | 'skipped' | 'partial'
-export type TimeboxStatus = 'planned' | 'running' | 'paused' | 'ended' | 'logged'
+export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'
+export type CompletionStatus = 'completed' | 'partially_completed' | 'not_completed'
 export type ReviewStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
 export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
 

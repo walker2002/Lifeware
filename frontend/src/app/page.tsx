@@ -15,10 +15,13 @@ import { TracePanel } from "@/components/trace-panel";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange } from "./actions/intent";
-import type { IntentSubmissionResult } from "./actions/intent";
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent } from "./actions/intent";
+import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
 import { setTraceConfig, getTraceConfig } from "@/lib/config/trace-config";
 import { Button } from "@/components/ui/button";
+import { ExecutionLogDialog } from "@/components/execution-log-dialog";
+import type { ExecutionRecord } from "@/usom/types/objects";
+import { useAutoTrigger } from "@/hooks/use-auto-trigger";
 import {
   startOfDay, endOfDay,
   startOfWeek, endOfWeek,
@@ -65,6 +68,14 @@ export default function Home() {
   const [traceEnabled, setTraceEnabled] = useState(getTraceConfig().enabled);
   const [traceSessions, setTraceSessions] = useState<TraceSession[]>([]);
 
+  const [logTarget, setLogTarget] = useState<string | null>(null);
+
+  const [transitionConfirm, setTransitionConfirm] = useState<{
+    timeboxId: string;
+    action: string;
+    message: string;
+  } | null>(null);
+
   const [confirmation, setConfirmation] = useState<{
     message: string;
     rawInput?: string;
@@ -88,6 +99,15 @@ export default function Home() {
   useEffect(() => {
     loadTimeboxes();
   }, [dateMode, currentDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 自动触发：planned→running / running→overtime
+  useAutoTrigger({
+    timeboxes,
+    onTransition: async (id, action) => {
+      const result = await transitionTimebox(id, action as any);
+      if (result.success) await loadTimeboxes();
+    },
+  });
 
   function handleResult(result: IntentSubmissionResult) {
     setTimeboxes(result.timeboxes);
@@ -118,10 +138,49 @@ export default function Home() {
     }
   }
 
+  // 检测执行意图关键词
+  const isExecutionIntent = (input: string): boolean => {
+    return /^(开始|结束|取消|记录|复盘|启动|完成|停止)/.test(input.trim());
+  };
+
+  // 检测批量创建意图：多个时间模式或显式分隔符
+  const isBatchIntent = (input: string): boolean => {
+    const timePattern = /\d{1,2}[:：]\d{2}/g;
+    const timeMatches = input.match(timePattern);
+    if (timeMatches && timeMatches.length >= 2) return true;
+    if (/[;；\n]/.test(input) && input.length > 20) return true;
+    return false;
+  };
+
   const handleSubmit = useCallback(async (rawInput: string, confirmed?: boolean) => {
     setError(undefined);
     setIsLoading(true);
     try {
+      // 执行意图走专用路径
+      if (isExecutionIntent(rawInput)) {
+        const result = await submitExecutionIntent(rawInput);
+        setTimeboxes(result.timeboxes);
+        if (!result.success) {
+          setError(result.error ?? "执行失败");
+        }
+        return;
+      }
+
+      // 批量意图：多任务拆分创建
+      if (isBatchIntent(rawInput)) {
+        const batchResult = await submitBatchIntent(rawInput);
+        await loadTimeboxes();
+        const batchErrors = batchResult.results
+          .filter(r => r.error)
+          .map(r => `第${r.index + 1}个任务"${r.title}"：${r.error}`);
+        if (batchErrors.length > 0) {
+          setError(batchErrors.join("；"));
+        } else {
+          setError(undefined);
+        }
+        return;
+      }
+
       const result = await submitIntent(rawInput, confirmed, traceEnabled);
       if (result.needsConfirmation) {
         setConfirmation({ message: result.confirmationMessage ?? "", rawInput });
@@ -132,7 +191,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [traceEnabled]);
+  }, [traceEnabled, loadTimeboxes]);
 
   const handleFormSubmit = useCallback(async (fields: TemplateFormFields, confirmed?: boolean) => {
     setError(undefined);
@@ -197,12 +256,84 @@ export default function Home() {
     setCurrentDate((prev) => navigateDate(dateMode, prev, direction));
   }, [dateMode]);
 
+  const handleTimeboxAction = useCallback(async (timeboxId: string, action: string) => {
+    if (action === "log" || action === "viewLog") {
+      // log 和 viewLog 由 ExecutionLogDialog 处理，此处仅触发打开
+      setLogTarget(timeboxId);
+      return;
+    }
+
+    // cancel 和 end 需要确认
+    if (action === "cancel") {
+      setTransitionConfirm({ timeboxId, action, message: "确认取消这个时间盒？" });
+      return;
+    }
+
+    // start / end / overtime 直接执行
+    setIsLoading(true);
+    try {
+      const result = await transitionTimebox(timeboxId, action as any);
+      if (result.success) {
+        await loadTimeboxes();
+      } else if (result.needsConfirmation) {
+        setTransitionConfirm({ timeboxId, action, message: result.confirmationMessage ?? "确认继续？" });
+      } else {
+        setError(result.error ?? "操作失败");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作失败");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadTimeboxes]);
+
+  const handleTransitionConfirm = useCallback(async () => {
+    if (!transitionConfirm) return;
+    setIsLoading(true);
+    try {
+      const result = await transitionTimebox(
+        transitionConfirm.timeboxId,
+        transitionConfirm.action as any,
+      );
+      if (result.success) {
+        await loadTimeboxes();
+      } else {
+        setError(result.error ?? "操作失败");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作失败");
+    } finally {
+      setIsLoading(false);
+      setTransitionConfirm(null);
+    }
+  }, [transitionConfirm, loadTimeboxes]);
+
+  const handleLogSubmit = useCallback(async (timeboxId: string, executionRecord: ExecutionRecord) => {
+    setIsLoading(true);
+    try {
+      const result = await transitionTimebox(timeboxId, 'log', executionRecord);
+      if (result.success) {
+        await loadTimeboxes();
+      } else {
+        setError(result.error ?? "记录失败");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "记录失败");
+    } finally {
+      setIsLoading(false);
+      setLogTarget(null);
+    }
+  }, [loadTimeboxes]);
+
+  const logTargetTimebox = logTarget ? timeboxes.find(t => t.id === logTarget) : null;
+
   const handleDateSelect = useCallback((date: Date) => {
     setCurrentDate(date);
     setDateMode('day');
   }, []);
 
   return (
+    <>
     <AppShell
       onSettingsClick={handleSettingsClick}
       tilesBanner={
@@ -276,7 +407,7 @@ export default function Home() {
         </div>
       }
       mainContent={
-        <div className="flex flex-col gap-4">
+        <div className="flex w-full flex-col gap-4">
           <DateNav
             mode={dateMode}
             currentDate={currentDate}
@@ -285,7 +416,7 @@ export default function Home() {
           />
 
           {dateMode === "day" && (
-            <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} />
+            <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />
           )}
           {dateMode === "week" && (
             <WeekView timeboxes={timeboxes} currentDate={currentDate} />
@@ -303,5 +434,31 @@ export default function Home() {
         />
       }
     />
+        {/* 状态转换确认对话框 */}
+        {transitionConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="mx-4 max-w-sm rounded-lg bg-white p-6 shadow-lg">
+              <p className="mb-4 text-sm font-medium text-ink">{transitionConfirm.message}</p>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => setTransitionConfirm(null)} disabled={isLoading}>
+                  取消
+                </Button>
+                <Button size="sm" onClick={handleTransitionConfirm} disabled={isLoading}>
+                  {isLoading ? "处理中..." : "确认"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* 执行记录对话框 */}
+        {logTargetTimebox && (
+          <ExecutionLogDialog
+            timebox={logTargetTimebox}
+            open={!!logTarget}
+            onClose={() => setLogTarget(null)}
+            onSubmit={handleLogSubmit}
+          />
+        )}
+    </>
   );
 }

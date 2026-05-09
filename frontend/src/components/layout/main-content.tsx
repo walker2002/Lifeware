@@ -16,7 +16,7 @@ export function MainContent({ children }: MainContentProps) {
       className="min-w-0 flex-1 overflow-y-auto bg-canvas p-6"
       role="main"
     >
-      <div className="mx-auto max-w-[960px]">{children}</div>
+      <div className="w-full">{children}</div>
     </main>
   );
 }

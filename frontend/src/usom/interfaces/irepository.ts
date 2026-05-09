@@ -57,10 +57,11 @@ export interface IHabitLogRepository {
 export interface ITimeboxRepository {
   findById(id: USOM_ID, userId: USOM_ID): Promise<Timebox | null>
   findRunning(userId: USOM_ID): Promise<Timebox[]>
+  findByStatus(status: string, userId: USOM_ID): Promise<Timebox[]>
   findUpcoming(userId: USOM_ID, withinHours?: number): Promise<Timebox[]>
   findByDateRange(start: Timestamp, end: Timestamp, userId: USOM_ID): Promise<Timebox[]>
   save(timebox: Timebox, userId: USOM_ID): Promise<void>
-  archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+  archive(id: USOM_ID, userId: USOM_ID, executionRecord?: import('../types/objects').ExecutionRecord): Promise<void>
 }
 
 // ─── Objective ─────────────────────────────────────────────────

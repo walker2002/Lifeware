@@ -1,6 +1,5 @@
 // Orchestrator — Nexus 管道协调器
 // 统一入口，按顺序协调: IntentEngine → RuleEngine → StateMachine → EventBus → ActionSurfaceEngine
-// MVP 阶段: 仅接线已有组件，未实现的组件使用 stub 接口
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { Timebox } from '@/usom/types/objects'
@@ -16,14 +15,10 @@ import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructu
 import { createTimeboxStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 
-// ─── Stub 接口（未实现的组件）──────────────────────────────────
-
-/** 意图引擎 — 将原始输入解析为 StructuredIntent */
 interface IntentEngine {
   parse(rawInput: string, userId: USOM_ID): Promise<StructuredIntent>
 }
 
-/** 规则引擎 — 校验意图，返回通过/警告/需确认 */
 interface RuleEngine {
   evaluate(
     intent: StructuredIntent,
@@ -35,64 +30,43 @@ interface RuleEngine {
   }>
 }
 
-/** 动作面引擎 — 生成 ActionSurface */
 interface ActionSurfaceEngine {
   generate(snapshot: ContextSnapshot, event?: SystemEvent, userId?: USOM_ID): Promise<ActionSurface>
 }
 
-// ─── 结果类型 ─────────────────────────────────────────────────
-
-/** Orchestrator 执行结果 */
 export interface OrchestratorResult {
   success: boolean
-  /** 状态机产出的 Timebox 对象 */
   timebox?: Timebox
-  /** 动作面（Phase 2） */
   actionSurface?: ActionSurface
-  /** 失败时的错误信息 */
   error?: string
-  /** 规则引擎的警告列表 */
   warnings?: string[]
-  /** 是否需要用户确认 */
   needsConfirmation?: boolean
-  /** 确认提示消息 */
   confirmationMessage?: string
 }
-
-// ─── 依赖接口 ─────────────────────────────────────────────────
 
 export interface OrchestratorDeps {
   timeboxRepo: ITimeboxRepository
   eventRepo: ISystemEventRepository
   intentEngine: IntentEngine
   ruleEngine: RuleEngine
-  /** 可选，MVP 阶段不实现 */
   actionSurfaceEngine?: ActionSurfaceEngine
-  /** 可选，追踪日志回调（注入 TraceLogger） */
   onTrace?: (step: TraceStep) => void
 }
 
-// ─── 动作映射 ─────────────────────────────────────────────────
-
-/** 意图引擎的领域动作 → 状态机生命周期动作 */
 function toLifecycleAction(domainAction: string): string {
   const map: Record<string, string> = {
     create_timebox: 'create',
     start_timebox: 'start',
-    pause_timebox: 'pause',
-    resume_timebox: 'resume',
     end_timebox: 'end',
+    overtime_timebox: 'overtime',
+    cancel_timebox: 'cancel',
     log_timebox: 'log',
   }
   return map[domainAction] ?? domainAction
 }
 
-// ─── Stub 工具函数 ─────────────────────────────────────────────
-
-/** 创建最小化的 ContextSnapshot（MVP 临时占位） */
 function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
   const now = new Date().toISOString() as Timestamp
-
   return {
     snapshotId: crypto.randomUUID() as USOM_ID,
     userId,
@@ -117,8 +91,6 @@ function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
   }
 }
 
-// ─── 追踪辅助 ─────────────────────────────────────────────────
-
 function trace(
   onTrace: OrchestratorDeps['onTrace'],
   component: TraceComponent,
@@ -137,8 +109,6 @@ function trace(
   })
 }
 
-// ─── 工厂函数 ─────────────────────────────────────────────────
-
 export function createOrchestrator(deps: OrchestratorDeps) {
   const eventBus = createEventBus()
   const stateMachine = createTimeboxStateMachine({
@@ -147,22 +117,16 @@ export function createOrchestrator(deps: OrchestratorDeps) {
   })
 
   return {
-    /** 暴露 eventBus 供外部注册订阅 */
     eventBus,
 
-    /**
-     * 执行 Nexus 管道
-     */
+    /** 通过自然语言输入执行 Nexus 管道（创建路径） */
     async execute(rawInput: string, userId: USOM_ID, confirmed?: boolean): Promise<OrchestratorResult> {
-      // Step 1: 解析意图
       trace(deps.onTrace, 'IntentEngine', 'start', { input: { rawInput } })
       const intent = await deps.intentEngine.parse(rawInput, userId)
       trace(deps.onTrace, 'IntentEngine', 'end', { input: { rawInput }, output: { intent } })
 
-      // Step 2: 构造最小快照（MVP 占位）
       const snapshot = createStubSnapshot(userId)
 
-      // Step 3: 规则评估
       trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
       const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
       trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
@@ -175,7 +139,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // Step 4: 从 StructuredIntent 创建 StateProposal
       const proposal: StateProposal = {
         id: crypto.randomUUID() as USOM_ID,
         intentId: intent.id,
@@ -186,7 +149,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         approvedBy: 'rule_engine',
       }
 
-      // Step 5: 执行状态机
       trace(deps.onTrace, 'StateMachine', 'start', { input: { proposal } })
       const smResult = await stateMachine.execute(proposal, eventBus, userId)
       trace(deps.onTrace, 'StateMachine', 'end', {
@@ -199,7 +161,78 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         return { success: false, error: smResult.error }
       }
 
-      // Step 6: 生成 ActionSurface
+      trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot, event: smResult.event } })
+      let actionSurface: ActionSurface | undefined
+      if (deps.actionSurfaceEngine) {
+        actionSurface = await deps.actionSurfaceEngine.generate(snapshot, smResult.event, userId)
+      }
+      trace(deps.onTrace, 'ActionSurfaceEngine', 'end', { input: { snapshot }, output: { actionSurface } })
+
+      return {
+        success: true,
+        timebox: smResult.object,
+        actionSurface,
+        warnings: ruleResult.warnings,
+      }
+    },
+
+    /** 直接执行状态转换（非创建路径：start/end/cancel/log/overtime） */
+    async executeTransition(
+      objectId: USOM_ID,
+      action: string,
+      userId: USOM_ID,
+      payload: Record<string, unknown> = {},
+      confirmed?: boolean,
+    ): Promise<OrchestratorResult> {
+      const snapshot = createStubSnapshot(userId)
+
+      // 构造一个最小化的 StructuredIntent 供规则引擎评估
+      const stubIntent: StructuredIntent = {
+        id: crypto.randomUUID() as USOM_ID,
+        intentionId: '' as USOM_ID,
+        targetDomain: 'timebox',
+        action: action + '_timebox',
+        fields: { objectId, ...payload },
+        confidence: 1.0,
+        resolvedBy: 'template_form',
+        createdAt: new Date().toISOString() as Timestamp,
+      }
+
+      trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent: stubIntent } })
+      const ruleResult = await deps.ruleEngine.evaluate(stubIntent, snapshot)
+      trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent: stubIntent }, output: { ruleResult } })
+
+      if (ruleResult.result === 'confirm' && !confirmed) {
+        return {
+          success: false,
+          needsConfirmation: true,
+          confirmationMessage: ruleResult.confirmations?.join('; '),
+          warnings: ruleResult.warnings,
+        }
+      }
+
+      const proposal: StateProposal = {
+        id: crypto.randomUUID() as USOM_ID,
+        intentId: '' as USOM_ID,
+        targetObject: { type: 'timebox', id: objectId },
+        action,
+        payload,
+        approvedAt: new Date().toISOString() as Timestamp,
+        approvedBy: 'rule_engine',
+      }
+
+      trace(deps.onTrace, 'StateMachine', 'start', { input: { proposal } })
+      const smResult = await stateMachine.execute(proposal, eventBus, userId)
+      trace(deps.onTrace, 'StateMachine', 'end', {
+        input: { proposal },
+        output: { success: smResult.success, object: smResult.object },
+        error: smResult.error,
+      })
+
+      if (!smResult.success) {
+        return { success: false, error: smResult.error }
+      }
+
       trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot, event: smResult.event } })
       let actionSurface: ActionSurface | undefined
       if (deps.actionSurfaceEngine) {

@@ -67,9 +67,9 @@ describe('EventBus', () => {
   it('取消订阅后 handler 不再被调用', () => {
     const bus = createEventBus()
     const handler = vi.fn()
-    const event = makeEvent({ type: 'TimeboxPaused' })
+    const event = makeEvent({ type: 'TimeboxOvertime' })
 
-    const unsubscribe = bus.subscribe('TimeboxPaused', handler)
+    const unsubscribe = bus.subscribe('TimeboxOvertime', handler)
     unsubscribe()
     bus.publish(event)
 

@@ -118,6 +118,77 @@ function parseTemplateForm(fields: {
 }
 ```
 
+### Server Action: `submitBatchIntent`
+
+```typescript
+// 批量创建 — 单次输入描述多个时间盒任务
+
+interface BatchItemResult {
+  index: number
+  title: string
+  timeboxId?: string       // 创建成功时返回
+  error?: string           // 失败原因
+  warning?: string         // Rule Engine 警告
+  needsConfirmation?: boolean
+}
+
+interface BatchIntentResult {
+  results: BatchItemResult[]
+}
+
+async function submitBatchIntent(rawInput: string): Promise<BatchIntentResult>
+```
+
+**数据流**：
+
+```
+submitBatchIntent(rawInput)
+  │
+  ├─ 构造 Intention { rawInput, inputMode: 'natural_language' }
+  │
+  ├─ Intent Engine parseBatch(rawInput)
+  │   └─ LLM 输出 { tasks: [{ title, startTime, duration, confidence, incomplete }] }
+  │   └─ 过滤 incomplete 和低置信度任务
+  │
+  ├─ 遍历每个任务 → submitIntent(taskDesc)
+  │   └─ 每个任务独立走完整 Nexus 管道
+  │
+  └─ 返回 BatchIntentResult { results: [{ index, title, timeboxId? }] }
+```
+
+**多任务 AI Prompt 规范**：
+
+```typescript
+const MULTI_TASK_PROMPT = `
+输出 JSON 格式：
+{
+  "tasks": [
+    {
+      "title": "string",
+      "startTime": "ISO 8601（含时区）",
+      "duration": number（分钟）,
+      "confidence": 0-1,
+      "incomplete": false
+    }
+  ]
+}
+
+识别规则：
+- 时间关键词（上午/下午/晚上/明天/X点）标志新任务开始
+- 常见分隔符（分号、逗号、句号、换行）为辅助线索
+- 语义分段优于分隔符
+- 无法提取完整信息的任务标记 incomplete: true
+`
+```
+
+**前端集成**：
+
+客户端通过启发式函数 `isBatchIntent(rawInput)` 判断是否路由到批量路径：
+- 输入包含 2+ 个时间模式（`\d{1,2}:\d{2}`）
+- 或包含分隔符（`;`、`；`、`\n`）且长度 > 20
+
+成功时刷新时间盒列表，失败时显示格式：`第N个任务"标题"：错误信息`。
+
 ## 错误处理
 
 | 场景 | 处理方式 |
@@ -127,3 +198,5 @@ function parseTemplateForm(fields: {
 | 规则校验失败 | 返回 warnings + needsConfirmation |
 | 时间重叠 | Rule Engine 返回 `confirm`，等待用户确认 |
 | Repository 错误 | 抛出异常，Server Action 捕获并返回通用错误 |
+| 批量全部失败 | 返回单个 error "未识别到有效任务" |
+| 批量部分失败 | 成功项已创建，失败项逐条报告 |

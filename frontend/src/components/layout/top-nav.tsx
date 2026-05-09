@@ -6,6 +6,7 @@ import { Menu } from "lucide-react";
 interface TopNavProps {
   onMenuClick?: () => void;
   onSettingsClick?: () => void;
+  isPanelOpen?: boolean;
 }
 
 /**
@@ -13,7 +14,7 @@ interface TopNavProps {
  *
  * 显示 Lifeware 品牌标识和右侧图标导航按钮。
  */
-export function TopNav({ onMenuClick, onSettingsClick }: TopNavProps) {
+export function TopNav({ onMenuClick, onSettingsClick, isPanelOpen }: TopNavProps) {
   return (
     <header
       className="flex h-16 items-center justify-between border-b border-hairline bg-canvas px-4"
@@ -24,9 +25,8 @@ export function TopNav({ onMenuClick, onSettingsClick }: TopNavProps) {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="md:hidden"
             onClick={onMenuClick}
-            aria-label="打开菜单"
+            aria-label={isPanelOpen ? "收起 AI 面板" : "展开 AI 面板"}
           >
             <Menu className="size-5 text-body" />
           </Button>

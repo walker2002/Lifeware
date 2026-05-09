@@ -35,6 +35,11 @@ export interface TimeboxSummary {
   endTime: Timestamp
   taskIds: USOM_ID[]
   habitIds: USOM_ID[]
+  startedAt?: Timestamp
+  overtimeAt?: Timestamp
+  endedAt?: Timestamp
+  loggedAt?: Timestamp
+  executionRecord?: import('./objects').ExecutionRecord
 }
 
 export interface ObjectiveSummary {

@@ -38,6 +38,7 @@ function makeMockRepos() {
   const timeboxRepo: ITimeboxRepository = {
     findById: vi.fn().mockResolvedValue(null),
     findRunning: vi.fn().mockResolvedValue([]),
+    findByStatus: vi.fn().mockResolvedValue([]),
     findUpcoming: vi.fn().mockResolvedValue([]),
     findByDateRange: vi.fn().mockResolvedValue([]),
     save: vi.fn(async (timebox: Timebox) => {
@@ -87,18 +88,18 @@ describe('State Machine — transitions 表', () => {
     expect(t!.eventType).toBe('TimeboxStarted')
   })
 
-  it('pause → running → paused 应存在', () => {
-    const t = findTransition('running', 'pause')
+  it('overtime → running → overtime 应存在', () => {
+    const t = findTransition('running', 'overtime')
     expect(t).not.toBeNull()
-    expect(t!.to).toBe('paused')
-    expect(t!.eventType).toBe('TimeboxPaused')
+    expect(t!.to).toBe('overtime')
+    expect(t!.eventType).toBe('TimeboxOvertime')
   })
 
-  it('resume → paused → running 应存在', () => {
-    const t = findTransition('paused', 'resume')
+  it('end → overtime → ended 应存在', () => {
+    const t = findTransition('overtime', 'end')
     expect(t).not.toBeNull()
-    expect(t!.to).toBe('running')
-    expect(t!.eventType).toBe('TimeboxStarted')
+    expect(t!.to).toBe('ended')
+    expect(t!.eventType).toBe('TimeboxEnded')
   })
 
   it('end → running → ended 应存在', () => {
@@ -125,7 +126,7 @@ describe('State Machine — transitions 表', () => {
   // 5. 拒绝非法转换
   it('非法转换应返回 null', () => {
     expect(findTransition('logged', 'create')).toBeNull()
-    expect(findTransition('planned', 'pause')).toBeNull()
+    expect(findTransition('planned', 'overtime')).toBeNull()
     expect(findTransition('ended', 'start')).toBeNull()
   })
 
@@ -187,9 +188,9 @@ describe('State Machine — execute', () => {
     expect(timebox.isRecurring).toBe(false)
     expect(timebox.tags).toEqual(['写作'])
     expect(timebox.status).toBe('planned')
-    // 创建时不应有 startedAt/pausedAt/endedAt/loggedAt
+    // 创建时不应有 startedAt/overtimeAt/endedAt/loggedAt
     expect(timebox.startedAt).toBeUndefined()
-    expect(timebox.pausedAt).toBeUndefined()
+    expect(timebox.overtimeAt).toBeUndefined()
     expect(timebox.endedAt).toBeUndefined()
     expect(timebox.loggedAt).toBeUndefined()
     // id 和时间戳应被自动生成

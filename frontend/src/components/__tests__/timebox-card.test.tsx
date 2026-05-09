@@ -48,8 +48,8 @@ describe("TimeboxCard", () => {
     expect(screen.getByText("已结束")).toBeInTheDocument();
   });
 
-  it("paused 状态显示正确徽章", () => {
-    render(<TimeboxCard timebox={createMockTimebox({ status: "paused" })} />);
-    expect(screen.getByText("已暂停")).toBeInTheDocument();
+  it("overtime 状态显示正确徽章", () => {
+    render(<TimeboxCard timebox={createMockTimebox({ status: "overtime" })} />);
+    expect(screen.getByText("已超时")).toBeInTheDocument();
   });
 });

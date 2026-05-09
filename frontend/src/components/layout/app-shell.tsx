@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { usePanelState } from "@/hooks/use-panel-state";
 
 interface AppShellProps {
   /** AI 面板内容 */
@@ -27,27 +28,44 @@ interface AppShellProps {
 /**
  * AppShell — 全局布局壳
  *
- * 响应式布局：
- * - 桌面端（>=768px）：CSS Grid 两栏（AiPanel 320px + MainContent flex-1）
- * - 移动端（<768px）：单栏，AiPanel 折叠为 Sheet 侧边抽屉
+ * 桌面端（>=768px）：Flexbox 可收起侧边栏。
+ * - AI 面板展开时占据 320px，主内容区填充剩余宽度
+ * - 收起时面板宽度过渡为 0，主内容区拉伸至全宽
+ * - 状态持久化至 localStorage，默认展开
+ *
+ * 移动端（<768px）：Sheet 侧边抽屉（不变）
  */
 export function AppShell({ aiPanel, mainContent, tilesBanner, tracePanel, onSettingsClick }: AppShellProps) {
+  const { isOpen, toggle } = usePanelState();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <div className="grid h-screen grid-rows-[64px_1fr] bg-canvas">
       {/* 顶栏 — 横跨全宽 */}
-      <TopNav onMenuClick={() => setSheetOpen(true)} onSettingsClick={onSettingsClick} />
+      <TopNav onMenuClick={toggle} onSettingsClick={onSettingsClick} isPanelOpen={isOpen} />
 
-      {/* 内容区域：Tiles + 两栏 + 追踪面板 */}
+      {/* 内容区域：Tiles + 主内容区 + AI 面板 + 追踪面板 */}
       <div className="flex min-h-0 flex-col overflow-hidden">
         {/* TilesBanner — 全宽横幅 */}
         {tilesBanner}
 
-        {/* 桌面端：两栏布局 */}
-        <div className="hidden min-h-0 flex-1 md:grid md:grid-cols-[320px_1fr]">
-          <AiPanel>{aiPanel}</AiPanel>
-          <MainContent>{mainContent}</MainContent>
+        {/* 桌面端：Flexbox 可收起侧边栏 */}
+        <div className="hidden min-h-0 flex-1 md:flex">
+          {/* AI 面板 — 宽度过渡动画 */}
+          <div
+            className={`h-full overflow-hidden border-r border-hairline bg-canvas transition-all duration-300 ${
+              isOpen ? "w-80" : "w-0 border-r-0"
+            }`}
+          >
+            <div className="w-80 h-full">
+              <AiPanel>{aiPanel}</AiPanel>
+            </div>
+          </div>
+
+          {/* 主内容区 — flex-1 自动填充 */}
+          <div className="min-h-0 flex-1">
+            <MainContent>{mainContent}</MainContent>
+          </div>
         </div>
 
         {/* 移动端：单栏 + Sheet 抽屉 */}
