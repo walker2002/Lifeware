@@ -50,7 +50,7 @@
 
 - [ ] T006 生成并验证 Drizzle migration，运行 `npm run db:generate` 和 `npm run db:migrate`
 
-  **验收**: Given schema.ts 已更新, When 运行 db:generate, Then 生成 0002_habit_enhancements.sql 文件；When 运行 db:migrate, Then 数据库表结构更新成功，现有数据保留且新字段有默认值
+  **验收**: Given schema.ts 已更新, When 运行 db:generate, Then 生成 0002_habit_enhancements.sql 文件；When 运行 db:migrate, Then 数据库表结构更新成功，现有数据保留且新字段按公式回填（earliestTime = defaultTime - 30min, latestEndTime = defaultTime + defaultDuration + 30min, minDuration = floor(defaultDuration * 0.5 / 5) * 5, trackable = true）。注意：data-model.md 中 Migration SQL 的回填值需与此公式一致，非简单赋值
 
 ---
 
@@ -165,38 +165,47 @@
 
   **验收**: Given 工作日模板含 3 个习惯（晨跑 timeOverride=06:30, 午餐, 复盘）, When 执行 applyTemplate, Then 生成 3 个 draft 时间盒，每个通过 timebox_habits 关联到对应习惯
 
-- [ ] T024 [US2] 实现习惯冲突检测规则：检测习惯时间盒与已有时间盒/任务的重叠，在 `frontend/src/nexus/core/rule-engine/rules/habit-conflict.ts`
+- [ ] T024 [US2] 实现模板应用幂等性检查：同一天对同一模板重复调用 applyTemplate 时，拒绝并提示"今日已使用该模板生成计划"，在 `frontend/src/nexus/orchestrator/index.ts`
 
-  **验收**: Given 模板生成晨跑时间盒 06:30-07:00，且已有一个任务占据 06:45-07:15, When 冲突检测运行, Then 返回冲突信息含 habitTitle="晨跑"、conflictType="overlap"、解决建议
+  **验收**:
+  - Given 今日已用"工作日"模板生成了时间盒草稿, When 再次调用 applyTemplate(同一模板, 同一日期), Then 返回错误提示"今日已使用该模板生成计划，如需调整请直接编辑时间盒"
+  - Given 今日已用"工作日"模板, When 调用 applyTemplate("休息日"模板, 同一日期), Then 正常生成（不同模板允许）
 
-- [ ] T025 [US2] 注册习惯冲突规则到 Rule Engine，在 `frontend/src/nexus/core/rule-engine/index.ts`
+- [ ] T026 [US2] 注册习惯冲突规则到 Rule Engine，在 `frontend/src/nexus/core/rule-engine/index.ts`
 
   **验收**: Given Rule Engine 已初始化, When 习惯相关意图经过规则检查, Then habit-conflict 规则被正确调用
 
-- [ ] T026 [P] [US2] 创建模板卡片组件 habit-template-card.tsx：显示模板名称/适用日/习惯数/迷你时间轴，在 `frontend/src/components/habit-template-card.tsx`
+- [ ] T027 [P] [US2] 创建模板卡片组件 habit-template-card.tsx：显示模板名称/适用日/习惯数/迷你时间轴，在 `frontend/src/components/habit-template-card.tsx`
 
   **验收**: Given 工作日模板含 3 个习惯总计 90min, When 渲染组件, Then 显示名称"工作日"、适用日"周一至周五"、迷你时间轴含 3 个色块
 
-- [ ] T027 [US2] 创建模板对比视图组件 habit-template-view.tsx：纵向时间轴 + 横向模板列，显示习惯块和覆盖标记，在 `frontend/src/components/habit-template-view.tsx`
+- [ ] T028 [US2] 创建模板对比视图组件 habit-template-view.tsx：纵向时间轴 + 横向模板列，显示习惯块和覆盖标记，在 `frontend/src/components/habit-template-view.tsx`
 
   **验收**:
   - Given 工作日和休息日两个模板, When 渲染对比视图, Then 左侧为时间刻度，两列分别为两个模板
   - Given 工作日模板中晨跑 timeOverride=06:30, When 渲染, Then 该习惯块显示橙色"覆盖: +30min"标记
   - Given 09:00-12:00 无习惯, When 渲染, Then 显示"— 自由时间 —"
 
-- [ ] T028 [US2] 创建模板表单组件（新建/编辑模板，添加/移除习惯，设置覆盖值），在 `frontend/src/components/habit-template-form.tsx`
+- [ ] T029 [US2] 创建时间盒草稿调整组件：支持拖拽调整时间（earliestTime~latestEndTime 范围内）、压缩时长（不低于 minDuration）、跳过习惯（移除该时间盒），在 `frontend/src/components/timebox-draft-editor.tsx`
+
+  **验收**:
+  - Given draft 时间盒对应习惯 earliestTime=06:00/latestEndTime=09:00, When 拖拽到 08:00, Then 时间更新成功
+  - Given draft 时间盒对应习惯 minDuration=15, When 压缩时长到 10, Then 拒绝并提示"低于最小时长 15 分钟"
+  - Given 用户点击"跳过", When 确认, Then 移除该 draft 时间盒和 timebox_habits 关联
+
+- [ ] T030 [US2] 创建模板表单组件（新建/编辑模板，添加/移除习惯，设置覆盖值），在 `frontend/src/components/habit-template-form.tsx`
 
   **验收**: Given 用户选择"晨跑"习惯添加到模板, When 设置 timeOverride=06:30, Then 表单提交数据包含 {habitId, timeOverride:"06:30"}
 
-- [ ] T029 [US2] 扩展 Server Actions：添加模板相关 Server Action（submitTemplateIntent/addHabitToTemplate/removeHabitFromTemplate/applyTemplate），在 `frontend/src/app/actions/intent.ts`
+- [ ] T031 [US2] 扩展 Server Actions：添加模板相关 Server Action（submitTemplateIntent/addHabitToTemplate/removeHabitFromTemplate/applyTemplate），在 `frontend/src/app/actions/intent.ts`
 
   **验收**: Given 客户端调用 applyTemplate({templateId,date:"2026-05-09"}), When Server Action 执行, Then 返回 ApplyTemplateResult 含 generatedTimeboxes 和 conflicts
 
-- [ ] T030 [US2] 在主页面添加模板管理视图入口，在 `frontend/src/app/page.tsx`
+- [ ] T032 [US2] 在主页面添加模板管理视图入口，在 `frontend/src/app/page.tsx`
 
   **验收**: Given 应用运行, When 切换到模板视图, Then 显示 habit-template-view 组件；When 点击"用模板安排今天", Then 时间盒视图出现 draft 时间盒
 
-**Checkpoint**: 用户可以创建模板、通过模板一键生成每日时间盒计划、查看冲突、调整并确认。
+**Checkpoint**: 用户可以创建模板、通过模板一键生成每日时间盒计划、查看冲突、调整并确认。同一天重复应用同一模板会被拒绝。
 
 ---
 
@@ -208,21 +217,21 @@
 
 ### Implementation for User Story 3
 
-- [ ] T031 [US3] 扩展 AI Parser habit 类型意图解析模板：支持 createHabit/createTemplate/addHabitToTemplate/applyTemplate 解析，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
+- [ ] T033 [US3] 扩展 AI Parser habit 类型意图解析模板：支持 createHabit/createTemplate/addHabitToTemplate/applyTemplate 解析，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
 
   **验收**:
   - Given 输入"每天早上7点运动30分钟", When AI 解析, Then 生成 {type:"createHabit", title:"运动", defaultTime:"07:00", defaultDuration:30, trackable:true, frequencyType:"daily"}
   - Given 输入"午餐12点，1小时", When AI 解析, Then trackable=false（用餐关键词）
   - Given 输入"工作日晚上10点复盘15分钟", When AI 解析, Then frequencyType:"weekly", daysOfWeek:[1,2,3,4,5]
 
-- [ ] T032 [US3] 实现 AI 自动推断默认值逻辑：earliestTime/latestEndTime/minDuration 的计算函数，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
+- [ ] T034 [US3] 实现 AI 自动推断默认值逻辑：earliestTime/latestEndTime/minDuration 的计算函数，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
 
   **验收**:
   - Given defaultTime="07:00", defaultDuration=30, When 推断, Then earliestTime="06:30", latestEndTime="08:00", minDuration=15
   - Given defaultTime="12:00", defaultDuration=60, When 推断, Then minDuration=floor(60*0.5/5)*5=30
   - Given 标题含"午餐"/"晚餐"/"睡眠"关键词, When 推断, Then trackable=false
 
-- [ ] T033 [US3] 添加模板相关 AI 意图解析：createTemplate/addHabitToTemplate/applyTemplate，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
+- [ ] T035 [US3] 添加模板相关 AI 意图解析：createTemplate/addHabitToTemplate/applyTemplate，在 `frontend/src/nexus/core/intent-engine/ai-parser.ts`
 
   **验收**:
   - Given 输入"创建一个工作日模板", When 解析, Then {type:"createTemplate", name:"工作日", applicableDays:[1,2,3,4,5]}
@@ -241,33 +250,33 @@
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] 扩展 habits 域插件 onEvent：实现 HabitLogged/HabitSkipped/HabitStreakMilestone 事件处理，在 `frontend/src/domains/habits/index.ts`
+- [ ] T036 [US4] 扩展 habits 域插件 onEvent：实现 HabitLogged/HabitSkipped/HabitStreakMilestone 事件处理，在 `frontend/src/domains/habits/index.ts`
 
   **验收**:
   - Given HabitLogged 事件, When streak=6, Then 返回 {suggestions:[{weight:40, ...}]} (静默更新)
   - Given HabitSkipped 事件且 streak=5, When onEvent 处理, Then 返回 {suggestions:[{weight:80, text:"streak 保护提醒"}]}
   - Given HabitStreakMilestone(streak=7) 事件, When onEvent 处理, Then 返回 {suggestions:[{weight:90, text:"7天连续成就"}]}
 
-- [ ] T035 [US4] 扩展 habits 域插件 onActionSurfaceRequest：返回 log_habit/streak_milestone_hint/habit_risk_warning 候选，在 `frontend/src/domains/habits/index.ts`
+- [ ] T037 [US4] 扩展 habits 域插件 onActionSurfaceRequest：返回 log_habit/streak_milestone_hint/habit_risk_warning 候选，在 `frontend/src/domains/habits/index.ts`
 
   **验收**:
   - Given 有 2 个待打卡的 trackable 习惯, When onActionSurfaceRequest 调用, Then 返回 2 个 log_habit ActionCandidate (weight=70)
   - Given streak=6（距 7 天里程碑 1 天）, When onActionSurfaceRequest 调用, Then 返回 streak_milestone_hint (weight=85)
 
-- [ ] T036 [US4] 实现 streak 计算逻辑：打卡时自动更新 streak/longestStreak/completionRate7d，在 `frontend/src/lib/db/repositories/habit.repository.ts`
+- [ ] T038 [US4] 实现 streak 计算逻辑：打卡时自动更新 streak/longestStreak/completionRate7d，在 `frontend/src/lib/db/repositories/habit.repository.ts`
 
   **验收**:
   - Given 昨日已打卡且 streak=5, When 今日打卡, Then streak 更新为 6, longestStreak=max(6, longestStreak)
   - Given 昨日未打卡且 streak=3, When 今日打卡, Then streak 重置为 1
   - Given 近 7 天打卡 5 次, When 计算 completionRate7d, Then 值为 5/7≈0.71
 
-- [ ] T037 [US4] 创建打卡 UI 组件：今日打卡视图，显示待打卡习惯列表和打卡/跳过按钮，在 `frontend/src/components/habit-checkin.tsx`
+- [ ] T039 [US4] 创建打卡 UI 组件：今日打卡视图，显示待打卡习惯列表和打卡/跳过按钮，在 `frontend/src/components/habit-checkin.tsx`
 
   **验收**:
   - Given 有 3 个 trackable 习惯（2 个未打卡、1 个已打卡）, When 渲染组件, Then 显示 2 个待打卡项和 1 个已完成标记
   - Given 用户点击"完成"打卡按钮, When 提交, Then 习惯标记为已打卡，streak 更新
 
-- [ ] T038 [US4] 扩展 habit-card.tsx：trackable 习惯显示打卡按钮和 streak 徽章，在 `frontend/src/components/habit-card.tsx`
+- [ ] T040 [US4] 扩展 habit-card.tsx：trackable 习惯显示打卡按钮和 streak 徽章，在 `frontend/src/components/habit-card.tsx`
 
   **验收**: Given trackable=true 且 streak=12 的习惯, When 渲染卡片, Then 显示 streak=12 徽章和今日打卡状态
 
@@ -279,19 +288,23 @@
 
 **Purpose**: 跨故事的改进和最终验证。
 
-- [ ] T039 [P] 验证跨午夜时间比较逻辑：确认睡眠习惯(22:00-06:00)在冲突检测和时间轴渲染中正确处理，在 `frontend/src/lib/db/repositories/mappers.ts` 和 `frontend/src/components/habit-template-view.tsx`
+- [ ] T041 [P] 验证跨午夜时间比较逻辑：确认睡眠习惯(22:00-06:00)在冲突检测和时间轴渲染中正确处理，在 `frontend/src/lib/db/repositories/mappers.ts` 和 `frontend/src/components/habit-template-view.tsx`
 
   **验收**: Given 睡眠习惯 earliestTime=22:00, latestEndTime=06:00, When 执行时间比较, Then 22:00 < 06:00+1440 成立；When 渲染时间轴, Then 睡眠块跨越午夜正确显示
 
-- [ ] T040 [P] 验证习惯删除级联：删除被模板引用的习惯时，系统正确处理 RESTRICT 约束，在 `frontend/src/lib/db/schema.ts` 和 `frontend/src/app/actions/intent.ts`
+- [ ] T042 [P] 验证习惯删除级联：删除被模板引用的习惯时，系统正确处理 RESTRICT 约束，在 `frontend/src/lib/db/schema.ts` 和 `frontend/src/app/actions/intent.ts`
 
   **验收**: Given 习惯被"工作日"模板引用, When 尝试删除习惯, Then 系统提示"该习惯正在模板'工作日'中使用"并阻止删除（RESTRICT）
 
-- [ ] T041 运行 quickstart.md 中的所有验证步骤，确认端到端功能正常，在 `frontend/src/`
+- [ ] T043 验证端到端数据一致性：创建习惯→添加到模板→生成每日计划→确认生效→打卡，全链路数据正确无误，在 `frontend/src/`
+
+  **验收**: Given 创建"晨跑"习惯(defaultTime=07:00, trackable=true) → 添加到"工作日"模板(timeOverride=06:30) → 用模板生成今日计划, When 全流程执行, Then 时间盒 startTime=06:30（使用覆盖值）、timebox_habits 关联正确、打卡后 streak=1、HabitLog 记录的 actualDuration 正确
+
+- [ ] T044 运行 quickstart.md 中的所有验证步骤，确认端到端功能正常，在 `frontend/src/`
 
   **验收**: Given quickstart.md Phase 1~3 的所有步骤, When 逐一执行, Then 全部验证通过
 
-- [ ] T042 推送到远程仓库并推送 main 分支
+- [ ] T045 推送到远程仓库并推送 main 分支
 
   **验收**: Given 所有任务完成, When git push, Then 代码成功推送到 Gitee 远程仓库
 
@@ -354,7 +367,10 @@ Phase 1 (Setup) → Phase 2 (Repo/Mapper) → US1 (习惯库) ─┬→ US2 (模
 
 ## Notes
 
-- 共 42 个任务，预估总工时 5-8 小时
+- 共 45 个任务，预估总工时 6-9 小时
 - MVP（Phase 1-3）约 21 个任务，预估 3-4 小时
 - 每个 User Story 完成后可独立演示
 - US2/US3/US4 的 UI 任务建议在 US1 的 UI 验证通过后再开始
+- F1 修复：T006 验收标准明确要求 migration 回填使用计算公式（非简单赋值）
+- F2 修复：T024 新增模板应用幂等性检查（同天同模板拒绝重复生成）
+- F3 修复：T043 新增端到端数据一致性验证任务（习惯→模板→时间盒→打卡全链路）
