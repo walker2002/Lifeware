@@ -87,6 +87,8 @@ export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review'
 export type ActionCategory = 'guide' | 'tile' | 'cue'
 export type ActionType =
   | 'log_habit'
+  | 'streak_milestone_hint'
+  | 'habit_risk_warning'
   | 'complete_task'
   | 'start_timebox'
   | 'review_okr'

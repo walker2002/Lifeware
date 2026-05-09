@@ -10,6 +10,7 @@ import * as schema from "@/lib/db/schema";
 import { TimeboxRepository } from "@/lib/db/repositories/timebox.repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
+import { HabitRepository } from "@/lib/db/repositories/habit.repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
@@ -468,4 +469,281 @@ export async function getTimeboxesByRange(
   end: Date,
 ): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummariesByRange(start, end);
+}
+
+// ─── Habit Server Actions ─────────────────────────────────────────
+
+import type { Habit } from "@/usom/types/objects";
+import type { CreateHabitInput, UpdateHabitInput } from "@/usom/interfaces/irepository";
+
+export interface HabitActionResult {
+  success: boolean;
+  habit?: Habit;
+  habits?: Habit[];
+  error?: string;
+}
+
+async function getHabitRepo(): Promise<HabitRepository> {
+  return new HabitRepository();
+}
+
+/** 获取当前用户的所有习惯 */
+export async function getHabits(): Promise<HabitActionResult> {
+  try {
+    const repo = await getHabitRepo();
+    const habits = await repo.findByUserId(MVP_USER_ID);
+    return { success: true, habits };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "获取习惯列表失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 创建新习惯 */
+export async function submitHabitIntent(
+  input: CreateHabitInput,
+): Promise<HabitActionResult> {
+  try {
+    const habitRepo = await getHabitRepo();
+    const eventRepo = new SystemEventRepository();
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: new TimeboxRepository(),
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error("not used") } },
+      ruleEngine: {
+        evaluate: async () => ({
+          result: "pass" as const,
+          warnings: [],
+          confirmations: [],
+        }),
+      },
+      habitRepo,
+    });
+
+    const intentionId = crypto.randomUUID();
+    const now = new Date().toISOString() as Timestamp;
+
+    const intent: import("@/usom/types/objects").StructuredIntent = {
+      id: crypto.randomUUID(),
+      intentionId,
+      targetDomain: "habits",
+      action: "createHabit",
+      fields: { ...input },
+      confidence: 1.0,
+      resolvedBy: "template_form",
+      createdAt: now,
+    };
+
+    const result = await orchestrator.executeHabitIntent(intent, MVP_USER_ID);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, habit: result.habit };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "创建习惯失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 更新习惯状态（暂停/恢复/归档） */
+export async function updateHabitStatus(
+  habitId: string,
+  action: "activate" | "suspend" | "reactivate" | "archive",
+): Promise<HabitActionResult> {
+  try {
+    const habitRepo = await getHabitRepo();
+    const eventRepo = new SystemEventRepository();
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: new TimeboxRepository(),
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error("not used") } },
+      ruleEngine: {
+        evaluate: async () => ({
+          result: "pass" as const,
+          warnings: [],
+          confirmations: [],
+        }),
+      },
+      habitRepo,
+    });
+
+    const now = new Date().toISOString() as Timestamp;
+    const actionMap: Record<string, string> = {
+      activate: "activateHabit",
+      suspend: "suspendHabit",
+      reactivate: "reactivateHabit",
+      archive: "archiveHabit",
+    };
+
+    const intent: import("@/usom/types/objects").StructuredIntent = {
+      id: crypto.randomUUID(),
+      intentionId: crypto.randomUUID(),
+      targetDomain: "habits",
+      action: actionMap[action],
+      fields: { habitId },
+      confidence: 1.0,
+      resolvedBy: "template_form",
+      createdAt: now,
+    };
+
+    const result = await orchestrator.executeHabitIntent(intent, MVP_USER_ID);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, habit: result.habit };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "更新习惯状态失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 删除习惯 */
+export async function deleteHabit(
+  habitId: string,
+): Promise<HabitActionResult> {
+  try {
+    const repo = await getHabitRepo();
+    await repo.delete(habitId, MVP_USER_ID);
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "删除习惯失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 更新习惯信息 */
+export async function updateHabit(
+  habitId: string,
+  input: UpdateHabitInput,
+): Promise<HabitActionResult> {
+  try {
+    const repo = await getHabitRepo();
+    const habit = await repo.update(habitId, input, MVP_USER_ID);
+    return { success: true, habit };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "更新习惯失败";
+    return { success: false, error: message };
+  }
+}
+
+// ─── Template Server Actions ────────────────────────────────────
+
+import { HabitTemplateRepository } from "@/lib/db/repositories/habit-template.repository";
+import type { HabitTemplate } from "@/usom/types/objects";
+import type { CreateTemplateInput, TemplateHabitOverrides } from "@/usom/interfaces/irepository";
+
+export interface TemplateActionResult {
+  success: boolean;
+  template?: HabitTemplate;
+  templates?: HabitTemplate[];
+  generatedTimeboxes?: import("@/usom/types/objects").Timebox[];
+  error?: string;
+}
+
+async function getTemplateRepo(): Promise<HabitTemplateRepository> {
+  return new HabitTemplateRepository();
+}
+
+/** 获取所有模板 */
+export async function getTemplates(): Promise<TemplateActionResult> {
+  try {
+    const repo = await getTemplateRepo();
+    const templates = await repo.findByUserId(MVP_USER_ID);
+    return { success: true, templates };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "获取模板列表失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 创建模板 */
+export async function createTemplate(
+  input: CreateTemplateInput,
+): Promise<TemplateActionResult> {
+  try {
+    const repo = await getTemplateRepo();
+    const template = await repo.create(input, MVP_USER_ID);
+    return { success: true, template };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "创建模板失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 添加习惯到模板 */
+export async function addHabitToTemplate(
+  templateId: string,
+  habitId: string,
+  overrides?: TemplateHabitOverrides,
+): Promise<TemplateActionResult> {
+  try {
+    const repo = await getTemplateRepo();
+    await repo.addHabit(templateId, habitId, overrides ?? undefined, MVP_USER_ID);
+    const template = await repo.findById(templateId, MVP_USER_ID);
+    return { success: true, template: template ?? undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "添加习惯到模板失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 从模板移除习惯 */
+export async function removeHabitFromTemplate(
+  templateId: string,
+  habitId: string,
+): Promise<TemplateActionResult> {
+  try {
+    const repo = await getTemplateRepo();
+    await repo.removeHabit(templateId, habitId, MVP_USER_ID);
+    const template = await repo.findById(templateId, MVP_USER_ID);
+    return { success: true, template: template ?? undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "从模板移除习惯失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 应用模板生成每日时间盒 */
+export async function applyTemplate(
+  templateId: string,
+  date: string,
+): Promise<TemplateActionResult> {
+  try {
+    const habitRepo = await getHabitRepo();
+    const templateRepo = await getTemplateRepo();
+    const timeboxRepo = new TimeboxRepository();
+    const eventRepo = new SystemEventRepository();
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error("not used") } },
+      ruleEngine: {
+        evaluate: async () => ({
+          result: "pass" as const,
+          warnings: [],
+          confirmations: [],
+        }),
+      },
+      habitRepo,
+      templateRepo,
+    });
+
+    const result = await orchestrator.applyTemplate(templateId, date, MVP_USER_ID);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, generatedTimeboxes: result.generatedTimeboxes };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "应用模板失败";
+    return { success: false, error: message };
+  }
 }

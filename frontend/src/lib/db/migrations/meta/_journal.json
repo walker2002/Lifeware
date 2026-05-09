@@ -15,6 +15,13 @@
       "when": 1778136937824,
       "tag": "0001_execution_logging",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778332443028,
+      "tag": "0002_habit_enhancements",
+      "breakpoints": true
     }
   ]
 }

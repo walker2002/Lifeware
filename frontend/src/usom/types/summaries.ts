@@ -22,7 +22,8 @@ export interface HabitSummary {
   id: USOM_ID
   title: string
   status: HabitStatus
-  scheduledTime: string // HH:MM
+  defaultTime: string // HH:MM
+  trackable: boolean
   streak: number
   todayLogged: boolean
 }
