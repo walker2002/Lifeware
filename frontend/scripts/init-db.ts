@@ -1,37 +1,30 @@
-import { db, sql } from '../src/lib/db';
-import * as schema from '../src/lib/db/schema';
+import { db } from '../src/lib/db'
+import { sql } from 'drizzle-orm'
 
 async function main() {
-  console.log('🔄 Initializing database...');
+  console.log('Initializing database...')
 
-  // Create tables
   try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        title TEXT NOT NULL,
-        description TEXT,
-        status TEXT NOT NULL DEFAULT 'draft',
-        priority TEXT NOT NULL DEFAULT 'medium',
-        estimated_time INTEGER,
-        actual_time INTEGER,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        due_date TIMESTAMP,
-        completed_at TIMESTAMP,
-        context JSONB DEFAULT '{}'
+    // Check if the users table exists to verify migration has been applied
+    const result = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'users'
       );
-    `);
+    `)
 
-    console.log('✅ Tasks table created/verified');
-
-    // Add more tables as needed...
-
-    console.log('🎉 Database initialization completed!');
+    const exists = (result as any)[0]?.exists
+    if (exists) {
+      console.log('Database already initialized. Run `npm run db:migrate` to apply pending migrations.')
+    } else {
+      console.log('Database not yet initialized. Run `npm run db:generate` then `npm run db:migrate`.')
+    }
   } catch (error) {
-    console.error('❌ Error initializing database:', error);
-    process.exit(1);
+    console.error('Error checking database:', error)
+    process.exit(1)
   }
+
+  process.exit(0)
 }
 
-main();
+main()

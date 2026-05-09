@@ -67,6 +67,13 @@ Extensible domain-specific logic with standard interface (four hooks):
 
 ---
 
+## 语言规范
+- 所有对话、解释和文档必须使用**简体中文**。
+- 代码注释必须使用**简体中文**。
+- 保留 `API`、`SDK` 等通用技术术语的英文形式。
+- 保留表、字段名、变量、函数、文件名等的代码相关的英文命名规范。
+
+
 ## Governance Reference
 
 > **All architectural constraints, development rules, and governance principles
@@ -100,6 +107,14 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 - `timebox_tasks`, `timebox_habits` - Junction tables
 - `context_snapshots`, `system_events`, `action_surfaces`, `derived_signals` - System tables
 - `energy_logs` - Energy calibration logs
+
+---
+
+## 界面设计要求
+
+- 视觉风格参照 DESIGN.md
+- 组件库使用 shadcn/ui
+- Web 端布局为 Notion 风格三栏（顶部导航 + 左侧 AI 面板 + 右侧主内容区）
 
 ---
 
@@ -156,4 +171,5 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
+at `specs/002-timebox-slice/plan.md`.
 <!-- SPECKIT END -->

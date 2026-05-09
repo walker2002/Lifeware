@@ -1,0 +1,19 @@
+# Domain Manifest - Timebox
+# 与 index.ts 中 timeboxManifest 保持一致
+
+id: timebox
+name: Timebox
+version: 0.1.0
+
+requiredFields:
+  create_timebox:
+    - title
+    - startTime
+    - duration
+
+subscribedEvents:
+  - TimeboxCreated
+  - TimeboxStarted
+  - TimeboxPaused
+  - TimeboxEnded
+  - TimeboxLogged

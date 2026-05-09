@@ -1,0 +1,363 @@
+// AI Parser — 意图引擎的自然语言解析模块
+// 使用 LLM 将用户输入解析为 StructuredIntent
+
+import { chat } from '@/lib/llm/client'
+import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
+
+// ─── 系统提示词 ─────────────────────────────────────────────────
+
+const TIMEBOX_SYSTEM_PROMPT = (now: Date) => `
+你是 Lifeware 时间盒意图解析器。将用户的自然语言输入解析为结构化意图。
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
+时区：Asia/Shanghai (UTC+8)
+
+支持的动作类型：
+
+1. 创建时间盒：
+{
+  "targetDomain": "timebox",
+  "action": "create_timebox",
+  "fields": {
+    "title": "string",
+    "startTime": "ISO 8601（含时区，如 2026-05-04T09:00:00+08:00）",
+    "duration": number（分钟）
+  },
+  "confidence": 0-1
+}
+
+2. 执行时间盒操作（开始/结束/取消/记录）：
+{
+  "targetDomain": "timebox",
+  "action": "start_timebox" | "end_timebox" | "cancel_timebox" | "log_timebox",
+  "fields": {
+    "target": {
+      "type": "title" | "current" | "index",
+      "value": "string（标题关键词 / 'running' / 数字序号）"
+    }
+  },
+  "confidence": 0-1
+}
+
+执行动作关键词映射：
+- "开始做XX"、"开始XX"、"启动XX" → start_timebox，target.type="title", target.value="XX"
+- "结束了"、"完成"、"结束XX" → end_timebox，target.type="current"（当前运行中的）或 target.type="title"
+- "取消XX"、"不要XX了" → cancel_timebox，target.type="title"
+- "记录XX"、"复盘XX" → log_timebox，target.type="title" 或 "current"
+
+规则：
+- "今天" → ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}
+- "2小时" → 120 分钟
+- "上午9点" → 当天 09:00
+- 缺少必需字段时 confidence 设低
+- 只处理时间盒相关意图，其他意图返回 confidence < 0.5
+- 执行动作必须有 target 字段
+`
+
+// ─── 多任务系统提示词 ──────────────────────────────────────────
+
+const MULTI_TASK_PROMPT = (now: Date) => `
+你是 Lifeware 时间盒意图解析器。将用户的自然语言输入解析为结构化意图。
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
+时区：Asia/Shanghai (UTC+8)
+
+用户可能一次性输入多个时间盒任务。请识别并拆分为独立的任务列表。
+
+输出 JSON 格式：
+{
+  "tasks": [
+    {
+      "title": "string",
+      "startTime": "ISO 8601（含时区，如 2026-05-04T09:00:00+08:00）",
+      "duration": number（分钟）,
+      "confidence": 0-1,
+      "incomplete": false
+    }
+  ]
+}
+
+识别规则：
+- 时间关键词（上午/下午/晚上/明天/今天/X点）通常标志新任务的开始
+- 常见分隔符（分号、逗号、句号、换行）为辅助线索，但不作为唯一依据
+- 语义分段优于分隔符：通过上下文判断任务边界
+- 每个任务独立提取标题、开始时间、持续时长
+- 无法提取完整信息的任务标记 incomplete: true，设置 confidence < 0.5
+- "今天" → ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}
+- "2小时" → 120 分钟，"1个半小时" → 90 分钟
+- "上午9点" → 当天 09:00，"下午3点" → 当天 15:00
+- 只处理时间盒相关意图，不相关的输入返回空 tasks 数组
+- 只有一个任务也返回 tasks 数组（单个元素）
+`
+
+// ─── 返回类型 ────────────────────────────────────────────────────
+
+export interface AIParserResult {
+  success: boolean
+  intent?: StructuredIntent
+  error?: string
+}
+
+export interface MultiTaskParserResult {
+  success: boolean
+  intents: StructuredIntent[]
+  error?: string
+}
+
+export interface BatchItemResult {
+  index: number
+  title: string
+  timeboxId?: string
+  error?: string
+  warning?: string
+  needsConfirmation?: boolean
+}
+
+export interface BatchIntentResult {
+  results: BatchItemResult[]
+}
+
+// ─── LLM 响应中间类型 ────────────────────────────────────────────
+
+interface LLMIntentResponse {
+  targetDomain: string
+  action: string
+  fields: Record<string, unknown>
+  confidence: number
+}
+
+// ─── 核心解析函数 ─────────────────────────────────────────────────
+
+/**
+ * 使用 AI 将自然语言输入解析为 StructuredIntent
+ *
+ * @param rawInput  - 用户原始自然语言输入
+ * @param intentionId - 关联的 Intention 对象 ID
+ * @returns 解析结果，成功时包含 intent，失败时包含 error
+ */
+export async function parseWithAI(
+  rawInput: string,
+  intentionId: USOM_ID,
+): Promise<AIParserResult> {
+  try {
+    // 1. 调用 LLM
+    const response = await chat(
+      [
+        { role: 'system', content: TIMEBOX_SYSTEM_PROMPT(new Date()) },
+        { role: 'user', content: rawInput },
+      ],
+      { temperature: 0.3 },
+    )
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      return {
+        success: false,
+        error: 'LLM 返回内容为空，请重试或使用表单模式',
+      }
+    }
+
+    // 2. 从响应中提取 JSON（处理 markdown 代码块包裹的情况）
+    const jsonStr = extractJSON(content)
+
+    let parsed: LLMIntentResponse
+    try {
+      parsed = JSON.parse(jsonStr) as LLMIntentResponse
+    } catch {
+      return {
+        success: false,
+        error: `无法解析 JSON 响应，请重试或使用表单模式。原始内容：${content.slice(0, 100)}`,
+      }
+    }
+
+    // 3. 验证必需字段
+    const validationError = validateResponse(parsed)
+    if (validationError) {
+      return {
+        success: false,
+        error: validationError,
+      }
+    }
+
+    // 4. 检查置信度
+    if (parsed.confidence < 0.5) {
+      return {
+        success: false,
+        error: `AI 置信度过低（${parsed.confidence.toFixed(2)}），建议使用表单模式输入`,
+      }
+    }
+
+    // 5. 补全 endTime（LLM 通常返回 duration 而非 endTime）
+    const fields = { ...parsed.fields }
+    if (!fields.endTime && fields.startTime && fields.duration) {
+      const start = new Date(fields.startTime as string)
+      start.setMinutes(start.getMinutes() + Number(fields.duration))
+      fields.endTime = start.toISOString()
+    }
+
+    // 6. 构建 StructuredIntent 并返回
+    const intent: StructuredIntent = {
+      id: generateUUID(),
+      intentionId,
+      targetDomain: parsed.targetDomain,
+      action: parsed.action,
+      fields,
+      confidence: parsed.confidence,
+      resolvedBy: 'ai',
+      createdAt: new Date().toISOString() as Timestamp,
+    }
+
+    return { success: true, intent }
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : '未知错误'
+    return {
+      success: false,
+      error: `AI 解析失败：${message}`,
+    }
+  }
+}
+
+// ─── 辅助函数 ─────────────────────────────────────────────────────
+
+/**
+ * 从 LLM 响应内容中提取 JSON 字符串
+ * 支持纯 JSON 和 markdown 代码块包裹的 JSON
+ */
+function extractJSON(content: string): string {
+  const trimmed = content.trim()
+
+  // 尝试匹配 markdown 代码块 ```json ... ```
+  const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim()
+  }
+
+  // 尝试匹配直接的花括号包裹
+  const braceMatch = trimmed.match(/\{[\s\S]*\}/)
+  if (braceMatch) {
+    return braceMatch[0]
+  }
+
+  // 原样返回，后续 JSON.parse 会报错
+  return trimmed
+}
+
+/**
+ * 验证 LLM 返回的响应结构是否完整
+ */
+function validateResponse(parsed: LLMIntentResponse): string | null {
+  if (!parsed.targetDomain) {
+    return 'AI 响应缺少 targetDomain 字段，请重试或使用表单模式'
+  }
+
+  if (!parsed.action) {
+    return 'AI 响应缺少 action 字段，请重试或使用表单模式'
+  }
+
+  if (typeof parsed.confidence !== 'number' || parsed.confidence < 0 || parsed.confidence > 1) {
+    return 'AI 响应的 confidence 字段无效，请重试或使用表单模式'
+  }
+
+  if (!parsed.fields || typeof parsed.fields !== 'object') {
+    return 'AI 响应缺少 fields 字段，请重试或使用表单模式'
+  }
+
+  return null
+}
+
+// ─── 多任务 LLM 响应类型 ─────────────────────────────────────────
+
+interface LLMMultiTaskResponse {
+  tasks: Array<{
+    title: string
+    startTime?: string | null
+    duration?: number | null
+    confidence: number
+    incomplete?: boolean
+  }>
+}
+
+// ─── 多任务解析函数 ──────────────────────────────────────────────
+
+/**
+ * 使用 AI 解析自然语言输入中的多个时间盒任务。
+ *
+ * 返回 StructuredIntent 数组，每个对应一个独立的时间盒创建意图。
+ * 过滤掉标记为 incomplete 或 confidence < 0.5 的任务。
+ */
+export async function parseMultiTask(
+  rawInput: string,
+  intentionId: USOM_ID,
+): Promise<MultiTaskParserResult> {
+  try {
+    const response = await chat(
+      [
+        { role: 'system', content: MULTI_TASK_PROMPT(new Date()) },
+        { role: 'user', content: rawInput },
+      ],
+      { temperature: 0.3 },
+    )
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      return { success: false, intents: [], error: 'LLM 返回内容为空' }
+    }
+
+    const jsonStr = extractJSON(content)
+    let parsed: LLMMultiTaskResponse
+    try {
+      parsed = JSON.parse(jsonStr) as LLMMultiTaskResponse
+    } catch {
+      return { success: false, intents: [], error: '无法解析批量任务 JSON 响应' }
+    }
+
+    if (!Array.isArray(parsed.tasks) || parsed.tasks.length === 0) {
+      return { success: false, intents: [], error: '未识别到有效的时间盒任务，请重新描述' }
+    }
+
+    const intents: StructuredIntent[] = []
+    for (const task of parsed.tasks) {
+      // 跳过不完整的任务
+      if (task.incomplete || task.confidence < 0.5) continue
+      if (!task.title || !task.startTime || !task.duration) continue
+
+      // 计算 endTime
+      const start = new Date(task.startTime)
+      start.setMinutes(start.getMinutes() + task.duration)
+      const endTime = start.toISOString()
+
+      intents.push({
+        id: generateUUID(),
+        intentionId,
+        targetDomain: 'timebox',
+        action: 'create_timebox',
+        fields: {
+          title: task.title,
+          startTime: task.startTime,
+          duration: task.duration,
+          endTime,
+        },
+        confidence: task.confidence,
+        resolvedBy: 'ai',
+        createdAt: new Date().toISOString() as Timestamp,
+      })
+    }
+
+    if (intents.length === 0) {
+      return { success: false, intents: [], error: '所有子任务信息不完整，请单独逐一创建' }
+    }
+
+    return { success: true, intents }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '未知错误'
+    return { success: false, intents: [], error: `批量解析失败：${message}` }
+  }
+}
+
+/**
+ * 生成 UUID v4
+ */
+function generateUUID(): string {
+  return crypto.randomUUID()
+}
