@@ -1,15 +1,17 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, asc } from 'drizzle-orm'
 import { db } from '../index'
 import * as s from '../schema'
 import type {
   IHabitRepository,
   HabitFilters,
+  HabitReferenceInfo,
   CreateHabitInput,
   UpdateHabitInput,
 } from '../../../usom/interfaces/irepository'
 import type { Habit, HabitFrequency } from '../../../usom/types/objects'
 import type { USOM_ID, DateOnly, Timestamp } from '../../../usom/types/primitives'
 import { habitRowToUSOM, habitUSOMToRow } from './mappers'
+import { calculateStreak, calculateLongestStreak, calculateCompletion7d } from '../../../domains/habits/streak-calculator'
 
 export class HabitRepository implements IHabitRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Habit | null> {
@@ -54,7 +56,7 @@ export class HabitRepository implements IHabitRepository {
       },
       defaultTime: data.defaultTime,
       earliestTime: data.earliestTime,
-      latestEndTime: data.latestEndTime,
+      latestStartTime: data.latestStartTime,
       defaultDuration: data.defaultDuration,
       minDuration: data.minDuration,
       trackable: data.trackable,
@@ -83,7 +85,7 @@ export class HabitRepository implements IHabitRepository {
       ...(data.description !== undefined && { description: data.description }),
       ...(data.defaultTime !== undefined && { defaultTime: data.defaultTime }),
       ...(data.earliestTime !== undefined && { earliestTime: data.earliestTime }),
-      ...(data.latestEndTime !== undefined && { latestEndTime: data.latestEndTime }),
+      ...(data.latestStartTime !== undefined && { latestStartTime: data.latestStartTime }),
       ...(data.defaultDuration !== undefined && { defaultDuration: data.defaultDuration }),
       ...(data.minDuration !== undefined && { minDuration: data.minDuration }),
       ...(data.trackable !== undefined && { trackable: data.trackable }),
@@ -139,5 +141,75 @@ export class HabitRepository implements IHabitRepository {
     await db.update(s.habits)
       .set({ status: 'archived', archivedAt: new Date() })
       .where(and(eq(s.habits.id, id), eq(s.habits.userId, userId)))
+  }
+
+  async checkReferences(id: USOM_ID, userId: USOM_ID): Promise<HabitReferenceInfo> {
+    const [logs, templates, timeboxes] = await Promise.all([
+      db.select({ id: s.habitLogs.id }).from(s.habitLogs)
+        .where(and(eq(s.habitLogs.habitId, id), eq(s.habitLogs.userId, userId)))
+        .limit(1),
+      db.select({ id: s.templateHabits.templateId }).from(s.templateHabits)
+        .where(eq(s.templateHabits.habitId, id))
+        .limit(1),
+      db.select({ id: s.timeboxHabits.timeboxId }).from(s.timeboxHabits)
+        .where(eq(s.timeboxHabits.habitId, id))
+        .limit(1),
+    ])
+    const habitLogs = logs.length
+    const templateHabits = templates.length
+    const timeboxHabits = timeboxes.length
+    return {
+      habitLogs,
+      templateHabits,
+      timeboxHabits,
+      hasReferences: habitLogs > 0 || templateHabits > 0 || timeboxHabits > 0,
+    }
+  }
+
+  // ─── 打卡指标自动计算 ──────────────────────────────────────────
+
+  /** 获取指定习惯所有 completed 状态的打卡日期（ASC 排序） */
+  private async getCompletedDates(habitId: USOM_ID, userId: USOM_ID): Promise<string[]> {
+    const rows = await db.select({ date: s.habitLogs.date })
+      .from(s.habitLogs)
+      .where(and(
+        eq(s.habitLogs.habitId, habitId),
+        eq(s.habitLogs.userId, userId),
+        eq(s.habitLogs.status, 'completed'),
+      ))
+      .orderBy(asc(s.habitLogs.date))
+    return rows.map(r => r.date!)
+  }
+
+  async calculateStreak(habitId: USOM_ID, userId: USOM_ID): Promise<number> {
+    const dates = await this.getCompletedDates(habitId, userId)
+    const today = new Date().toISOString().slice(0, 10)
+    return calculateStreak(dates, today)
+  }
+
+  async calculateLongestStreak(habitId: USOM_ID, userId: USOM_ID): Promise<number> {
+    const dates = await this.getCompletedDates(habitId, userId)
+    return calculateLongestStreak(dates)
+  }
+
+  async calculateCompletion7d(habitId: USOM_ID, userId: USOM_ID): Promise<number> {
+    const dates = await this.getCompletedDates(habitId, userId)
+    const today = new Date().toISOString().slice(0, 10)
+    return calculateCompletion7d(dates, today)
+  }
+
+  async updateMetrics(
+    habitId: USOM_ID,
+    userId: USOM_ID,
+    metrics: { streak: number; longestStreak: number; completionRate7d: number },
+  ): Promise<void> {
+    await db.update(s.habits)
+      .set({
+        streak: metrics.streak,
+        longestStreak: metrics.longestStreak,
+        completionRate7d: metrics.completionRate7d,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(s.habits.id, habitId), eq(s.habits.userId, userId)))
   }
 }

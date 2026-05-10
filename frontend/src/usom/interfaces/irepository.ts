@@ -38,6 +38,13 @@ export interface ITaskRepository {
 }
 
 // ─── Habit ─────────────────────────────────────────────────────
+export interface HabitReferenceInfo {
+  habitLogs: number
+  templateHabits: number
+  timeboxHabits: number
+  hasReferences: boolean
+}
+
 export interface IHabitRepository {
   findById(id: USOM_ID, userId: USOM_ID): Promise<Habit | null>
   findByUserId(userId: USOM_ID, filters?: HabitFilters): Promise<Habit[]>
@@ -49,6 +56,11 @@ export interface IHabitRepository {
   save(habit: Habit, userId: USOM_ID): Promise<void>
   delete(id: USOM_ID, userId: USOM_ID): Promise<void>
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+  checkReferences(id: USOM_ID, userId: USOM_ID): Promise<HabitReferenceInfo>
+  calculateStreak(habitId: USOM_ID, userId: USOM_ID): Promise<number>
+  calculateLongestStreak(habitId: USOM_ID, userId: USOM_ID): Promise<number>
+  calculateCompletion7d(habitId: USOM_ID, userId: USOM_ID): Promise<number>
+  updateMetrics(habitId: USOM_ID, userId: USOM_ID, metrics: { streak: number; longestStreak: number; completionRate7d: number }): Promise<void>
 }
 
 export interface HabitFilters {
@@ -61,7 +73,7 @@ export interface CreateHabitInput {
   description?: string
   defaultTime: string
   earliestTime: string
-  latestEndTime: string
+  latestStartTime: string
   defaultDuration: number
   minDuration: number
   trackable: boolean

@@ -142,7 +142,7 @@ export interface Habit {
   frequency: HabitFrequency
   defaultTime: string // HH:MM
   earliestTime: string // HH:MM
-  latestEndTime: string // HH:MM
+  latestStartTime: string // HH:MM
   defaultDuration: DurationMinutes
   minDuration: DurationMinutes
   trackable: boolean

@@ -11,7 +11,7 @@ export interface HabitFormFields {
   description?: string
   defaultTime: string
   earliestTime: string
-  latestEndTime: string
+  latestStartTime: string
   defaultDuration: number
   minDuration: number
   trackable: boolean
@@ -38,7 +38,7 @@ const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
 function autoComplete(
   defaultTime: string,
   defaultDuration: number,
-): { earliestTime: string; latestEndTime: string; minDuration: number } {
+): { earliestTime: string; latestStartTime: string; minDuration: number } {
   const [h, m] = defaultTime.split(":").map(Number)
   const defaultMin = h * 60 + m
 
@@ -47,8 +47,8 @@ function autoComplete(
   const earlyH = Math.floor(earlyMin / 60)
   const earlyM = earlyMin % 60
 
-  // latestEndTime = defaultTime + defaultDuration + 30min
-  const lateMin = defaultMin + defaultDuration + 30
+  // latestStartTime = defaultTime + 30min
+  const lateMin = defaultMin + 30
   const lateH = Math.floor(lateMin / 60) % 24
   const lateM = lateMin % 60
 
@@ -57,7 +57,7 @@ function autoComplete(
 
   return {
     earliestTime: `${String(earlyH).padStart(2, "0")}:${String(earlyM).padStart(2, "0")}`,
-    latestEndTime: `${String(lateH).padStart(2, "0")}:${String(lateM).padStart(2, "0")}`,
+    latestStartTime: `${String(lateH).padStart(2, "0")}:${String(lateM).padStart(2, "0")}`,
     minDuration: minDur,
   }
 }
@@ -67,7 +67,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
   const [description, setDescription] = useState(initial?.description ?? "")
   const [defaultTime, setDefaultTime] = useState(initial?.defaultTime ?? "07:00")
   const [earliestTime, setEarliestTime] = useState(initial?.earliestTime ?? "06:30")
-  const [latestEndTime, setLatestEndTime] = useState(initial?.latestEndTime ?? "08:00")
+  const [latestStartTime, setLatestEndTime] = useState(initial?.latestStartTime ?? "08:00")
   const [defaultDuration, setDefaultDuration] = useState(initial?.defaultDuration ?? 30)
   const [minDuration, setMinDuration] = useState(initial?.minDuration ?? 15)
   const [trackable, setTrackable] = useState(initial?.trackable ?? true)
@@ -83,7 +83,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
     if (/^\d{2}:\d{2}$/.test(defaultTime)) {
       const auto = autoComplete(defaultTime, defaultDuration)
       setEarliestTime(auto.earliestTime)
-      setLatestEndTime(auto.latestEndTime)
+      setLatestEndTime(auto.latestStartTime)
       setMinDuration(auto.minDuration)
       setAutoFilled(true)
     }
@@ -95,7 +95,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
       setMinDuration(auto.minDuration)
       if (!autoFilled) {
         setEarliestTime(auto.earliestTime)
-        setLatestEndTime(auto.latestEndTime)
+        setLatestEndTime(auto.latestStartTime)
       }
     }
   }, [defaultTime, defaultDuration, autoFilled])
@@ -116,7 +116,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
       description: description || undefined,
       defaultTime,
       earliestTime: earliestTime || auto.earliestTime,
-      latestEndTime: latestEndTime || auto.latestEndTime,
+      latestStartTime: latestStartTime || auto.latestStartTime,
       defaultDuration,
       minDuration: minDuration || auto.minDuration,
       trackable,
@@ -190,11 +190,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="habit-latest">最晚结束</Label>
+          <Label htmlFor="habit-latest">最迟开始</Label>
           <Input
             id="habit-latest"
             type="time"
-            value={latestEndTime}
+            value={latestStartTime}
             onChange={(e) => setLatestEndTime(e.target.value)}
           />
         </div>

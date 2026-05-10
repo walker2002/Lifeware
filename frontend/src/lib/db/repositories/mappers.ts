@@ -113,7 +113,7 @@ type HabitRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string; description: string | null;
   frequencyType: string; defaultTime: string;
-  earliestTime: string; latestEndTime: string;
+  earliestTime: string; latestStartTime: string;
   defaultDuration: number; minDuration: number;
   trackable: boolean; keyResultId: string | null;
   streak: number; longestStreak: number; completionRate7d: number;
@@ -136,7 +136,7 @@ export function habitRowToUSOM(row: HabitRow): Habit {
     },
     defaultTime: row.defaultTime,
     earliestTime: row.earliestTime,
-    latestEndTime: row.latestEndTime,
+    latestStartTime: row.latestStartTime,
     defaultDuration: row.defaultDuration,
     minDuration: row.minDuration,
     trackable: row.trackable,
@@ -165,7 +165,7 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
     frequencyType: habit.frequency.type,
     defaultTime: habit.defaultTime,
     earliestTime: habit.earliestTime,
-    latestEndTime: habit.latestEndTime,
+    latestStartTime: habit.latestStartTime,
     defaultDuration: habit.defaultDuration,
     minDuration: habit.minDuration,
     trackable: habit.trackable,

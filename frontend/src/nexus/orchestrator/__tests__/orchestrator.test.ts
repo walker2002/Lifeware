@@ -351,7 +351,7 @@ function createMockHabitRepo() {
       frequency: { type: data.frequencyType, daysOfWeek: data.daysOfWeek },
       defaultTime: data.defaultTime,
       earliestTime: data.earliestTime,
-      latestEndTime: data.latestEndTime,
+      latestStartTime: data.latestStartTime,
       defaultDuration: data.defaultDuration,
       minDuration: data.minDuration,
       trackable: data.trackable,
@@ -373,6 +373,7 @@ function createMockHabitRepo() {
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
+    checkReferences: vi.fn().mockResolvedValue({ habitLogs: 0, templateHabits: 0, timeboxHabits: 0, hasReferences: false }),
   }
 }
 
@@ -387,7 +388,7 @@ function createHabitIntent(overrides?: Partial<StructuredIntent>): StructuredInt
       title: '晨跑',
       defaultTime: '07:00',
       earliestTime: '06:30',
-      latestEndTime: '08:00',
+      latestStartTime: '08:00',
       defaultDuration: 30,
       minDuration: 15,
       trackable: true,
@@ -478,7 +479,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       frequency: { type: 'daily' },
       defaultTime: '07:00',
       earliestTime: '06:30',
-      latestEndTime: '08:00',
+      latestStartTime: '08:00',
       defaultDuration: 30,
       minDuration: 15,
       trackable: true,
@@ -583,7 +584,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       frequency: { type: 'daily' },
       defaultTime: '07:00',
       earliestTime: '06:30',
-      latestEndTime: '08:00',
+      latestStartTime: '08:00',
       defaultDuration: 30,
       minDuration: 15,
       trackable: true,
@@ -672,21 +673,21 @@ describe('createOrchestrator — applyTemplate', () => {
       if (id === 'habit-run') return {
         id: 'habit-run' as USOM_ID, status: 'active', title: '晨跑',
         frequency: { type: 'daily' }, defaultTime: '07:00', earliestTime: '06:00',
-        latestEndTime: '09:00', defaultDuration: 30, minDuration: 15,
+        latestStartTime: '09:00', defaultDuration: 30, minDuration: 15,
         trackable: true, startDate: '2026-05-09', streak: 0, longestStreak: 0,
         completionRate7d: 0, tags: [], createdAt: '2026-05-09T08:00:00Z', updatedAt: '2026-05-09T08:00:00Z',
       }
       if (id === 'habit-lunch') return {
         id: 'habit-lunch' as USOM_ID, status: 'active', title: '午餐',
         frequency: { type: 'daily' }, defaultTime: '12:00', earliestTime: '11:30',
-        latestEndTime: '13:30', defaultDuration: 60, minDuration: 30,
+        latestStartTime: '13:30', defaultDuration: 60, minDuration: 30,
         trackable: false, startDate: '2026-05-09', streak: 0, longestStreak: 0,
         completionRate7d: 0, tags: [], createdAt: '2026-05-09T08:00:00Z', updatedAt: '2026-05-09T08:00:00Z',
       }
       if (id === 'habit-review') return {
         id: 'habit-review' as USOM_ID, status: 'active', title: '复盘',
         frequency: { type: 'daily' }, defaultTime: '22:00', earliestTime: '21:30',
-        latestEndTime: '23:00', defaultDuration: 15, minDuration: 10,
+        latestStartTime: '23:00', defaultDuration: 15, minDuration: 10,
         trackable: true, startDate: '2026-05-09', streak: 0, longestStreak: 0,
         completionRate7d: 0, tags: [], createdAt: '2026-05-09T08:00:00Z', updatedAt: '2026-05-09T08:00:00Z',
       }
@@ -807,5 +808,61 @@ describe('createOrchestrator — applyTemplate', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toContain('已使用该模板')
+  })
+
+  it('applyTemplate 生成的时间盒使用本地时区偏移（+08:00），不是 UTC（Z）', async () => {
+    // Bug [010]: 习惯的 HH:MM 是本地时间，拼接时不应使用 Z（UTC）后缀
+    // 例如 "07:30" 本地时间拼接 Z 变成 UTC 07:30 = 本地 15:30（UTC+8 错位）
+    // 应该拼接 +08:00 使 07:30 保持为本地 07:30
+    const habitRepo = createMockHabitRepo()
+    habitRepo.findById.mockImplementation(async (id: string) => {
+      if (id === 'habit-run') return {
+        id: 'habit-run' as USOM_ID, status: 'active', title: '晨跑',
+        frequency: { type: 'daily' }, defaultTime: '07:30', earliestTime: '07:00',
+        latestStartTime: '08:00', defaultDuration: 30, minDuration: 15,
+        trackable: true, startDate: '2026-05-09', streak: 0, longestStreak: 0,
+        completionRate7d: 0, tags: [], createdAt: '2026-05-09T08:00:00Z', updatedAt: '2026-05-09T08:00:00Z',
+      }
+      return null
+    })
+
+    const singleHabitTemplate: HabitTemplate = {
+      id: 'tpl-tz-test' as USOM_ID,
+      name: '时区测试',
+      status: 'active',
+      applicableDays: [1, 2, 3, 4, 5, 6],
+      habits: [
+        { habitId: 'habit-run' as USOM_ID, sortOrder: 1 },
+      ],
+      createdAt: '2026-05-09T08:00:00Z',
+      updatedAt: '2026-05-09T08:00:00Z',
+    }
+
+    const templateRepo = createMockTemplateRepo([singleHabitTemplate])
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+      habitRepo,
+      templateRepo,
+    })
+
+    const result = await orchestrator.applyTemplate('tpl-tz-test', '2026-05-09', userId)
+
+    expect(result.success).toBe(true)
+    expect(result.generatedTimeboxes).toBeDefined()
+    expect(result.generatedTimeboxes!.length).toBe(1)
+
+    const tb = result.generatedTimeboxes![0]
+    // 时间盒的开始时间必须使用 +08:00 后缀（本地时区），不能是 Z（UTC）
+    expect(tb.startTime).toBe('2026-05-09T07:30:00+08:00')
+    expect(tb.endTime).toBe('2026-05-09T08:00:00+08:00')
+    // 绝对不能是 Z 后缀（会导致 UTC+8 时区错位 8 小时）
+    expect(tb.startTime).not.toContain('T07:30:00Z')
+    expect(tb.endTime).not.toContain('T08:00:00Z')
   })
 })

@@ -10,6 +10,7 @@ interface HabitTemplateCardProps {
   habits: { title: string; defaultTime: string; defaultDuration: number }[]
   onApply?: () => void
   onEdit?: () => void
+  onDelete?: () => void
 }
 
 const DAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"]
@@ -21,7 +22,7 @@ function formatDays(days: number[]): string {
   return days.map(d => `周${DAY_LABELS[d]}`).join("、")
 }
 
-export function HabitTemplateCard({ name, applicableDays, habits, onApply, onEdit }: HabitTemplateCardProps) {
+export function HabitTemplateCard({ name, applicableDays, habits, onApply, onEdit, onDelete }: HabitTemplateCardProps) {
   const totalMinutes = habits.reduce((sum, h) => sum + h.defaultDuration, 0)
 
   // 计算时间范围
@@ -68,12 +69,25 @@ export function HabitTemplateCard({ name, applicableDays, habits, onApply, onEdi
           })}
         </div>
 
+        {/* 习惯名称列表 */}
+        <div className="flex flex-col gap-1">
+          {habits.map((habit, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="truncate text-ink">{habit.title}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{habit.defaultTime} · {habit.defaultDuration}min</span>
+            </div>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2">
           {onApply && (
             <Button size="sm" onClick={onApply}>用模板安排今天</Button>
           )}
           {onEdit && (
             <Button variant="outline" size="sm" onClick={onEdit}>编辑</Button>
+          )}
+          {onDelete && (
+            <Button variant="ghost" size="sm" onClick={onDelete}>删除</Button>
           )}
         </div>
       </CardContent>

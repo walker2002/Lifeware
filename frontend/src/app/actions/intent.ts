@@ -617,6 +617,20 @@ export async function deleteHabit(
   }
 }
 
+/** 检查习惯引用状态 */
+export async function checkHabitReferences(
+  habitId: string,
+): Promise<{ success: boolean; references?: import("@/usom/interfaces/irepository").HabitReferenceInfo; error?: string }> {
+  try {
+    const repo = await getHabitRepo();
+    const references = await repo.checkReferences(habitId, MVP_USER_ID);
+    return { success: true, references };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "检查引用失败";
+    return { success: false, error: message };
+  }
+}
+
 /** 更新习惯信息 */
 export async function updateHabit(
   habitId: string,
@@ -672,6 +686,35 @@ export async function createTemplate(
     return { success: true, template };
   } catch (err) {
     const message = err instanceof Error ? err.message : "创建模板失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 更新模板 */
+export async function updateTemplate(
+  id: string,
+  data: { name?: string; description?: string; icon?: string; applicableDays?: number[] },
+): Promise<TemplateActionResult> {
+  try {
+    const repo = await getTemplateRepo();
+    const template = await repo.update(id, data, MVP_USER_ID);
+    return { success: true, template };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "更新模板失败";
+    return { success: false, error: message };
+  }
+}
+
+/** 删除模板 */
+export async function deleteTemplate(
+  id: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const repo = await getTemplateRepo();
+    await repo.delete(id, MVP_USER_ID);
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "删除模板失败";
     return { success: false, error: message };
   }
 }

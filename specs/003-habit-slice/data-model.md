@@ -1,6 +1,6 @@
 # Data Model: 习惯管理切片
 
-**Date**: 2026-05-09 | **Feature**: 003-habit-slice
+**Date**: 2026-05-10 | **Feature**: 003-habit-slice | **Version**: v2（改进计划）
 
 ## Entity Relationship
 
@@ -28,7 +28,7 @@ Habit 1──N Timebox (via timebox_habits)
 | daysOfWeek | jsonb (number[]?) | ❌ | null | 0-6 范围，frequencyType=weekly/custom 时必填 |
 | **defaultTime** | text | ✅ | — | HH:MM 格式（重命名自 scheduledTime） |
 | **earliestTime** | text | ✅ | defaultTime-30min | HH:MM 格式（新增） |
-| **latestEndTime** | text | ✅ | defaultTime+duration+30min | HH:MM 格式（新增） |
+| **latestStartTime** | text | ✅ | defaultTime+30min | HH:MM 格式（重命名自 latestEndTime，语义变更） |
 | **defaultDuration** | integer | ✅ | — | > 0，分钟（重命名自 duration） |
 | **minDuration** | integer | ✅ | defaultDuration*0.5 | > 0, <= defaultDuration（新增） |
 | **trackable** | boolean | ✅ | true | —（新增） |
@@ -49,18 +49,18 @@ Habit 1──N Timebox (via timebox_habits)
 
 **Constraints**:
 - earliestTime <= defaultTime
-- defaultTime + defaultDuration <= latestEndTime（或跨日约定）
+- latestStartTime >= defaultTime + 30min（最迟开始时间在默认时间之后）
 - minDuration <= defaultDuration
 - trackable=false 时不产生 HabitLog
 
-**State Transitions**:
+**State Transitions**（改进后）:
 ```
 draft → active (用户确认激活)
 active → suspended (用户暂停)
-active → archived (用户归档)
 suspended → active (用户恢复)
-suspended → archived (用户归档)
+suspended → archived (用户归档，需二次确认)
 ```
+注：`active → archived` 转换已移除，只有暂停状态才能归档。
 
 ### HabitTemplate（习惯模板）— 新增表
 
@@ -85,7 +85,7 @@ suspended → archived (用户归档)
 | templateId | uuid FK→habit_templates | ✅ | — | CASCADE 删除 |
 | habitId | uuid FK→habits | ✅ | — | RESTRICT 删除（习惯被引用时阻止） |
 | sortOrder | integer | ✅ | 0 | >= 0 |
-| timeOverride | text | ❌ | null | HH:MM, 范围在习惯 earliestTime~latestEndTime 内 |
+| timeOverride | text | ❌ | null | HH:MM, 范围在习惯 earliestTime~latestStartTime 内 |
 | durationOverride | integer | ❌ | null | >= 习惯 minDuration |
 
 **Primary Key**: (templateId, habitId)
@@ -112,11 +112,11 @@ suspended → archived (用户归档)
 
 ## Cross-Midnight Convention
 
-当 `latestEndTime < defaultTime`（或 `latestEndTime < earliestTime`）时，表示跨越午夜到次日。
+当 `latestStartTime < defaultTime`（或 `latestStartTime < earliestTime`）时，表示跨越午夜到次日。
 
-**转换规则**：将 HH:MM 转为分钟偏移（0~1439）。跨日时 `latestEndTime` 加 1440 再比较。
+**转换规则**：将 HH:MM 转为分钟偏移（0~1439）。跨日时 `latestStartTime` 加 1440 再比较。
 
-**示例**：睡眠 earliestTime=22:00(1320), latestEndTime=06:00(360) → 实际比较 360+1440=1800, 所以 1320 < 1800 ✅
+**示例**：睡眠 earliestTime=22:00(1320), latestStartTime=06:00(360) → 实际比较 360+1440=1800, 所以 1320 < 1800 ✅
 
 ## Schema Migration Plan
 
@@ -133,7 +133,7 @@ ALTER TABLE habits ADD COLUMN "earliestTime" text;
 ALTER TABLE habits ADD COLUMN "latestEndTime" text;
 ALTER TABLE habits ADD COLUMN "minDuration" integer;
 
--- 根据 defaultTime 和 defaultDuration 回填新字段
+-- 回填新字段
 UPDATE habits SET
   "earliestTime" = "defaultTime",
   "latestEndTime" = "defaultTime",
@@ -144,3 +144,23 @@ WHERE "earliestTime" IS NULL;
 CREATE TABLE habit_templates ( ... );
 CREATE TABLE template_habits ( ... );
 ```
+
+### Migration: 0003_latest_start_time.sql（改进计划新增）
+
+```sql
+-- 重命名 latestEndTime → latestStartTime
+ALTER TABLE habits RENAME COLUMN "latest_end_time" TO "latest_start_time";
+
+-- 回填：从 defaultTime+duration+30 改为 defaultTime+30
+-- 注意：需要将时间值调整为新语义
+UPDATE habits SET
+  "latest_start_time" = "default_time"
+WHERE "latest_start_time" IS NULL;
+```
+
+## 变更历史
+
+| 版本 | 日期 | 变更 |
+|---|---|---|
+| v1 | 2026-05-09 | 初始版本 |
+| v2 | 2026-05-10 | 改进计划：latestEndTime→latestStartTime 重命名，移除 active→archived 转换 |

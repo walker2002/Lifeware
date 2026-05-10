@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import type { Habit } from "@/usom/types/objects"
 
 interface AvailableHabit {
   id: string
@@ -22,23 +23,51 @@ export interface TemplateHabitEntry {
 
 interface HabitTemplateFormProps {
   availableHabits: AvailableHabit[]
+  /** 活跃习惯列表，用于新建模板时自动填充 */
+  habits?: Habit[]
   initial?: {
+    templateId?: string
     name?: string
+    applicableDays?: number[]
     habits?: TemplateHabitEntry[]
   }
-  onSubmit: (data: { name: string; applicableDays: number[]; habits: TemplateHabitEntry[] }) => void
+  onSubmit: (data: { templateId?: string; name: string; applicableDays: number[]; habits: TemplateHabitEntry[] }) => void
   onCancel: () => void
   isLoading?: boolean
 }
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
 
-export function HabitTemplateForm({ availableHabits, initial, onSubmit, onCancel, isLoading }: HabitTemplateFormProps) {
+export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, onCancel, isLoading }: HabitTemplateFormProps) {
   const [name, setName] = useState(initial?.name ?? "")
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5])
+  const [selectedDays, setSelectedDays] = useState<number[]>(initial?.applicableDays ?? [1, 2, 3, 4, 5])
   const [entries, setEntries] = useState<TemplateHabitEntry[]>(initial?.habits ?? [])
   const [selectedHabitId, setSelectedHabitId] = useState("")
   const [timeOverride, setTimeOverride] = useState("")
+
+  // 防止重复自动填充的标记
+  const autoFilledRef = useRef(false)
+
+  // T066: 新建模式自动填充活跃习惯（仅初始化一次）
+  useEffect(() => {
+    if (initial || autoFilledRef.current || !habits) return
+
+    // 筛选活跃习惯并按 defaultTime 排序
+    const activeHabits = habits
+      .filter(h => h.status === "active")
+      .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime))
+
+    if (activeHabits.length > 0) {
+      const autoEntries: TemplateHabitEntry[] = activeHabits.map((h, i) => ({
+        habitId: h.id,
+        title: h.title,
+        sortOrder: i + 1,
+        timeOverride: h.defaultTime,
+      }))
+      setEntries(autoEntries)
+    }
+    autoFilledRef.current = true
+  }, [initial, habits])
 
   const toggleDay = (day: number) => {
     setSelectedDays(prev =>
@@ -73,13 +102,25 @@ export function HabitTemplateForm({ availableHabits, initial, onSubmit, onCancel
     )
   }, [])
 
+  const updateTimeOverride = useCallback((habitId: string, time: string) => {
+    setEntries(prev => prev.map(e =>
+      e.habitId === habitId ? { ...e, timeOverride: time } : e,
+    ))
+  }, [])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || selectedDays.length === 0) return
-    onSubmit({ name: name.trim(), applicableDays: selectedDays, habits: entries })
+    onSubmit({
+      templateId: initial?.templateId,
+      name: name.trim(),
+      applicableDays: selectedDays,
+      habits: entries,
+    })
   }
 
   const isValid = name.trim().length > 0 && selectedDays.length > 0
+  const isEditMode = !!initial
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -140,22 +181,31 @@ export function HabitTemplateForm({ availableHabits, initial, onSubmit, onCancel
       </div>
 
       {/* 已添加的习惯列表 */}
-      {entries.length > 0 && (
+      {entries.length > 0 ? (
         <div className="flex flex-col gap-1">
           <Label>模板中的习惯</Label>
           {entries.map(entry => (
             <div key={entry.habitId} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <div>
+              <div className="flex items-center gap-2">
                 <span className="font-medium">{entry.title}</span>
-                {entry.timeOverride && (
-                  <span className="ml-2 text-xs text-amber-600">覆盖: {entry.timeOverride}</span>
-                )}
+                {/* T067: 时间覆盖输入框 */}
+                <Input
+                  type="time"
+                  value={entry.timeOverride ?? ""}
+                  onChange={e => updateTimeOverride(entry.habitId, e.target.value)}
+                  className="w-28"
+                />
               </div>
+              {/* T067: 移除按钮 */}
               <Button type="button" variant="ghost" size="sm" onClick={() => removeHabit(entry.habitId)}>
                 移除
               </Button>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="py-2 text-center text-xs text-muted-foreground">
+          暂无习惯，请从上方添加或系统将自动填充活跃习惯
         </div>
       )}
 
@@ -163,7 +213,7 @@ export function HabitTemplateForm({ availableHabits, initial, onSubmit, onCancel
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>取消</Button>
         <Button type="submit" disabled={!isValid || isLoading}>
-          {isLoading ? "提交中..." : initial ? "保存" : "创建模板"}
+          {isLoading ? "提交中..." : isEditMode ? "保存" : "创建模板"}
         </Button>
       </div>
     </form>

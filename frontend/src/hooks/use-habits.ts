@@ -9,6 +9,7 @@ import {
   updateHabitStatus,
   deleteHabit as deleteHabitAction,
   updateHabit as updateHabitAction,
+  checkHabitReferences,
 } from "@/app/actions/intent"
 
 interface UseHabitsResult {
@@ -20,6 +21,7 @@ interface UseHabitsResult {
   changeStatus: (habitId: string, action: "activate" | "suspend" | "reactivate" | "archive") => Promise<boolean>
   deleteHabit: (habitId: string) => Promise<boolean>
   updateHabit: (habitId: string, input: UpdateHabitInput) => Promise<boolean>
+  checkReferences: (habitId: string) => Promise<import("@/usom/interfaces/irepository").HabitReferenceInfo | null>
 }
 
 export function useHabits(): UseHabitsResult {
@@ -72,6 +74,13 @@ export function useHabits(): UseHabitsResult {
   }, [refresh])
 
   const deleteHabit_ = useCallback(async (habitId: string): Promise<boolean> => {
+    // 先检查外键引用
+    const refs = await checkHabitReferences(habitId)
+    if (refs?.success && refs.references?.hasReferences) {
+      setError('该习惯存在关联数据（打卡记录或时间盒），无法删除')
+      return false
+    }
+    // 无引用，执行删除
     const result = await deleteHabitAction(habitId)
     if (result.success) {
       await refresh()
@@ -91,6 +100,15 @@ export function useHabits(): UseHabitsResult {
     return false
   }, [refresh])
 
+  const checkReferences_ = useCallback(async (habitId: string) => {
+    const result = await checkHabitReferences(habitId)
+    if (result.success && result.references) {
+      return result.references
+    }
+    setError(result.error ?? "检查引用失败")
+    return null
+  }, [])
+
   return {
     habits,
     isLoading,
@@ -100,5 +118,6 @@ export function useHabits(): UseHabitsResult {
     changeStatus,
     deleteHabit: deleteHabit_,
     updateHabit: updateHabit_,
+    checkReferences: checkReferences_,
   }
 }

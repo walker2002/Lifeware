@@ -9,7 +9,7 @@ interface InferInput {
 
 interface InferOutput {
   earliestTime: string // HH:MM
-  latestEndTime: string // HH:MM
+  latestStartTime: string // HH:MM
   minDuration: number
   trackable: boolean
 }
@@ -33,8 +33,8 @@ export function inferHabitDefaults(input: InferInput): InferOutput {
   // earliestTime = defaultTime - 30min (不低于 00:00)
   const earlyMin = Math.max(0, toMin(defaultTime) - 30)
 
-  // latestEndTime = defaultTime + defaultDuration + 30min
-  const lateMin = toMin(defaultTime) + defaultDuration + 30
+  // latestStartTime = defaultTime + 30min
+  const lateMin = toMin(defaultTime) + 30
 
   // minDuration = floor(defaultDuration * 0.5 / 5) * 5, 最低 5
   const minDur = Math.max(5, Math.floor((defaultDuration * 0.5) / 5) * 5)
@@ -46,7 +46,7 @@ export function inferHabitDefaults(input: InferInput): InferOutput {
 
   return {
     earliestTime: toHHMM(earlyMin),
-    latestEndTime: toHHMM(lateMin),
+    latestStartTime: toHHMM(lateMin),
     minDuration: minDur,
     trackable,
   }

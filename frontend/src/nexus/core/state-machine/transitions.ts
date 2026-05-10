@@ -36,15 +36,13 @@ export function findTransition<T extends string>(
 // ─── Habit 状态转换 ─────────────────────────────────────────
 // draft → active (用户确认激活)
 // active → suspended (用户暂停)
-// active → archived (用户归档)
 // suspended → active (用户恢复)
-// suspended → archived (用户归档)
+// suspended → archived (用户归档，需二次确认)
 
 export const habitTransitions: Transition<HabitStatus>[] = [
   { from: null,        to: 'draft',     action: 'create',     eventType: 'HabitCreated' },
   { from: 'draft',     to: 'active',    action: 'activate',   eventType: 'HabitActivated' },
   { from: 'active',    to: 'suspended', action: 'suspend',    eventType: 'HabitSuspended' },
-  { from: 'active',    to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
   { from: 'suspended', to: 'active',    action: 'reactivate', eventType: 'HabitActivated' },
   { from: 'suspended', to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
 ]

@@ -437,7 +437,7 @@ function generateUUID(): string {
 
 /**
  * 使用 AI 解析自然语言输入为习惯相关 StructuredIntent
- * 自动补全 earliestTime/latestEndTime/minDuration/trackable
+ * 自动补全 earliestTime/latestStartTime/minDuration/trackable
  */
 export async function parseHabitWithAI(
   rawInput: string,
@@ -485,7 +485,7 @@ export async function parseHabitWithAI(
       })
 
       if (!fields.earliestTime) fields.earliestTime = defaults.earliestTime
-      if (!fields.latestEndTime) fields.latestEndTime = defaults.latestEndTime
+      if (!fields.latestStartTime) fields.latestStartTime = defaults.latestStartTime
       if (!fields.minDuration) fields.minDuration = defaults.minDuration
       if (fields.trackable === undefined) fields.trackable = defaults.trackable
 

@@ -6,7 +6,7 @@ import type { USOM_ID } from '@/usom/types/primitives'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import { createTimeboxStateMachine } from '../index'
-import { findTransition, timeboxTransitions } from '../transitions'
+import { findTransition, timeboxTransitions, habitTransitions } from '../transitions'
 
 // 测试辅助：封装 timebox 专用的 findTransition
 const findTimeboxTransition = (from: string | null, action: string) =>
@@ -245,5 +245,37 @@ describe('State Machine — execute', () => {
     expect(eventRepo.append).toHaveBeenCalledOnce()
     expect(savedEvents).toHaveLength(1)
     expect(savedEvents[0].type).toBe('TimeboxCreated')
+  })
+})
+
+// ─── Habit 状态转换测试 ──────────────────────────────────────────
+const findHabitTransition = (from: string | null, action: string) =>
+  findTransition(habitTransitions, from as any, action)
+
+describe('Habit transitions — 归档约束', () => {
+  it('active → archived 应被拒绝', () => {
+    expect(findHabitTransition('active', 'archive')).toBeNull()
+  })
+
+  it('suspended → archived 应允许', () => {
+    const t = findHabitTransition('suspended', 'archive')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('archived')
+  })
+
+  it('active → suspended 应允许', () => {
+    const t = findHabitTransition('active', 'suspend')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('suspended')
+  })
+
+  it('suspended → active 应允许', () => {
+    const t = findHabitTransition('suspended', 'reactivate')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('active')
+  })
+
+  it('转换表应包含 5 条规则（不含 active→archived）', () => {
+    expect(habitTransitions).toHaveLength(5)
   })
 })

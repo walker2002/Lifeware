@@ -6,14 +6,14 @@ describe('inferHabitDefaults', () => {
   it('根据 defaultTime 和 defaultDuration 计算时间窗口', () => {
     const result = inferHabitDefaults({ defaultTime: '07:00', defaultDuration: 30 })
     expect(result.earliestTime).toBe('06:30')
-    expect(result.latestEndTime).toBe('08:00')
+    expect(result.latestStartTime).toBe('07:30')
     expect(result.minDuration).toBe(15)
   })
 
   it('defaultDuration=60 → minDuration=30', () => {
     const result = inferHabitDefaults({ defaultTime: '12:00', defaultDuration: 60 })
     expect(result.minDuration).toBe(30)
-    expect(result.latestEndTime).toBe('13:30')
+    expect(result.latestStartTime).toBe('12:30')
   })
 
   it('defaultDuration=15 → minDuration=5 (最低 5 分钟)', () => {

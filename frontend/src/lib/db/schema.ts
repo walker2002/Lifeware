@@ -167,7 +167,7 @@ export const habits = pgTable('habits', {
   frequencyType: text('frequency_type', { enum: ['daily', 'weekly', 'custom'] }).notNull(),
   defaultTime: text('default_time').notNull(),
   earliestTime: text('earliest_time').notNull(),
-  latestEndTime: text('latest_end_time').notNull(),
+  latestStartTime: text('latest_start_time').notNull(),
   defaultDuration: integer('default_duration').notNull(),
   minDuration: integer('min_duration').notNull(),
   trackable: boolean('trackable').notNull().default(true),

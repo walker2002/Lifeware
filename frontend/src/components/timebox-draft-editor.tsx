@@ -14,7 +14,7 @@ interface DraftTimebox {
   habitId: string
   // 约束（来自习惯）
   earliestTime: string
-  latestEndTime: string
+  latestStartTime: string
   minDuration: number
 }
 
@@ -82,13 +82,13 @@ export function TimeboxDraftEditor({ drafts, onConfirm, onSkip, onCancel }: Time
     for (const draft of localDrafts) {
       const start = toMin(draft.startTime)
       const earliest = toMin(draft.earliestTime)
-      const latest = toMin(draft.latestEndTime)
+      const latest = toMin(draft.latestStartTime)
 
       if (start < earliest) {
         newErrors[draft.id] = `开始时间不能早于 ${draft.earliestTime}`
       }
       if (start + draft.duration > latest + 24 * 60) { // 跨午夜处理
-        newErrors[draft.id] = `结束时间不能晚于 ${draft.latestEndTime}`
+        newErrors[draft.id] = `结束时间不能晚于 ${draft.latestStartTime}`
       }
       if (draft.duration < draft.minDuration) {
         newErrors[draft.id] = `时长不能低于最短 ${draft.minDuration} 分钟`
@@ -114,7 +114,7 @@ export function TimeboxDraftEditor({ drafts, onConfirm, onSkip, onCancel }: Time
               <div className="flex items-center gap-2">
                 <span className="font-medium text-ink">{draft.title}</span>
                 <span className="text-xs text-muted-foreground">
-                  {draft.earliestTime} ~ {draft.latestEndTime}
+                  {draft.earliestTime} ~ {draft.latestStartTime}
                 </span>
               </div>
               <div className="flex items-center gap-2">

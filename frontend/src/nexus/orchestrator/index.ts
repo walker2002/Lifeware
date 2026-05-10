@@ -318,7 +318,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             description: intent.fields.description as string | undefined,
             defaultTime: intent.fields.defaultTime as string,
             earliestTime: intent.fields.earliestTime as string,
-            latestEndTime: intent.fields.latestEndTime as string,
+            latestStartTime: intent.fields.latestStartTime as string,
             defaultDuration: intent.fields.defaultDuration as number,
             minDuration: intent.fields.minDuration as number,
             trackable: intent.fields.trackable as boolean,
@@ -396,6 +396,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     },
 
+    /** 重新计算习惯打卡指标并持久化 */
+    async recalculateHabitMetrics(habitId: USOM_ID, userId: USOM_ID): Promise<void> {
+      if (!deps.habitRepo) return
+      const streak = await deps.habitRepo.calculateStreak(habitId, userId)
+      const longestStreak = await deps.habitRepo.calculateLongestStreak(habitId, userId)
+      const completionRate7d = await deps.habitRepo.calculateCompletion7d(habitId, userId)
+      await deps.habitRepo.updateMetrics(habitId, userId, { streak, longestStreak, completionRate7d })
+    },
+
     /** 应用模板生成每日时间盒计划 */
     async applyTemplate(
       templateId: USOM_ID,
@@ -416,8 +425,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       // 幂等性检查：查找当天已有的时间盒
-      const dayStart = `${date}T00:00:00Z` as Timestamp
-      const dayEnd = `${date}T23:59:59Z` as Timestamp
+      const dayStart = `${date}T00:00:00+08:00` as Timestamp
+      const dayEnd = `${date}T23:59:59+08:00` as Timestamp
       const existingTimeboxes = await deps.timeboxRepo.findByDateRange(dayStart, dayEnd, userId)
 
       // 检查模板中所有习惯是否已在当天时间盒中（完全重合 = 重复应用）
@@ -460,8 +469,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           id: timeboxId,
           status: 'planned',
           title: habit.title,
-          startTime: `${date}T${startTime}:00Z` as Timestamp,
-          endTime: `${date}T${endTime}:00Z` as Timestamp,
+          startTime: `${date}T${startTime}:00+08:00` as Timestamp,
+          endTime: `${date}T${endTime}:00+08:00` as Timestamp,
           taskIds: [],
           habitIds: [habit.id],
           isRecurring: false,

@@ -188,15 +188,24 @@ function onEvent(
         }],
       }
 
-    case 'HabitLogged':
+    case 'HabitLogged': {
+      const trackable = (event.payload['trackable'] as boolean) ?? false
+      const metrics: MetricUpdate[] = []
+      if (trackable) {
+        metrics.push({
+          metricKey: 'habit_metrics_needs_update',
+          value: 1,
+        })
+      }
       return {
-        metrics: [],
+        metrics,
         suggestions: [{
           actionType: 'log_habit',
           label: `已打卡: ${title}`,
           weight: 40,
         }],
       }
+    }
 
     case 'HabitSkipped':
       return {
