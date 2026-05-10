@@ -152,7 +152,7 @@ export interface SystemEvent {
   id: USOM_ID
   type: SystemEventType
   occurredAt: Timestamp
-  triggeredBy: 'state_machine' | 'time_trigger'
+  triggeredBy: 'state_machine' | 'time_trigger' | 'template_apply'
   payload: Record<string, unknown>
   snapshotId: USOM_ID
 }

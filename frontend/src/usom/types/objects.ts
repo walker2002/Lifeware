@@ -140,8 +140,12 @@ export interface Habit {
   title: string
   description?: string
   frequency: HabitFrequency
-  scheduledTime: string // HH:MM
-  duration: DurationMinutes
+  defaultTime: string // HH:MM
+  earliestTime: string // HH:MM
+  latestStartTime: string // HH:MM
+  defaultDuration: DurationMinutes
+  minDuration: DurationMinutes
+  trackable: boolean
   startDate: DateOnly
   endDate?: DateOnly
   keyResultId?: USOM_ID
@@ -159,6 +163,26 @@ export interface Habit {
 export interface HabitFrequency {
   type: 'daily' | 'weekly' | 'custom'
   daysOfWeek?: number[] // 0=Sunday ... 6=Saturday
+}
+
+// ─── 3.8a HabitTemplate ────────────────────────────────────────
+export interface HabitTemplate {
+  id: USOM_ID
+  name: string
+  description?: string
+  icon?: string
+  status: 'draft' | 'active'
+  applicableDays: number[] // 0=Sunday ... 6=Saturday
+  habits: TemplateHabitItem[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export interface TemplateHabitItem {
+  habitId: USOM_ID
+  sortOrder: number
+  timeOverride?: string // HH:MM
+  durationOverride?: DurationMinutes
 }
 
 // ─── 3.9 HabitLog ─────────────────────────────────────────────

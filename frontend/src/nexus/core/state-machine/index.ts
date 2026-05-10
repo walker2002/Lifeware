@@ -7,7 +7,7 @@ import type { Timebox } from '@/usom/types/objects'
 import type { StateProposal, SystemEvent } from '@/usom/types/process'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
-import { findTransition } from './transitions'
+import { findTransition, timeboxTransitions } from './transitions'
 
 export interface StateMachineResult {
   success: boolean
@@ -52,7 +52,7 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
       }
 
       // 2. 查找转换规则
-      const transition = findTransition(fromState, proposal.action)
+      const transition = findTransition(timeboxTransitions, fromState, proposal.action)
       if (!transition) {
         return {
           success: false,

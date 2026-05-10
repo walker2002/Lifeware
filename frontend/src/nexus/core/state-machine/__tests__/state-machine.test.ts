@@ -6,7 +6,11 @@ import type { USOM_ID } from '@/usom/types/primitives'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import { createTimeboxStateMachine } from '../index'
-import { findTransition, timeboxTransitions } from '../transitions'
+import { findTransition, timeboxTransitions, habitTransitions } from '../transitions'
+
+// 测试辅助：封装 timebox 专用的 findTransition
+const findTimeboxTransition = (from: string | null, action: string) =>
+  findTransition(timeboxTransitions, from as any, action)
 
 // ─── 测试辅助：构造 StateProposal ─────────────────────────────
 function makeCreateProposal(overrides: Partial<StateProposal> = {}): StateProposal {
@@ -75,49 +79,49 @@ function makeMockEventBus() {
 describe('State Machine — transitions 表', () => {
   // 5. 查找合法转换
   it('create → null → planned 应存在', () => {
-    const t = findTransition(null, 'create')
+    const t = findTimeboxTransition(null, 'create')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('planned')
     expect(t!.eventType).toBe('TimeboxCreated')
   })
 
   it('start → planned → running 应存在', () => {
-    const t = findTransition('planned', 'start')
+    const t = findTimeboxTransition('planned', 'start')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('running')
     expect(t!.eventType).toBe('TimeboxStarted')
   })
 
   it('overtime → running → overtime 应存在', () => {
-    const t = findTransition('running', 'overtime')
+    const t = findTimeboxTransition('running', 'overtime')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('overtime')
     expect(t!.eventType).toBe('TimeboxOvertime')
   })
 
   it('end → overtime → ended 应存在', () => {
-    const t = findTransition('overtime', 'end')
+    const t = findTimeboxTransition('overtime', 'end')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('ended')
     expect(t!.eventType).toBe('TimeboxEnded')
   })
 
   it('end → running → ended 应存在', () => {
-    const t = findTransition('running', 'end')
+    const t = findTimeboxTransition('running', 'end')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('ended')
     expect(t!.eventType).toBe('TimeboxEnded')
   })
 
   it('end → planned → ended 应存在（跳过 start）', () => {
-    const t = findTransition('planned', 'end')
+    const t = findTimeboxTransition('planned', 'end')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('ended')
     expect(t!.eventType).toBe('TimeboxEnded')
   })
 
   it('log → ended → logged 应存在', () => {
-    const t = findTransition('ended', 'log')
+    const t = findTimeboxTransition('ended', 'log')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('logged')
     expect(t!.eventType).toBe('TimeboxLogged')
@@ -125,9 +129,9 @@ describe('State Machine — transitions 表', () => {
 
   // 5. 拒绝非法转换
   it('非法转换应返回 null', () => {
-    expect(findTransition('logged', 'create')).toBeNull()
-    expect(findTransition('planned', 'overtime')).toBeNull()
-    expect(findTransition('ended', 'start')).toBeNull()
+    expect(findTimeboxTransition('logged', 'create')).toBeNull()
+    expect(findTimeboxTransition('planned', 'overtime')).toBeNull()
+    expect(findTimeboxTransition('ended', 'start')).toBeNull()
   })
 
   it('转换表应包含 7 条规则', () => {
@@ -241,5 +245,37 @@ describe('State Machine — execute', () => {
     expect(eventRepo.append).toHaveBeenCalledOnce()
     expect(savedEvents).toHaveLength(1)
     expect(savedEvents[0].type).toBe('TimeboxCreated')
+  })
+})
+
+// ─── Habit 状态转换测试 ──────────────────────────────────────────
+const findHabitTransition = (from: string | null, action: string) =>
+  findTransition(habitTransitions, from as any, action)
+
+describe('Habit transitions — 归档约束', () => {
+  it('active → archived 应被拒绝', () => {
+    expect(findHabitTransition('active', 'archive')).toBeNull()
+  })
+
+  it('suspended → archived 应允许', () => {
+    const t = findHabitTransition('suspended', 'archive')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('archived')
+  })
+
+  it('active → suspended 应允许', () => {
+    const t = findHabitTransition('active', 'suspend')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('suspended')
+  })
+
+  it('suspended → active 应允许', () => {
+    const t = findHabitTransition('suspended', 'reactivate')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('active')
+  })
+
+  it('转换表应包含 5 条规则（不含 active→archived）', () => {
+    expect(habitTransitions).toHaveLength(5)
   })
 })

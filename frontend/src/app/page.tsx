@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { ExecutionLogDialog } from "@/components/execution-log-dialog";
 import type { ExecutionRecord } from "@/usom/types/objects";
 import { useAutoTrigger } from "@/hooks/use-auto-trigger";
+import { HabitLibraryView } from "@/components/habit-library-view";
+import { HabitTemplateManager } from "@/components/habit-template-manager";
 import {
   startOfDay, endOfDay,
   startOfWeek, endOfWeek,
@@ -31,6 +33,7 @@ import {
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 type InputMode = "ai" | "form";
+type MainView = "schedule" | "habits" | "templates";
 
 /** 根据视图模式计算日期范围 */
 function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
@@ -62,6 +65,7 @@ export default function Home() {
   const [actionSurface, setActionSurface] = useState<ActionSurface | undefined>();
   const [dateMode, setDateMode] = useState<DateViewMode>("day");
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [mainView, setMainView] = useState<MainView>("schedule");
 
   // 追踪日志状态
   const [traceVisible, setTraceVisible] = useState(false);
@@ -408,21 +412,66 @@ export default function Home() {
       }
       mainContent={
         <div className="flex w-full flex-col gap-4">
-          <DateNav
-            mode={dateMode}
-            currentDate={currentDate}
-            onModeChange={handleDateModeChange}
-            onNavigate={handleNavigate}
-          />
+          {/* 视图切换标签 */}
+          <div className="flex gap-1 rounded-md bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setMainView("schedule")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mainView === "schedule"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-body hover:text-foreground"
+              }`}
+            >
+              时间安排
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainView("habits")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mainView === "habits"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-body hover:text-foreground"
+              }`}
+            >
+              习惯库
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainView("templates")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mainView === "templates"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-body hover:text-foreground"
+              }`}
+            >
+              模板
+            </button>
+          </div>
 
-          {dateMode === "day" && (
-            <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />
-          )}
-          {dateMode === "week" && (
-            <WeekView timeboxes={timeboxes} currentDate={currentDate} />
-          )}
-          {dateMode === "month" && (
-            <MonthView timeboxes={timeboxes} currentDate={currentDate} />
+          {mainView === "schedule" ? (
+            <>
+              <DateNav
+                mode={dateMode}
+                currentDate={currentDate}
+                onModeChange={handleDateModeChange}
+                onNavigate={handleNavigate}
+              />
+
+              {dateMode === "day" && (
+                <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />
+              )}
+              {dateMode === "week" && (
+                <WeekView timeboxes={timeboxes} currentDate={currentDate} />
+              )}
+              {dateMode === "month" && (
+                <MonthView timeboxes={timeboxes} currentDate={currentDate} />
+              )}
+            </>
+          ) : mainView === "habits" ? (
+            <HabitLibraryView />
+          ) : (
+            <HabitTemplateManager />
           )}
         </div>
       }

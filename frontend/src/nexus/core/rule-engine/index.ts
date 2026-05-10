@@ -16,14 +16,16 @@ import {
   DelayedStartRule,
 } from './rules/timebox'
 import { createTimeOverlapRule } from './rules/timebox-overlap'
+import { HabitConflictRule } from './rules/habit-conflict'
 
-// ─── 默认 timebox 基础规则集（不含异步规则）──────────────────
+// ─── 默认规则集（不含异步规则）──────────────────
 
 const BASE_RULES: Rule[] = [
   FieldCompletenessRule,
   DurationRangeRule,
   StartTimeInFutureRule,
   DelayedStartRule,
+  HabitConflictRule,
 ]
 
 // ─── Rule Engine 接口 ─────────────────────────────────────────

@@ -208,7 +208,9 @@ async function seed() {
   await upsert(s.habits, {
     id: IDS.habitMeditation, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '晨间冥想', description: '每天早上 10 分钟正念冥想',
-    frequencyType: 'daily', scheduledTime: '07:00', duration: 10,
+    frequencyType: 'daily',
+    defaultTime: '07:00', earliestTime: '06:30', latestStartTime: '07:30',
+    defaultDuration: 10, minDuration: 5, trackable: true,
     streak: 5, longestStreak: 12, completionRate7d: 0.85,
     startDate: formatDate(daysAgo(30)), tags: ['健康', '正念'],
     createdAt: daysAgo(30), updatedAt: now,
@@ -216,7 +218,9 @@ async function seed() {
   await upsert(s.habits, {
     id: IDS.habitReading, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '睡前阅读', description: '每天睡前阅读 30 分钟',
-    frequencyType: 'daily', scheduledTime: '22:00', duration: 30,
+    frequencyType: 'daily',
+    defaultTime: '22:00', earliestTime: '21:30', latestStartTime: '22:30',
+    defaultDuration: 30, minDuration: 15, trackable: true,
     streak: 3, longestStreak: 7, completionRate7d: 0.71,
     startDate: formatDate(daysAgo(30)), keyResultId: IDS.krRead, tags: ['学习'],
     createdAt: daysAgo(30), updatedAt: now,
@@ -224,7 +228,9 @@ async function seed() {
   await upsert(s.habits, {
     id: IDS.habitExercise, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '力量训练', description: '每周 3 次力量训练',
-    frequencyType: 'weekly', scheduledTime: '18:00', duration: 45,
+    frequencyType: 'weekly',
+    defaultTime: '18:00', earliestTime: '17:30', latestStartTime: '18:30',
+    defaultDuration: 45, minDuration: 20, trackable: true,
     streak: 2, longestStreak: 4, completionRate7d: 0.57,
     startDate: formatDate(daysAgo(30)), keyResultId: IDS.krExercise,
     daysOfWeek: [1, 3, 5], tags: ['健康', '运动'],
@@ -233,7 +239,9 @@ async function seed() {
   await upsert(s.habits, {
     id: IDS.habitJournal, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '每日复盘', description: '每天结束时写复盘日记',
-    frequencyType: 'daily', scheduledTime: '21:30', duration: 15,
+    frequencyType: 'daily',
+    defaultTime: '21:30', earliestTime: '21:00', latestStartTime: '22:00',
+    defaultDuration: 15, minDuration: 5, trackable: true,
     streak: 8, longestStreak: 15, completionRate7d: 1.0,
     startDate: formatDate(daysAgo(30)), tags: ['反思', '成长'],
     createdAt: daysAgo(30), updatedAt: now,

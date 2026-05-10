@@ -6,6 +6,7 @@ import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Habit, HabitFrequency, HabitLog,
   Timebox, Review, ReviewSection, ReviewMetrics,
+  HabitTemplate, TemplateHabitItem,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -111,8 +112,10 @@ export function taskUSOMToRow(task: Task, userId: USOM_ID) {
 type HabitRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string; description: string | null;
-  frequencyType: string; scheduledTime: string;
-  duration: number; keyResultId: string | null;
+  frequencyType: string; defaultTime: string;
+  earliestTime: string; latestStartTime: string;
+  defaultDuration: number; minDuration: number;
+  trackable: boolean; keyResultId: string | null;
   streak: number; longestStreak: number; completionRate7d: number;
   startDate: string; endDate: string | null;
   daysOfWeek: number[] | null; tags: string[];
@@ -131,8 +134,12 @@ export function habitRowToUSOM(row: HabitRow): Habit {
       type: row.frequencyType as HabitFrequency['type'],
       daysOfWeek: row.daysOfWeek ?? undefined,
     },
-    scheduledTime: row.scheduledTime,
-    duration: row.duration,
+    defaultTime: row.defaultTime,
+    earliestTime: row.earliestTime,
+    latestStartTime: row.latestStartTime,
+    defaultDuration: row.defaultDuration,
+    minDuration: row.minDuration,
+    trackable: row.trackable,
     startDate: row.startDate as DateOnly,
     endDate: (row.endDate as DateOnly) ?? undefined,
     keyResultId: row.keyResultId ?? undefined,
@@ -156,8 +163,12 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
     title: habit.title,
     description: habit.description ?? null,
     frequencyType: habit.frequency.type,
-    scheduledTime: habit.scheduledTime,
-    duration: habit.duration,
+    defaultTime: habit.defaultTime,
+    earliestTime: habit.earliestTime,
+    latestStartTime: habit.latestStartTime,
+    defaultDuration: habit.defaultDuration,
+    minDuration: habit.minDuration,
+    trackable: habit.trackable,
     keyResultId: habit.keyResultId ?? null,
     streak: habit.streak,
     longestStreak: habit.longestStreak,
@@ -203,6 +214,63 @@ export function habitLogUSOMToRow(log: HabitLog, userId: USOM_ID) {
     actualDuration: log.actualDuration ?? null,
     note: log.note ?? null,
     source: log.source,
+  }
+}
+
+// --- HabitTemplate -------------------------------------------------
+type HabitTemplateRow = {
+  id: string; userId: string; schemaVersion: number;
+  name: string; description: string | null;
+  icon: string | null; status: string;
+  applicableDays: number[];
+  createdAt: Date; updatedAt: Date;
+}
+
+export function habitTemplateRowToUSOM(row: HabitTemplateRow, habits: TemplateHabitItem[] = []): HabitTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    icon: row.icon ?? undefined,
+    status: row.status as HabitTemplate['status'],
+    applicableDays: row.applicableDays ?? [],
+    habits,
+    createdAt: row.createdAt.toISOString() as Timestamp,
+    updatedAt: row.updatedAt.toISOString() as Timestamp,
+  }
+}
+
+export function habitTemplateUSOMToRow(template: HabitTemplate, userId: USOM_ID) {
+  return {
+    id: template.id,
+    userId: userId,
+    name: template.name,
+    description: template.description ?? null,
+    icon: template.icon ?? null,
+    status: template.status,
+    applicableDays: template.applicableDays,
+  }
+}
+
+export function templateHabitItemToRow(
+  templateId: USOM_ID,
+  item: TemplateHabitItem,
+) {
+  return {
+    templateId,
+    habitId: item.habitId,
+    sortOrder: item.sortOrder,
+    timeOverride: item.timeOverride ?? null,
+    durationOverride: item.durationOverride ?? null,
+  }
+}
+
+export function templateHabitRowToItem(row: { habitId: string; sortOrder: number; timeOverride: string | null; durationOverride: number | null }): TemplateHabitItem {
+  return {
+    habitId: row.habitId,
+    sortOrder: row.sortOrder,
+    timeOverride: row.timeOverride ?? undefined,
+    durationOverride: row.durationOverride ?? undefined,
   }
 }
 

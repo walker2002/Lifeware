@@ -3,6 +3,7 @@
 
 import { chat } from '@/lib/llm/client'
 import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
+import { inferHabitDefaults } from './habit-defaults'
 
 // ─── 系统提示词 ─────────────────────────────────────────────────
 
@@ -52,6 +53,76 @@ const TIMEBOX_SYSTEM_PROMPT = (now: Date) => `
 - 缺少必需字段时 confidence 设低
 - 只处理时间盒相关意图，其他意图返回 confidence < 0.5
 - 执行动作必须有 target 字段
+`
+
+// ─── 习惯解析系统提示词 ─────────────────────────────────────────
+
+const HABIT_SYSTEM_PROMPT = (now: Date) => `
+你是 Lifeware 习惯意图解析器。将用户的自然语言输入解析为习惯相关结构化意图。
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
+时区：Asia/Shanghai (UTC+8)
+
+支持的动作类型：
+
+1. 创建习惯：
+{
+  "targetDomain": "habits",
+  "action": "createHabit",
+  "fields": {
+    "title": "string",
+    "defaultTime": "HH:MM（24小时制）",
+    "defaultDuration": number（分钟）,
+    "trackable": boolean,
+    "frequencyType": "daily" | "weekly" | "custom",
+    "daysOfWeek": number[]（0=日，6=六，可选，weekly/custom 时必填）
+  },
+  "confidence": 0-1
+}
+
+2. 创建模板：
+{
+  "targetDomain": "habits",
+  "action": "createTemplate",
+  "fields": {
+    "name": "string（模板名称）",
+    "applicableDays": number[]（适用星期）
+  },
+  "confidence": 0-1
+}
+
+3. 添加习惯到模板：
+{
+  "targetDomain": "habits",
+  "action": "addHabitToTemplate",
+  "fields": {
+    "templateName": "string",
+    "habitTitle": "string",
+    "timeOverride": "HH:MM（可选覆盖时间）"
+  },
+  "confidence": 0-1
+}
+
+4. 应用模板：
+{
+  "targetDomain": "habits",
+  "action": "applyTemplate",
+  "fields": {
+    "templateName": "string",
+    "date": "YYYY-MM-DD 或 today"
+  },
+  "confidence": 0-1
+}
+
+推断规则：
+- "每天早上7点运动30分钟" → createHabit, title="运动", defaultTime="07:00", defaultDuration=30, trackable=true, frequencyType="daily"
+- "午餐12点，1小时" → createHabit, title="午餐", defaultTime="12:00", defaultDuration=60, trackable=false（用餐关键词）, frequencyType="daily"
+- "工作日晚上10点复盘15分钟" → createHabit, title="复盘", defaultTime="22:00", defaultDuration=15, trackable=true, frequencyType="weekly", daysOfWeek=[1,2,3,4,5]
+- 用餐/睡眠/午休类习惯 → trackable=false
+- 运动冥想阅读学习类 → trackable=true
+- "工作日" → daysOfWeek=[1,2,3,4,5]
+- "周末" → daysOfWeek=[0,6]
+- 只处理习惯相关意图，其他意图返回 confidence < 0.5
 `
 
 // ─── 多任务系统提示词 ──────────────────────────────────────────
@@ -360,4 +431,84 @@ export async function parseMultiTask(
  */
 function generateUUID(): string {
   return crypto.randomUUID()
+}
+
+// ─── 习惯意图解析 ──────────────────────────────────────────────
+
+/**
+ * 使用 AI 解析自然语言输入为习惯相关 StructuredIntent
+ * 自动补全 earliestTime/latestStartTime/minDuration/trackable
+ */
+export async function parseHabitWithAI(
+  rawInput: string,
+  intentionId: USOM_ID,
+): Promise<AIParserResult> {
+  try {
+    const response = await chat(
+      [
+        { role: 'system', content: HABIT_SYSTEM_PROMPT(new Date()) },
+        { role: 'user', content: rawInput },
+      ],
+      { temperature: 0.3 },
+    )
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      return { success: false, error: 'LLM 返回内容为空' }
+    }
+
+    const jsonStr = extractJSON(content)
+    let parsed: LLMIntentResponse
+    try {
+      parsed = JSON.parse(jsonStr) as LLMIntentResponse
+    } catch {
+      return { success: false, error: '无法解析 JSON 响应' }
+    }
+
+    const validationError = validateResponse(parsed)
+    if (validationError) {
+      return { success: false, error: validationError }
+    }
+
+    if (parsed.confidence < 0.5) {
+      return { success: false, error: `AI 置信度过低（${parsed.confidence.toFixed(2)}）` }
+    }
+
+    const fields = { ...parsed.fields }
+
+    // 对 createHabit 自动补全默认值
+    if (parsed.action === 'createHabit' && fields.defaultTime && fields.defaultDuration) {
+      const defaults = inferHabitDefaults({
+        defaultTime: fields.defaultTime as string,
+        defaultDuration: fields.defaultDuration as number,
+        title: fields.title as string | undefined,
+      })
+
+      if (!fields.earliestTime) fields.earliestTime = defaults.earliestTime
+      if (!fields.latestStartTime) fields.latestStartTime = defaults.latestStartTime
+      if (!fields.minDuration) fields.minDuration = defaults.minDuration
+      if (fields.trackable === undefined) fields.trackable = defaults.trackable
+
+      // 补全 startDate
+      if (!fields.startDate) {
+        fields.startDate = new Date().toISOString().slice(0, 10)
+      }
+    }
+
+    const intent: StructuredIntent = {
+      id: generateUUID(),
+      intentionId,
+      targetDomain: parsed.targetDomain,
+      action: parsed.action,
+      fields,
+      confidence: parsed.confidence,
+      resolvedBy: 'ai',
+      createdAt: new Date().toISOString() as Timestamp,
+    }
+
+    return { success: true, intent }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '未知错误'
+    return { success: false, error: `AI 习惯解析失败：${message}` }
+  }
 }

@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- 2026_05_09：habits 表时间模型升级（三字段时间窗口 + 双时长 + trackable）、新增 habit_templates 和 template_habits 表、timeboxes 状态枚举更新（paused→overtime, 新增 cancelled）、system_events.triggered_by 新增 template_apply
 - 2026_03_21：新增能量账户设计（energy_logs 表、user_calibration 能量字段、context_snapshots.energy_state）、整合评审意见（多租户、JSONB 规范、关联表）
 - 2026_03_20：初始版本
 
@@ -120,6 +121,8 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── tasks                  ← 任务
 ├── habits                 ← 习惯
 ├── habit_logs             ← 习惯打卡记录（独立表）
+├── habit_templates        ← 习惯模板（一组习惯的打包方案）
+├── template_habits        ← 模板-习惯关联表（多对多）
 ├── timeboxes              ← 时间盒
 └── reviews                ← 复盘
 
@@ -406,19 +409,31 @@ CREATE INDEX idx_tasks_timebox ON tasks(timebox_id) where timebox_id is not null
 
 对应 USOM `Habit`。
 
+> **时间模型升级（2026-05-09）**：原 `scheduled_time` + `duration` 双字段升级为三字段时间窗口（`default_time` + `earliest_time` + `latest_start_time`）+ 双时长（`default_duration` + `min_duration`）+ 可追踪标记（`trackable`），支持弹性排程。
+
 ```sql
 CREATE TABLE habits (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references users(id) on delete cascade,
-  schema_version integer not null default 1,
+  schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
   status       text not null check (status in ('draft', 'active', 'suspended', 'archived')),
   title        text not null,
   description  text,
   frequency_type text not null check (frequency_type in ('daily', 'weekly', 'custom')),
-  scheduled_time text not null check (scheduled_time ~ '^\d{2}:\d{2}$'),
-  duration     integer not null,
+
+  -- 时间窗口（三字段弹性排程）
+  default_time     text not null check (default_time ~ '^\d{2}:\d{2}$'),       -- 默认执行时间 HH:MM
+  earliest_time    text not null check (earliest_time ~ '^\d{2}:\d{2}$'),      -- 最早可开始时间 HH:MM
+  latest_start_time  text not null check (latest_start_time ~ '^\d{2}:\d{2}$'),   -- 最迟开始时间 HH:MM
+
+  -- 时长（双时长模型）
+  default_duration integer not null,  -- 默认执行时长（分钟）
+  min_duration     integer not null,  -- 最短有效时长（分钟）
+
+  -- 可追踪标记
+  trackable    boolean not null default true,  -- true=可追踪打卡, false=仅占时（不计入 streak）
 
   -- 关联字段（查询关键）
   key_result_id uuid references key_results(id) on delete set null,
@@ -484,18 +499,67 @@ CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 
 ---
 
+### 4.5a habit_templates（习惯模板表）
+
+对应 USOM `HabitTemplate`。一组习惯的打包方案，可一键应用到某天生成多个 Timebox。
+
+```sql
+CREATE TABLE habit_templates (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  schema_version integer not null default 1,
+
+  -- 查询关键字段（独立列）
+  name        text not null,
+  description text,
+  icon        text,  -- 图标标识，e.g. "sunrise", "focus"
+  status      text not null check (status in ('draft', 'active')) default 'draft',
+
+  -- JSONB 允许：applicableDays 不参与 WHERE 过滤
+  applicable_days jsonb not null,  -- number[]，适用星期（0=Sunday ... 6=Saturday）
+
+  -- 审计字段
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- 索引
+CREATE INDEX idx_habit_templates_user_status ON habit_templates(user_id, status);
+```
+
+---
+
+### 4.5b template_habits（模板-习惯关联表）
+
+对应 USOM `TemplateHabitItem`。模板与习惯的多对多关系，支持覆盖时间和时长。
+
+```sql
+CREATE TABLE template_habits (
+  template_id       uuid not null references habit_templates(id) on delete cascade,
+  habit_id          uuid not null references habits(id) on delete restrict,
+  sort_order        integer not null default 0,
+  time_override     text,     -- 覆盖习惯默认时间 HH:MM，null 则使用习惯自身 default_time
+  duration_override integer,  -- 覆盖习惯默认时长（分钟），null 则使用习惯自身 default_duration
+  primary key (template_id, habit_id)
+);
+```
+
+> **设计说明**：`habit_id` 使用 `on delete restrict`，防止习惯被删除时模板残留无效引用。`time_override` 和 `duration_override` 允许模板内习惯使用不同于默认的时间/时长。
+
 ### 4.6 timeboxes（时间盒表）
 
 对应 USOM `Timebox`。
+
+> **状态枚举更新（2026-05-09）**：原 `paused` 替换为 `overtime`（超时运行），新增 `cancelled`（取消）。生命周期：`Planned → Running → Overtime → Ended → Logged`，或 `Running/Planned → Cancelled`。
 
 ```sql
 CREATE TABLE timeboxes (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null references users(id) on delete cascade,
-  schema_version integer not null default 1,
+  schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
-  status        text not null check (status in ('planned', 'running', 'paused', 'ended', 'logged')),
+  status        text not null check (status in ('planned', 'running', 'overtime', 'ended', 'cancelled', 'logged')),
   title         text not null,
   start_time    timestamptz not null,
   end_time      timestamptz not null,
@@ -505,12 +569,15 @@ CREATE TABLE timeboxes (
   recurrence_rule jsonb,
   tags            jsonb not null default '[]',
 
+  -- JSONB 允许：执行记录，记录实际执行情况
+  execution_record jsonb,  -- ExecutionRecord（SimpleExecutionRecord | DetailedExecutionRecord）
+
   -- 审计字段
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   started_at    timestamptz,
-  paused_at     timestamptz,
+  overtime_at   timestamptz,  -- 进入超时状态的时间
   ended_at      timestamptz,
   logged_at     timestamptz
 );
@@ -742,7 +809,7 @@ CREATE TABLE system_events (
   -- 查询关键字段（独立列）
   type         text not null,
   occurred_at  timestamptz not null default now(),
-  triggered_by text not null check (triggered_by in ('state_machine', 'time_trigger')),
+  triggered_by text not null check (triggered_by in ('state_machine', 'time_trigger', 'template_apply')),
   snapshot_id  uuid references context_snapshots(id) on delete set null,
 
   -- JSONB 允许：payload 结构可变
@@ -978,13 +1045,14 @@ WHERE status IN ('active', 'scheduled')
 -- 今日待打卡习惯视图
 CREATE VIEW v_today_pending_habits AS
 SELECT
-  h.id, h.user_id, h.title, h.scheduled_time, h.streak,
+  h.id, h.user_id, h.title, h.default_time, h.trackable, h.streak,
   h.completion_rate_7d, h.key_result_id,
   COALESCE(hl.status, 'pending') as log_status
 FROM habits h
 LEFT JOIN habit_logs hl
   ON h.id = hl.habit_id AND hl.date = CURRENT_DATE
 WHERE h.status = 'active'
+  AND h.trackable = true
   AND h.archived_at IS NULL
   AND h.start_date <= CURRENT_DATE
   AND (h.end_date IS NULL OR h.end_date >= CURRENT_DATE);
@@ -994,7 +1062,7 @@ CREATE VIEW v_running_timeboxes AS
 SELECT
   id, user_id, title, status, start_time, end_time, tags
 FROM timeboxes
-WHERE status IN ('running', 'paused');
+WHERE status IN ('running', 'overtime');
 ```
 
 ---
@@ -1046,7 +1114,14 @@ interface DerivedSignalsRepository {
 | `Objective.keyResultIds` | 不存储 | 由 `key_results.objective_id` 反查，Repository 聚合后注入 |
 | `Timebox.taskIds` | `timebox_tasks` 关联表 | Repository 联查后聚合为数组 |
 | `Timebox.habitIds` | `timebox_habits` 关联表 | 同上 |
+| `Timebox.executionRecord` | `execution_record` JSONB | 直接 JSON 序列化/反序列化 |
 | `Habit.frequency` | 拆为 `frequency_type` + `days_of_week` | Repository 组装为 `HabitFrequency` 对象 |
+| `Habit.defaultTime` | `default_time` text | snake_case 映射 |
+| `Habit.earliestTime` | `earliest_time` text | snake_case 映射 |
+| `Habit.latestStartTime` | `latest_start_time` text | snake_case 映射 |
+| `Habit.defaultDuration` | `default_duration` integer | snake_case 映射 |
+| `Habit.minDuration` | `min_duration` integer | snake_case 映射 |
+| `HabitTemplate.habits` | `template_habits` 关联表 | Repository 联查后聚合为 `TemplateHabitItem[]` |
 | `Review.sections` | JSONB | 直接 JSON 序列化/反序列化 |
 | `Review.metrics` | JSONB | 同上 |
 | `Task.tags` / `Habit.tags` | JSONB | `string[]` 序列化 |
@@ -1064,6 +1139,8 @@ interface DerivedSignalsRepository {
 | `tasks` | 任务表 |
 | `habits` | 习惯表 |
 | `habit_logs` | 习惯打卡记录表 |
+| `habit_templates` | 习惯模板表 |
+| `template_habits` | 模板-习惯关联表 |
 | `timeboxes` | 时间盒表 |
 | `timebox_tasks` | Timebox-Task 关联表 |
 | `timebox_habits` | Timebox-Habit 关联表 |

@@ -171,5 +171,5 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/002-timebox-slice/plan.md`.
+at `specs/003-habit-slice/plan.md`.
 <!-- SPECKIT END -->

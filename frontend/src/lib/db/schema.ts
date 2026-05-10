@@ -165,8 +165,12 @@ export const habits = pgTable('habits', {
   title: text('title').notNull(),
   description: text('description'),
   frequencyType: text('frequency_type', { enum: ['daily', 'weekly', 'custom'] }).notNull(),
-  scheduledTime: text('scheduled_time').notNull(),
-  duration: integer('duration').notNull(),
+  defaultTime: text('default_time').notNull(),
+  earliestTime: text('earliest_time').notNull(),
+  latestStartTime: text('latest_start_time').notNull(),
+  defaultDuration: integer('default_duration').notNull(),
+  minDuration: integer('min_duration').notNull(),
+  trackable: boolean('trackable').notNull().default(true),
 
   keyResultId: uuid('key_result_id').references(() => keyResults.id, { onDelete: 'set null' }),
 
@@ -209,6 +213,35 @@ export const habitLogs = pgTable('habit_logs', {
   uniqueIndex('uniq_habit_logs_habit_date').on(table.habitId, table.date),
   index('idx_habit_logs_user_date').on(table.userId, table.date),
   index('idx_habit_logs_habit_id').on(table.habitId),
+])
+
+// ─── 4.5a habit_templates ──────────────────────────────────────
+export const habitTemplates = pgTable('habit_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'),
+  status: text('status', { enum: ['draft', 'active'] }).notNull().default('draft'),
+  applicableDays: jsonb('applicable_days').notNull().$type<number[]>(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_habit_templates_user_status').on(table.userId, table.status),
+])
+
+// ─── 4.5b template_habits ──────────────────────────────────────
+export const templateHabits = pgTable('template_habits', {
+  templateId: uuid('template_id').notNull().references(() => habitTemplates.id, { onDelete: 'cascade' }),
+  habitId: uuid('habit_id').notNull().references(() => habits.id, { onDelete: 'restrict' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  timeOverride: text('time_override'),
+  durationOverride: integer('duration_override'),
+}, (table) => [
+  primaryKey({ columns: [table.templateId, table.habitId] }),
 ])
 
 // ─── 4.6 timeboxes ────────────────────────────────────────────
@@ -382,7 +415,7 @@ export const systemEvents = pgTable('system_events', {
 
   type: text('type').notNull(),
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
-  triggeredBy: text('triggered_by', { enum: ['state_machine', 'time_trigger'] }).notNull(),
+  triggeredBy: text('triggered_by', { enum: ['state_machine', 'time_trigger', 'template_apply'] }).notNull(),
   snapshotId: uuid('snapshot_id').references(() => contextSnapshots.id, { onDelete: 'set null' }),
   payload: jsonb('payload').notNull().$type<Record<string, unknown>>().default({}),
 
