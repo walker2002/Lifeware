@@ -451,13 +451,13 @@ Phase 6 和 Phase 7 可由两个 Agent 并行执行：
 
 ### D2: 移除激活按钮
 
-- [X] T058 [P] [US6] 确认并移除习惯卡片的激活按钮 — 在 `frontend/src/components/habit-card.tsx` 检查所有按钮渲染分支，确认 `status === "draft"` 分支不渲染任何"激活"或"activate"相关按钮。如果存在 `onStatusChange("activate")` 调用，移除对应按钮和条件分支
+- [X] T058 [P] [US6] 为草稿习惯卡片添加「激活」按钮 — 在 `frontend/src/components/habit-card.tsx` 中，当 `status === "draft"` 时渲染「激活」按钮，点击后调用 `onStatusChange("activate")` 将习惯状态从草稿转为活跃。活跃状态后按钮变为「暂停」（已有逻辑）
   - **Given** 一个草稿状态（status="draft"）的习惯
   - **When** 渲染习惯卡片
-  - **Then** 卡片不显示「激活」按钮，仅显示「编辑」和「删除」按钮
-  - **Given** 一个活跃状态（status="active"）的习惯
-  - **When** 渲染习惯卡片
-  - **Then** 卡片不显示「激活」按钮，显示「编辑」和「暂停」按钮
+  - **Then** 卡片显示「激活」按钮（以及「编辑」和「删除」按钮）
+  - **Given** 用户点击草稿习惯的「激活」按钮
+  - **When** 激活操作成功
+  - **Then** 习惯状态变为活跃，卡片按钮更新为「暂停」（不再显示「激活」）
 
 ### D3: 删除确认对话框
 

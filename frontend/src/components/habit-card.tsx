@@ -192,7 +192,12 @@ export function HabitCard({
               暂停
             </Button>
           )}
-          {/* draft: [删除] */}
+          {/* draft: [激活] [删除] */}
+          {onStatusChange && isDraft && (
+            <Button variant="outline" size="sm" onClick={() => onStatusChange("activate")}>
+              激活
+            </Button>
+          )}
           {onStatusChange && isDraft && (
             <Button variant="ghost" size="sm" onClick={() => onStatusChange("delete")}>
               删除
