@@ -8,7 +8,6 @@
 习惯管理切片为 Lifeware 提供习惯库管理、习惯模板与每日计划、AI 意图解析、打卡追踪（streak）等完整功能。基于 Nexus 四层架构（USOM → Nexus → Domain → Bridge），使用 Repository Pattern 隔离数据层，Domain Plugin 四钩子模型保持习惯域的被动性。
 
 **已实现**: Bug 修复（[001]-[005]）、US4（指标自动计算）、US5（习惯库列表优化）、US6（卡片布局与交互优化）、US7（模板编辑与删除）
-**待实现**: [010] 时区错位 Bug 修复
 
 ## Technical Context
 
@@ -60,7 +59,7 @@ specs/003-habit-slice/
 ```text
 frontend/src/
 ├── components/
-│   ├── habit-card.tsx              # US6: 网格布局样式 + 删除确认
+│   ├── habit-card.tsx              # US6: 网格布局样式 + 删除确认 + 激活按钮
 │   ├── habit-list.tsx              # US6: 网格容器 + 响应式
 │   ├── habit-library-view.tsx      # US6: 删除确认 AlertDialog
 │   ├── habit-template-card.tsx     # US7: 编辑/删除按钮

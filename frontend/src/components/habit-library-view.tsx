@@ -69,6 +69,8 @@ export function HabitLibraryView() {
     }
     if (action === "suspend") {
       await changeStatus(id, "suspend")
+    } else if (action === "activate") {
+      await changeStatus(id, "activate")
     } else if (action === "reactivate") {
       await changeStatus(id, "reactivate")
     }
