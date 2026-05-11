@@ -37,7 +37,7 @@
 |------|------|------|
 | `objective_number` | text | NEW — 目标编号，如 26Q1-O1，用户级唯一 |
 | `priority` | text | NEW — P0 / P1 / P2，默认 P1 |
-| `period_type` | text | MODIFY — 枚举从 5 项改为 4 项：annual / semi_annual / quarterly / monthly |
+| `period_type` | text | MODIFY — 数据库枚举新增 `semi_annual`；OKR 表单仅展示 4 项（年度/半年度/季度/月度），不展示 daily/weekly（仍保留在枚举中供其他领域使用） |
 
 ### 3.2 重要程度
 
@@ -62,7 +62,7 @@
 ### 3.4 USOM 类型变更
 
 ```typescript
-// primitives.ts — PeriodType 新增
+// primitives.ts — PeriodType 新增 semi_annual（现有值保持不变，其他领域仍需 daily/weekly）
 enum PeriodType {
   Daily = 'daily',
   Weekly = 'weekly',
@@ -71,6 +71,8 @@ enum PeriodType {
   SemiAnnual = 'semi_annual',  // NEW
   Annual = 'annual',
 }
+// 注：OKR 表单仅展示 4 项（annual/semi_annual/quarterly/monthly）
+// daily/weekly 仅供习惯/任务等其他领域使用
 
 // objects.ts — Objective 新增字段
 interface Objective {
@@ -153,6 +155,8 @@ OKRWorkspace                  ← 单容器，管理 selectedId / mode 状态
 | 暂停/恢复/完成/废弃 | 左栏条目下拉菜单 | 对应状态转换 |
 
 ### 6.2 删除确认
+
+所有删除操作（Objective 和 KR）均需 AlertDialog 二次确认。
 
 使用 shadcn/ui AlertDialog：
 - 标题："确认删除"
