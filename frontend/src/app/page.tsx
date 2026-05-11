@@ -24,6 +24,7 @@ import type { ExecutionRecord } from "@/usom/types/objects";
 import { useAutoTrigger } from "@/hooks/use-auto-trigger";
 import { HabitLibraryView } from "@/components/habit-library-view";
 import { HabitTemplateManager } from "@/components/habit-template-manager";
+import { OKRWorkspace } from "@/components/okr/okr-workspace";
 import {
   startOfDay, endOfDay,
   startOfWeek, endOfWeek,
@@ -33,7 +34,7 @@ import {
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 type InputMode = "ai" | "form";
-type MainView = "schedule" | "habits" | "templates";
+type MainView = "schedule" | "habits" | "templates" | "okrs";
 
 /** 根据视图模式计算日期范围 */
 function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
@@ -447,6 +448,17 @@ export default function Home() {
             >
               模板
             </button>
+            <button
+              type="button"
+              onClick={() => setMainView("okrs")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mainView === "okrs"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-body hover:text-foreground"
+              }`}
+            >
+              OKR
+            </button>
           </div>
 
           {mainView === "schedule" ? (
@@ -470,6 +482,8 @@ export default function Home() {
             </>
           ) : mainView === "habits" ? (
             <HabitLibraryView />
+          ) : mainView === "okrs" ? (
+            <OKRWorkspace />
           ) : (
             <HabitTemplateManager />
           )}

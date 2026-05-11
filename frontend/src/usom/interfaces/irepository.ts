@@ -2,7 +2,7 @@
 // All methods use USOM types only (R-02). No Drizzle types exposed.
 // All methods filter by userId (T-02). Nexus components do not see userId (T-03).
 
-import type { USOM_ID, Timestamp, DateOnly } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
@@ -133,9 +133,16 @@ export interface ITimeboxRepository {
 }
 
 // ─── Objective ─────────────────────────────────────────────────
+export type ObjectiveWithKR = Objective & { keyResults: KeyResult[] }
+
 export interface IObjectiveRepository {
   findById(id: USOM_ID, userId: USOM_ID): Promise<Objective | null>
+  findAll(userId: USOM_ID): Promise<Objective[]>
   findActive(userId: USOM_ID): Promise<Objective[]>
+  findByStatus(status: ObjectiveStatus, userId: USOM_ID): Promise<Objective[]>
+  findByPeriod(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]>
+  findByStatusInPeriod(status: ObjectiveStatus[], start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]>
+  findWithKeyResults(id: USOM_ID, userId: USOM_ID): Promise<ObjectiveWithKR | null>
   save(objective: Objective, userId: USOM_ID): Promise<void>
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
 }
@@ -144,6 +151,9 @@ export interface IObjectiveRepository {
 export interface IKeyResultRepository {
   findById(id: USOM_ID, userId: USOM_ID): Promise<KeyResult | null>
   findByObjective(objectiveId: USOM_ID, userId: USOM_ID): Promise<KeyResult[]>
+  updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID): Promise<KeyResult>
+  batchUpdateStatus(objectiveId: USOM_ID, fromStatus: KeyResultStatus, toStatus: KeyResultStatus, userId: USOM_ID): Promise<void>
+  deleteDraft(id: USOM_ID, userId: USOM_ID): Promise<void>
   save(keyResult: KeyResult, userId: USOM_ID): Promise<void>
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
 }

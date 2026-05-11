@@ -3,7 +3,7 @@
 // 特殊路径: running → overtime → ended（超时自动标记）
 //           planned → cancelled（用户取消）
 
-import type { TimeboxStatus, HabitStatus } from '@/usom/types/primitives'
+import type { TimeboxStatus, HabitStatus, ObjectiveStatus, KeyResultStatus } from '@/usom/types/primitives'
 import type { SystemEventType } from '@/usom/types/process'
 
 export interface Transition<T extends string = string> {
@@ -45,4 +45,39 @@ export const habitTransitions: Transition<HabitStatus>[] = [
   { from: 'active',    to: 'suspended', action: 'suspend',    eventType: 'HabitSuspended' },
   { from: 'suspended', to: 'active',    action: 'reactivate', eventType: 'HabitActivated' },
   { from: 'suspended', to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
+]
+
+// ─── Objective 状态转换 ─────────────────────────────────────
+// (null) → draft → active ⇄ paused
+// draft/active/paused → discarded → archived
+// active → completed → archived
+
+export const objectiveTransitions: Transition<ObjectiveStatus>[] = [
+  { from: null,       to: 'draft',     action: 'create',   eventType: 'ObjectiveCreated' },
+  { from: 'draft',    to: 'active',    action: 'activate',  eventType: 'ObjectiveActivated' },
+  { from: 'draft',    to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
+  { from: 'active',   to: 'paused',    action: 'pause',     eventType: 'ObjectivePaused' },
+  { from: 'active',   to: 'completed', action: 'complete',  eventType: 'ObjectiveCompleted' },
+  { from: 'active',   to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
+  { from: 'paused',   to: 'active',    action: 'resume',    eventType: 'ObjectiveResumed' },
+  { from: 'paused',   to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
+  { from: 'completed',to: 'archived',  action: 'archive',   eventType: 'ObjectiveArchived' },
+  { from: 'discarded',to: 'archived',  action: 'archive',   eventType: 'ObjectiveArchived' },
+]
+
+// ─── KeyResult 状态转换 ─────────────────────────────────────
+// 联动：Objective 状态变更时 KR 同步转换
+// 独立：updateProgress 不改变状态，currentValue >= targetValue 自动完成
+
+export const keyResultTransitions: Transition<KeyResultStatus>[] = [
+  { from: null,       to: 'draft',     action: 'create',   eventType: 'KeyResultUpdated' },
+  { from: 'draft',    to: 'active',    action: 'activate',  eventType: 'KeyResultUpdated' },
+  { from: 'draft',    to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
+  { from: 'active',   to: 'paused',    action: 'pause',     eventType: 'KeyResultUpdated' },
+  { from: 'active',   to: 'completed', action: 'complete',  eventType: 'KeyResultCompleted' },
+  { from: 'active',   to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
+  { from: 'paused',   to: 'active',    action: 'resume',    eventType: 'KeyResultUpdated' },
+  { from: 'paused',   to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
+  { from: 'completed',to: 'archived',  action: 'archive',   eventType: 'KeyResultUpdated' },
+  { from: 'discarded',to: 'archived',  action: 'archive',   eventType: 'KeyResultUpdated' },
 ]

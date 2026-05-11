@@ -18,6 +18,8 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- 2026_05_11 (enhancement)：objectives 新增 objective_number/priority 列、period_type 枚举新增 semi_annual
+- 2026_05_11：objectives 表新增 okr_type/discarded_at 列、key_results 表新增 discarded_at 列、状态枚举新增 discarded
 - 2026_05_09：habits 表时间模型升级（三字段时间窗口 + 双时长 + trackable）、新增 habit_templates 和 template_habits 表、timeboxes 状态枚举更新（paused→overtime, 新增 cancelled）、system_events.triggered_by 新增 template_apply
 - 2026_03_21：新增能量账户设计（energy_logs 表、user_calibration 能量字段、context_snapshots.energy_state）、整合评审意见（多租户、JSONB 规范、关联表）
 - 2026_03_20：初始版本
@@ -271,14 +273,19 @@ CREATE TABLE objectives (
   schema_version integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status      text not null check (status in ('draft', 'active', 'paused', 'completed', 'archived')),
+  status      text not null check (status in ('draft', 'active', 'paused', 'completed', 'discarded', 'archived')),
+  okr_type    text not null default 'committed' check (okr_type in ('visionary', 'committed')),
   title       text not null,
   description text,
 
   -- 周期字段（查询关键）
-  period_type  text not null check (period_type in ('daily', 'weekly', 'monthly', 'quarterly', 'annual')),
+  period_type  text not null check (period_type in ('daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual')),
   period_start date not null,
   period_end   date not null,
+
+  -- 编号与优先级
+  objective_number TEXT,  -- 目标编号，格式如 26Q1-O1，创建时自动生成
+  priority         TEXT NOT NULL DEFAULT 'P1' CHECK (priority IN ('P0', 'P1', 'P2')),  -- 重要程度
 
   -- 层级支持（自引用）
   parent_id   uuid references objectives(id) on delete set null,
@@ -290,6 +297,7 @@ CREATE TABLE objectives (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   completed_at timestamptz,
+  discarded_at timestamptz,
   archived_at  timestamptz
 );
 
@@ -318,7 +326,7 @@ CREATE TABLE key_results (
   schema_version integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status       text not null check (status in ('draft', 'active', 'paused', 'completed', 'archived')),
+  status       text not null check (status in ('draft', 'active', 'paused', 'completed', 'discarded', 'archived')),
   objective_id uuid not null references objectives(id) on delete cascade,
   title        text not null,
   description  text,
@@ -336,6 +344,7 @@ CREATE TABLE key_results (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   completed_at timestamptz,
+  discarded_at timestamptz,
   archived_at  timestamptz
 );
 
@@ -1112,6 +1121,9 @@ interface DerivedSignalsRepository {
 | USOM 字段 | DB 存储方式 | 映射说明 |
 |---|---|---|
 | `Objective.keyResultIds` | 不存储 | 由 `key_results.objective_id` 反查，Repository 聚合后注入 |
+| `Objective.okrType` | `okr_type` text | snake_case 映射 |
+| `Objective.discardedAt` | `discarded_at` timestamptz | snake_case 映射 |
+| `KeyResult.discardedAt` | `discarded_at` timestamptz | snake_case 映射 |
 | `Timebox.taskIds` | `timebox_tasks` 关联表 | Repository 联查后聚合为数组 |
 | `Timebox.habitIds` | `timebox_habits` 关联表 | 同上 |
 | `Timebox.executionRecord` | `execution_record` JSONB | 直接 JSON 序列化/反序列化 |

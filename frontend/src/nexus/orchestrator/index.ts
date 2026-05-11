@@ -3,7 +3,7 @@
 // 支持两种域对象: Timebox 和 Habit
 
 import type { USOM_ID, Timestamp, Tag } from '@/usom/types/primitives'
-import type { Timebox, Habit, HabitFrequency } from '@/usom/types/objects'
+import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
 import type {
   StateProposal,
   SystemEvent,
@@ -16,10 +16,12 @@ import type {
   ISystemEventRepository,
   IHabitRepository,
   IHabitTemplateRepository,
+  IObjectiveRepository,
+  IKeyResultRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import { createTimeboxStateMachine } from '../core/state-machine'
-import { findTransition, habitTransitions } from '../core/state-machine/transitions'
+import { findTransition, habitTransitions, objectiveTransitions, keyResultTransitions } from '../core/state-machine/transitions'
 import { createEventBus } from '../infrastructure/event-bus'
 
 interface IntentEngine {
@@ -66,6 +68,8 @@ export interface OrchestratorDeps {
   actionSurfaceEngine?: ActionSurfaceEngine
   habitRepo?: IHabitRepository
   templateRepo?: IHabitTemplateRepository
+  objectiveRepo?: IObjectiveRepository
+  keyResultRepo?: IKeyResultRepository
   onTrace?: (step: TraceStep) => void
 }
 
@@ -89,6 +93,25 @@ function toHabitAction(domainAction: string): string {
     suspendHabit: 'suspend',
     archiveHabit: 'archive',
     reactivateHabit: 'reactivate',
+  }
+  return map[domainAction] ?? domainAction
+}
+
+/** 从 OKR 意图的 action 提取状态机 action */
+function toOKRAction(domainAction: string): string {
+  const map: Record<string, string> = {
+    createObjective: 'create',
+    updateObjective: 'update',
+    activateObjective: 'activate',
+    pauseObjective: 'pause',
+    resumeObjective: 'resume',
+    completeObjective: 'complete',
+    discardObjective: 'discard',
+    archiveObjective: 'archive',
+    createKeyResult: 'create',
+    updateKeyResult: 'update',
+    updateKeyResultProgress: 'updateProgress',
+    deleteKeyResult: 'deleteDraft',
   }
   return map[domainAction] ?? domainAction
 }
@@ -403,6 +426,247 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const longestStreak = await deps.habitRepo.calculateLongestStreak(habitId, userId)
       const completionRate7d = await deps.habitRepo.calculateCompletion7d(habitId, userId)
       await deps.habitRepo.updateMetrics(habitId, userId, { streak, longestStreak, completionRate7d })
+    },
+
+    /** 处理 OKR 类型意图 */
+    async executeOKRIntent(
+      intent: StructuredIntent,
+      userId: USOM_ID,
+      confirmed?: boolean,
+    ): Promise<OrchestratorResult> {
+      if (!deps.objectiveRepo || !deps.keyResultRepo) {
+        return { success: false, error: 'ObjectiveRepository 或 KeyResultRepository 未配置' }
+      }
+
+      const snapshot = createStubSnapshot(userId)
+      const action = toOKRAction(intent.action)
+
+      // RuleEngine 评估
+      trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
+      const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
+      trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
+
+      if (ruleResult.result === 'confirm' && !confirmed) {
+        return {
+          success: false,
+          needsConfirmation: true,
+          confirmationMessage: ruleResult.confirmations?.join('; '),
+          warnings: ruleResult.warnings,
+        }
+      }
+
+      const now = new Date().toISOString() as Timestamp
+      const target = intent.targetDomain as string
+
+      // ─── Objective 操作 ──────────────────────────────
+      if (target === 'objective') {
+        if (action === 'create') {
+          const transition = findTransition(objectiveTransitions, null, 'create')
+          if (!transition) {
+            return { success: false, error: '非法状态转换: 目标创建失败' }
+          }
+
+          const objId = crypto.randomUUID() as USOM_ID
+          const objective: Objective = {
+            id: objId,
+            status: 'draft',
+            title: intent.fields.title as string,
+            description: intent.fields.description as string | undefined,
+            period: {
+              type: (intent.fields.periodType ?? 'quarterly') as Objective['period']['type'],
+              start: (intent.fields.periodStart ?? '') as unknown as import('@/usom/types/primitives').DateOnly,
+              end: (intent.fields.periodEnd ?? '') as unknown as import('@/usom/types/primitives').DateOnly,
+            },
+            keyResultIds: [],
+            okrType: (intent.fields.okrType ?? 'committed') as 'visionary' | 'committed',
+            objectiveNumber: '',
+            priority: (intent.fields.priority ?? 'P1') as 'P0' | 'P1' | 'P2',
+            tags: (intent.fields.tags ?? []) as string[],
+            createdAt: now,
+            updatedAt: now,
+          }
+
+          await deps.objectiveRepo.save(objective, userId)
+
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: transition.eventType,
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: { objectiveId: objId, title: objective.title, toStatus: 'draft' },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(event, userId)
+          eventBus.publish(event)
+
+          return { success: true, warnings: ruleResult.warnings }
+        }
+
+        // 非创建路径: 加载已有目标并执行状态转换
+        const objectiveId = intent.fields.objectiveId as USOM_ID
+        const existing = await deps.objectiveRepo.findById(objectiveId, userId)
+        if (!existing) {
+          return { success: false, error: '目标不存在' }
+        }
+
+        const transition = findTransition(objectiveTransitions, existing.status, action)
+        if (!transition) {
+          return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
+        }
+
+        // 激活前置校验
+        if (action === 'activate') {
+          const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
+          const draftKRs = krs.filter(kr => kr.status === 'draft')
+          if (draftKRs.length === 0) {
+            return { success: false, error: '激活失败: 至少需要 1 个草稿关键结果' }
+          }
+          if (!existing.period.start || !existing.period.end) {
+            return { success: false, error: '激活失败: 必须设置周期起止日期' }
+          }
+        }
+
+        // 更新 Objective 状态
+        const updated: Objective = {
+          ...existing,
+          status: transition.to,
+          updatedAt: now,
+          ...(transition.to === 'discarded' ? { discardedAt: now } : {}),
+          ...(transition.to === 'completed' ? { completedAt: now } : {}),
+          ...(transition.to === 'archived' ? { archivedAt: now } : {}),
+        }
+        await deps.objectiveRepo.save(updated, userId)
+
+        // KR 联动状态变更
+        if (action === 'activate') {
+          await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'draft', 'active', userId)
+        } else if (action === 'pause') {
+          await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'active', 'paused', userId)
+        } else if (action === 'resume') {
+          await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'paused', 'active', userId)
+        } else if (action === 'complete') {
+          await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'active', 'completed', userId)
+          await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'paused', 'completed', userId)
+        } else if (action === 'discard') {
+          // 所有 KR → discarded
+          const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
+          for (const kr of krs) {
+            if (kr.status !== 'discarded' && kr.status !== 'archived') {
+              const krUpdated: KeyResult = { ...kr, status: 'discarded', discardedAt: now, updatedAt: now }
+              await deps.keyResultRepo.save(krUpdated, userId)
+            }
+          }
+        } else if (action === 'archive') {
+          const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
+          for (const kr of krs) {
+            if (kr.status !== 'archived') {
+              const krUpdated: KeyResult = { ...kr, status: 'archived', updatedAt: now }
+              await deps.keyResultRepo.save(krUpdated, userId)
+            }
+          }
+        }
+
+        const event: SystemEvent = {
+          id: crypto.randomUUID() as USOM_ID,
+          type: transition.eventType,
+          occurredAt: now,
+          triggeredBy: 'state_machine',
+          payload: { objectiveId, title: existing.title, fromStatus: existing.status, toStatus: transition.to },
+          snapshotId: '' as USOM_ID,
+        }
+        await deps.eventRepo.append(event, userId)
+        eventBus.publish(event)
+
+        return { success: true, warnings: ruleResult.warnings }
+      }
+
+      // ─── KeyResult 操作 ──────────────────────────────
+      if (target === 'keyResult') {
+        if (action === 'create') {
+          const objectiveId = intent.fields.objectiveId as USOM_ID
+          const krId = crypto.randomUUID() as USOM_ID
+          const kr: KeyResult = {
+            id: krId,
+            objectiveId,
+            title: intent.fields.title as string,
+            description: intent.fields.description as string | undefined,
+            targetValue: intent.fields.targetValue as number,
+            currentValue: 0,
+            unit: intent.fields.unit as string,
+            progressRate: 0,
+            status: 'draft',
+            createdAt: now,
+            updatedAt: now,
+          }
+          await deps.keyResultRepo.save(kr, userId)
+
+          // 更新 Objective 的 keyResultIds
+          const obj = await deps.objectiveRepo.findById(objectiveId, userId)
+          if (obj) {
+            await deps.objectiveRepo.save({ ...obj, keyResultIds: [...obj.keyResultIds, krId], updatedAt: now }, userId)
+          }
+
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'KeyResultUpdated',
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: { keyResultId: krId, objectiveId, title: kr.title },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(event, userId)
+          eventBus.publish(event)
+
+          return { success: true, warnings: ruleResult.warnings }
+        }
+
+        if (action === 'updateProgress') {
+          const krId = intent.fields.keyResultId as USOM_ID
+          const currentValue = intent.fields.currentValue as number
+          const kr = await deps.keyResultRepo.updateProgress(krId, currentValue, userId)
+
+          const eventType = kr.status === 'completed' ? 'KeyResultCompleted' as const : 'KeyResultProgressUpdated' as const
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: eventType,
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: { keyResultId: krId, currentValue, progressRate: kr.progressRate, krTitle: kr.title },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(event, userId)
+          eventBus.publish(event)
+
+          return { success: true, warnings: ruleResult.warnings }
+        }
+
+        if (action === 'deleteDraft') {
+          const krId = intent.fields.keyResultId as USOM_ID
+          await deps.keyResultRepo.deleteDraft(krId, userId)
+          return { success: true, warnings: ruleResult.warnings }
+        }
+
+        // update (字段更新)
+        if (action === 'update') {
+          const krId = intent.fields.keyResultId as USOM_ID
+          const existing = await deps.keyResultRepo.findById(krId, userId)
+          if (!existing) {
+            return { success: false, error: '关键结果不存在' }
+          }
+          const updatedKR: KeyResult = {
+            ...existing,
+            ...(intent.fields.title != null ? { title: intent.fields.title as string } : {}),
+            ...(intent.fields.description != null ? { description: intent.fields.description as string | undefined } : {}),
+            ...(intent.fields.targetValue != null ? { targetValue: intent.fields.targetValue as number } : {}),
+            ...(intent.fields.unit != null ? { unit: intent.fields.unit as string } : {}),
+            updatedAt: now,
+          }
+          await deps.keyResultRepo.save(updatedKR, userId)
+          return { success: true, warnings: ruleResult.warnings }
+        }
+      }
+
+      return { success: false, error: `未知的 OKR 操作: ${intent.action}` }
     },
 
     /** 应用模板生成每日时间盒计划 */

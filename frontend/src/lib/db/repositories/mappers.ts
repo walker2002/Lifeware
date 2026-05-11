@@ -335,9 +335,10 @@ type ObjectiveRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string; description: string | null;
   periodType: string; periodStart: string; periodEnd: string;
-  parentId: string | null; tags: string[];
+  parentId: string | null; okrType: string; tags: string[];
+  objectiveNumber: string | null; priority: string;
   createdAt: Date; updatedAt: Date;
-  completedAt: Date | null; archivedAt: Date | null;
+  discardedAt: Date | null; completedAt: Date | null; archivedAt: Date | null;
 }
 
 export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = []): Objective {
@@ -353,9 +354,13 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
     },
     parentId: row.parentId ?? undefined,
     keyResultIds,
+    okrType: row.okrType as 'visionary' | 'committed',
+    objectiveNumber: row.objectiveNumber ?? '',
+    priority: row.priority as Objective['priority'],
     tags: row.tags ?? [],
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
+    discardedAt: toISO(row.discardedAt),
     completedAt: toISO(row.completedAt),
     archivedAt: toISO(row.archivedAt),
   }
@@ -372,7 +377,11 @@ export function objectiveUSOMToRow(objective: Objective, userId: USOM_ID) {
     periodStart: objective.period.start,
     periodEnd: objective.period.end,
     parentId: objective.parentId ?? null,
+    okrType: objective.okrType,
+    objectiveNumber: objective.objectiveNumber || null,
+    priority: objective.priority,
     tags: objective.tags,
+    discardedAt: toDate(objective.discardedAt),
     completedAt: toDate(objective.completedAt),
     archivedAt: toDate(objective.archivedAt),
   }
@@ -387,7 +396,7 @@ type KeyResultRow = {
   unit: string; progressRate: string;
   dueDate: string | null;
   createdAt: Date; updatedAt: Date;
-  completedAt: Date | null; archivedAt: Date | null;
+  discardedAt: Date | null; completedAt: Date | null; archivedAt: Date | null;
 }
 
 export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
@@ -402,6 +411,7 @@ export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
     progressRate: Number(row.progressRate),
     status: row.status as KeyResult['status'],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
+    discardedAt: toISO(row.discardedAt),
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
   }
@@ -420,7 +430,7 @@ export function keyResultUSOMToRow(kr: KeyResult, userId: USOM_ID) {
     unit: kr.unit,
     progressRate: String(kr.progressRate),
     dueDate: kr.dueDate ?? null,
-    completedAt: toDate(kr.createdAt),
+    discardedAt: toDate(kr.discardedAt),
   }
 }
 

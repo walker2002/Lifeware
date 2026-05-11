@@ -84,6 +84,10 @@ export interface Objective {
   tags: Tag[]
   createdAt: Timestamp
   updatedAt: Timestamp
+  okrType: 'visionary' | 'committed'
+  objectiveNumber: string
+  priority: 'P0' | 'P1' | 'P2'
+  discardedAt?: Timestamp
   completedAt?: Timestamp
   archivedAt?: Timestamp
 }
@@ -100,6 +104,7 @@ export interface KeyResult {
   progressRate: number
   status: KeyResultStatus
   dueDate?: DateOnly
+  discardedAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }

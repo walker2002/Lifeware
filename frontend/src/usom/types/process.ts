@@ -144,7 +144,9 @@ export type SystemEventType =
   | 'HabitCreated' | 'HabitActivated' | 'HabitSuspended' | 'HabitArchived'
   | 'HabitLogged' | 'HabitSkipped' | 'HabitStreakMilestone'
   | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged'
-  | 'ObjectiveCreated' | 'ObjectiveCompleted' | 'KeyResultUpdated' | 'KeyResultCompleted'
+  | 'ObjectiveCreated' | 'ObjectiveActivated' | 'ObjectivePaused' | 'ObjectiveResumed'
+  | 'ObjectiveCompleted' | 'ObjectiveDiscarded' | 'ObjectiveArchived'
+  | 'KeyResultUpdated' | 'KeyResultCompleted' | 'KeyResultProgressUpdated'
   | 'ReviewCreated' | 'ReviewCompleted'
   | 'IntentionCaptured' | 'IntentionDissolved'
 

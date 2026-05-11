@@ -67,20 +67,24 @@ export const objectives = pgTable('objectives', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'archived'] }).notNull(),
+  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'discarded', 'archived'] }).notNull(),
   title: text('title').notNull(),
   description: text('description'),
 
-  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'annual'] }).notNull(),
+  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }).notNull(),
   periodStart: date('period_start').notNull(),
   periodEnd: date('period_end').notNull(),
 
   parentId: uuid('parent_id'),
 
+  okrType: text('okr_type').notNull().default('committed'),
+  objectiveNumber: text('objective_number'),
+  priority: text('priority').notNull().default('P1'),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  discardedAt: timestamp('discarded_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
@@ -96,7 +100,7 @@ export const keyResults = pgTable('key_results', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'archived'] }).notNull(),
+  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'discarded', 'archived'] }).notNull(),
   objectiveId: uuid('objective_id').notNull().references(() => objectives.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
@@ -110,6 +114,7 @@ export const keyResults = pgTable('key_results', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  discardedAt: timestamp('discarded_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
@@ -282,7 +287,7 @@ export const reviews = pgTable('reviews', {
   schemaVersion: integer('schema_version').notNull().default(1),
 
   status: text('status', { enum: ['draft', 'in_progress', 'completed', 'archived'] }).notNull(),
-  type: text('type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'annual'] }).notNull(),
+  type: text('type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }).notNull(),
   periodStart: date('period_start').notNull(),
   periodEnd: date('period_end').notNull(),
   generatedBy: text('generated_by', { enum: ['ai', 'manual'] }).notNull(),
