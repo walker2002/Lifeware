@@ -75,7 +75,10 @@ export type Notes = string | null
 // ─── Status Enums ──────────────────────────────────────────────
 export type ObjectiveStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded' | 'archived'
 export type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded' | 'archived'
-export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'completed' | 'archived'
+export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'archived'
+/** @deprecated Use 'in_progress' instead. 'scheduled' retained for backward compatibility with existing data. */
+
+export type ProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
 export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived'
 export type HabitLogStatus = 'completed' | 'skipped' | 'partial'
 export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'

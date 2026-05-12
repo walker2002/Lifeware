@@ -2,11 +2,12 @@
 // All methods use USOM types only (R-02). No Drizzle types exposed.
 // All methods filter by userId (T-02). Nexus components do not see userId (T-03).
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ProjectStatus } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
+  Project, ProjectTemplate, TaskTemplate,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
@@ -33,8 +34,75 @@ export interface ITaskRepository {
   findByStatus(status: Task['status'], userId: USOM_ID): Promise<Task[]>
   findByTimebox(timeboxId: USOM_ID, userId: USOM_ID): Promise<Task[]>
   findActive(userId: USOM_ID): Promise<Task[]>
+  findByProject(projectId: USOM_ID, userId: USOM_ID): Promise<Task[]>
+  findByParent(parentId: USOM_ID, userId: USOM_ID): Promise<Task[]>
+  findIndependent(userId: USOM_ID): Promise<Task[]>
+  findByDateRange(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Task[]>
   save(task: Task, userId: USOM_ID): Promise<void>
+  updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task>
+  bulkCreate(tasks: CreateTaskInput[], userId: USOM_ID): Promise<Task[]>
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+}
+
+export interface CreateTaskInput {
+  title: string
+  description?: string
+  priority: Priority
+  energyRequired: EnergyLevel
+  estimatedDuration: number
+  projectId?: USOM_ID
+  parentId?: USOM_ID
+  earliestTime?: string
+  latestStartTime?: string
+  defaultTime?: string
+  defaultDuration?: number
+  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
+  daysOfWeek?: number[]
+  startDate?: DateOnly
+  endDate?: DateOnly
+}
+
+// ─── Project ─────────────────────────────────────────────────────
+export interface IProjectRepository {
+  findById(id: USOM_ID, userId: USOM_ID): Promise<Project | null>
+  findByUserId(userId: USOM_ID, filters?: ProjectFilters): Promise<Project[]>
+  findByStatus(status: ProjectStatus, userId: USOM_ID): Promise<Project[]>
+  create(input: CreateProjectInput, userId: USOM_ID): Promise<Project>
+  update(id: USOM_ID, input: UpdateProjectInput, userId: USOM_ID): Promise<Project>
+  updateStatus(id: USOM_ID, status: ProjectStatus, userId: USOM_ID): Promise<Project>
+  saveAsTemplate(id: USOM_ID, userId: USOM_ID): Promise<ProjectTemplate>
+  delete(id: USOM_ID, userId: USOM_ID): Promise<void>
+  archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+}
+
+export interface ProjectFilters {
+  status?: ProjectStatus | ProjectStatus[]
+}
+
+export interface CreateProjectInput {
+  name: string
+  description?: string
+  startDate?: DateOnly
+  endDate?: DateOnly
+  defaultEarliestTime?: string
+  defaultLatestStartTime?: string
+  defaultDuration?: number
+  priority?: Priority
+  color?: string
+  tags?: string[]
+}
+
+export type UpdateProjectInput = Partial<CreateProjectInput>
+
+// ─── TaskTemplate ────────────────────────────────────────────────
+export interface ITaskTemplateRepository {
+  findProjectTemplateById(id: USOM_ID, userId: USOM_ID): Promise<ProjectTemplate | null>
+  findProjectTemplates(userId: USOM_ID): Promise<ProjectTemplate[]>
+  findTasksByProject(projectTemplateId: USOM_ID): Promise<TaskTemplate[]>
+  saveProjectTemplate(template: ProjectTemplate, userId: USOM_ID): Promise<void>
+  saveTaskTemplate(template: TaskTemplate): Promise<void>
+  createFromTemplate(projectTemplateId: USOM_ID, dates: { startDate?: DateOnly; endDate?: DateOnly }, userId: USOM_ID): Promise<Project>
+  deleteProjectTemplate(id: USOM_ID, userId: USOM_ID): Promise<void>
 }
 
 // ─── Habit ─────────────────────────────────────────────────────

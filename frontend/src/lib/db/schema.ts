@@ -125,13 +125,80 @@ export const keyResults = pgTable('key_results', {
   index('idx_key_results_due_date').on(table.userId, table.dueDate),
 ])
 
-// ─── 4.3 tasks ────────────────────────────────────────────────
+// ─── 4.3 projects ──────────────────────────────────────────────
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+
+  name: text('name').notNull(),
+  description: text('description'),
+  status: text('status', { enum: ['planning', 'active', 'paused', 'completed', 'archived'] }).notNull(),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  defaultEarliestTime: text('default_earliest_time'),
+  defaultLatestStartTime: text('default_latest_start_time'),
+  defaultDuration: integer('default_duration'),
+  priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
+  color: text('color'),
+  tags: jsonb('tags').notNull().$type<string[]>().default([]),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_projects_user_status').on(table.userId, table.status),
+  index('idx_projects_user_start_date').on(table.userId, table.startDate),
+])
+
+// ─── 4.3b project_templates ─────────────────────────────────────
+export const projectTemplates = pgTable('project_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  defaultEarliestTime: text('default_earliest_time'),
+  defaultLatestStartTime: text('default_latest_start_time'),
+  defaultDuration: integer('default_duration'),
+  priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
+  color: text('color'),
+  tags: jsonb('tags').notNull().$type<string[]>().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_project_templates_user').on(table.userId),
+])
+
+// ─── 4.3c task_templates ────────────────────────────────────────
+export const taskTemplates = pgTable('task_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectTemplateId: uuid('project_template_id').references(() => projectTemplates.id, { onDelete: 'cascade' }),
+  parentTemplateId: uuid('parent_template_id').references((): any => taskTemplates.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
+  energyRequired: text('energy_required', { enum: ['high', 'medium', 'low'] }),
+  estimatedDuration: integer('estimated_duration'),
+  earliestTime: text('earliest_time'),
+  latestStartTime: text('latest_start_time'),
+  defaultTime: text('default_time'),
+  defaultDuration: integer('default_duration'),
+  frequencyType: text('frequency_type', { enum: ['once', 'daily', 'weekly', 'custom'] }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_task_templates_project').on(table.projectTemplateId),
+  index('idx_task_templates_parent').on(table.parentTemplateId),
+])
+
+// ─── 4.4 tasks ────────────────────────────────────────────────
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'scheduled', 'completed', 'archived'] }).notNull(),
+  status: text('status', { enum: ['draft', 'active', 'scheduled', 'in_progress', 'on_hold', 'completed', 'archived'] }).notNull(),
   title: text('title').notNull(),
   description: text('description'),
   priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }).notNull(),
@@ -152,12 +219,26 @@ export const tasks = pgTable('tasks', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
+
+  parentId: uuid('parent_id').references((): any => tasks.id, { onDelete: 'set null' }),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  earliestTime: text('earliest_time'),
+  latestStartTime: text('latest_start_time'),
+  defaultTime: text('default_time'),
+  defaultDuration: integer('default_duration'),
+  frequencyType: text('frequency_type', { enum: ['once', 'daily', 'weekly', 'custom'] }),
+  daysOfWeek: jsonb('days_of_week').$type<number[]>(),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
 }, (table) => [
   index('idx_tasks_user_status').on(table.userId, table.status),
   index('idx_tasks_priority').on(table.userId, table.priority),
   index('idx_tasks_due_date').on(table.userId, table.dueDate),
   index('idx_tasks_key_result').on(table.keyResultId),
   index('idx_tasks_timebox').on(table.timeboxId),
+  index('idx_tasks_user_project').on(table.userId, table.projectId),
+  index('idx_tasks_user_parent').on(table.userId, table.parentId),
+  index('idx_tasks_project_status').on(table.projectId, table.status),
 ])
 
 // ─── 4.4 habits ───────────────────────────────────────────────

@@ -7,6 +7,7 @@ import type {
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
   HabitLogStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
+  ProjectStatus,
 } from './primitives'
 
 // ─── 3.1 User ─────────────────────────────────────────────────
@@ -128,7 +129,72 @@ export interface Task {
   updatedAt: Timestamp
   completedAt?: Timestamp
   archivedAt?: Timestamp
+  parentId?: USOM_ID
+  projectId?: USOM_ID
+  earliestTime?: string
+  latestStartTime?: string
+  defaultTime?: string
+  defaultDuration?: number
+  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
+  daysOfWeek?: number[]
+  startDate?: DateOnly
+  endDate?: DateOnly
   notes?: Notes
+}
+
+// ─── 3.7a Project ──────────────────────────────────────────────
+export interface Project {
+  id: USOM_ID
+  status: ProjectStatus
+  name: string
+  description?: string
+  startDate?: DateOnly
+  endDate?: DateOnly
+  defaultEarliestTime?: string
+  defaultLatestStartTime?: string
+  defaultDuration?: number
+  priority?: Priority
+  color?: string
+  tags: Tag[]
+  notes?: Notes
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
+}
+
+// ─── 3.7b ProjectTemplate ─────────────────────────────────────
+export interface ProjectTemplate {
+  id: USOM_ID
+  name: string
+  description?: string
+  defaultEarliestTime?: string
+  defaultLatestStartTime?: string
+  defaultDuration?: number
+  priority?: Priority
+  color?: string
+  tags: Tag[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+// ─── 3.7c TaskTemplate ────────────────────────────────────────
+export interface TaskTemplate {
+  id: USOM_ID
+  projectTemplateId?: USOM_ID
+  parentTemplateId?: USOM_ID
+  title: string
+  description?: string
+  priority?: Priority
+  energyRequired?: EnergyLevel
+  estimatedDuration?: number
+  earliestTime?: string
+  latestStartTime?: string
+  defaultTime?: string
+  defaultDuration?: number
+  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
+  sortOrder: number
+  createdAt: Timestamp
 }
 
 // MVP stub — type only, no business logic
