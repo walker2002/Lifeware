@@ -14,8 +14,7 @@ const userId = MVP_USER_ID // TODO: get from session
 
 export async function createProject(data: {
   name: string; description?: string; priority?: string
-  defaultEarliestTime?: string; defaultLatestStartTime?: string
-  defaultDuration?: number; startDate?: string; endDate?: string; color?: string
+  startDate?: string; endDate?: string; color?: string
 }) {
   const repo = new ProjectRepository()
   const project = await repo.create({
@@ -35,8 +34,7 @@ export async function updateProjectStatus(projectId: string, status: ProjectStat
 
 export async function updateProject(projectId: string, data: {
   name?: string; description?: string; priority?: string
-  defaultEarliestTime?: string; defaultLatestStartTime?: string
-  defaultDuration?: number; startDate?: string; endDate?: string; color?: string
+  startDate?: string; endDate?: string; color?: string
 }) {
   const repo = new ProjectRepository()
   await repo.update(projectId, {
@@ -57,8 +55,7 @@ export async function saveProjectAsTemplate(projectId: string) {
 
 export async function createTask(data: {
   title: string; description?: string; priority: string; energyRequired: string
-  estimatedDuration: number; earliestTime?: string; latestStartTime?: string
-  defaultTime?: string; defaultDuration?: number
+  estimatedDuration: number
   frequencyType?: string; daysOfWeek?: number[]
   startDate?: string; endDate?: string
   projectId?: string; parentId?: string
@@ -70,10 +67,6 @@ export async function createTask(data: {
     priority: data.priority as Priority,
     energyRequired: data.energyRequired as EnergyLevel,
     estimatedDuration: data.estimatedDuration,
-    earliestTime: data.earliestTime,
-    latestStartTime: data.latestStartTime,
-    defaultTime: data.defaultTime,
-    defaultDuration: data.defaultDuration,
     frequencyType: data.frequencyType as "once" | "daily" | "weekly" | "custom" | undefined,
     daysOfWeek: data.daysOfWeek,
     startDate: data.startDate ?? undefined,
@@ -104,8 +97,6 @@ export async function importTasks(preview: ImportPreview) {
     name: preview.project.name,
     description: preview.project.description,
     priority: preview.project.priority as Priority | undefined,
-    defaultEarliestTime: preview.project.defaultEarliestTime,
-    defaultLatestStartTime: preview.project.defaultLatestStartTime,
   }, userId)
 
   if (preview.tasks.length > 0) {
