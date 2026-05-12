@@ -63,13 +63,13 @@ export function AppShell({ aiPanel, mainContent, tilesBanner, tracePanel, onSett
           </div>
 
           {/* 主内容区 — flex-1 自动填充 */}
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 flex flex-col">
             <MainContent>{mainContent}</MainContent>
           </div>
         </div>
 
         {/* 移动端：单栏 + Sheet 抽屉 */}
-        <div className="min-h-0 flex-1 md:hidden">
+        <div className="min-h-0 flex-1 flex flex-col md:hidden">
           <MainContent>{mainContent}</MainContent>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetContent side="left" className="w-80 p-0">

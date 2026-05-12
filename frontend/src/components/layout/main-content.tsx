@@ -13,7 +13,7 @@ interface MainContentProps {
 export function MainContent({ children }: MainContentProps) {
   return (
     <main
-      className="min-w-0 flex-1 overflow-y-auto bg-canvas p-6"
+      className="min-w-0 min-h-0 flex-1 overflow-y-auto bg-canvas p-6"
       role="main"
     >
       <div className="w-full">{children}</div>

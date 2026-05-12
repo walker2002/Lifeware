@@ -82,7 +82,7 @@ export function WeekView({ timeboxes, currentDate }: WeekViewProps) {
         startAccessor="start"
         endAccessor="end"
         date={currentDate}
-        style={{ height: 500 }}
+        style={{ height: 960 }}
         messages={{
           today: "今天",
           previous: "上一页",
