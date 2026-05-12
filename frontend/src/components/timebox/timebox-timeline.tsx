@@ -9,8 +9,8 @@ interface TimeboxTimelineProps {
 }
 
 // 时间轴范围
-const TIMELINE_START = 6   // 06:00
-const TIMELINE_END = 23    // 23:00
+const TIMELINE_START = 0   // 00:00
+const TIMELINE_END = 24    // 24:00
 const HOURS = TIMELINE_END - TIMELINE_START
 
 // 状态颜色映射
