@@ -131,10 +131,6 @@ export interface Task {
   archivedAt?: Timestamp
   parentId?: USOM_ID
   projectId?: USOM_ID
-  earliestTime?: string
-  latestStartTime?: string
-  defaultTime?: string
-  defaultDuration?: number
   frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
   daysOfWeek?: number[]
   startDate?: DateOnly
@@ -150,9 +146,6 @@ export interface Project {
   description?: string
   startDate?: DateOnly
   endDate?: DateOnly
-  defaultEarliestTime?: string
-  defaultLatestStartTime?: string
-  defaultDuration?: number
   priority?: Priority
   color?: string
   tags: Tag[]
@@ -168,9 +161,6 @@ export interface ProjectTemplate {
   id: USOM_ID
   name: string
   description?: string
-  defaultEarliestTime?: string
-  defaultLatestStartTime?: string
-  defaultDuration?: number
   priority?: Priority
   color?: string
   tags: Tag[]
@@ -188,10 +178,6 @@ export interface TaskTemplate {
   priority?: Priority
   energyRequired?: EnergyLevel
   estimatedDuration?: number
-  earliestTime?: string
-  latestStartTime?: string
-  defaultTime?: string
-  defaultDuration?: number
   frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
   sortOrder: number
   createdAt: Timestamp
