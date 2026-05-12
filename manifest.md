@@ -75,8 +75,8 @@ database-design.md     # 数据库表结构与设计规范（由 LW_database_数
 | 总体设计 | 2026_05_02 | 2026_03_18 | 增加附录 TODO，列出可能的下一步核心扩展设计（非 MVP 考虑） |
 | 技术栈设计演进 | 2026_03_18 | 2026_02_27 | 各阶段追加 Bridge Layer 实现时序、新增约束5、风险表新增2条 |
 | 方法论落地设计规范 | 2026_03_18 | 无 | 创建 |
-| USOM 详细设计 | 2026_03_21 | 2026_03_20 | 新增多租户设计、能量账户、ContextSnapshot/USOMSnapshot 增加 energyState |
-| 数据库设计 | 2026_03_21 | 2026_03_20 | 新增能量账户设计、多租户设计、JSONB规范、关联表 |
+| USOM 详细设计 | 2026_05_12 | 2026_03_21 | 新增 Project/ProjectTemplate/TaskTemplate 类型；TaskStatus 扩展 in_progress/on_hold 状态、deprecated scheduled；Task 新增 parentId/projectId/时间窗口/频率等 10 个字段 |
+| 数据库设计 | 2026_05_12 | 2026_03_21 | 新增 projects/project_templates/task_templates 表；tasks 表扩展状态枚举、新增 parent_id/project_id/时间窗口/频率等列和索引 |
 | 场景提示词设计方案 | 2026_04_06 | 无 | 创建。确定场景提示词方案方向，替代原知识库方案 |
 | 冲突仲裁矩阵 | 2026_04_06 | 无 | 创建。定义10条方法论冲突仲裁规则和5条仲裁原则 |
 | 意图驱动场景示例 | 2026_05_01 | 无 | 创建。通过两个场景案例验证 Nexus→Domain 全链路 |

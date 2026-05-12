@@ -373,7 +373,7 @@ CREATE TABLE tasks (
   schema_version    integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status            text not null check (status in ('draft', 'active', 'scheduled', 'completed', 'archived')),
+  status            text not null check (status in ('draft', 'active', 'scheduled', 'in_progress', 'on_hold', 'completed', 'archived')),
   title             text not null,
   description       text,
   priority          text not null check (priority in ('critical', 'high', 'medium', 'low')),
@@ -382,6 +382,8 @@ CREATE TABLE tasks (
   actual_duration   integer,
 
   -- 关联字段（查询关键）
+  parent_id         uuid references tasks(id) on delete set null,  -- 父任务
+  project_id        uuid references projects(id) on delete set null,  -- 归属项目
   key_result_id     uuid references key_results(id) on delete set null,
   -- timebox_id 使用软引用，通过 timebox_tasks 关联表维护多对多关系
   -- 此字段仅表示"当前激活的 Timebox"，是派生的便利字段
@@ -390,8 +392,22 @@ CREATE TABLE tasks (
   -- 时间字段（查询关键）
   due_date          date,
 
-  -- JSONB 允许：tags 不参与 WHERE 过滤；recurrence MVP 不实现
+  -- 时间窗口字段（弹性排程）
+  earliest_time     text,  -- HH:MM
+  latest_start_time text,  -- HH:MM
+  default_time      text,  -- HH:MM
+  default_duration  integer,  -- 分钟
+
+  -- 频率字段
+  frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
+
+  -- 日期范围
+  start_date date,  -- 周期性任务开始日期
+  end_date   date,  -- 周期性任务结束日期
+
+  -- JSONB 允许：tags/days_of_week 不参与 WHERE 过滤；recurrence MVP 不实现
   tags              jsonb not null default '[]',
+  days_of_week      jsonb,  -- number[]，custom 频率时使用
   recurrence        jsonb,  -- RecurrenceRule，预留字段
 
   -- 审计字段
@@ -408,9 +424,134 @@ CREATE INDEX idx_tasks_priority ON tasks(user_id, priority) where status in ('ac
 CREATE INDEX idx_tasks_due_date ON tasks(user_id, due_date) where due_date is not null and archived_at is null;
 CREATE INDEX idx_tasks_key_result ON tasks(key_result_id) where key_result_id is not null;
 CREATE INDEX idx_tasks_timebox ON tasks(timebox_id) where timebox_id is not null;
+CREATE INDEX idx_tasks_user_project ON tasks(user_id, project_id);
+CREATE INDEX idx_tasks_user_parent ON tasks(user_id, parent_id);
+CREATE INDEX idx_tasks_project_status ON tasks(project_id, status);
 ```
 
 > **设计说明**：`tasks.timebox_id` 使用软引用（不设 FK constraint）。原因：`timeboxes` 和 `tasks` 之间是多对多关系（通过 `timebox_tasks` 关联表），`tasks.timebox_id` 只表示"当前激活的 Timebox"，是一个派生的便利字段。
+
+---
+
+### 4.3a projects
+
+对应 USOM `Project`。
+
+```sql
+CREATE TABLE projects (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  schema_version integer not null default 1,
+
+  -- 查询关键字段（独立列）
+  name        text not null,
+  description text,
+  status      text not null check (status in ('planning', 'active', 'paused', 'completed', 'archived')),
+
+  -- 时间字段（查询关键）
+  start_date  date,
+  end_date    date,
+
+  -- 默认排程参数
+  default_earliest_time     text,  -- HH:MM
+  default_latest_start_time text,  -- HH:MM
+  default_duration          integer,  -- 分钟
+
+  -- 其他
+  priority    text check (priority in ('critical', 'high', 'medium', 'low')),
+  color       text,
+
+  -- JSONB 允许：tags 不参与 WHERE 过滤
+  tags        jsonb not null default '[]',
+
+  -- 审计字段
+  notes         text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  completed_at  timestamptz,
+  archived_at   timestamptz
+);
+
+-- 索引
+CREATE INDEX idx_projects_user_status ON projects(user_id, status);
+CREATE INDEX idx_projects_user_start_date ON projects(user_id, start_date);
+```
+
+---
+
+### 4.3b project_templates
+
+对应 USOM `ProjectTemplate`。
+
+```sql
+CREATE TABLE project_templates (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+
+  -- 查询关键字段（独立列）
+  name        text not null,
+  description text,
+
+  -- 默认排程参数
+  default_earliest_time     text,  -- HH:MM
+  default_latest_start_time text,  -- HH:MM
+  default_duration          integer,  -- 分钟
+
+  -- 其他
+  priority    text check (priority in ('critical', 'high', 'medium', 'low')),
+  color       text,
+
+  -- JSONB 允许：tags 不参与 WHERE 过滤
+  tags        jsonb not null default '[]',
+
+  -- 审计字段
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- 索引
+CREATE INDEX idx_project_templates_user ON project_templates(user_id);
+```
+
+---
+
+### 4.3c task_templates
+
+对应 USOM `TaskTemplate`。
+
+```sql
+CREATE TABLE task_templates (
+  id                   uuid primary key default gen_random_uuid(),
+  project_template_id  uuid references project_templates(id) on delete cascade,
+  parent_template_id   uuid references task_templates(id) on delete set null,
+
+  -- 查询关键字段（独立列）
+  title        text not null,
+  description  text,
+  priority     text check (priority in ('critical', 'high', 'medium', 'low')),
+  energy_required text check (energy_required in ('high', 'medium', 'low')),
+  estimated_duration integer,  -- 分钟
+
+  -- 时间窗口字段
+  earliest_time     text,  -- HH:MM
+  latest_start_time text,  -- HH:MM
+  default_time      text,  -- HH:MM
+  default_duration  integer,  -- 分钟
+
+  -- 频率
+  frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
+
+  -- 排序
+  sort_order   integer not null default 0,
+
+  -- 审计字段
+  created_at   timestamptz not null default now()
+);
+
+-- 索引
+CREATE INDEX idx_task_templates_project ON task_templates(project_template_id);
+CREATE INDEX idx_task_templates_parent ON task_templates(parent_template_id);
+```
 
 ---
 
