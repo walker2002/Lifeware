@@ -1,16 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SplitWarning } from "./split-warning"
 import { StatusBadge } from "./status-badge"
 import type { Task, Project } from "@/usom/types/objects"
-import type { ResolvedTime } from "@/domains/projects/time-inheritance"
 import type { TaskStatus } from "@/usom/types/primitives"
 
 export interface TaskWithChildren extends Task {
   children: TaskWithChildren[]
-  resolvedTime: ResolvedTime
 }
 
 interface TaskListProps {
@@ -21,12 +18,12 @@ interface TaskListProps {
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void
 }
 
-function buildTree(tasks: Task[], resolvedTimes: Map<string, ResolvedTime>): TaskWithChildren[] {
+function buildTree(tasks: Task[]): TaskWithChildren[] {
   const map = new Map<string, TaskWithChildren>()
   const roots: TaskWithChildren[] = []
 
   for (const task of tasks) {
-    map.set(task.id, { ...task, children: [], resolvedTime: resolvedTimes.get(task.id) ?? {} })
+    map.set(task.id, { ...task, children: [] })
   }
 
   for (const task of map.values()) {
@@ -38,22 +35,6 @@ function buildTree(tasks: Task[], resolvedTimes: Map<string, ResolvedTime>): Tas
   }
 
   return roots
-}
-
-function getTimeSourceLabel(task: TaskWithChildren, parentTask?: TaskWithChildren | null, project?: Project): string {
-  const ae = task.earliestTime
-  const ls = task.latestStartTime
-  const dt = task.defaultTime
-  const dd = task.defaultDuration
-
-  if (ae || ls || dt || dd) return "自定义"
-  if (parentTask && (parentTask.earliestTime || parentTask.latestStartTime || parentTask.defaultTime || parentTask.defaultDuration)) {
-    return "继承自父任务"
-  }
-  if (project && (project.defaultEarliestTime || project.defaultLatestStartTime || project.defaultDuration)) {
-    return "继承自项目默认时间"
-  }
-  return "未设置"
 }
 
 function TaskRow({
@@ -75,8 +56,6 @@ function TaskRow({
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const hasChildren = task.children.length > 0
-  const timeSource = getTimeSourceLabel(task, parentTask, project)
-  const hasTimeInheritance = task.resolvedTime.defaultTime || task.resolvedTime.defaultDuration
 
   const STATUS_ACTIONS: Record<string, { label: string; status: TaskStatus }[]> = {
     draft: [{ label: '激活', status: 'active' as TaskStatus }],
@@ -114,24 +93,9 @@ function TaskRow({
         {/* 拆分警告 */}
         {task.estimatedDuration > 720 && <SplitWarning />}
 
-        {/* 时间继承（含 tooltip） */}
-        {hasTimeInheritance ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-xs text-primary/70 shrink-0 cursor-help">
-                {task.resolvedTime.defaultTime && <span>{task.resolvedTime.defaultTime}</span>}
-                {task.resolvedTime.defaultTime && task.resolvedTime.defaultDuration && <span> · </span>}
-                {task.resolvedTime.defaultDuration && <span>{task.resolvedTime.defaultDuration}分钟</span>}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="text-xs">时间来源: {timeSource}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          task.estimatedDuration > 0 && (
-            <span className="text-xs text-muted-foreground shrink-0">{task.estimatedDuration}分钟</span>
-          )
+        {/* 预估时长 */}
+        {task.estimatedDuration > 0 && (
+          <span className="text-xs text-muted-foreground shrink-0">{task.estimatedDuration}分钟</span>
         )}
 
         {/* 子任务数量 */}

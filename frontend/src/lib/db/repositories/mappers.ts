@@ -63,8 +63,6 @@ type TaskRow = {
   createdAt: Date; updatedAt: Date;
   completedAt: Date | null; archivedAt: Date | null;
   parentId: string | null; projectId: string | null;
-  earliestTime: string | null; latestStartTime: string | null;
-  defaultTime: string | null; defaultDuration: number | null;
   frequencyType: string | null; daysOfWeek: number[] | null;
   startDate: string | null; endDate: string | null;
 }
@@ -92,10 +90,6 @@ export function taskRowToUSOM(row: TaskRow): Task {
     notes: row.notes ?? undefined,
     parentId: row.parentId ?? undefined,
     projectId: row.projectId ?? undefined,
-    earliestTime: row.earliestTime ?? undefined,
-    latestStartTime: row.latestStartTime ?? undefined,
-    defaultTime: row.defaultTime ?? undefined,
-    defaultDuration: row.defaultDuration ?? undefined,
     frequencyType: row.frequencyType as Task['frequencyType'],
     daysOfWeek: row.daysOfWeek ?? undefined,
     startDate: (row.startDate as DateOnly) ?? undefined,
@@ -124,10 +118,6 @@ export function taskUSOMToRow(task: Task, userId: USOM_ID) {
     archivedAt: toDate(task.archivedAt),
     parentId: task.parentId ?? null,
     projectId: task.projectId ?? null,
-    earliestTime: task.earliestTime ?? null,
-    latestStartTime: task.latestStartTime ?? null,
-    defaultTime: task.defaultTime ?? null,
-    defaultDuration: task.defaultDuration ?? null,
     frequencyType: task.frequencyType ?? null,
     daysOfWeek: task.daysOfWeek ?? null,
     startDate: task.startDate ?? null,
@@ -744,8 +734,6 @@ type ProjectRow = {
   name: string; description: string | null;
   status: string;
   startDate: string | null; endDate: string | null;
-  defaultEarliestTime: string | null; defaultLatestStartTime: string | null;
-  defaultDuration: number | null;
   priority: string | null; color: string | null;
   tags: string[]; notes: string | null;
   createdAt: Date; updatedAt: Date;
@@ -760,9 +748,6 @@ export function projectRowToUSOM(row: ProjectRow): Project {
     status: row.status as Project['status'],
     startDate: (row.startDate as DateOnly) ?? undefined,
     endDate: (row.endDate as DateOnly) ?? undefined,
-    defaultEarliestTime: row.defaultEarliestTime ?? undefined,
-    defaultLatestStartTime: row.defaultLatestStartTime ?? undefined,
-    defaultDuration: row.defaultDuration ?? undefined,
     priority: row.priority as Project['priority'],
     color: row.color ?? undefined,
     tags: row.tags ?? [],
@@ -783,9 +768,6 @@ export function projectUSOMToRow(project: Project, userId: USOM_ID) {
     status: project.status,
     startDate: project.startDate ?? null,
     endDate: project.endDate ?? null,
-    defaultEarliestTime: project.defaultEarliestTime ?? null,
-    defaultLatestStartTime: project.defaultLatestStartTime ?? null,
-    defaultDuration: project.defaultDuration ?? null,
     priority: project.priority ?? null,
     color: project.color ?? null,
     tags: project.tags,
@@ -799,8 +781,6 @@ export function projectUSOMToRow(project: Project, userId: USOM_ID) {
 type ProjectTemplateRow = {
   id: string; userId: string;
   name: string; description: string | null;
-  defaultEarliestTime: string | null; defaultLatestStartTime: string | null;
-  defaultDuration: number | null;
   priority: string | null; color: string | null;
   tags: string[];
   createdAt: Date; updatedAt: Date;
@@ -811,9 +791,6 @@ export function projectTemplateRowToUSOM(row: ProjectTemplateRow): ProjectTempla
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
-    defaultEarliestTime: row.defaultEarliestTime ?? undefined,
-    defaultLatestStartTime: row.defaultLatestStartTime ?? undefined,
-    defaultDuration: row.defaultDuration ?? undefined,
     priority: row.priority as ProjectTemplate['priority'],
     color: row.color ?? undefined,
     tags: row.tags ?? [],
@@ -828,9 +805,6 @@ export function projectTemplateUSOMToRow(template: ProjectTemplate, userId: USOM
     userId,
     name: template.name,
     description: template.description ?? null,
-    defaultEarliestTime: template.defaultEarliestTime ?? null,
-    defaultLatestStartTime: template.defaultLatestStartTime ?? null,
-    defaultDuration: template.defaultDuration ?? null,
     priority: template.priority ?? null,
     color: template.color ?? null,
     tags: template.tags,
@@ -844,8 +818,6 @@ type TaskTemplateRow = {
   title: string; description: string | null;
   priority: string | null; energyRequired: string | null;
   estimatedDuration: number | null;
-  earliestTime: string | null; latestStartTime: string | null;
-  defaultTime: string | null; defaultDuration: number | null;
   frequencyType: string | null;
   sortOrder: number;
   createdAt: Date;
@@ -861,10 +833,6 @@ export function taskTemplateRowToUSOM(row: TaskTemplateRow): TaskTemplate {
     priority: row.priority as TaskTemplate['priority'],
     energyRequired: row.energyRequired as TaskTemplate['energyRequired'],
     estimatedDuration: row.estimatedDuration ?? undefined,
-    earliestTime: row.earliestTime ?? undefined,
-    latestStartTime: row.latestStartTime ?? undefined,
-    defaultTime: row.defaultTime ?? undefined,
-    defaultDuration: row.defaultDuration ?? undefined,
     frequencyType: row.frequencyType as TaskTemplate['frequencyType'],
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString() as Timestamp,
@@ -881,10 +849,6 @@ export function taskTemplateUSOMToRow(template: TaskTemplate) {
     priority: template.priority ?? null,
     energyRequired: template.energyRequired ?? null,
     estimatedDuration: template.estimatedDuration ?? null,
-    earliestTime: template.earliestTime ?? null,
-    latestStartTime: template.latestStartTime ?? null,
-    defaultTime: template.defaultTime ?? null,
-    defaultDuration: template.defaultDuration ?? null,
     frequencyType: template.frequencyType ?? null,
     sortOrder: template.sortOrder,
   }

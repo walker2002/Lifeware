@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import { TaskList, buildTree } from "./task-list"
-import { resolveTaskTime } from "@/domains/projects/time-inheritance"
 import type { Project, Task } from "@/usom/types/objects"
 import type { TaskStatus, ProjectStatus } from "@/usom/types/primitives"
 
@@ -19,17 +18,7 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ project, tasks, onAddTask, onEditTask, onEditProject, onSaveAsTemplate, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
-  // 计算时间继承
-  const parentMap = new Map<string, Task>()
-  for (const t of tasks) parentMap.set(t.id, t)
-
-  const resolvedTimes = new Map<string, ReturnType<typeof resolveTaskTime>>()
-  for (const t of tasks) {
-    const parent = t.parentId ? parentMap.get(t.parentId) : null
-    resolvedTimes.set(t.id, resolveTaskTime(t, parent, project))
-  }
-
-  const tree = buildTree(tasks, resolvedTimes)
+  const tree = buildTree(tasks)
 
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(t => t.status === "completed").length

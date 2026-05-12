@@ -53,10 +53,6 @@ export interface CreateTaskInput {
   estimatedDuration: number
   projectId?: USOM_ID
   parentId?: USOM_ID
-  earliestTime?: string
-  latestStartTime?: string
-  defaultTime?: string
-  defaultDuration?: number
   frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
   daysOfWeek?: number[]
   startDate?: DateOnly
@@ -85,9 +81,6 @@ export interface CreateProjectInput {
   description?: string
   startDate?: DateOnly
   endDate?: DateOnly
-  defaultEarliestTime?: string
-  defaultLatestStartTime?: string
-  defaultDuration?: number
   priority?: Priority
   color?: string
   tags?: string[]
