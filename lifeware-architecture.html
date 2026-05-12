@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lifeware 架构图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; height: 100vh; overflow: hidden; display: flex; }
+
+  /* Sidebar */
+  .sidebar { width: 280px; min-width: 280px; background: #161822; border-right: 1px solid #2a2d3a; display: flex; flex-direction: column; overflow-y: auto; }
+  .sidebar-section { padding: 16px; border-bottom: 1px solid #2a2d3a; }
+  .sidebar-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #8b8fa3; margin-bottom: 10px; font-weight: 600; }
+
+  /* Presets */
+  .preset-btn { display: block; width: 100%; padding: 8px 12px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; color: #c5c9db; font-size: 13px; text-align: left; cursor: pointer; border-radius: 6px; transition: all 0.15s; }
+  .preset-btn:hover { background: #1e2030; border-color: #2a2d3a; }
+  .preset-btn.active { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+
+  /* Layer toggles */
+  .layer-toggle { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 13px; }
+  .layer-toggle input[type="checkbox"] { accent-color: #3b82f6; width: 14px; height: 14px; }
+  .layer-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Connection filters */
+  .conn-toggle { display: flex; align-items: center; gap: 8px; padding: 5px 0; cursor: pointer; font-size: 12px; }
+  .conn-toggle input[type="checkbox"] { accent-color: #3b82f6; width: 14px; height: 14px; }
+  .conn-line { width: 24px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+  /* Comments */
+  .comments-section { flex: 1; overflow-y: auto; }
+  .comment-item { padding: 10px 16px; border-bottom: 1px solid #1e2030; font-size: 12px; }
+  .comment-item .comment-target { color: #93c5fd; font-weight: 600; margin-bottom: 3px; }
+  .comment-item .comment-text { color: #c5c9db; line-height: 1.4; }
+  .comment-item .comment-delete { color: #6b7280; cursor: pointer; font-size: 11px; float: right; }
+  .comment-item .comment-delete:hover { color: #ef4444; }
+
+  /* Main area */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .canvas-area { flex: 1; position: relative; overflow: hidden; background: radial-gradient(ellipse at center, #13151f 0%, #0f1117 100%); }
+  .canvas-area svg { position: absolute; top: 0; left: 0; cursor: grab; }
+  .canvas-area svg:active { cursor: grabbing; }
+
+  /* Zoom controls */
+  .zoom-controls { position: absolute; bottom: 16px; left: 16px; display: flex; gap: 4px; z-index: 10; }
+  .zoom-btn { width: 32px; height: 32px; background: #1e2030; border: 1px solid #2a2d3a; color: #c5c9db; font-size: 16px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .zoom-btn:hover { background: #2a2d3a; }
+
+  /* Legend */
+  .legend { position: absolute; bottom: 16px; left: 120px; background: #161822cc; border: 1px solid #2a2d3a; border-radius: 8px; padding: 10px 14px; display: flex; gap: 16px; z-index: 10; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b8fa3; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* Node tooltip */
+  .node-tooltip { position: absolute; background: #1e2030; border: 1px solid #3b82f6; border-radius: 8px; padding: 12px 16px; font-size: 12px; pointer-events: none; z-index: 20; max-width: 300px; display: none; }
+  .node-tooltip .tt-title { font-weight: 600; color: #93c5fd; margin-bottom: 4px; }
+  .node-tooltip .tt-path { color: #6b7280; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; margin-bottom: 6px; }
+  .node-tooltip .tt-desc { color: #c5c9db; line-height: 1.4; }
+
+  /* Comment modal */
+  .modal-overlay { position: fixed; inset: 0; background: #0009; z-index: 100; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #1e2030; border: 1px solid #2a2d3a; border-radius: 12px; padding: 24px; width: 400px; max-width: 90vw; }
+  .modal h3 { font-size: 15px; margin-bottom: 4px; color: #e2e8f0; }
+  .modal .modal-path { font-size: 12px; color: #6b7280; font-family: monospace; margin-bottom: 14px; }
+  .modal textarea { width: 100%; height: 100px; background: #0f1117; border: 1px solid #2a2d3a; border-radius: 8px; color: #e2e8f0; padding: 10px; font-size: 13px; resize: vertical; outline: none; }
+  .modal textarea:focus { border-color: #3b82f6; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+  .modal-btn { padding: 7px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #2a2d3a; }
+  .modal-btn.cancel { background: transparent; color: #8b8fa3; }
+  .modal-btn.save { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  /* Prompt output */
+  .prompt-area { border-top: 1px solid #2a2d3a; background: #161822; padding: 14px 20px; min-height: 80px; max-height: 120px; overflow-y: auto; position: relative; }
+  .prompt-area .prompt-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 6px; }
+  .prompt-area .prompt-text { font-size: 13px; color: #c5c9db; line-height: 1.5; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .copy-btn { position: absolute; top: 10px; right: 16px; padding: 4px 12px; font-size: 11px; background: #2a2d3a; border: 1px solid #3a3d4a; color: #c5c9db; border-radius: 4px; cursor: pointer; }
+  .copy-btn:hover { background: #3a3d4a; }
+  .copy-btn.copied { background: #065f46; border-color: #10b981; color: #6ee7b7; }
+
+  /* SVG styles */
+  .arch-node { cursor: pointer; transition: filter 0.15s; }
+  .arch-node:hover { filter: brightness(1.15); }
+  .arch-node.commented rect { stroke-dasharray: 4 2; }
+  .layer-band { opacity: 0.04; }
+  .layer-label { font-size: 13px; font-weight: 700; letter-spacing: 2px; opacity: 0.25; }
+  .conn-path { fill: none; stroke-width: 2; }
+  .conn-label { font-size: 10px; fill: #8b8fa3; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-section">
+    <h3>视图预设</h3>
+    <button class="preset-btn active" data-preset="full">完整架构</button>
+    <button class="preset-btn" data-preset="intent">意图管道</button>
+    <button class="preset-btn" data-preset="data">数据流</button>
+    <button class="preset-btn" data-preset="domains">领域插件</button>
+    <button class="preset-btn" data-preset="frontend">前端视图</button>
+  </div>
+
+  <div class="sidebar-section">
+    <h3>架构层</h3>
+    <label class="layer-toggle"><input type="checkbox" data-layer="presentation" checked><span class="layer-dot" style="background:#6366f1"></span>表现层 (Presentation)</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="nexus" checked><span class="layer-dot" style="background:#f59e0b"></span>核心枢纽 (Nexus)</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="domain" checked><span class="layer-dot" style="background:#10b981"></span>领域插件 (Domain)</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="usom" checked><span class="layer-dot" style="background:#8b5cf6"></span>统一对象 (USOM)</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="data" checked><span class="layer-dot" style="background:#ec4899"></span>数据层 (Data)</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="infra" checked><span class="layer-dot" style="background:#64748b"></span>基础设施 (Infra)</label>
+  </div>
+
+  <div class="sidebar-section">
+    <h3>连接类型</h3>
+    <label class="conn-toggle"><input type="checkbox" data-conn="data-flow" checked><span class="conn-line" style="background:#3b82f6"></span>数据流</label>
+    <label class="conn-toggle"><input type="checkbox" data-conn="invoke" checked><span class="conn-line" style="background:#10b981; opacity:0.7"></span>调用</label>
+    <label class="conn-toggle"><input type="checkbox" data-conn="event" checked><span class="conn-line" style="background:#ef4444; opacity:0.7"></span>事件</label>
+    <label class="conn-toggle"><input type="checkbox" data-conn="implements" checked><span class="conn-line" style="background:#6b7280; opacity:0.5; border-top: 1px dashed #6b7280; background:transparent; height:0"></span>实现/依赖</label>
+  </div>
+
+  <div class="sidebar-section comments-section">
+    <h3>批注 (<span class="comment-count">0</span>)</h3>
+    <div id="commentList"></div>
+    <p id="noComments" style="font-size:12px;color:#6b7280;padding:8px 0;">点击节点添加批注</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="canvas-area" id="canvasArea">
+    <svg id="diagram" width="2000" height="1200"></svg>
+    <div class="node-tooltip" id="tooltip">
+      <div class="tt-title"></div>
+      <div class="tt-path"></div>
+      <div class="tt-desc"></div>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoom(0.1)">+</button>
+      <button class="zoom-btn" onclick="zoom(-0.1)">−</button>
+      <button class="zoom-btn" onclick="zoomReset()">⟲</button>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>表现层</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Nexus</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#10b981"></span>领域插件</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>USOM</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#ec4899"></span>数据层</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#64748b"></span>基础设施</div>
+    </div>
+  </div>
+
+  <div class="prompt-area">
+    <div class="prompt-label">架构描述</div>
+    <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+    <div class="prompt-text" id="promptText"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="commentModal">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <div class="modal-path" id="modalPath"></div>
+    <textarea id="modalInput" placeholder="输入你的批注..."></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+      <button class="modal-btn save" onclick="saveComment()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('diagram');
+
+// State
+const state = {
+  layers: { presentation: true, nexus: true, domain: true, usom: true, data: true, infra: true },
+  conns: { 'data-flow': true, invoke: true, event: true, implements: true },
+  preset: 'full',
+  comments: [],
+  scale: 1,
+  panX: 0, panY: 0,
+  dragging: false, dragStart: null,
+  activeNode: null
+};
+
+// Architecture data
+const LAYER_COLORS = {
+  presentation: { bg: '#312e81', border: '#6366f1', text: '#c7d2fe', band: '#6366f1' },
+  nexus: { bg: '#78350f', border: '#f59e0b', text: '#fde68a', band: '#f59e0b' },
+  domain: { bg: '#064e3b', border: '#10b981', text: '#a7f3d0', band: '#10b981' },
+  usom: { bg: '#4c1d95', border: '#8b5cf6', text: '#ddd6fe', band: '#8b5cf6' },
+  data: { bg: '#831843', border: '#ec4899', text: '#fbcfe8', band: '#ec4899' },
+  infra: { bg: '#334155', border: '#64748b', text: '#cbd5e1', band: '#64748b' }
+};
+
+const CONN_COLORS = {
+  'data-flow': '#3b82f6',
+  'invoke': '#10b981',
+  'event': '#ef4444',
+  'implements': '#6b7280'
+};
+
+const CONN_DASH = {
+  'data-flow': '',
+  'invoke': '8,4',
+  'event': '4,4',
+  'implements': '3,5'
+};
+
+const nodes = [
+  // === Presentation Layer ===
+  { id: 'app-router', label: 'App Router', subtitle: 'frontend/src/app/page.tsx', desc: 'Next.js App Router 入口，Notion 风格三栏布局', x: 200, y: 60, w: 160, h: 48, layer: 'presentation' },
+  { id: 'server-actions', label: 'Server Actions', subtitle: 'frontend/src/app/actions/intent.ts', desc: 'UI → Nexus 的桥梁，组装完整管道', x: 430, y: 60, w: 170, h: 48, layer: 'presentation' },
+  { id: 'ai-panel', label: 'AI Panel', subtitle: 'frontend/src/components/layout/ai-panel.tsx', desc: '左侧 AI 对话面板', x: 80, y: 140, w: 140, h: 44, layer: 'presentation' },
+  { id: 'intent-input', label: 'Intent Input', subtitle: 'frontend/src/components/intent-input.tsx', desc: 'AI 自然语言输入组件', x: 260, y: 140, w: 150, h: 44, layer: 'presentation' },
+  { id: 'intent-form', label: 'Intent Form', subtitle: 'frontend/src/components/intent-form.tsx', desc: '表单输入组件（AI 降级路径）', x: 450, y: 140, w: 150, h: 44, layer: 'presentation' },
+  { id: 'timebox-view', label: 'Timebox Views', subtitle: 'frontend/src/components/timebox/', desc: '日/周/月三栏时间盒视图', x: 660, y: 100, w: 160, h: 44, layer: 'presentation' },
+  { id: 'tiles-banner', label: 'Tiles Banner', subtitle: 'frontend/src/components/layout/tiles-banner.tsx', desc: '动态磁贴横幅，展示 Action Surface', x: 660, y: 160, w: 160, h: 44, layer: 'presentation' },
+
+  // === Nexus Layer ===
+  { id: 'orchestrator', label: 'Orchestrator', subtitle: 'frontend/src/nexus/orchestrator/index.ts', desc: '管道编排器，调度完整处理链路，不含业务逻辑', x: 420, y: 270, w: 180, h: 52, layer: 'nexus' },
+  { id: 'intent-engine', label: 'Intent Engine', subtitle: 'frontend/src/nexus/core/intent-engine/', desc: '系统唯一输入入口，支持 AI 解析 + 表单降级', x: 160, y: 370, w: 170, h: 52, layer: 'nexus' },
+  { id: 'ai-parser', label: 'AI Parser', subtitle: 'nexus/core/intent-engine/ai-parser.ts', desc: 'LLM 自然语言解析，调用 OpenAI 兼容接口', x: 80, y: 460, w: 150, h: 44, layer: 'nexus' },
+  { id: 'template-parser', label: 'Template Parser', subtitle: 'nexus/core/intent-engine/template-parser.ts', desc: '表单模式解析，AI 失败时的降级路径', x: 280, y: 460, w: 170, h: 44, layer: 'nexus' },
+  { id: 'rule-engine', label: 'Rule Engine', subtitle: 'frontend/src/nexus/core/rule-engine/', desc: '策略模式规则评估器，顺序执行可插拔规则', x: 380, y: 370, w: 170, h: 52, layer: 'nexus' },
+  { id: 'state-machine', label: 'State Machine', subtitle: 'frontend/src/nexus/core/state-machine/', desc: 'FSM 对象生命周期管理，严格状态跃迁控制', x: 590, y: 370, w: 170, h: 52, layer: 'nexus' },
+  { id: 'action-surface', label: 'Action Surface Engine', subtitle: 'nexus/core/action-surface-engine/index.ts', desc: '系统唯一输出口，分类 Guide/Tile/Cue', x: 790, y: 370, w: 200, h: 52, layer: 'nexus' },
+  { id: 'event-bus', label: 'Event Bus', subtitle: 'frontend/src/nexus/infrastructure/event-bus/', desc: '观察者模式同步事件分发，错误隔离', x: 590, y: 470, w: 150, h: 44, layer: 'nexus' },
+  { id: 'trace-logger', label: 'Trace Logger', subtitle: 'frontend/src/nexus/infrastructure/trace-logger/', desc: '管道追踪日志，记录各组件 input/output', x: 790, y: 470, w: 150, h: 44, layer: 'infra' },
+
+  // === Domain Layer ===
+  { id: 'timebox-domain', label: 'Timebox Domain', subtitle: 'frontend/src/domains/timebox/', desc: '时间盒领域插件，完整四钩子实现', x: 160, y: 590, w: 170, h: 52, layer: 'domain' },
+  { id: 'tasks-domain', label: 'Tasks Domain', subtitle: 'frontend/src/domains/tasks/', desc: '任务领域插件，部分实现（仅有 create handler）', x: 380, y: 590, w: 160, h: 52, layer: 'domain' },
+  { id: 'habits-domain', label: 'Habits Domain', subtitle: 'frontend/src/domains/habits/', desc: '习惯领域插件，待实现', x: 590, y: 590, w: 160, h: 52, layer: 'domain' },
+  { id: 'okrs-domain', label: 'OKRs Domain', subtitle: 'frontend/src/domains/okrs/', desc: 'OKR 领域插件，待实现', x: 790, y: 590, w: 160, h: 52, layer: 'domain' },
+  { id: 'review-domain', label: 'Review Domain', subtitle: 'frontend/src/domains/review/', desc: '复盘领域插件，待实现', x: 980, y: 590, w: 160, h: 52, layer: 'domain' },
+
+  // === USOM Layer ===
+  { id: 'usom-types', label: 'USOM Types', subtitle: 'frontend/src/usom/types/', desc: '核心业务对象 (11个) + 流程对象 + 摘要类型', x: 200, y: 720, w: 160, h: 48, layer: 'usom' },
+  { id: 'usom-interfaces', label: 'Repository Interfaces', subtitle: 'frontend/src/usom/interfaces/irepository.ts', desc: '16 个 Repository 接口定义，数据访问抽象', x: 430, y: 720, w: 200, h: 48, layer: 'usom' },
+  { id: 'usom-primitives', label: 'Primitives', subtitle: 'frontend/src/usom/types/primitives.ts', desc: '基础类型：Status 枚举、Priority、EnergyLevel 等', x: 700, y: 720, w: 160, h: 48, layer: 'usom' },
+
+  // === Data Layer ===
+  { id: 'drizzle-schema', label: 'Drizzle Schema', subtitle: 'frontend/src/lib/db/schema.ts', desc: '14 张表 + 2 张关联表的 Drizzle ORM 定义', x: 200, y: 840, w: 170, h: 48, layer: 'data' },
+  { id: 'repo-impl', label: 'Repository Impl', subtitle: 'frontend/src/lib/db/repositories/', desc: '16 个 Repository 实现类，映射 USOM ↔ DB', x: 430, y: 840, w: 180, h: 48, layer: 'data' },
+  { id: 'mappers', label: 'Mappers', subtitle: 'frontend/src/lib/db/repositories/mappers.ts', desc: 'DB Row ↔ USOM Object 双向映射器', x: 670, y: 840, w: 150, h: 48, layer: 'data' },
+  { id: 'postgresql', label: 'PostgreSQL', subtitle: 'Docker Compose', desc: 'PostgreSQL 数据库，Docker 容器运行', x: 890, y: 840, w: 150, h: 48, layer: 'data' },
+
+  // === Infra ===
+  { id: 'llm-client', label: 'LLM Client', subtitle: 'frontend/src/lib/llm/client.ts', desc: 'OpenAI 兼容 Chat 接口，多 Provider 支持', x: 80, y: 540, w: 150, h: 44, layer: 'infra' },
+];
+
+const connections = [
+  // Presentation -> Nexus
+  { from: 'ai-panel', to: 'intent-input', type: 'data-flow', label: '' },
+  { from: 'intent-input', to: 'server-actions', type: 'data-flow', label: 'NL' },
+  { from: 'intent-form', to: 'server-actions', type: 'data-flow', label: '表单' },
+  { from: 'server-actions', to: 'orchestrator', type: 'invoke', label: 'submit' },
+  { from: 'app-router', to: 'server-actions', type: 'implements', label: '' },
+  { from: 'app-router', to: 'timebox-view', type: 'implements', label: '' },
+  { from: 'app-router', to: 'tiles-banner', type: 'implements', label: '' },
+
+  // Nexus internal
+  { from: 'orchestrator', to: 'intent-engine', type: 'invoke', label: '1.解析' },
+  { from: 'orchestrator', to: 'rule-engine', type: 'invoke', label: '2.校验' },
+  { from: 'orchestrator', to: 'state-machine', type: 'invoke', label: '3.执行' },
+  { from: 'orchestrator', to: 'action-surface', type: 'invoke', label: '5.输出' },
+  { from: 'intent-engine', to: 'ai-parser', type: 'invoke', label: 'AI路径' },
+  { from: 'intent-engine', to: 'template-parser', type: 'invoke', label: '降级' },
+  { from: 'ai-parser', to: 'llm-client', type: 'invoke', label: 'LLM' },
+
+  // State Machine -> Event Bus
+  { from: 'state-machine', to: 'event-bus', type: 'event', label: '4.发布' },
+
+  // Event Bus -> Domains
+  { from: 'event-bus', to: 'timebox-domain', type: 'event', label: 'onEvent' },
+  { from: 'event-bus', to: 'tasks-domain', type: 'event', label: '' },
+  { from: 'event-bus', to: 'habits-domain', type: 'event', label: '' },
+  { from: 'event-bus', to: 'okrs-domain', type: 'event', label: '' },
+
+  // Rule Engine -> Domains
+  { from: 'rule-engine', to: 'timebox-domain', type: 'invoke', label: 'onValidate' },
+
+  // Action Surface -> Domains
+  { from: 'action-surface', to: 'timebox-domain', type: 'invoke', label: 'onAction' },
+  { from: 'action-surface', to: 'tasks-domain', type: 'invoke', label: '' },
+
+  // Domains -> USOM
+  { from: 'timebox-domain', to: 'usom-types', type: 'implements', label: '只读快照' },
+  { from: 'tasks-domain', to: 'usom-types', type: 'implements', label: '' },
+
+  // Nexus -> USOM
+  { from: 'state-machine', to: 'usom-types', type: 'implements', label: '创建对象' },
+  { from: 'rule-engine', to: 'usom-types', type: 'implements', label: '' },
+  { from: 'intent-engine', to: 'usom-types', type: 'implements', label: 'StructuredIntent' },
+
+  // USOM -> Data
+  { from: 'usom-interfaces', to: 'repo-impl', type: 'implements', label: '实现' },
+  { from: 'usom-types', to: 'mappers', type: 'implements', label: '映射' },
+  { from: 'repo-impl', to: 'drizzle-schema', type: 'data-flow', label: '' },
+  { from: 'repo-impl', to: 'mappers', type: 'data-flow', label: '' },
+  { from: 'drizzle-schema', to: 'postgresql', type: 'data-flow', label: 'SQL' },
+
+  // State Machine -> Repos (data flow)
+  { from: 'state-machine', to: 'repo-impl', type: 'data-flow', label: '持久化' },
+  { from: 'rule-engine', to: 'repo-impl', type: 'data-flow', label: '查询重叠' },
+
+  // Action Surface -> UI
+  { from: 'action-surface', to: 'tiles-banner', type: 'data-flow', label: 'Tile' },
+  { from: 'action-surface', to: 'timebox-view', type: 'data-flow', label: '' },
+
+  // Trace Logger observes
+  { from: 'orchestrator', to: 'trace-logger', type: 'invoke', label: '记录' },
+];
+
+const LAYER_BANDS = [
+  { id: 'presentation', label: 'PRESENTATION', y: 30, h: 200 },
+  { id: 'nexus', label: 'NEXUS CORE', y: 240, h: 300 },
+  { id: 'domain', label: 'DOMAIN PLUGINS', y: 560, h: 110 },
+  { id: 'usom', label: 'USOM', y: 690, h: 80 },
+  { id: 'data', label: 'DATA', y: 810, h: 100 },
+];
+
+const PRESETS = {
+  full: { layers: { presentation: true, nexus: true, domain: true, usom: true, data: true, infra: true }, conns: { 'data-flow': true, invoke: true, event: true, implements: true } },
+  intent: { layers: { presentation: true, nexus: true, domain: false, usom: true, data: false, infra: true }, conns: { 'data-flow': true, invoke: true, event: false, implements: false } },
+  data: { layers: { presentation: false, nexus: true, domain: false, usom: true, data: true, infra: false }, conns: { 'data-flow': true, invoke: false, event: false, implements: true } },
+  domains: { layers: { presentation: false, nexus: true, domain: true, usom: true, data: false, infra: false }, conns: { 'data-flow': false, invoke: true, event: true, implements: true } },
+  frontend: { layers: { presentation: true, nexus: true, domain: false, usom: false, data: false, infra: false }, conns: { 'data-flow': true, invoke: true, event: false, implements: false } },
+};
+
+const PRESET_LABELS = { full: '完整架构', intent: '意图管道', data: '数据流', domains: '领域插件', frontend: '前端视图' };
+
+// Rendering
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  children.forEach(c => typeof c === 'string' ? e.appendChild(document.createTextNode(c)) : e.appendChild(c));
+  return e;
+}
+
+function renderDiagram() {
+  svg.innerHTML = '';
+
+  // Defs
+  const defs = el('defs');
+  Object.entries(CONN_COLORS).forEach(([type, color]) => {
+    const marker = el('marker', { id: `arrow-${type}`, markerWidth: '8', markerHeight: '6', refX: '7', refY: '3', orient: 'auto' });
+    marker.appendChild(el('polygon', { points: '0 0, 8 3, 0 6', fill: color, 'fill-opacity': '0.8' }));
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  const visibleLayers = new Set(Object.entries(state.layers).filter(([,v]) => v).map(([k]) => k));
+  const visibleNodes = new Set(nodes.filter(n => visibleLayers.has(n.layer)).map(n => n.id));
+  const visibleConnTypes = new Set(Object.entries(state.conns).filter(([,v]) => v).map(([k]) => k));
+
+  // Layer bands
+  LAYER_BANDS.forEach(band => {
+    if (!visibleLayers.has(band.id)) return;
+    svg.appendChild(el('rect', {
+      x: '20', y: String(band.y), width: '1100', height: String(band.h),
+      rx: '8', fill: LAYER_COLORS[band.id]?.band || '#666', class: 'layer-band'
+    }));
+    svg.appendChild(el('text', {
+      x: '30', y: String(band.y + 20), class: 'layer-label', fill: LAYER_COLORS[band.id]?.band || '#666'
+    }, [band.label]));
+  });
+
+  // Connections
+  connections.forEach(c => {
+    if (!visibleConnTypes.has(c.type)) return;
+    const fromNode = nodes.find(n => n.id === c.from);
+    const toNode = nodes.find(n => n.id === c.to);
+    if (!fromNode || !toNode || !visibleNodes.has(c.from) || !visibleNodes.has(c.to)) return;
+
+    const x1 = fromNode.x + fromNode.w / 2;
+    const y1 = fromNode.y + fromNode.h / 2;
+    const x2 = toNode.x + toNode.w / 2;
+    const y2 = toNode.y + toNode.h / 2;
+
+    // Calculate edge points
+    const { x: sx, y: sy } = edgePoint(fromNode, x2, y2);
+    const { x: ex, y: ey } = edgePoint(toNode, x1, y1);
+
+    const dx = ex - sx, dy = ey - sy;
+    const cx1 = sx + dx * 0.3, cy1 = sy;
+    const cx2 = ex - dx * 0.3, cy2 = ey;
+
+    const path = el('path', {
+      d: `M${sx},${sy} C${cx1},${cy1} ${cx2},${cy2} ${ex},${ey}`,
+      class: 'conn-path',
+      stroke: CONN_COLORS[c.type],
+      'stroke-dasharray': CONN_DASH[c.type] || '',
+      'stroke-opacity': '0.6',
+      'marker-end': `url(#arrow-${c.type})`
+    });
+    svg.appendChild(path);
+
+    if (c.label) {
+      const mx = (sx + ex) / 2, my = (sy + ey) / 2 - 8;
+      const label = el('text', { x: String(mx), y: String(my), class: 'conn-label', 'text-anchor': 'middle' }, [c.label]);
+      svg.appendChild(label);
+    }
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    if (!visibleLayers.has(n.layer)) return;
+    const colors = LAYER_COLORS[n.layer];
+    const g = el('g', { class: 'arch-node' + (state.comments.some(c => c.target === n.id) ? ' commented' : ''), 'data-id': n.id });
+
+    const rect = el('rect', {
+      x: String(n.x), y: String(n.y), width: String(n.w), height: String(n.h),
+      rx: '8', fill: colors.bg, stroke: colors.border, 'stroke-width': '1.5', 'stroke-opacity': '0.7'
+    });
+    g.appendChild(rect);
+
+    const title = el('text', {
+      x: String(n.x + n.w / 2), y: String(n.y + n.h / 2 - (n.h > 46 ? 4 : 1)),
+      'text-anchor': 'middle', fill: colors.text, 'font-size': '13', 'font-weight': '600'
+    }, [n.label]);
+    g.appendChild(title);
+
+    if (n.h > 46) {
+      const sub = el('text', {
+        x: String(n.x + n.w / 2), y: String(n.y + n.h / 2 + 12),
+        'text-anchor': 'middle', fill: colors.text, 'font-size': '9', 'opacity': '0.6'
+      }, [n.subtitle.split('/').slice(-2).join('/')]);
+      g.appendChild(sub);
+    }
+
+    // Comment indicator
+    if (state.comments.some(c => c.target === n.id)) {
+      const dot = el('circle', { cx: String(n.x + n.w - 8), cy: String(n.y + 8), r: '5', fill: '#f59e0b' });
+      g.appendChild(dot);
+    }
+
+    g.addEventListener('click', (e) => { e.stopPropagation(); openModal(n); });
+    g.addEventListener('mouseenter', (e) => showTooltip(n, e));
+    g.addEventListener('mouseleave', hideTooltip);
+
+    svg.appendChild(g);
+  });
+
+  updatePrompt();
+}
+
+function edgePoint(node, tx, ty) {
+  const cx = node.x + node.w / 2, cy = node.y + node.h / 2;
+  const dx = tx - cx, dy = ty - cy;
+  const hw = node.w / 2, hh = node.h / 2;
+  const scale = Math.min(hw / Math.abs(dx || 1), hh / Math.abs(dy || 1));
+  return { x: cx + dx * scale, y: cy + dy * scale };
+}
+
+function showTooltip(node, event) {
+  const tt = document.getElementById('tooltip');
+  tt.querySelector('.tt-title').textContent = node.label;
+  tt.querySelector('.tt-path').textContent = node.subtitle;
+  tt.querySelector('.tt-desc').textContent = node.desc;
+  tt.style.display = 'block';
+  const rect = document.getElementById('canvasArea').getBoundingClientRect();
+  tt.style.left = (event.clientX - rect.left + 12) + 'px';
+  tt.style.top = (event.clientY - rect.top + 12) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+// Comment modal
+function openModal(node) {
+  state.activeNode = node;
+  document.getElementById('modalTitle').textContent = node.label;
+  document.getElementById('modalPath').textContent = node.subtitle;
+  document.getElementById('modalInput').value = '';
+  document.getElementById('commentModal').classList.add('active');
+  document.getElementById('modalInput').focus();
+}
+
+function closeModal() {
+  document.getElementById('commentModal').classList.remove('active');
+  state.activeNode = null;
+}
+
+function saveComment() {
+  const text = document.getElementById('modalInput').value.trim();
+  if (!text || !state.activeNode) return;
+  state.comments.push({
+    id: Date.now(),
+    target: state.activeNode.id,
+    targetLabel: state.activeNode.label,
+    targetFile: state.activeNode.subtitle,
+    text
+  });
+  closeModal();
+  renderComments();
+  renderDiagram();
+}
+
+function deleteComment(id) {
+  state.comments = state.comments.filter(c => c.id !== id);
+  renderComments();
+  renderDiagram();
+}
+
+function renderComments() {
+  const list = document.getElementById('commentList');
+  const noComments = document.getElementById('noComments');
+  list.innerHTML = '';
+  document.querySelector('.comment-count').textContent = state.comments.length;
+  noComments.style.display = state.comments.length ? 'none' : 'block';
+  state.comments.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'comment-item';
+    div.innerHTML = `
+      <span class="comment-delete" onclick="deleteComment(${c.id})">✕</span>
+      <div class="comment-target">${c.targetLabel}</div>
+      <div class="comment-text">${c.text}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// Prompt output
+function updatePrompt() {
+  const visibleLayers = Object.entries(state.layers).filter(([,v]) => v).map(([k]) => k);
+  const presetName = PRESET_LABELS[state.preset] || '自定义';
+
+  let prompt = `这是 Lifeware 项目的架构图，当前展示的是「${presetName}」视图。`;
+
+  const layerNames = { presentation: '表现层', nexus: '核心枢纽层 (Nexus)', domain: '领域插件层', usom: '统一语义对象模型 (USOM)', data: '数据层', infra: '基础设施' };
+  const visible = visibleLayers.map(l => layerNames[l]).join('、');
+  prompt += `\n\n可见层：${visible}。`;
+
+  if (state.comments.length > 0) {
+    prompt += '\n\n对以下组件的反馈：';
+    state.comments.forEach(c => {
+      prompt += `\n\n**${c.targetLabel}** (${c.targetFile})：\n${c.text}`;
+    });
+  }
+
+  prompt += '\n\n架构概述：Lifeware 使用自定义的五层 Nexus 架构——USOM 定义共同语言，Nexus 持有唯一执行权，Domain 是被动规则集。核心管道：Intent Engine → Rule Engine → State Machine → Event Bus → Action Surface Engine。';
+
+  document.getElementById('promptText').textContent = prompt;
+}
+
+// Zoom & Pan
+function zoom(delta) {
+  state.scale = Math.max(0.4, Math.min(2, state.scale + delta));
+  applyTransform();
+}
+
+function zoomReset() {
+  state.scale = 1; state.panX = 0; state.panY = 0;
+  applyTransform();
+}
+
+function applyTransform() {
+  svg.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+  svg.style.transformOrigin = '0 0';
+}
+
+// Pan
+const canvasArea = document.getElementById('canvasArea');
+canvasArea.addEventListener('mousedown', (e) => {
+  if (e.target === svg || e.target.closest('svg') && !e.target.closest('.arch-node')) {
+    state.dragging = true;
+    state.dragStart = { x: e.clientX - state.panX, y: e.clientY - state.panY };
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (state.dragging) {
+    state.panX = e.clientX - state.dragStart.x;
+    state.panY = e.clientY - state.dragStart.y;
+    applyTransform();
+  }
+});
+window.addEventListener('mouseup', () => { state.dragging = false; });
+
+// Mouse wheel zoom
+canvasArea.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  state.scale = Math.max(0.4, Math.min(2, state.scale + delta));
+  applyTransform();
+});
+
+// Controls
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const preset = PRESETS[btn.dataset.preset];
+    state.preset = btn.dataset.preset;
+    Object.assign(state.layers, preset.layers);
+    Object.assign(state.conns, preset.conns);
+    document.querySelectorAll('[data-layer]').forEach(cb => { cb.checked = state.layers[cb.dataset.layer]; });
+    document.querySelectorAll('[data-conn]').forEach(cb => { cb.checked = state.conns[cb.dataset.conn]; });
+    renderDiagram();
+  });
+});
+
+document.querySelectorAll('[data-layer]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    state.layers[cb.dataset.layer] = cb.checked;
+    state.preset = 'custom';
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    renderDiagram();
+  });
+});
+
+document.querySelectorAll('[data-conn]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    state.conns[cb.dataset.conn] = cb.checked;
+    state.preset = 'custom';
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    renderDiagram();
+  });
+});
+
+function copyPrompt(btn) {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '已复制！';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+// Initial render
+renderDiagram();
+</script>
+</body>
+</html>

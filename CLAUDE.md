@@ -68,10 +68,7 @@ Extensible domain-specific logic with standard interface (four hooks):
 ---
 
 ## 语言规范
-- 所有对话、解释和文档必须使用**简体中文**。
-- 代码注释必须使用**简体中文**。
-- 保留 `API`、`SDK` 等通用技术术语的英文形式。
-- 保留表、字段名、变量、函数、文件名等的代码相关的英文命名规范。
+- 所有对话、注释和文档必须使用**简体中文**。
 
 
 ## Governance Reference
@@ -146,9 +143,7 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 | 总体设计 | `mydocs/core/` | Architecture design |
 | 技术栈设计演进 | `mydocs/core/` | Tech stack evolution |
 | 意图驱动场景示例 | `mydocs/core/` | Intent-driven scenario examples |
-| 方法论落地设计规范 | `mydocs/methodology/` | Methodology implementation |
-| 场景提示词设计方案 | `mydocs/methodology/` | Scenario prompt design |
-| 冲突仲裁矩阵 | `mydocs/methodology/` | Conflict arbitration rules |
+
 
 ### 第二层：协同维护 (`docs/`)
 
@@ -157,7 +152,7 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 | `docs/usom-design.md` | USOM object definitions |
 | `docs/database-design.md` | Database schema design |
 
-**Document Update Rule**: After updating any document, **MUST** update `manifest.md` version history.
+**Document Update Rule**: 以上文档若有修改, **MUST** 更新 `manifest.md` 版本历史记录。
 
 ---
 
@@ -173,3 +168,55 @@ For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 at `specs/004-okr-core/plan.md`.
 <!-- SPECKIT END -->
+
+
+## Coding Guidelines
+
+### 1. Think Before Coding
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+Before implementing:
+
+State your assumptions explicitly. If uncertain, ask.
+If multiple interpretations exist, present them - don't pick silently.
+If a simpler approach exists, say so. Push back when warranted.
+If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+
+No features beyond what was asked.
+No abstractions for single-use code.
+No "flexibility" or "configurability" that wasn't requested.
+No error handling for impossible scenarios.
+If you write 200 lines and it could be 50, rewrite it.
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor things that aren't broken.
+Match existing style, even if you'd do it differently.
+If you notice unrelated dead code, mention it - don't delete it.
+When your changes create orphans:
+
+Remove imports/variables/functions that YOUR changes made unused.
+Don't remove pre-existing dead code unless asked.
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+"Add validation" → "Write tests for invalid inputs, then make them pass"
+"Fix the bug" → "Write a test that reproduces it, then make it pass"
+"Refactor X" → "Ensure tests pass before and after"
+For multi-step tasks, state a brief plan:
+
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
