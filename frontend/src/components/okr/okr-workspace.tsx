@@ -8,8 +8,12 @@ import { OKRDirectory } from "./okr-directory"
 import { OKRPanel } from "./okr-panel"
 import { useOKRs } from "@/hooks/use-okrs"
 import type { OKRFormFields } from "./okr-form"
+import { OKRImportPanel } from "./okr-import-panel"
+import { OKRImportDialog } from "./okr-import-dialog"
+import type { ImportResult } from "@/lib/okr-import/types"
+import { saveImportedOKRs } from "@/app/actions/okr-import"
 
-type PanelMode = "empty" | "detail" | "edit" | "create"
+type PanelMode = "empty" | "detail" | "edit" | "create" | "import"
 
 export function OKRWorkspace() {
   const hook = useOKRs()
@@ -18,6 +22,8 @@ export function OKRWorkspace() {
   const [statusFilter, setStatusFilter] = useState<ObjectiveStatus | "all">("all")
   const [detailData, setDetailData] = useState<ObjectiveWithKR | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const filteredObjectives = statusFilter === "all"
     ? hook.objectives.filter(o => o.status !== "archived")
@@ -108,6 +114,26 @@ export function OKRWorkspace() {
     }
   }, [selectedId, hook])
 
+  const handleImportComplete = useCallback((result: ImportResult) => {
+    setImportResult(result)
+    setMode("import")
+  }, [])
+
+  const handleSaveImport = useCallback(async (markdown: string) => {
+    const result = await saveImportedOKRs(markdown)
+    if (result.success) {
+      setImportResult(null)
+      setMode("empty")
+      await hook.refresh()
+    }
+    return result
+  }, [hook])
+
+  const handleCancelImport = useCallback(() => {
+    setImportResult(null)
+    setMode("empty")
+  }, [])
+
   return (
     <div className="flex h-full">
       <div className="w-80 shrink-0 border-r overflow-y-auto">
@@ -120,25 +146,40 @@ export function OKRWorkspace() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreate={handleCreate}
+          onImport={() => setImportOpen(true)}
         />
       </div>
       <div className="flex-1 overflow-y-auto">
-        <OKRPanel
-          mode={mode}
-          data={detailData}
-          isCreating={isCreating}
-          onBack={handleBack}
-          onEdit={handleEdit}
-          onSaveCreate={handleSaveCreate}
-          onSaveEdit={handleSaveEdit}
-          onActivate={handleActivate}
-          onChangeStatus={handleStatusChange}
-          onAddKR={selectedId ? (input) => hook.addKR(selectedId, input) : undefined}
-          onUpdateKRProgress={hook.updateKRProgress}
-          onDeleteKR={hook.deleteKR}
-          onReload={selectedId ? async () => { const data = await hook.loadDetail(selectedId); setDetailData(data) } : undefined}
-        />
+        {mode === "import" && importResult ? (
+          <OKRImportPanel
+            initialMarkdown={importResult.markdown}
+            report={importResult.report}
+            onSave={handleSaveImport}
+            onCancel={handleCancelImport}
+          />
+        ) : (
+          <OKRPanel
+            mode={mode === "import" ? "empty" : mode}
+            data={detailData}
+            isCreating={isCreating}
+            onBack={handleBack}
+            onEdit={handleEdit}
+            onSaveCreate={handleSaveCreate}
+            onSaveEdit={handleSaveEdit}
+            onActivate={handleActivate}
+            onChangeStatus={handleStatusChange}
+            onAddKR={selectedId ? (input) => hook.addKR(selectedId, input) : undefined}
+            onUpdateKRProgress={hook.updateKRProgress}
+            onDeleteKR={hook.deleteKR}
+            onReload={selectedId ? async () => { const data = await hook.loadDetail(selectedId); setDetailData(data) } : undefined}
+          />
+        )}
       </div>
+      <OKRImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImportComplete={handleImportComplete}
+      />
     </div>
   )
 }
