@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { Objective } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,17 @@ export function OKRDirectory({
   objectives, selectedId, statusFilter,
   onStatusFilterChange, onSelect, onEdit, onDelete, onCreate, onImport,
 }: OKRDirectoryProps) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   const groupMap = new Map<string, Objective[]>()
   for (const obj of objectives) {
     const key = getPeriodGroupKey(obj.period)
@@ -150,21 +162,32 @@ export function OKRDirectory({
 
       {groups.map(group => (
         <div key={group.key}>
-          <div className="text-xs font-semibold text-muted-foreground py-1">{group.key}</div>
-          <div className="space-y-0.5">
-            {group.items.map(obj => (
-              <button key={obj.id} type="button"
-                onClick={() => onSelect(obj.id)}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-muted/80 transition-colors ${
-                  selectedId === obj.id ? 'bg-muted font-medium' : ''
-                }`}>
-                {obj.objectiveNumber && (
-                  <span className="font-mono text-xs text-muted-foreground mr-1.5">{obj.objectiveNumber}</span>
-                )}
-                <span className="truncate">{obj.title}</span>
-              </button>
-            ))}
-          </div>
+          <button type="button"
+            onClick={() => toggleGroup(group.key)}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground py-1 w-full hover:bg-muted/50 rounded px-1 transition-colors">
+            <span className="text-[10px] leading-none">
+              {collapsedGroups.has(group.key) ? '▸' : '▾'}
+            </span>
+            {group.key}
+            <span className="font-normal text-muted-foreground/60">({group.items.length})</span>
+          </button>
+          {!collapsedGroups.has(group.key) && (
+            <div className="space-y-0.5">
+              {group.items.map(obj => (
+                <button key={obj.id} type="button"
+                  onClick={() => onSelect(obj.id)}
+                  title={obj.title}
+                  className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-sm hover:bg-muted/80 transition-colors ${
+                    selectedId === obj.id ? 'bg-muted font-medium' : ''
+                  }`}>
+                  {obj.objectiveNumber && (
+                    <span className="font-mono text-xs text-muted-foreground shrink-0">{obj.objectiveNumber}</span>
+                  )}
+                  <span className="truncate min-w-0">{obj.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
