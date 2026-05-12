@@ -87,7 +87,7 @@ export type ReviewStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
 export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
 
 // ─── Domain & Action Types ─────────────────────────────────────
-export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review'
+export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review' | 'projects'
 export type ActionCategory = 'guide' | 'tile' | 'cue'
 export type ActionType =
   | 'log_habit'
@@ -105,7 +105,7 @@ export type USOMObjectType =
   | 'objective' | 'key_result'
   | 'task' | 'habit' | 'habit_log'
   | 'timebox' | 'review'
-  | 'intention'
+  | 'intention' | 'project'
 
 // ─── External Types (MVP stub) ────────────────────────────────
 export type ExternalSourceType = 'health' | 'productivity' | 'calendar' | 'communication' | 'custom'

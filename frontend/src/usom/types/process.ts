@@ -149,6 +149,8 @@ export type SystemEventType =
   | 'KeyResultUpdated' | 'KeyResultCompleted' | 'KeyResultProgressUpdated'
   | 'ReviewCreated' | 'ReviewCompleted'
   | 'IntentionCaptured' | 'IntentionDissolved'
+  | 'ProjectCreated' | 'ProjectActivated' | 'ProjectPaused' | 'ProjectResumed'
+  | 'ProjectCompleted' | 'ProjectArchived'
 
 export interface SystemEvent {
   id: USOM_ID

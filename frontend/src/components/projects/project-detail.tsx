@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import { SplitWarning } from "./split-warning"
-import { TaskList, buildTree, type TaskWithChildren } from "./task-list"
+import { TaskList, buildTree } from "./task-list"
 import { resolveTaskTime } from "@/domains/projects/time-inheritance"
 import { ProjectRepository } from "@/lib/db/repositories/project.repository"
 import { TaskRepository } from "@/lib/db/repositories/task.repository"
@@ -65,6 +65,14 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(t => t.status === "completed").length
 
+  // 任务状态转换映射
+  const TASK_TRANSITIONS: Record<string, { action: string; label: string; status: string }[]> = {
+    draft: [{ action: 'activate', label: '激活', status: 'active' }],
+    active: [{ action: 'start', label: '开始', status: 'in_progress' }, { action: 'pause', label: '搁置', status: 'on_hold' }],
+    in_progress: [{ action: 'pause', label: '搁置', status: 'on_hold' }, { action: 'complete', label: '完成', status: 'completed' }],
+    on_hold: [{ action: 'resume', label: '恢复', status: 'active' }],
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6 max-w-3xl mx-auto">
       {/* 标题区 */}
@@ -78,9 +86,23 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
           </div>
           {project.description && <p className="text-sm text-muted-foreground mt-1">{project.description}</p>}
         </div>
-        <Button variant="outline" size="sm" onClick={() => onEditTask("")}>
-          编辑项目
-        </Button>
+        <div className="flex items-center gap-2">
+          {project.status === 'planning' && (
+            <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'active' as TaskStatus)}>激活项目</Button>
+          )}
+          {project.status === 'active' && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => onStatusChange(project.id, 'paused' as TaskStatus)}>暂停</Button>
+              <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'completed' as TaskStatus)}>完成</Button>
+            </>
+          )}
+          {project.status === 'paused' && (
+            <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'active' as TaskStatus)}>恢复</Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => onEditTask("")}>
+            编辑项目
+          </Button>
+        </div>
       </div>
 
       {/* 默认时间信息 */}
@@ -118,6 +140,7 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
           project={project}
           onTaskClick={(id) => onEditTask(id)}
           onAddSubTask={(parentId) => onAddTask(parentId)}
+          onStatusChange={onStatusChange}
         />
       </div>
     </div>

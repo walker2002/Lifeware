@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SplitWarning } from "./split-warning"
 import { StatusBadge } from "./status-badge"
 import type { Task, Project } from "@/usom/types/objects"
 import type { ResolvedTime } from "@/domains/projects/time-inheritance"
+import type { TaskStatus } from "@/usom/types/primitives"
 
 export interface TaskWithChildren extends Task {
   children: TaskWithChildren[]
@@ -17,6 +19,7 @@ interface TaskListProps {
   project?: Project
   onTaskClick: (taskId: string) => void
   onAddSubTask: (parentId: string) => void
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void
 }
 
 function buildTree(tasks: Task[], resolvedTimes: Map<string, ResolvedTime>): TaskWithChildren[] {
@@ -38,21 +41,52 @@ function buildTree(tasks: Task[], resolvedTimes: Map<string, ResolvedTime>): Tas
   return roots
 }
 
+function getTimeSourceLabel(task: TaskWithChildren, parentTask?: TaskWithChildren | null, project?: Project): string {
+  const ae = task.earliestTime
+  const ls = task.latestStartTime
+  const dt = task.defaultTime
+  const dd = task.defaultDuration
+
+  if (ae || ls || dt || dd) return "自定义"
+  if (parentTask && (parentTask.earliestTime || parentTask.latestStartTime || parentTask.defaultTime || parentTask.defaultDuration)) {
+    return "继承自父任务"
+  }
+  if (project && (project.defaultEarliestTime || project.defaultLatestStartTime || project.defaultDuration)) {
+    return "继承自项目默认时间"
+  }
+  return "未设置"
+}
+
 function TaskRow({
   task,
+  parentTask,
   depth = 0,
   project,
   onTaskClick,
   onAddSubTask,
+  onStatusChange,
 }: {
   task: TaskWithChildren
+  parentTask?: TaskWithChildren | null
   depth: number
   project?: Project
   onTaskClick: (taskId: string) => void
   onAddSubTask: (parentId: string) => void
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const hasChildren = task.children.length > 0
+  const timeSource = getTimeSourceLabel(task, parentTask, project)
+  const hasTimeInheritance = task.resolvedTime.defaultTime || task.resolvedTime.defaultDuration
+
+  const STATUS_ACTIONS: Record<string, { label: string; status: TaskStatus }[]> = {
+    draft: [{ label: '激活', status: 'active' as TaskStatus }],
+    active: [{ label: '开始', status: 'in_progress' as TaskStatus }, { label: '搁置', status: 'on_hold' as TaskStatus }],
+    in_progress: [{ label: '搁置', status: 'on_hold' as TaskStatus }, { label: '完成', status: 'completed' as TaskStatus }],
+    on_hold: [{ label: '恢复', status: 'active' as TaskStatus }],
+  }
+
+  const actions = STATUS_ACTIONS[task.status] ?? []
 
   return (
     <div>
@@ -78,19 +112,45 @@ function TaskRow({
         {/* 标题 */}
         <span className="flex-1 text-sm truncate">{task.title}</span>
 
-        {/* 时间继承 */}
-        {task.resolvedTime.defaultTime && (
-          <span className="text-xs text-muted-foreground shrink-0">{task.resolvedTime.defaultTime}</span>
-        )}
-
-        {/* 时长 */}
-        {task.resolvedTime.defaultDuration && (
-          <span className="text-xs text-muted-foreground shrink-0">{task.resolvedTime.defaultDuration}分钟</span>
+        {/* 时间继承（含 tooltip） */}
+        {hasTimeInheritance ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs text-primary/70 shrink-0 cursor-help">
+                {task.resolvedTime.defaultTime && <span>{task.resolvedTime.defaultTime}</span>}
+                {task.resolvedTime.defaultTime && task.resolvedTime.defaultDuration && <span> · </span>}
+                {task.resolvedTime.defaultDuration && <span>{task.resolvedTime.defaultDuration}分钟</span>}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">时间来源: {timeSource}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          task.estimatedDuration > 0 && (
+            <span className="text-xs text-muted-foreground shrink-0">{task.estimatedDuration}分钟</span>
+          )
         )}
 
         {/* 子任务数量 */}
         {hasChildren && (
           <span className="text-xs text-muted-foreground shrink-0">{task.children.length}个子任务</span>
+        )}
+
+        {/* 状态操作按钮（悬停可见） */}
+        {actions.length > 0 && onStatusChange && (
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {actions.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                className="text-xs px-1.5 py-0.5 rounded border border-muted-foreground/20 hover:bg-muted shrink-0"
+                onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, a.status) }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* 添加子任务按钮 */}
@@ -111,10 +171,12 @@ function TaskRow({
             <TaskRow
               key={child.id}
               task={child}
+              parentTask={task}
               depth={depth + 1}
               project={project}
               onTaskClick={onTaskClick}
               onAddSubTask={onAddSubTask}
+              onStatusChange={onStatusChange}
             />
           ))}
         </div>
@@ -123,7 +185,7 @@ function TaskRow({
   )
 }
 
-export function TaskList({ tasks, project, onTaskClick, onAddSubTask }: TaskListProps) {
+export function TaskList({ tasks, project, onTaskClick, onAddSubTask, onStatusChange }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -133,7 +195,6 @@ export function TaskList({ tasks, project, onTaskClick, onAddSubTask }: TaskList
     )
   }
 
-  // tasks are already TaskWithChildren from buildTree in the parent
   return (
     <div className="flex flex-col gap-0.5">
       {tasks.map((task) => (
@@ -144,6 +205,7 @@ export function TaskList({ tasks, project, onTaskClick, onAddSubTask }: TaskList
           project={project}
           onTaskClick={onTaskClick}
           onAddSubTask={onAddSubTask}
+          onStatusChange={onStatusChange}
         />
       ))}
     </div>
