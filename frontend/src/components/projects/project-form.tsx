@@ -13,9 +13,6 @@ export interface ProjectFormData {
   description?: string
   startDate?: string
   endDate?: string
-  defaultEarliestTime?: string
-  defaultLatestStartTime?: string
-  defaultDuration?: number
   priority?: string
   color?: string
   tags?: string[]
@@ -39,9 +36,6 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
   const [description, setDescription] = useState(project?.description ?? "")
   const [startDate, setStartDate] = useState(project?.startDate ?? "")
   const [endDate, setEndDate] = useState(project?.endDate ?? "")
-  const [defaultEarliestTime, setDefaultEarliestTime] = useState(project?.defaultEarliestTime ?? "")
-  const [defaultLatestStartTime, setDefaultLatestStartTime] = useState(project?.defaultLatestStartTime ?? "")
-  const [defaultDuration, setDefaultDuration] = useState(project?.defaultDuration?.toString() ?? "")
   const [priority, setPriority] = useState<string>(project?.priority ?? Priority.Medium)
   const [color, setColor] = useState(project?.color ?? "#3b82f6")
   const [isLoading, setIsLoading] = useState(false)
@@ -58,9 +52,6 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
         description: description || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
-        defaultEarliestTime: defaultEarliestTime || undefined,
-        defaultLatestStartTime: defaultLatestStartTime || undefined,
-        defaultDuration: defaultDuration ? Number(defaultDuration) : undefined,
         priority: priority || undefined,
         color: color || undefined,
         tags: [],
@@ -101,39 +92,6 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="project-end">结束日期</Label>
           <Input id="project-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="project-earliest">默认最早时间</Label>
-          <Input
-            id="project-earliest"
-            type="time"
-            value={defaultEarliestTime}
-            onChange={(e) => setDefaultEarliestTime(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="project-latest">默认最晚时间</Label>
-          <Input
-            id="project-latest"
-            type="time"
-            value={defaultLatestStartTime}
-            onChange={(e) => setDefaultLatestStartTime(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="project-duration">默认时长（分钟）</Label>
-          <Input
-            id="project-duration"
-            type="number"
-            min={5}
-            max={480}
-            value={defaultDuration}
-            onChange={(e) => setDefaultDuration(e.target.value)}
-            placeholder="60"
-          />
         </div>
       </div>
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SplitWarning } from "./split-warning"
-import type { Task, Project } from "@/usom/types/objects"
+import type { Task } from "@/usom/types/objects"
 import { Priority, EnergyLevel } from "@/usom/types/primitives"
 
 export interface TaskFormData {
@@ -15,10 +15,6 @@ export interface TaskFormData {
   priority: string
   energyRequired: string
   estimatedDuration: number
-  earliestTime?: string
-  latestStartTime?: string
-  defaultTime?: string
-  defaultDuration?: number
   frequencyType?: string
   daysOfWeek?: number[]
   startDate?: string
@@ -29,7 +25,6 @@ interface TaskFormProps {
   projectId?: string
   parentId?: string
   task?: Task
-  project?: Project
   onSave: (data: TaskFormData) => Promise<void>
   onCancel: () => void
 }
@@ -47,16 +42,12 @@ const ENERGY_OPTIONS = [
   { value: EnergyLevel.Low, label: "低能量" },
 ]
 
-export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskFormProps) {
+export function TaskForm({ parentId, task, onSave, onCancel }: TaskFormProps) {
   const [title, setTitle] = useState(task?.title ?? "")
   const [description, setDescription] = useState(task?.description ?? "")
   const [priority, setPriority] = useState<string>(task?.priority ?? Priority.Medium)
   const [energyRequired, setEnergyRequired] = useState<string>(task?.energyRequired ?? EnergyLevel.Medium)
   const [estimatedDuration, setEstimatedDuration] = useState(task?.estimatedDuration?.toString() ?? "60")
-  const [earliestTime, setEarliestTime] = useState(task?.earliestTime ?? "")
-  const [latestStartTime, setLatestStartTime] = useState(task?.latestStartTime ?? "")
-  const [defaultTime, setDefaultTime] = useState(task?.defaultTime ?? "")
-  const [defaultDuration, setDefaultDuration] = useState(task?.defaultDuration?.toString() ?? "")
   const [frequencyType, setFrequencyType] = useState<string>(task?.frequencyType ?? "once")
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(task?.daysOfWeek ?? [])
   const [startDate, setStartDate] = useState(task?.startDate ?? "")
@@ -77,10 +68,6 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
         priority,
         energyRequired,
         estimatedDuration: Number(estimatedDuration) || 60,
-        earliestTime: earliestTime || undefined,
-        latestStartTime: latestStartTime || undefined,
-        defaultTime: defaultTime || undefined,
-        defaultDuration: defaultDuration ? Number(defaultDuration) : undefined,
         frequencyType: frequencyType || undefined,
         daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : undefined,
         startDate: startDate || undefined,
@@ -160,51 +147,6 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
         {Number(estimatedDuration) > 720 && <SplitWarning />}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="task-earliest">最早开始</Label>
-          <Input
-            id="task-earliest"
-            type="time"
-            value={earliestTime}
-            onChange={(e) => setEarliestTime(e.target.value)}
-            placeholder={project?.defaultEarliestTime ?? "继承项目"}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="task-latest">最迟开始</Label>
-          <Input
-            id="task-latest"
-            type="time"
-            value={latestStartTime}
-            onChange={(e) => setLatestStartTime(e.target.value)}
-            placeholder={project?.defaultLatestStartTime ?? "继承项目"}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="task-default-time">默认时间</Label>
-          <Input
-            id="task-default-time"
-            type="time"
-            value={defaultTime}
-            onChange={(e) => setDefaultTime(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="task-default-duration">默认时长（分钟）</Label>
-        <Input
-          id="task-default-duration"
-          type="number"
-          min={5}
-          max={480}
-          value={defaultDuration}
-          onChange={(e) => setDefaultDuration(e.target.value)}
-          placeholder={project?.defaultDuration?.toString() ?? "继承项目"}
-        />
-      </div>
-
       {/* 调度设置 */}
       <fieldset className="border-t pt-3 mt-1">
         <legend className="text-sm font-medium px-1">调度设置</legend>
@@ -261,7 +203,7 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                placeholder={project?.startDate ?? "继承项目"}
+                placeholder="开始日期"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -271,7 +213,7 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                placeholder={project?.endDate ?? "继承项目"}
+                placeholder="结束日期"
               />
             </div>
           </div>
