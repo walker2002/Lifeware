@@ -156,6 +156,17 @@ type Tag = string  // 自由文本，小写，最多 20 字符
 type Notes = string | null
 ```
 
+### ProjectStatus
+
+type ProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+
+状态转换：
+- planning → active, archived
+- active → paused, completed, archived
+- paused → active, archived
+- completed → archived
+- archived →（终态）
+
 ---
 
 ## 三、核心对象定义（Core Objects）
@@ -363,15 +374,18 @@ type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded'
 
 **对象意图**：一个有明确完成条件的单次可执行单元。
 
-**生命周期**：`Draft → Active → Scheduled → Completed / Archived`
+**生命周期**：`Draft → Active → InProgress → OnHold → Completed / Archived`
 
 | 状态 | 语义 |
 |---|---|
 | `Draft` | 已捕获，条件未完整，不参与编排 |
-| `Active` | 待执行，可被 Timebox 调度 |
-| `Scheduled` | 已被排入某个 Timebox |
+| `Active` | 已就绪，可被 Timebox 调度 |
+| `InProgress` | 执行中 |
+| `OnHold` | 暂停/搁置 |
 | `Completed` | 已完成，KeyResult 自动更新 |
 | `Archived` | 归档，不再显示在活跃列表 |
+
+> **兼容说明**：旧状态 `scheduled` 保留兼容，读取时映射为 `in_progress`。
 
 ```typescript
 interface Task {
@@ -383,8 +397,18 @@ interface Task {
   energyRequired:    EnergyLevel
   estimatedDuration: DurationMinutes
   actualDuration?:   DurationMinutes   // 完成时由 Timebox 或手动记录填入
+  parentId?:         USOM_ID           // 父任务 ID（null=顶级任务）
+  projectId?:        USOM_ID           // 归属项目 ID（null=独立任务）
   keyResultId?:      USOM_ID           // 关联 KeyResult（可选）
   timeboxId?:        USOM_ID           // 当前排入的 Timebox（可选）
+  earliestTime?:     string            // 最早开始时间 (HH:MM)，null 时向上继承
+  latestStartTime?:  string            // 最晚开始时间 (HH:MM)
+  defaultTime?:      string            // 默认执行时间 (HH:MM)
+  defaultDuration?:  number            // 默认时长（分钟）
+  frequencyType?:    'once' | 'daily' | 'weekly' | 'custom'  // 频率类型
+  daysOfWeek?:       number[]          // frequencyType=custom 时使用
+  startDate?:        DateOnly          // 周期性任务开始日期
+  endDate?:          DateOnly          // 周期性任务结束日期
   tags:              Tag[]
   dueDate?:          DateOnly
   recurrence?:       RecurrenceRule    // 重复任务规则（暂不在 MVP 实现）
@@ -395,13 +419,150 @@ interface Task {
   notes?:            Notes
 }
 
-type TaskStatus = 'draft' | 'active' | 'scheduled' | 'completed' | 'archived'
+type TaskStatus = 'draft' | 'active' | 'in_progress' | 'on_hold' | 'completed' | 'archived'
+// @deprecated 'scheduled' 保留兼容，读取时映射为 'in_progress'
+
+状态转换：
+- draft → active, archived
+- active → in_progress, on_hold, archived
+- in_progress → on_hold, completed, archived
+- on_hold → active, archived
+- completed → archived
+- archived →（终态）
 
 // 暂不在 MVP 中实现，字段预留
 interface RecurrenceRule {
   frequency: 'daily' | 'weekly' | 'monthly'
   interval:  number
   endDate?:  DateOnly
+}
+```
+
+---
+
+### 3.7a Project
+
+项目是任务的组织容器，拥有独立的状态生命周期。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | `USOM_ID` | 是 | UUID v4 |
+| `status` | `ProjectStatus` | 是 | planning/active/paused/completed/archived |
+| `name` | `string` | 是 | 项目名称 |
+| `description` | `string` | 否 | 项目描述 |
+| `startDate` | `DateOnly` | 否 | 项目开始日期 |
+| `endDate` | `DateOnly` | 否 | 项目截止日期 |
+| `defaultEarliestTime` | `string` | 否 | 默认最早开始时间 (HH:MM) |
+| `defaultLatestStartTime` | `string` | 否 | 默认最晚开始时间 (HH:MM) |
+| `defaultDuration` | `number` | 否 | 默认时长（分钟） |
+| `priority` | `Priority` | 否 | critical/high/medium/low |
+| `color` | `string` | 否 | CSS 颜色标识 |
+| `tags` | `Tag[]` | 是 | 标签数组 |
+| `notes` | `Notes` | 否 | 备注 |
+| `createdAt` | `Timestamp` | 是 | 创建时间 |
+| `updatedAt` | `Timestamp` | 是 | 更新时间 |
+| `completedAt` | `Timestamp` | 否 | 完成时间 |
+| `archivedAt` | `Timestamp` | 否 | 归档时间 |
+
+```typescript
+interface Project {
+  id:                    USOM_ID
+  status:                ProjectStatus
+  name:                  string
+  description?:          string
+  startDate?:            DateOnly
+  endDate?:              DateOnly
+  defaultEarliestTime?:  string
+  defaultLatestStartTime?: string
+  defaultDuration?:      number
+  priority?:             Priority
+  color?:                string
+  tags:                  Tag[]
+  notes?:                Notes
+  createdAt:             Timestamp
+  updatedAt:             Timestamp
+  completedAt?:          Timestamp
+  archivedAt?:           Timestamp
+}
+```
+
+---
+
+### 3.7b ProjectTemplate
+
+项目模板是项目结构的可复用快照。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | `USOM_ID` | 是 | UUID v4 |
+| `name` | `string` | 是 | 模板名称 |
+| `description` | `string` | 否 | 模板描述 |
+| `defaultEarliestTime` | `string` | 否 | 默认最早时间 |
+| `defaultLatestStartTime` | `string` | 否 | 默认最晚时间 |
+| `defaultDuration` | `number` | 否 | 默认时长 |
+| `priority` | `Priority` | 否 | 默认优先级 |
+| `color` | `string` | 否 | 颜色标识 |
+| `tags` | `Tag[]` | 是 | 标签 |
+| `createdAt` | `Timestamp` | 是 | 创建时间 |
+| `updatedAt` | `Timestamp` | 是 | 更新时间 |
+
+```typescript
+interface ProjectTemplate {
+  id:                     USOM_ID
+  name:                   string
+  description?:           string
+  defaultEarliestTime?:   string
+  defaultLatestStartTime?: string
+  defaultDuration?:       number
+  priority?:              Priority
+  color?:                 string
+  tags:                   Tag[]
+  createdAt:              Timestamp
+  updatedAt:              Timestamp
+}
+```
+
+---
+
+### 3.7c TaskTemplate
+
+任务模板可归属项目模板或独立存在，支持自关联（模板内子任务）。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | `USOM_ID` | 是 | UUID v4 |
+| `projectTemplateId` | `USOM_ID` | 否 | 所属项目模板 |
+| `parentTemplateId` | `USOM_ID` | 否 | 模板内父任务（自关联） |
+| `title` | `string` | 是 | 任务标题 |
+| `description` | `string` | 否 | 任务描述 |
+| `priority` | `Priority` | 否 | 优先级 |
+| `energyRequired` | `EnergyLevel` | 否 | 能量要求 |
+| `estimatedDuration` | `number` | 否 | 预估时长（分钟） |
+| `earliestTime` | `string` | 否 | 最早开始时间 |
+| `latestStartTime` | `string` | 否 | 最晚开始时间 |
+| `defaultTime` | `string` | 否 | 默认执行时间 |
+| `defaultDuration` | `number` | 否 | 默认时长 |
+| `frequencyType` | `'once' \| 'daily' \| 'weekly' \| 'custom'` | 否 | 频率 |
+| `sortOrder` | `number` | 是 | 排序序号 |
+| `createdAt` | `Timestamp` | 是 | 创建时间 |
+
+```typescript
+interface TaskTemplate {
+  id:                  USOM_ID
+  projectTemplateId?:  USOM_ID
+  parentTemplateId?:   USOM_ID
+  title:               string
+  description?:        string
+  priority?:           Priority
+  energyRequired?:     EnergyLevel
+  estimatedDuration?:  number
+  earliestTime?:       string
+  latestStartTime?:    string
+  defaultTime?:        string
+  defaultDuration?:    number
+  frequencyType?:      'once' | 'daily' | 'weekly' | 'custom'
+  sortOrder:           number
+  createdAt:           Timestamp
 }
 ```
 
