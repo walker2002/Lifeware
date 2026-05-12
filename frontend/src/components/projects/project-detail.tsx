@@ -1,17 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import { TaskList, buildTree } from "./task-list"
 import { resolveTaskTime } from "@/domains/projects/time-inheritance"
-import { ProjectRepository } from "@/lib/db/repositories/project.repository"
-import { TaskRepository } from "@/lib/db/repositories/task.repository"
 import type { Project, Task } from "@/usom/types/objects"
 import type { TaskStatus, ProjectStatus } from "@/usom/types/primitives"
 
 interface ProjectDetailProps {
-  projectId: string
+  project: Project
+  tasks: Task[]
   onAddTask: (parentId?: string) => void
   onEditTask: (taskId: string) => void
   onEditProject: () => void
@@ -20,38 +18,7 @@ interface ProjectDetailProps {
   onProjectStatusChange: (newStatus: ProjectStatus) => void
 }
 
-export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject, onSaveAsTemplate, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
-  const [project, setProject] = useState<Project | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const projectRepo = new ProjectRepository()
-  const taskRepo = new TaskRepository()
-
-  useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true)
-        // TODO: get userId from session
-        const userId = "current-user"
-        const p = await projectRepo.findById(projectId, userId)
-        if (!p) { setError("项目不存在"); return }
-        setProject(p)
-        const t = await taskRepo.findByProject(projectId, userId)
-        setTasks(t)
-      } catch {
-        setError("加载失败")
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [projectId])
-
-  if (loading) return <div className="p-8 text-center text-muted-foreground">加载中...</div>
-  if (error || !project) return <div className="p-8 text-center text-muted-foreground">{error ?? "项目不存在"}</div>
-
+export function ProjectDetail({ project, tasks, onAddTask, onEditTask, onEditProject, onSaveAsTemplate, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
   // 计算时间继承
   const parentMap = new Map<string, Task>()
   for (const t of tasks) parentMap.set(t.id, t)
@@ -81,20 +48,20 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject,
           {project.description && <p className="text-sm text-muted-foreground mt-1">{project.description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          {project.status === 'planning' && (
-            <Button size="sm" variant="default" onClick={() => onProjectStatusChange('active')}>激活项目</Button>
+          {project.status === "planning" && (
+            <Button size="sm" variant="default" onClick={() => onProjectStatusChange("active")}>激活项目</Button>
           )}
-          {project.status === 'active' && (
+          {project.status === "active" && (
             <>
-              <Button size="sm" variant="outline" onClick={() => onProjectStatusChange('paused')}>暂停</Button>
-              <Button size="sm" variant="default" onClick={() => onProjectStatusChange('completed')}>完成</Button>
+              <Button size="sm" variant="outline" onClick={() => onProjectStatusChange("paused")}>暂停</Button>
+              <Button size="sm" variant="default" onClick={() => onProjectStatusChange("completed")}>完成</Button>
             </>
           )}
-          {project.status === 'paused' && (
-            <Button size="sm" variant="default" onClick={() => onProjectStatusChange('active')}>恢复</Button>
+          {project.status === "paused" && (
+            <Button size="sm" variant="default" onClick={() => onProjectStatusChange("active")}>恢复</Button>
           )}
-          {project.status === 'completed' && (
-            <Button size="sm" variant="outline" onClick={() => onProjectStatusChange('archived')}>归档</Button>
+          {project.status === "completed" && (
+            <Button size="sm" variant="outline" onClick={() => onProjectStatusChange("archived")}>归档</Button>
           )}
           <Button variant="outline" size="sm" onClick={onEditProject}>
             编辑项目

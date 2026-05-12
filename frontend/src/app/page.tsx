@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { IntentInput } from "@/components/intent-input";
@@ -59,6 +60,7 @@ function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'
 }
 
 export default function Home() {
+  const router = useRouter();
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -458,6 +460,13 @@ export default function Home() {
               }`}
             >
               OKR
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/projects")}
+              className="flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors text-body hover:text-foreground"
+            >
+              项目/任务
             </button>
           </div>
 

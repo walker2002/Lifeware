@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
 import type { ProjectTemplate } from "@/usom/types/objects"
 
 interface TemplateDialogProps {
@@ -11,24 +10,12 @@ interface TemplateDialogProps {
   onOpenChange: (open: boolean) => void
   onApplyTemplate: (templateId: string) => Promise<void>
   onSaveCurrentAsTemplate?: () => Promise<void>
+  templates: ProjectTemplate[]
+  loading?: boolean
 }
 
-export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onSaveCurrentAsTemplate }: TemplateDialogProps) {
-  const [templates, setTemplates] = useState<ProjectTemplate[]>([])
-  const [loading, setLoading] = useState(false)
+export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onSaveCurrentAsTemplate, templates, loading = false }: TemplateDialogProps) {
   const [applying, setApplying] = useState<string | null>(null)
-
-  const repo = new TaskTemplateRepository()
-
-  useEffect(() => {
-    if (open) {
-      setLoading(true)
-      // TODO: get userId from session
-      repo.findProjectTemplates("current-user")
-        .then(setTemplates)
-        .finally(() => setLoading(false))
-    }
-  }, [open])
 
   const handleApply = async (templateId: string) => {
     setApplying(templateId)
