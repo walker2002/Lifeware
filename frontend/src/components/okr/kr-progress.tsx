@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button"
 
 interface KRProgressProps {
   kr: KeyResult
+  krNumber?: string
   editable?: boolean
   onProgressUpdate?: (krId: string, value: number) => Promise<KeyResult | null>
 }
 
-export function KRProgress({ kr, editable, onProgressUpdate }: KRProgressProps) {
+export function KRProgress({ kr, krNumber, editable, onProgressUpdate }: KRProgressProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [inputValue, setInputValue] = useState(String(kr.currentValue))
   const [isUpdating, setIsUpdating] = useState(false)
@@ -41,7 +42,10 @@ export function KRProgress({ kr, editable, onProgressUpdate }: KRProgressProps) 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{kr.title}</span>
+        <span className="text-sm font-medium">
+          {krNumber && <span className="font-mono text-xs text-muted-foreground mr-1">{krNumber}</span>}
+          {kr.title}
+        </span>
         <span className="text-xs text-muted-foreground">{kr.status}</span>
       </div>
 

@@ -217,10 +217,10 @@ export function OKRDetail({
           )}
         </div>
 
-        {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map(kr => (
+        {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map((kr, index) => (
           <Card key={kr.id}>
             <CardContent className="pt-4 space-y-2">
-              <KRProgress kr={kr} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
+              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
               {kr.status === "draft" && (
                 <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
                   删除
