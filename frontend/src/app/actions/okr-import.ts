@@ -72,13 +72,17 @@ export async function importOKRFromFile(
       }
     }
 
+    // 30s 超时保护
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+
     const response = await chat(
       [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `文件名: ${fileName}\n\n${fileContent}` },
       ],
       { temperature: 0.3, maxTokens: 4096 },
-    )
+    ).finally(() => clearTimeout(timeout))
 
     const rawText = response.choices[0]?.message?.content ?? ''
 
@@ -136,7 +140,7 @@ export async function saveImportedOKRs(markdown: string): Promise<SaveImportResu
         description: okr.description,
         okrType: okr.okrType ?? 'committed',
         priority: okr.priority ?? 'P1',
-        periodType: okr.periodType ?? 'quarterly',
+        periodType: okr.periodType ?? inferPeriodType(okr.periodStart!, okr.periodEnd!),
         periodStart: okr.periodStart,
         periodEnd: okr.periodEnd,
       })
@@ -166,6 +170,15 @@ export async function saveImportedOKRs(markdown: string): Promise<SaveImportResu
 }
 
 // ─── 内部工具函数 ─────────────────────────────────────────────
+
+function inferPeriodType(start: string, end: string): string {
+  const days = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000)
+  if (days <= 8) return 'weekly'
+  if (days <= 35) return 'monthly'
+  if (days <= 100) return 'quarterly'
+  if (days <= 200) return 'semi_annual'
+  return 'annual'
+}
 
 function extractJSON(text: string): string {
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)

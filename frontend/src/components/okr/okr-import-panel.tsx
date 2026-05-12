@@ -38,13 +38,13 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
     if (!textarea) return
 
     const lines = markdown.split('\n')
+    const totalLines = lines.length
     let objCount = -1
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < totalLines; i++) {
       if (lines[i].startsWith('## Objective:')) {
         objCount++
         if (objCount === index) {
-          const charsBefore = lines.slice(0, i).join('\n').length
-          textarea.scrollTop = charsBefore * 0.6
+          textarea.scrollTop = (i / totalLines) * textarea.scrollHeight
           break
         }
       }
