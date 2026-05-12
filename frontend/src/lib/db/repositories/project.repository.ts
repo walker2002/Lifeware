@@ -74,6 +74,11 @@ export class ProjectRepository implements IProjectRepository {
     return db.transaction(async (tx) => {
       const project = await this.findById(id, userId)
       if (!project) throw new Error('Project not found')
+
+      // 加载项目的所有任务
+      const taskRows = await tx.select().from(s.tasks)
+        .where(and(eq(s.tasks.projectId, id), eq(s.tasks.userId, userId)))
+
       const templateId = v4()
       const now = new Date()
       await tx.insert(s.projectTemplates).values({
@@ -90,6 +95,60 @@ export class ProjectRepository implements IProjectRepository {
         createdAt: now,
         updatedAt: now,
       })
+
+      // 两遍创建任务模板：第一遍创建顶级任务，建立 ID 映射
+      const idMap = new Map<string, string>() // taskId → templateTaskId
+      let sortOrder = 0
+
+      for (const t of taskRows) {
+        if (!t.parentId) {
+          const ttId = v4()
+          idMap.set(t.id, ttId)
+          await tx.insert(s.taskTemplates).values({
+            id: ttId,
+            projectTemplateId: templateId,
+            parentTemplateId: null,
+            title: t.title,
+            description: t.description ?? null,
+            priority: t.priority ?? null,
+            energyRequired: t.energyRequired ?? null,
+            estimatedDuration: t.estimatedDuration ?? null,
+            earliestTime: t.earliestTime ?? null,
+            latestStartTime: t.latestStartTime ?? null,
+            defaultTime: t.defaultTime ?? null,
+            defaultDuration: t.defaultDuration ?? null,
+            frequencyType: t.frequencyType ?? null,
+            sortOrder: sortOrder++,
+            createdAt: now,
+          })
+        }
+      }
+
+      // 第二遍：创建子任务模板，用映射表替换 parentId → parentTemplateId
+      for (const t of taskRows) {
+        if (t.parentId) {
+          const parentTemplateId = idMap.get(t.parentId)
+          if (!parentTemplateId) continue
+          await tx.insert(s.taskTemplates).values({
+            id: v4(),
+            projectTemplateId: templateId,
+            parentTemplateId,
+            title: t.title,
+            description: t.description ?? null,
+            priority: t.priority ?? null,
+            energyRequired: t.energyRequired ?? null,
+            estimatedDuration: t.estimatedDuration ?? null,
+            earliestTime: t.earliestTime ?? null,
+            latestStartTime: t.latestStartTime ?? null,
+            defaultTime: t.defaultTime ?? null,
+            defaultDuration: t.defaultDuration ?? null,
+            frequencyType: t.frequencyType ?? null,
+            sortOrder: sortOrder++,
+            createdAt: now,
+          })
+        }
+      }
+
       return (await tx.select().from(s.projectTemplates)
         .where(eq(s.projectTemplates.id, templateId))
         .then(rows => projectTemplateRowToUSOM(rows[0])))!

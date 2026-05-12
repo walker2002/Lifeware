@@ -51,7 +51,7 @@ export default function ProjectsPage() {
       ])
       setProjects(list)
       setIndependentTasks(indTasks)
-    } catch (e) {
+    } catch {
       // silently fail for now
     } finally {
       setLoading(false)
@@ -85,24 +85,45 @@ export default function ProjectsPage() {
 
   const handleImport = async (preview: ImportPreview) => {
     if (preview.project) {
-      await projectRepo.create({
+      const project = await projectRepo.create({
         name: preview.project.name,
         description: preview.project.description,
         priority: preview.project.priority as Priority | undefined,
         defaultEarliestTime: preview.project.defaultEarliestTime,
         defaultLatestStartTime: preview.project.defaultLatestStartTime,
       }, userId)
-      // 简单导入：所有任务作为顶级任务创建
+
       if (preview.tasks.length > 0) {
-        await taskRepo.bulkCreate(
-          preview.tasks.map(t => ({
+        // 两遍创建：第一遍创建顶级任务（depth=0），建立 tempId → realId 映射
+        const idMap = new Map<string, string>()
+
+        const topTasks = preview.tasks.filter(t => t.depth === 0)
+        for (const t of topTasks) {
+          const created = await taskRepo.bulkCreate([{
             title: t.title,
             priority: (t.priority ?? 'medium') as Priority,
             energyRequired: (t.energyRequired ?? 'medium') as EnergyLevel,
             estimatedDuration: t.estimatedDuration ?? 60,
-          })),
-          userId
-        )
+            projectId: project.id,
+          }], userId)
+          if (created[0]) {
+            idMap.set(t.tempId, created[0].id)
+          }
+        }
+
+        // 第二遍：创建子任务，用映射表替换 parentTempId → parentId
+        const childTasks = preview.tasks.filter(t => t.depth > 0 && t.parentTempId)
+        if (childTasks.length > 0) {
+          const childInputs = childTasks.map(t => ({
+            title: t.title,
+            priority: (t.priority ?? 'medium') as Priority,
+            energyRequired: (t.energyRequired ?? 'medium') as EnergyLevel,
+            estimatedDuration: t.estimatedDuration ?? 60,
+            projectId: project.id,
+            parentId: idMap.get(t.parentTempId!) ?? undefined,
+          }))
+          await taskRepo.bulkCreate(childInputs, userId)
+        }
       }
     }
     loadData()
@@ -167,7 +188,7 @@ export default function ProjectsPage() {
       {filteredProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <p className="text-sm">暂无项目</p>
-          <p className="text-xs mt-1">点击"新建项目"开始</p>
+          <p className="text-xs mt-1">点击&ldquo;新建项目&rdquo;开始</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

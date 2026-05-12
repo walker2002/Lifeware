@@ -3,22 +3,23 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
-import { SplitWarning } from "./split-warning"
 import { TaskList, buildTree } from "./task-list"
 import { resolveTaskTime } from "@/domains/projects/time-inheritance"
 import { ProjectRepository } from "@/lib/db/repositories/project.repository"
 import { TaskRepository } from "@/lib/db/repositories/task.repository"
 import type { Project, Task } from "@/usom/types/objects"
-import type { TaskStatus } from "@/usom/types/primitives"
+import type { TaskStatus, ProjectStatus } from "@/usom/types/primitives"
 
 interface ProjectDetailProps {
   projectId: string
   onAddTask: (parentId?: string) => void
   onEditTask: (taskId: string) => void
+  onEditProject: () => void
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void
+  onProjectStatusChange: (newStatus: ProjectStatus) => void
 }
 
-export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange }: ProjectDetailProps) {
+export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,7 +39,7 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
         setProject(p)
         const t = await taskRepo.findByProject(projectId, userId)
         setTasks(t)
-      } catch (e) {
+      } catch {
         setError("加载失败")
       } finally {
         setLoading(false)
@@ -65,14 +66,6 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(t => t.status === "completed").length
 
-  // 任务状态转换映射
-  const TASK_TRANSITIONS: Record<string, { action: string; label: string; status: string }[]> = {
-    draft: [{ action: 'activate', label: '激活', status: 'active' }],
-    active: [{ action: 'start', label: '开始', status: 'in_progress' }, { action: 'pause', label: '搁置', status: 'on_hold' }],
-    in_progress: [{ action: 'pause', label: '搁置', status: 'on_hold' }, { action: 'complete', label: '完成', status: 'completed' }],
-    on_hold: [{ action: 'resume', label: '恢复', status: 'active' }],
-  }
-
   return (
     <div className="flex flex-col gap-6 p-6 max-w-3xl mx-auto">
       {/* 标题区 */}
@@ -88,18 +81,21 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onStatusChange
         </div>
         <div className="flex items-center gap-2">
           {project.status === 'planning' && (
-            <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'active' as TaskStatus)}>激活项目</Button>
+            <Button size="sm" variant="default" onClick={() => onProjectStatusChange('active')}>激活项目</Button>
           )}
           {project.status === 'active' && (
             <>
-              <Button size="sm" variant="outline" onClick={() => onStatusChange(project.id, 'paused' as TaskStatus)}>暂停</Button>
-              <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'completed' as TaskStatus)}>完成</Button>
+              <Button size="sm" variant="outline" onClick={() => onProjectStatusChange('paused')}>暂停</Button>
+              <Button size="sm" variant="default" onClick={() => onProjectStatusChange('completed')}>完成</Button>
             </>
           )}
           {project.status === 'paused' && (
-            <Button size="sm" variant="default" onClick={() => onStatusChange(project.id, 'active' as TaskStatus)}>恢复</Button>
+            <Button size="sm" variant="default" onClick={() => onProjectStatusChange('active')}>恢复</Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => onEditTask("")}>
+          {project.status === 'completed' && (
+            <Button size="sm" variant="outline" onClick={() => onProjectStatusChange('archived')}>归档</Button>
+          )}
+          <Button variant="outline" size="sm" onClick={onEditProject}>
             编辑项目
           </Button>
         </div>

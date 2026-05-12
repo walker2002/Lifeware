@@ -9,7 +9,7 @@ import { ProjectForm, type ProjectFormData } from "@/components/projects/project
 import { TaskForm, type TaskFormData } from "@/components/projects/task-form"
 import { ProjectRepository } from "@/lib/db/repositories/project.repository"
 import { TaskRepository } from "@/lib/db/repositories/task.repository"
-import type { TaskStatus, Priority, EnergyLevel } from "@/usom/types/primitives"
+import type { TaskStatus, ProjectStatus, Priority, EnergyLevel } from "@/usom/types/primitives"
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -62,6 +62,11 @@ export default function ProjectDetailPage() {
     setRefreshKey(k => k + 1)
   }
 
+  const handleProjectStatusChange = async (newStatus: ProjectStatus) => {
+    await projectRepo.updateStatus(projectId, newStatus, userId)
+    setRefreshKey(k => k + 1)
+  }
+
   const handleEditProject = async (data: ProjectFormData) => {
     await projectRepo.update(projectId, {
       ...data,
@@ -96,7 +101,9 @@ export default function ProjectDetailPage() {
         projectId={projectId}
         onAddTask={handleAddTask}
         onEditTask={handleEditTask}
+        onEditProject={() => setShowEditProject(true)}
         onStatusChange={handleStatusChange}
+        onProjectStatusChange={handleProjectStatusChange}
       />
 
       {/* 编辑项目对话框 */}
