@@ -3,7 +3,8 @@ import { TaskRepository } from "@/lib/db/repositories/task.repository"
 import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
 import { ProjectsClient } from "./projects-client"
 
-const userId = "current-user" // TODO: get from session
+const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
+const userId = MVP_USER_ID // TODO: get from session
 
 export const dynamic = "force-dynamic"
 

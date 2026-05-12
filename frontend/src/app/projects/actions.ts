@@ -7,7 +7,8 @@ import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repo
 import type { Priority, EnergyLevel, ProjectStatus, TaskStatus } from "@/usom/types/primitives"
 import type { ImportPreview } from "@/lib/task-import/task-extractor"
 
-const userId = "current-user" // TODO: get from session
+const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
+const userId = MVP_USER_ID // TODO: get from session
 
 // ─── Project ────────────────────────────────────────────────
 
