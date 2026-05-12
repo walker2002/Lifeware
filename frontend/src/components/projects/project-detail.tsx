@@ -15,11 +15,12 @@ interface ProjectDetailProps {
   onAddTask: (parentId?: string) => void
   onEditTask: (taskId: string) => void
   onEditProject: () => void
+  onSaveAsTemplate: () => void
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void
   onProjectStatusChange: (newStatus: ProjectStatus) => void
 }
 
-export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
+export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject, onSaveAsTemplate, onStatusChange, onProjectStatusChange }: ProjectDetailProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,6 +98,9 @@ export function ProjectDetail({ projectId, onAddTask, onEditTask, onEditProject,
           )}
           <Button variant="outline" size="sm" onClick={onEditProject}>
             编辑项目
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onSaveAsTemplate}>
+            保存为模板
           </Button>
         </div>
       </div>

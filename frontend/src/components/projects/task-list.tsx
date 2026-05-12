@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SplitWarning } from "./split-warning"
 import { StatusBadge } from "./status-badge"
@@ -112,6 +111,9 @@ function TaskRow({
         {/* 标题 */}
         <span className="flex-1 text-sm truncate">{task.title}</span>
 
+        {/* 拆分警告 */}
+        {task.estimatedDuration > 720 && <SplitWarning />}
+
         {/* 时间继承（含 tooltip） */}
         {hasTimeInheritance ? (
           <Tooltip>
@@ -190,7 +192,7 @@ export function TaskList({ tasks, project, onTaskClick, onAddSubTask, onStatusCh
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <p className="text-sm">暂无任务</p>
-        <p className="text-xs mt-1">点击"添加任务"开始</p>
+        <p className="text-xs mt-1">点击&ldquo;添加任务&rdquo;开始</p>
       </div>
     )
   }

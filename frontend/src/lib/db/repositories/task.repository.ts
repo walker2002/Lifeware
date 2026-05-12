@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm'
+import { eq, and, isNull, gte, lte } from 'drizzle-orm'
 import { db } from '../index'
 import * as s from '../schema'
 import type { ITaskRepository, CreateTaskInput } from '../../../usom/interfaces/irepository'
@@ -54,11 +54,20 @@ export class TaskRepository implements ITaskRepository {
     return rows.map(r => taskRowToUSOM(r as any))
   }
 
+  async findAll(userId: USOM_ID): Promise<Task[]> {
+    const rows = await db.select().from(s.tasks)
+      .where(eq(s.tasks.userId, userId))
+    return rows.map(r => taskRowToUSOM(r as any))
+  }
+
   async findByDateRange(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Task[]> {
     const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.userId, userId)))
-    return rows.filter(r => r.startDate && r.startDate >= start && r.startDate <= end)
-      .map(r => taskRowToUSOM(r as any))
+      .where(and(
+        eq(s.tasks.userId, userId),
+        gte(s.tasks.startDate, start),
+        lte(s.tasks.startDate, end),
+      ))
+    return rows.map(r => taskRowToUSOM(r as any))
   }
 
   async save(task: Task, userId: USOM_ID): Promise<void> {

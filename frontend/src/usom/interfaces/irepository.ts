@@ -37,6 +37,7 @@ export interface ITaskRepository {
   findByProject(projectId: USOM_ID, userId: USOM_ID): Promise<Task[]>
   findByParent(parentId: USOM_ID, userId: USOM_ID): Promise<Task[]>
   findIndependent(userId: USOM_ID): Promise<Task[]>
+  findAll(userId: USOM_ID): Promise<Task[]>
   findByDateRange(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Task[]>
   save(task: Task, userId: USOM_ID): Promise<void>
   updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task>

@@ -9,6 +9,7 @@ import { ProjectForm, type ProjectFormData } from "@/components/projects/project
 import { TaskForm, type TaskFormData } from "@/components/projects/task-form"
 import { ProjectRepository } from "@/lib/db/repositories/project.repository"
 import { TaskRepository } from "@/lib/db/repositories/task.repository"
+import type { CreateTaskInput } from "@/usom/interfaces/irepository"
 import type { TaskStatus, ProjectStatus, Priority, EnergyLevel } from "@/usom/types/primitives"
 
 export default function ProjectDetailPage() {
@@ -46,15 +47,29 @@ export default function ProjectDetailPage() {
 
   const handleSaveTask = async (data: TaskFormData) => {
     await taskRepo.bulkCreate([{
-      ...data,
+      title: data.title,
+      description: data.description,
       priority: data.priority as Priority,
       energyRequired: data.energyRequired as EnergyLevel,
+      estimatedDuration: data.estimatedDuration,
+      earliestTime: data.earliestTime,
+      latestStartTime: data.latestStartTime,
+      defaultTime: data.defaultTime,
+      defaultDuration: data.defaultDuration,
+      frequencyType: data.frequencyType as CreateTaskInput['frequencyType'],
+      daysOfWeek: data.daysOfWeek,
+      startDate: data.startDate ?? undefined,
+      endDate: data.endDate ?? undefined,
       projectId,
       parentId: parentTaskId ?? undefined,
     }], userId)
     setShowTaskForm(false)
     setShowSubTaskForm(false)
     setRefreshKey(k => k + 1)
+  }
+
+  const handleSaveAsTemplate = async () => {
+    await projectRepo.saveAsTemplate(projectId, userId)
   }
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
@@ -102,6 +117,7 @@ export default function ProjectDetailPage() {
         onAddTask={handleAddTask}
         onEditTask={handleEditTask}
         onEditProject={() => setShowEditProject(true)}
+        onSaveAsTemplate={handleSaveAsTemplate}
         onStatusChange={handleStatusChange}
         onProjectStatusChange={handleProjectStatusChange}
       />

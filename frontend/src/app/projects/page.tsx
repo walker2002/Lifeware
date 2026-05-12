@@ -15,6 +15,7 @@ import { ProjectRepository } from "@/lib/db/repositories/project.repository"
 import { TaskRepository } from "@/lib/db/repositories/task.repository"
 import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
 import type { ImportPreview } from "@/lib/task-import/task-extractor"
+import type { CreateTaskInput } from "@/usom/interfaces/irepository"
 import type { Project, Task } from "@/usom/types/objects"
 import type { Priority, EnergyLevel } from "@/usom/types/primitives"
 
@@ -24,11 +25,13 @@ const STATUS_FILTERS = [
   { key: 'planning', label: '规划中' },
   { key: 'paused', label: '已暂停' },
   { key: 'completed', label: '已完成' },
+  { key: 'archived', label: '已归档' },
 ]
 
 export default function ProjectsPage() {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
+  const [taskCounts, setTaskCounts] = useState<Map<string, { total: number; completed: number }>>(new Map())
   const [independentTasks, setIndependentTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -45,12 +48,23 @@ export default function ProjectsPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [list, indTasks] = await Promise.all([
+      const [list, allTasks, indTasks] = await Promise.all([
         projectRepo.findByUserId(userId),
+        taskRepo.findAll(userId),
         taskRepo.findIndependent(userId),
       ])
       setProjects(list)
       setIndependentTasks(indTasks)
+      // 按项目分组统计任务数量
+      const counts = new Map<string, { total: number; completed: number }>()
+      for (const t of allTasks) {
+        if (!t.projectId) continue
+        const c = counts.get(t.projectId) ?? { total: 0, completed: 0 }
+        c.total++
+        if (t.status === 'completed') c.completed++
+        counts.set(t.projectId, c)
+      }
+      setTaskCounts(counts)
     } catch {
       // silently fail for now
     } finally {
@@ -75,9 +89,19 @@ export default function ProjectsPage() {
 
   const handleCreateTask = async (data: TaskFormData) => {
     await taskRepo.bulkCreate([{
-      ...data,
+      title: data.title,
+      description: data.description,
       priority: data.priority as Priority,
       energyRequired: data.energyRequired as EnergyLevel,
+      estimatedDuration: data.estimatedDuration,
+      earliestTime: data.earliestTime,
+      latestStartTime: data.latestStartTime,
+      defaultTime: data.defaultTime,
+      defaultDuration: data.defaultDuration,
+      frequencyType: data.frequencyType as CreateTaskInput['frequencyType'],
+      daysOfWeek: data.daysOfWeek,
+      startDate: data.startDate ?? undefined,
+      endDate: data.endDate ?? undefined,
     }], userId)
     setShowTaskForm(false)
     loadData()
@@ -192,13 +216,18 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProjects.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onClick={() => router.push(`/projects/${p.id}`)}
-            />
-          ))}
+          {filteredProjects.map((p) => {
+            const counts = taskCounts.get(p.id)
+            return (
+              <ProjectCard
+                key={p.id}
+                project={p}
+                taskCount={counts?.total ?? 0}
+                completedTaskCount={counts?.completed ?? 0}
+                onClick={() => router.push(`/projects/${p.id}`)}
+              />
+            )
+          })}
         </div>
       )}
 

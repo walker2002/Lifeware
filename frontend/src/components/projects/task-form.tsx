@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SplitWarning } from "./split-warning"
 import type { Task, Project } from "@/usom/types/objects"
 import { Priority, EnergyLevel } from "@/usom/types/primitives"
 
@@ -18,6 +19,10 @@ export interface TaskFormData {
   latestStartTime?: string
   defaultTime?: string
   defaultDuration?: number
+  frequencyType?: string
+  daysOfWeek?: number[]
+  startDate?: string
+  endDate?: string
 }
 
 interface TaskFormProps {
@@ -52,6 +57,10 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
   const [latestStartTime, setLatestStartTime] = useState(task?.latestStartTime ?? "")
   const [defaultTime, setDefaultTime] = useState(task?.defaultTime ?? "")
   const [defaultDuration, setDefaultDuration] = useState(task?.defaultDuration?.toString() ?? "")
+  const [frequencyType, setFrequencyType] = useState<string>(task?.frequencyType ?? "once")
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(task?.daysOfWeek ?? [])
+  const [startDate, setStartDate] = useState(task?.startDate ?? "")
+  const [endDate, setEndDate] = useState(task?.endDate ?? "")
   const [isLoading, setIsLoading] = useState(false)
 
   const isSubTask = !!parentId
@@ -72,6 +81,10 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
         latestStartTime: latestStartTime || undefined,
         defaultTime: defaultTime || undefined,
         defaultDuration: defaultDuration ? Number(defaultDuration) : undefined,
+        frequencyType: frequencyType || undefined,
+        daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
       })
     } finally {
       setIsLoading(false)
@@ -144,6 +157,7 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
           value={estimatedDuration}
           onChange={(e) => setEstimatedDuration(e.target.value)}
         />
+        {Number(estimatedDuration) > 720 && <SplitWarning />}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -190,6 +204,79 @@ export function TaskForm({ parentId, task, project, onSave, onCancel }: TaskForm
           placeholder={project?.defaultDuration?.toString() ?? "继承项目"}
         />
       </div>
+
+      {/* 调度设置 */}
+      <fieldset className="border-t pt-3 mt-1">
+        <legend className="text-sm font-medium px-1">调度设置</legend>
+        <div className="flex flex-col gap-3 mt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="task-frequency">重复频率</Label>
+              <select
+                id="task-frequency"
+                value={frequencyType}
+                onChange={(e) => setFrequencyType(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="once">仅一次</option>
+                <option value="daily">每日</option>
+                <option value="weekly">每周</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+          </div>
+
+          {frequencyType === 'weekly' && (
+            <div className="flex flex-col gap-1.5">
+              <Label>每周日</Label>
+              <div className="flex gap-1 flex-wrap">
+                {[
+                  { v: 1, l: '一' }, { v: 2, l: '二' }, { v: 3, l: '三' },
+                  { v: 4, l: '四' }, { v: 5, l: '五' }, { v: 6, l: '六' }, { v: 0, l: '日' },
+                ].map((d) => (
+                  <button
+                    key={d.v}
+                    type="button"
+                    className={`size-8 rounded-full text-xs font-medium border transition-colors ${
+                      daysOfWeek.includes(d.v)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input hover:bg-muted"
+                    }`}
+                    onClick={() => setDaysOfWeek(
+                      daysOfWeek.includes(d.v) ? daysOfWeek.filter(x => x !== d.v) : [...daysOfWeek, d.v]
+                    )}
+                  >
+                    {d.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="task-start-date">开始日期</Label>
+              <Input
+                id="task-start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder={project?.startDate ?? "继承项目"}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="task-end-date">结束日期</Label>
+              <Input
+                id="task-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder={project?.endDate ?? "继承项目"}
+              />
+            </div>
+          </div>
+        </div>
+      </fieldset>
 
       <div className="flex items-center justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
