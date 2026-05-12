@@ -3,7 +3,6 @@
 import type { Objective } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 import { Button } from "@/components/ui/button"
-import { ObjectiveCard } from "./objective-card"
 
 interface OKRDirectoryProps {
   objectives: Objective[]
@@ -26,26 +25,31 @@ const STATUS_TABS: { key: ObjectiveStatus | "all"; label: string }[] = [
   { key: "discarded", label: "已废弃" },
 ]
 
-const PERIOD_ORDER = ['annual', 'semi_annual', 'quarterly', 'monthly']
-const PERIOD_LABELS: Record<string, string> = {
-  annual: '年度',
-  semi_annual: '半年度',
-  quarterly: '季度',
-  monthly: '月度',
+function getPeriodGroupKey(period: { type: string; start: string }): string {
+  const d = new Date(period.start)
+  const y = d.getFullYear() % 100
+  switch (period.type) {
+    case 'annual': return `${y}Y`
+    case 'semi_annual': return `${y}H${d.getMonth() < 6 ? 1 : 2}`
+    case 'quarterly': return `${y}Q${Math.floor(d.getMonth() / 3) + 1}`
+    case 'monthly': return `${y}M${String(d.getMonth() + 1).padStart(2, '0')}`
+    default: return `${y}`
+  }
 }
 
 export function OKRDirectory({
   objectives, selectedId, statusFilter,
   onStatusFilterChange, onSelect, onEdit, onDelete, onCreate, onImport,
 }: OKRDirectoryProps) {
-  // 按周期类型分组
-  const grouped = PERIOD_ORDER
-    .map(pt => ({
-      periodType: pt,
-      label: PERIOD_LABELS[pt] ?? pt,
-      items: objectives.filter(o => o.period.type === pt),
-    }))
-    .filter(g => g.items.length > 0)
+  const groupMap = new Map<string, Objective[]>()
+  for (const obj of objectives) {
+    const key = getPeriodGroupKey(obj.period)
+    if (!groupMap.has(key)) groupMap.set(key, [])
+    groupMap.get(key)!.push(obj)
+  }
+  const groups = Array.from(groupMap.entries())
+    .map(([key, items]) => ({ key, items }))
+    .sort((a, b) => b.key.localeCompare(a.key))
 
   const downloadTemplate = () => {
     const template = `# OKR 导入模板
@@ -138,22 +142,27 @@ export function OKRDirectory({
         ))}
       </div>
 
-      {grouped.length === 0 && (
+      {groups.length === 0 && (
         <div className="text-center text-muted-foreground text-xs py-6">
           暂无 OKR，点击右上角创建
         </div>
       )}
 
-      {grouped.map(group => (
-        <div key={group.periodType}>
-          <div className="text-xs font-medium text-muted-foreground mb-1">{group.label}</div>
-          <div className="space-y-1">
+      {groups.map(group => (
+        <div key={group.key}>
+          <div className="text-xs font-semibold text-muted-foreground py-1">{group.key}</div>
+          <div className="space-y-0.5">
             {group.items.map(obj => (
-              <ObjectiveCard
-                key={obj.id}
-                objective={obj}
+              <button key={obj.id} type="button"
                 onClick={() => onSelect(obj.id)}
-              />
+                className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-muted/80 transition-colors ${
+                  selectedId === obj.id ? 'bg-muted font-medium' : ''
+                }`}>
+                {obj.objectiveNumber && (
+                  <span className="font-mono text-xs text-muted-foreground mr-1.5">{obj.objectiveNumber}</span>
+                )}
+                <span className="truncate">{obj.title}</span>
+              </button>
             ))}
           </div>
         </div>
