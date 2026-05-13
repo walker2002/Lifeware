@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
-import type { Objective, KeyResult } from "@/usom/types/objects"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 import { OKRDirectory } from "./okr-directory"
