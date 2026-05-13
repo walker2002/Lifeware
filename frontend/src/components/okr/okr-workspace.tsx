@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import type { Objective, KeyResult } from "@/usom/types/objects"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
@@ -17,6 +18,9 @@ type PanelMode = "empty" | "detail" | "edit" | "create" | "import"
 
 export function OKRWorkspace() {
   const hook = useOKRs()
+  const { leftWidth, handleMouseDown, containerRef } = useResizablePanel({
+    storageKey: "lw-okr-left-width",
+  })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mode, setMode] = useState<PanelMode>("empty")
   const [statusFilter, setStatusFilter] = useState<ObjectiveStatus | "all">("all")
@@ -135,8 +139,11 @@ export function OKRWorkspace() {
   }, [])
 
   return (
-    <div className="flex h-full">
-      <div className="w-80 shrink-0 border-r overflow-y-auto">
+    <div ref={containerRef} className="flex h-full">
+      <div
+        className="shrink-0 overflow-y-auto"
+        style={{ width: leftWidth }}
+      >
         <OKRDirectory
           objectives={filteredObjectives}
           selectedId={selectedId}
@@ -149,6 +156,15 @@ export function OKRWorkspace() {
           onImport={() => setImportOpen(true)}
         />
       </div>
+
+      {/* 分隔条 */}
+      <div
+        className="w-[6px] cursor-col-resize hover:bg-primary/30 active:bg-primary/50 shrink-0 flex items-center justify-center border-x border-hairline"
+        onMouseDown={handleMouseDown}
+      >
+        <span className="text-[10px] text-muted-foreground select-none leading-none">⋮</span>
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         {mode === "import" && importResult ? (
           <OKRImportPanel
