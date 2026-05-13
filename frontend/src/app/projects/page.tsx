@@ -13,10 +13,9 @@ export default async function ProjectsPage() {
   const taskRepo = new TaskRepository()
   const templateRepo = new TaskTemplateRepository()
 
-  const [projects, allTasks, independentTasks, templates] = await Promise.all([
+  const [projects, allTasks, templates] = await Promise.all([
     projectRepo.findByUserId(userId),
     taskRepo.findAll(userId),
-    taskRepo.findIndependent(userId),
     templateRepo.findProjectTemplates(userId),
   ])
 
@@ -34,7 +33,6 @@ export default async function ProjectsPage() {
     <ProjectsClient
       projects={projects}
       taskCounts={taskCounts}
-      independentTasks={independentTasks}
       allTasks={allTasks}
       templates={templates}
     />

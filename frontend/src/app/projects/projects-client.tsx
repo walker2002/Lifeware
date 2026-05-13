@@ -16,13 +16,12 @@ import type { ImportPreview } from "@/lib/task-import/task-extractor"
 interface ProjectsClientProps {
   projects: Project[]
   taskCounts: Record<string, { total: number; completed: number }>
-  independentTasks: Task[]
   allTasks: Task[]
   templates: ProjectTemplate[]
 }
 
 export function ProjectsClient({
-  projects, taskCounts, independentTasks, allTasks, templates,
+  projects, taskCounts, allTasks, templates,
 }: ProjectsClientProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -115,15 +114,12 @@ export function ProjectsClient({
           selectedProject={selectedProject}
           selectedTask={(!selectedProject) ? selectedTask : null}
           allTasks={allTasks}
-          allProjects={projects}
           onCreateTask={handleCreateTask}
           onCreateProject={handleCreateProject}
           onUpdateProject={handleUpdateProject}
           onUpdateTaskStatus={updateTaskStatus}
           onUpdateProjectStatus={updateProjectStatus}
           onSaveAsTemplate={saveProjectAsTemplate}
-          onSelectProject={handleSelectProject}
-          onSelectTask={handleSelectTask}
         />
       </div>
 

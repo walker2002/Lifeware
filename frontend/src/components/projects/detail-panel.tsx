@@ -14,22 +14,18 @@ interface DetailPanelProps {
   selectedProject: Project | null
   selectedTask: Task | null
   allTasks: Task[]
-  allProjects: Project[]
   onCreateTask: (data: TaskFormData & { projectId?: string; parentId?: string }) => Promise<void>
   onCreateProject: (data: ProjectFormData) => Promise<void>
   onUpdateProject: (projectId: string, data: ProjectFormData) => Promise<void>
   onUpdateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>
   onUpdateProjectStatus: (projectId: string, status: ProjectStatus) => Promise<void>
   onSaveAsTemplate: (projectId: string) => Promise<void>
-  onSelectProject: (id: string) => void
-  onSelectTask: (id: string) => void
 }
 
 export function DetailPanel({
-  selectedProject, selectedTask, allTasks, allProjects,
+  selectedProject, selectedTask, allTasks,
   onCreateTask, onCreateProject, onUpdateProject,
   onUpdateTaskStatus, onUpdateProjectStatus, onSaveAsTemplate,
-  onSelectProject, onSelectTask,
 }: DetailPanelProps) {
   const [showNewProject, setShowNewProject] = useState(false)
   const [showEditProject, setShowEditProject] = useState(false)
