@@ -61,15 +61,6 @@ export function ProjectDetail({ project, tasks, onAddTask, onEditTask, onEditPro
         </div>
       </div>
 
-      {/* 默认时间信息 */}
-      {(project.defaultEarliestTime || project.defaultLatestStartTime || project.defaultDuration) && (
-        <div className="flex gap-4 text-xs text-muted-foreground bg-muted/30 rounded-md px-4 py-2">
-          {project.defaultEarliestTime && <span>默认最早: {project.defaultEarliestTime}</span>}
-          {project.defaultLatestStartTime && <span>默认最晚: {project.defaultLatestStartTime}</span>}
-          {project.defaultDuration && <span>默认时长: {project.defaultDuration}分钟</span>}
-        </div>
-      )}
-
       {/* 进度 */}
       {totalTasks > 0 && (
         <div className="flex items-center gap-3">
@@ -93,7 +84,6 @@ export function ProjectDetail({ project, tasks, onAddTask, onEditTask, onEditPro
         </div>
         <TaskList
           tasks={tree}
-          project={project}
           onTaskClick={(id) => onEditTask(id)}
           onAddSubTask={(parentId) => onAddTask(parentId)}
           onStatusChange={onStatusChange}

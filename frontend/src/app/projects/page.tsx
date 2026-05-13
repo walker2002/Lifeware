@@ -35,6 +35,7 @@ export default async function ProjectsPage() {
       projects={projects}
       taskCounts={taskCounts}
       independentTasks={independentTasks}
+      allTasks={allTasks}
       templates={templates}
     />
   )

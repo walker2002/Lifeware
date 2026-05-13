@@ -43,8 +43,8 @@ export function TopNav({ onMenuClick, onSettingsClick, isPanelOpen }: TopNavProp
 
       <nav className="flex items-center gap-1" aria-label="主导航">
         <Link href="/projects">
-          <Button variant="ghost" size="sm" aria-label="项目">
-            项目
+          <Button variant="ghost" size="sm" aria-label="项目/任务">
+            项目/任务
           </Button>
         </Link>
         <Button variant="ghost" size="icon-sm" aria-label="通知">

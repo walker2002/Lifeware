@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { SplitWarning } from "./split-warning"
 import { StatusBadge } from "./status-badge"
-import type { Task, Project } from "@/usom/types/objects"
+import type { Task } from "@/usom/types/objects"
 import type { TaskStatus } from "@/usom/types/primitives"
 
 export interface TaskWithChildren extends Task {
@@ -12,7 +12,6 @@ export interface TaskWithChildren extends Task {
 
 interface TaskListProps {
   tasks: TaskWithChildren[]
-  project?: Project
   onTaskClick: (taskId: string) => void
   onAddSubTask: (parentId: string) => void
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void
@@ -39,17 +38,13 @@ function buildTree(tasks: Task[]): TaskWithChildren[] {
 
 function TaskRow({
   task,
-  parentTask,
   depth = 0,
-  project,
   onTaskClick,
   onAddSubTask,
   onStatusChange,
 }: {
   task: TaskWithChildren
-  parentTask?: TaskWithChildren | null
   depth: number
-  project?: Project
   onTaskClick: (taskId: string) => void
   onAddSubTask: (parentId: string) => void
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void
@@ -137,9 +132,7 @@ function TaskRow({
             <TaskRow
               key={child.id}
               task={child}
-              parentTask={task}
               depth={depth + 1}
-              project={project}
               onTaskClick={onTaskClick}
               onAddSubTask={onAddSubTask}
               onStatusChange={onStatusChange}
@@ -151,7 +144,7 @@ function TaskRow({
   )
 }
 
-export function TaskList({ tasks, project, onTaskClick, onAddSubTask, onStatusChange }: TaskListProps) {
+export function TaskList({ tasks, onTaskClick, onAddSubTask, onStatusChange }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -168,7 +161,6 @@ export function TaskList({ tasks, project, onTaskClick, onAddSubTask, onStatusCh
           key={task.id}
           task={task}
           depth={0}
-          project={project}
           onTaskClick={onTaskClick}
           onAddSubTask={onAddSubTask}
           onStatusChange={onStatusChange}
