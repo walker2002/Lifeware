@@ -111,6 +111,36 @@ describe("useResizablePanel", () => {
     expect(result.current.leftWidth).toBe(600) // 1200 * 0.5
   })
 
+  it("组件卸载时清理拖拽状态，不触发状态更新", () => {
+    const { result, unmount } = renderHook(() =>
+      useResizablePanel({ storageKey: "test-key", defaultWidth: 400 })
+    )
+
+    setupContainer(result)
+
+    act(() => {
+      result.current.handleMouseDown(
+        new MouseEvent("mousedown", { clientX: 400 }) as unknown as React.MouseEvent
+      )
+    })
+
+    // 确认拖拽在进行中
+    expect(document.body.style.cursor).toBe("col-resize")
+
+    // 卸载组件
+    unmount()
+
+    // body 样式应被清理
+    expect(document.body.style.cursor).toBe("")
+    expect(document.body.style.userSelect).toBe("")
+
+    // 后续 mousemove 不引起任何错误
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousemove", { clientX: 700 }))
+    })
+    // 无崩溃则通过
+  })
+
   it("mouseup 后停止拖拽", () => {
     const { result } = renderHook(() =>
       useResizablePanel({ storageKey: "test-key", defaultWidth: 400 })

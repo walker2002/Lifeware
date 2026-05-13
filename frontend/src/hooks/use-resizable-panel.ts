@@ -24,7 +24,11 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
   const [leftWidth, setLeftWidth] = useState(() => {
     if (typeof window === "undefined") return defaultWidth
     const stored = localStorage.getItem(storageKey)
-    return stored ? Number(stored) : defaultWidth
+    if (stored) {
+      const num = Number(stored)
+      if (!Number.isNaN(num) && num > 0) return num
+    }
+    return defaultWidth
   })
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -33,6 +37,16 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
   useEffect(() => {
     localStorage.setItem(storageKey, String(leftWidth))
   }, [leftWidth, storageKey])
+
+  useEffect(() => {
+    return () => {
+      if (draggingRef.current) {
+        draggingRef.current = false
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+      }
+    }
+  }, [])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
