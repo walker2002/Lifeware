@@ -18,10 +18,11 @@ interface ProjectsClientProps {
   taskCounts: Record<string, { total: number; completed: number }>
   allTasks: Task[]
   templates: ProjectTemplate[]
+  onRefresh?: () => void
 }
 
 export function ProjectsClient({
-  projects, taskCounts, allTasks, templates,
+  projects, taskCounts, allTasks, templates, onRefresh,
 }: ProjectsClientProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -56,22 +57,27 @@ export function ProjectsClient({
     if (created?.id) {
       setSelectedProjectId(created.id)
     }
+    onRefresh?.()
   }
 
   const handleCreateTask = async (data: TaskFormData & { projectId?: string; parentId?: string }) => {
     await createTask(data as Parameters<typeof createTask>[0])
+    onRefresh?.()
   }
 
   const handleUpdateProject = async (projectId: string, data: ProjectFormData) => {
     await updateProject(projectId, data as Parameters<typeof updateProject>[1])
+    onRefresh?.()
   }
 
   const handleImport = async (preview: ImportPreview) => {
     await importTasks(preview)
+    onRefresh?.()
   }
 
   const handleApplyTemplate = async (templateId: string) => {
     await applyTemplate(templateId)
+    onRefresh?.()
   }
 
   return (
@@ -117,8 +123,8 @@ export function ProjectsClient({
           onCreateTask={handleCreateTask}
           onCreateProject={handleCreateProject}
           onUpdateProject={handleUpdateProject}
-          onUpdateTaskStatus={updateTaskStatus}
-          onUpdateProjectStatus={updateProjectStatus}
+          onUpdateTaskStatus={async (taskId, status) => { await updateTaskStatus(taskId, status); onRefresh?.() }}
+          onUpdateProjectStatus={async (projectId, status) => { await updateProjectStatus(projectId, status); onRefresh?.() }}
           onSaveAsTemplate={saveProjectAsTemplate}
         />
       </div>

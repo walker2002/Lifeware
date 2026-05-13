@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { IntentInput } from "@/components/intent-input";
@@ -26,6 +25,7 @@ import { useAutoTrigger } from "@/hooks/use-auto-trigger";
 import { HabitLibraryView } from "@/components/habit-library-view";
 import { HabitTemplateManager } from "@/components/habit-template-manager";
 import { OKRWorkspace } from "@/components/okr/okr-workspace";
+import { ProjectsView } from "@/components/projects/projects-view";
 import {
   startOfDay, endOfDay,
   startOfWeek, endOfWeek,
@@ -35,7 +35,7 @@ import {
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 type InputMode = "ai" | "form";
-type MainView = "schedule" | "habits" | "templates" | "okrs";
+type MainView = "schedule" | "habits" | "templates" | "okrs" | "projects";
 
 /** 根据视图模式计算日期范围 */
 function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
@@ -60,7 +60,6 @@ function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'
 }
 
 export default function Home() {
-  const router = useRouter();
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -463,8 +462,12 @@ export default function Home() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/projects")}
-              className="flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors text-body hover:text-foreground"
+              onClick={() => setMainView("projects")}
+              className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
+                mainView === "projects"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-body hover:text-foreground"
+              }`}
             >
               项目/任务
             </button>
@@ -493,6 +496,8 @@ export default function Home() {
             <HabitLibraryView />
           ) : mainView === "okrs" ? (
             <OKRWorkspace />
+          ) : mainView === "projects" ? (
+            <ProjectsView />
           ) : (
             <HabitTemplateManager />
           )}

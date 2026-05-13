@@ -6,6 +6,7 @@ import { TaskRepository } from "@/lib/db/repositories/task.repository"
 import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
 import type { Priority, EnergyLevel, ProjectStatus, TaskStatus } from "@/usom/types/primitives"
 import type { ImportPreview } from "@/lib/task-import/task-extractor"
+import type { Project, Task, ProjectTemplate } from "@/usom/types/objects"
 
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
 const userId = MVP_USER_ID // TODO: get from session
@@ -22,6 +23,7 @@ export async function createProject(data: {
     priority: data.priority as Priority | undefined,
   }, userId)
   revalidatePath("/projects")
+  revalidatePath("/")
   return project
 }
 
@@ -30,6 +32,7 @@ export async function updateProjectStatus(projectId: string, status: ProjectStat
   await repo.updateStatus(projectId, status, userId)
   revalidatePath("/projects")
   revalidatePath(`/projects/${projectId}`)
+  revalidatePath("/")
 }
 
 export async function updateProject(projectId: string, data: {
@@ -43,12 +46,14 @@ export async function updateProject(projectId: string, data: {
   }, userId)
   revalidatePath("/projects")
   revalidatePath(`/projects/${projectId}`)
+  revalidatePath("/")
 }
 
 export async function saveProjectAsTemplate(projectId: string) {
   const repo = new ProjectRepository()
   await repo.saveAsTemplate(projectId, userId)
   revalidatePath("/projects")
+  revalidatePath("/")
 }
 
 // ─── Task ───────────────────────────────────────────────────
@@ -76,6 +81,7 @@ export async function createTask(data: {
   }], userId)
   revalidatePath("/projects")
   if (data.projectId) revalidatePath(`/projects/${data.projectId}`)
+  revalidatePath("/")
   return tasks[0]
 }
 
@@ -83,6 +89,7 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus) {
   const repo = new TaskRepository()
   await repo.updateStatus(taskId, status, userId)
   revalidatePath("/projects")
+  revalidatePath("/")
 }
 
 // ─── Import ─────────────────────────────────────────────────
@@ -130,6 +137,7 @@ export async function importTasks(preview: ImportPreview) {
   }
 
   revalidatePath("/projects")
+  revalidatePath("/")
 }
 
 // ─── Template ───────────────────────────────────────────────
@@ -138,4 +146,37 @@ export async function applyTemplate(templateId: string) {
   const repo = new TaskTemplateRepository()
   await repo.createFromTemplate(templateId, {}, userId)
   revalidatePath("/projects")
+  revalidatePath("/")
+}
+
+// ─── Data Loader ────────────────────────────────────────────
+
+export interface ProjectsViewData {
+  projects: Project[]
+  allTasks: Task[]
+  taskCounts: Record<string, { total: number; completed: number }>
+  templates: ProjectTemplate[]
+}
+
+export async function loadProjectsData(): Promise<ProjectsViewData> {
+  const projectRepo = new ProjectRepository()
+  const taskRepo = new TaskRepository()
+  const templateRepo = new TaskTemplateRepository()
+
+  const [projects, allTasks, templates] = await Promise.all([
+    projectRepo.findByUserId(userId),
+    taskRepo.findAll(userId),
+    templateRepo.findProjectTemplates(userId),
+  ])
+
+  const taskCounts: Record<string, { total: number; completed: number }> = {}
+  for (const t of allTasks) {
+    if (!t.projectId) continue
+    const c = taskCounts[t.projectId] ?? { total: 0, completed: 0 }
+    c.total++
+    if (t.status === "completed") c.completed++
+    taskCounts[t.projectId] = c
+  }
+
+  return { projects, allTasks, taskCounts, templates }
 }
