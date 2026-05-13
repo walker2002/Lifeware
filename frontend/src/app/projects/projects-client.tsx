@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { ProjectTree } from "@/components/projects/project-tree"
 import { DetailPanel } from "@/components/projects/detail-panel"
 import { TaskImportDialog } from "@/components/projects/task-import-dialog"
@@ -28,6 +29,10 @@ export function ProjectsClient({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+
+  const { leftWidth, handleMouseDown, containerRef } = useResizablePanel({
+    storageKey: "lw-projects-left-width",
+  })
 
   const selectedProject = selectedProjectId
     ? projects.find(p => p.id === selectedProjectId) ?? null
@@ -81,9 +86,12 @@ export function ProjectsClient({
   }
 
   return (
-    <div className="flex h-full">
+    <div ref={containerRef} className="flex h-full">
       {/* 左侧项目/任务树 */}
-      <div className="w-80 shrink-0 border-r border-hairline bg-canvas flex flex-col">
+      <div
+        className="shrink-0 border-hairline bg-canvas flex flex-col"
+        style={{ width: leftWidth }}
+      >
         <ProjectTree
           projects={projects}
           tasks={allTasks}
@@ -112,6 +120,14 @@ export function ProjectsClient({
             从模板创建
           </button>
         </div>
+      </div>
+
+      {/* 分隔条 */}
+      <div
+        className="w-[6px] cursor-col-resize hover:bg-primary/30 active:bg-primary/50 shrink-0 flex items-center justify-center border-x border-hairline"
+        onMouseDown={handleMouseDown}
+      >
+        <span className="text-[10px] text-muted-foreground select-none leading-none">⋮</span>
       </div>
 
       {/* 右侧详情面板 */}
