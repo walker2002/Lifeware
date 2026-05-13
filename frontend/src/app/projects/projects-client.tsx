@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { ProjectTree } from "@/components/projects/project-tree"
 import { DetailPanel } from "@/components/projects/detail-panel"
