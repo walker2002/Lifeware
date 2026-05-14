@@ -1,20 +1,37 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.0.0 → 1.1.0
-  Rationale: MINOR — added Document Ownership Model section; updated Document Authority
-  Chain to reflect new directory structure (document/ → mydocs/ + docs/).
+  Version change: 1.1.0 → 1.2.0
+  Rationale: MINOR — material expansion of architecture guidance based on
+  APP框架重要调整20260514: Intent Engine two-phase model, Domain manifest
+  self-description (intent_triggers + lifecycle), State Machine as generic
+  lifecycle executor, AI Markdown workflow.
 
-  Modified principles: none
+  Modified principles:
+    - I.  Intent-Driven → expanded with two-phase processing model,
+          bounded classification routing, three input methods, Markdown workflow
+    - III. Single-Writer Invariant → State Machine row updated to reflect
+          generic lifecycle executor role
+    - VI.  Domain Plugin Passivity → added manifest self-description
+          capabilities (intent_triggers, lifecycle)
+    - VIII. AI/Rule Boundary → clarified two-phase Intent Engine model
+          (Phase A interpretive, Phase B contract)
+
   Added sections:
-    - Document Ownership Model (three-tier: user-owned, co-maintained, auto-maintained)
+    - Architecture Constraints > Domain Manifest Self-Description
+
+  Updated sections:
+    - Architecture Constraints > Orchestrator Purity → added cross-Domain
+      intent splitting responsibility
 
   Templates requiring updates:
     - .specify/templates/plan-template.md       ✅ no changes needed
     - .specify/templates/spec-template.md        ✅ no changes needed
     - .specify/templates/tasks-template.md       ✅ no changes needed
 
-  Follow-up TODOs: None
+  Follow-up TODOs:
+    - mydocs/core/LW_overall_总体设计_2026_05_02.md needs corresponding updates
+      to Sections 3.2, 3.3, 3.5, 4.3
 -->
 
 # Lifeware Constitution
@@ -29,13 +46,41 @@ including those originating from the Bridge Layer. The Action Surface
 Engine is the **sole output channel**. No component may bypass this
 intent-to-action pipeline.
 
+Intent Engine processing has two distinct phases:
+
+- **Phase A (Routing)**: A bounded classification task that maps user
+  input to a `(targetDomain, action)` pair with confidence score.
+  This is "interpretive execution" — AI MUST participate. Domain
+  manifests provide `intent_triggers` as structured routing context.
+  The output space is bounded: only registered Domain actions are
+  candidates. Low confidence triggers user clarification.
+- **Phase B (Field Completion)**: A structured extraction task that
+  populates `StructuredIntent` fields from user input and Domain
+  `required_fields`. This is "contract execution" — output types are
+  determined. AI assists but the result is deterministic.
+
+Users may submit intent through three input methods: natural language
+(default path through both phases), slash shortcuts (`/domain:action`,
+fast path skipping Phase A with confidence = 1.0), or function menu
+(direct template form). Slash shortcuts and function menu enter
+Phase B directly.
+
+For complex create/plan operations, an AI Markdown workflow is
+supported: AI generates Markdown from Domain-defined templates and
+user attachments, user edits collaboratively, Intent Engine parses
+confirmed Markdown into `StructuredIntent`(s) following the standard
+Nexus chain. Cross-Domain batch processing from a single Markdown is
+deferred to post-MVP.
+
 **Rationale**: Ensures every system mutation is traceable to a user
-intention, enabling unified conflict detection, audit logging, and
-coaching feedback.
+intention. The two-phase model separates AI-dependent classification
+from deterministic field extraction, enabling clear testing boundaries
+and graceful degradation (Phase A failure → template form fallback).
 
 **How to apply**: Any new write path MUST route through Intent Engine.
 UI components MUST NOT directly call State Machine or Repository
-write methods.
+write methods. Domain manifests MUST include `intent_triggers` for
+Phase A routing context.
 
 ### II. Energy-First Scheduling
 
@@ -57,7 +102,7 @@ usurp their responsibilities:
 
 | Component | Exclusive Authority |
 |---|---|
-| State Machine | System state writes (accepts only StateProposal from Orchestrator or time triggers) |
+| State Machine | System state writes; generic lifecycle executor that validates transitions against Domain manifest `lifecycle` declarations (accepts only StateProposal from Orchestrator or time triggers) |
 | Memory Framework | Memory writes (all levels L1–L5); Derived Signals as the sole read interface for external consumers |
 | Intent Engine | Intent parsing and StructuredIntent production |
 | Action Surface Engine | Output presentation (Action Guide, Dynamic Tile, Continuity Cue) |
@@ -119,12 +164,30 @@ model:
 
 Domain return values MUST use `USOM_ID` references, not full objects.
 
+Domain manifests MUST include two self-description declarations:
+
+1. `intent_triggers`: Structured routing context for Intent Engine
+   Phase A (action name, description, examples, keywords, signals,
+   excludes). Enables bounded classification without hard-coding
+   routing logic into Intent Engine.
+2. `lifecycle`: Object lifecycle definitions and state transition
+   rules (from → to, trigger type `'intent'|'time'`, irreversible
+   states). Enables State Machine to validate transitions generically
+   without per-Domain business knowledge.
+
+These are passive declarations, not execution capabilities. They do
+not violate Domain passivity.
+
 **Rationale**: Keeps domains composable and testable. Prevents
 cross-domain coupling and ensures the Orchestrator remains the sole
-workflow coordinator.
+workflow coordinator. Manifest self-description prevents coupling
+leakage into Nexus components.
 
 **How to apply**: Each domain plugin file MUST implement only the four
-hooks. Any state-mutating code inside a domain is a violation.
+hooks. Any state-mutating code inside a domain is a violation. Domain
+manifests MUST include `intent_triggers` and `lifecycle` declarations.
+Adding a new Domain MUST NOT require modifying Intent Engine routing
+logic or State Machine transition rules.
 
 ### VII. Bridge Layer Readiness
 
@@ -149,21 +212,30 @@ Request/Response objects. Any HTTP-aware type in Nexus is a violation.
 ### VIII. AI/Rule Boundary
 
 AI handles ambiguity; rules handle certainty. AI participates in Intent
-Engine (parsing), Presentation (report generation), and Domain Plugin
-(domain-specific logic). AI MUST NOT participate in Rule Engine, State
-Machine, or time-conflict detection. AI generates proposals — it NEVER
-directly writes system state.
+Engine Phase A (routing classification) and Phase B (field extraction),
+Presentation (report generation), and Domain Plugin (domain-specific
+logic). AI MUST NOT participate in Rule Engine, State Machine, or
+time-conflict detection. AI generates proposals — it NEVER directly
+writes system state.
+
+The Intent Engine two-phase model enforces this boundary: Phase A
+(routing) is interpretive and AI-dependent; Phase B (field completion)
+and all subsequent stages are contract-type execution where AI assists
+but output types are predetermined. Once `StructuredIntent` is formed,
+the pipeline is fully deterministic.
 
 When AI fails, the Intent Engine MUST degrade gracefully to template-form
 fallback, producing an equivalent `StructuredIntent`.
 
 **Rationale**: Deterministic rules ensure safety invariants (energy
 mismatch, WIP limits). AI provides flexibility where rules cannot
-cover all cases. Keeping the boundary explicit prevents ambiguous
-responsibility.
+cover all cases. The two-phase model makes the boundary explicit and
+testable at each phase transition.
 
 **How to apply**: Rule Engine files MUST NOT import AI/LLM SDKs. Intent
 Engine files MUST include a non-AI fallback path tested independently.
+Phase A and Phase B MUST have separate test suites — Phase A tests
+routing accuracy, Phase B tests field extraction completeness.
 
 ## Architecture Constraints
 
@@ -204,7 +276,27 @@ architectural violation.
 
 The Orchestrator is a pure dispatcher. It MUST NOT contain business
 logic, write state, or participate in AI calls. It handles exceptions,
-retries, and human-decision pause points only.
+retries, human-decision pause points, and cross-Domain intent
+splitting (sequential processing of multiple `StructuredIntent`s
+derived from a single user input) only.
+
+### Domain Manifest Self-Description
+
+Domain manifests MUST declare two structured fields enabling Nexus
+components to operate generically without per-Domain hard-coding:
+
+| Field | Consumer | Purpose |
+|---|---|---|
+| `intent_triggers` | Intent Engine (Phase A) | Bounded classification context for routing user input to Domain actions |
+| `lifecycle` | State Machine | Object lifecycle definitions and transition rules for validating state changes |
+
+These declarations MUST be structured (not free-form text) to enable
+deterministic processing. Adding a new Domain MUST NOT require
+modifying Nexus components — only registering new manifest declarations.
+
+**Rationale**: Prevents coupling leakage between State Machine and
+Domain-specific lifecycle rules. State Machine is a generic executor;
+Domain manifests are the business knowledge source.
 
 ## Methodology Governance
 
@@ -323,4 +415,4 @@ docs/database-design.md         (physical schema — Tier 2)
 Drizzle Schema Code             (implementation)
 ```
 
-**Version**: 1.1.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-02
+**Version**: 1.2.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-14
