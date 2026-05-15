@@ -40,9 +40,8 @@ requiredFields:
 
 # Events this domain subscribes to (handles via onEvent)
 subscribedEvents:
-  - TimeBoxStarted
-  - TimeBoxEnded
-  - HabitCompleted
+  - TimeboxStarted
+  - TimeboxEnded
   - ProjectCreated
   - ProjectActivated
   - ProjectPaused
