@@ -2,8 +2,8 @@
 # Defines the Tasks domain capabilities and boundaries
 
 id: tasks-domain
-name: Tasks
-version: 1.0.0
+name: Tasks & Projects
+version: 1.1.0
 
 # Supported intents that this domain can handle
 supportedIntents:
@@ -12,6 +12,9 @@ supportedIntents:
   - CompleteTask
   - ArchiveTask
   - ScheduleTask
+  - CreateProject
+  - UpdateProject
+  - ArchiveProject
 
 # Required fields for each intent (validation by Intent Engine)
 requiredFields:
@@ -28,12 +31,28 @@ requiredFields:
     - taskId
     - startTime
     - endTime
+  CreateProject:
+    - name
+    - optional: [description, priority, startDate, endDate, color]
+  UpdateProject:
+    - projectId
+    - optional: [name, description, priority, startDate, endDate, color, status]
 
 # Events this domain subscribes to (handles via onEvent)
 subscribedEvents:
   - TimeBoxStarted
   - TimeBoxEnded
   - HabitCompleted
+  - ProjectCreated
+  - ProjectActivated
+  - ProjectPaused
+  - ProjectResumed
+  - ProjectCompleted
+  - ProjectArchived
+  - TaskCreated
+  - TaskActivated
+  - TaskCompleted
+  - TaskArchived
 
 # Action surface templates for Action Surface Engine
 actionSurfaceTemplates:
@@ -49,6 +68,10 @@ actionSurfaceTemplates:
     type: tile
     template: "完成任务"
     weight: 100
+  - intent: CreateProject
+    type: guide
+    template: "创建新项目"
+    weight: 70
 
 # Outbound connectors (optional, MVP not implemented)
 outboundConnectors:
