@@ -30,9 +30,12 @@ const PROJECT_TRANSITIONS: Record<string, string[]> = {
 
 const tasksManifest: DomainManifest = {
   domainId: 'tasks',
-  version: '1.0.0',
+  version: '1.1.0',
   requiredFields: ['name'],
   subscribedEvents: [
+    'TimeBoxStarted',
+    'TimeBoxEnded',
+    'HabitCompleted',
     'ProjectCreated',
     'ProjectActivated',
     'ProjectPaused',
