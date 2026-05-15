@@ -87,7 +87,7 @@ export type ReviewStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
 export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
 
 // ─── Domain & Action Types ─────────────────────────────────────
-export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review' | 'projects'
+export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review'
 export type ActionCategory = 'guide' | 'tile' | 'cue'
 export type ActionType =
   | 'log_habit'
