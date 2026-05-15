@@ -1,37 +1,30 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.1.0 → 1.2.0
-  Rationale: MINOR — material expansion of architecture guidance based on
-  APP框架重要调整20260514: Intent Engine two-phase model, Domain manifest
-  self-description (intent_triggers + lifecycle), State Machine as generic
-  lifecycle executor, AI Markdown workflow.
+  Version change: 1.2.0 → 1.3.0
+  Rationale: MINOR — new Architecture Constraint section (Domain Registration
+  Process) and expanded governance references based on the Domain Registration
+  Guide (LW_domain_注册指南_2026_05_14.md).
 
   Modified principles:
-    - I.  Intent-Driven → expanded with two-phase processing model,
-          bounded classification routing, three input methods, Markdown workflow
-    - III. Single-Writer Invariant → State Machine row updated to reflect
-          generic lifecycle executor role
-    - VI.  Domain Plugin Passivity → added manifest self-description
-          capabilities (intent_triggers, lifecycle)
-    - VIII. AI/Rule Boundary → clarified two-phase Intent Engine model
-          (Phase A interpretive, Phase B contract)
+    - VI. Domain Plugin Passivity → added reference to Registration Guide
+          for complete manifest requirements (six blocks A–F)
 
   Added sections:
-    - Architecture Constraints > Domain Manifest Self-Description
+    - Architecture Constraints > Domain Registration Process (new)
+      Codifies the 8-step mandatory registration process, page component
+      data access rules, and Nexus inviolability boundary.
 
   Updated sections:
-    - Architecture Constraints > Orchestrator Purity → added cross-Domain
-      intent splitting responsibility
+    - Governance > Document Authority Chain → added Domain Registration
+      Guide between Constitution and 总体设计
 
   Templates requiring updates:
     - .specify/templates/plan-template.md       ✅ no changes needed
     - .specify/templates/spec-template.md        ✅ no changes needed
     - .specify/templates/tasks-template.md       ✅ no changes needed
 
-  Follow-up TODOs:
-    - mydocs/core/LW_overall_总体设计_2026_05_02.md needs corresponding updates
-      to Sections 3.2, 3.3, 3.5, 4.3
+  Follow-up TODOs: none
 -->
 
 # Lifeware Constitution
@@ -178,16 +171,25 @@ Domain manifests MUST include two self-description declarations:
 These are passive declarations, not execution capabilities. They do
 not violate Domain passivity.
 
+In addition to `intent_triggers` and `lifecycle`, manifests MUST
+include the complete six-block structure defined in the Domain
+Registration Guide: field metadata (C), list actions (D),
+required fields and templates (E), and event subscriptions (F).
+Each block serves a distinct consumer (Presentation Layer, Intent
+Engine, Event Bus) and MUST NOT be omitted.
+
 **Rationale**: Keeps domains composable and testable. Prevents
 cross-domain coupling and ensures the Orchestrator remains the sole
 workflow coordinator. Manifest self-description prevents coupling
-leakage into Nexus components.
+leakage into Nexus components. Complete six-block manifests ensure
+every consumer has the data it needs without ad-hoc code.
 
 **How to apply**: Each domain plugin file MUST implement only the four
 hooks. Any state-mutating code inside a domain is a violation. Domain
-manifests MUST include `intent_triggers` and `lifecycle` declarations.
-Adding a new Domain MUST NOT require modifying Intent Engine routing
-logic or State Machine transition rules.
+manifests MUST include all six blocks (A–F). Adding a new Domain
+MUST NOT require modifying Intent Engine routing logic or State Machine
+transition rules. Refer to `mydocs/core/LW_domain_注册指南_2026_05_14.md`
+for the complete step-by-step registration process.
 
 ### VII. Bridge Layer Readiness
 
@@ -297,6 +299,58 @@ modifying Nexus components — only registering new manifest declarations.
 **Rationale**: Prevents coupling leakage between State Machine and
 Domain-specific lifecycle rules. State Machine is a generic executor;
 Domain manifests are the business knowledge source.
+
+### Domain Registration Process
+
+All new Domains MUST follow the mandatory 8-step registration process
+defined in `mydocs/core/LW_domain_注册指南_2026_05_14.md`. This
+section codifies the architectural invariants enforced by that process.
+
+**Mandatory registration steps**:
+
+1. Declare new USOM object types (if any) in USOM documentation
+2. Write `manifest.yaml` with all six blocks (A–F)
+3. Implement four hook functions (pure functions, no side effects)
+4. Define Drizzle DB Schema
+5. Implement Repository interface
+6. Implement Domain page components (view_routes)
+7. Register Domain in `domains/registry.ts`
+8. Implement Markdown templates (optional)
+
+**Nexus inviolability**: If completing any step requires modifying Nexus
+core components (Intent Engine, Rule Engine, State Machine, Action
+Surface Engine, Orchestrator), the boundary is broken. Stop and discuss
+before proceeding. The only permitted Nexus modification is adding a new
+object's Summary to `ContextSnapshot` — this is a legitimate aggregation
+need, not coupling leakage.
+
+**Page component data access rules**:
+
+| Operation Type | Path | Rationale |
+|---|---|---|
+| Read (list, detail) | Repository directly | No state mutation, Rule Engine has no value |
+| Write (create, update, delete, lifecycle) | `PrebuiltIntent` → Nexus chain | All state mutations must traverse full chain for consistency |
+
+Page components MUST NOT:
+- Directly call hook functions from `hooks.ts`
+- Directly import Drizzle schema or `db/` modules
+- Bypass Repository interface for data access
+
+**Manifest completeness**: Every registered Domain MUST have a
+`manifest.yaml` containing all six blocks. Incomplete manifests
+(block C–F omitted) are a registration violation and MUST be resolved
+before the Domain is considered production-ready.
+
+**Rationale**: The registration process ensures every Domain is
+self-contained, fully declared, and operates within Nexus boundaries
+without requiring Nexus modifications. This is the operational
+foundation for Domain Plugin Passivity (VI) and the Single-Writer
+Invariant (III).
+
+**How to apply**: Before implementing any new Domain, read the
+Registration Guide in full. Verify each step's checklist before
+proceeding to the next. The guide is the authoritative reference;
+this constitution codifies the architectural invariants it enforces.
 
 ## Methodology Governance
 
@@ -408,6 +462,8 @@ Lifeware Constitution           (architectural governance — Tier 3)
     ↓
 mydocs/core/总体设计             (overall design constraints — Tier 1)
     ↓
+mydocs/core/Domain注册指南       (Domain development process — Tier 1)
+    ↓
 docs/usom-design.md             (object model definitions — Tier 2)
     ↓
 docs/database-design.md         (physical schema — Tier 2)
@@ -415,4 +471,9 @@ docs/database-design.md         (physical schema — Tier 2)
 Drizzle Schema Code             (implementation)
 ```
 
-**Version**: 1.2.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-14
+The Domain Registration Guide (`mydocs/core/LW_domain_注册指南_*`)
+is a Tier 1 document and required reading for all Domain development.
+It provides the concrete step-by-step process that operationalizes the
+architectural invariants defined in this constitution.
+
+**Version**: 1.3.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-15
