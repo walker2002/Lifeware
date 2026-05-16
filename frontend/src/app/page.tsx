@@ -6,11 +6,11 @@ import { TilesBanner } from "@/components/layout/tiles-banner";
 import { IntentInput } from "@/components/intent-input";
 import { IntentForm } from "@/components/intent-form";
 import type { TemplateFormFields } from "@/components/intent-form";
-import { DateNav } from "@/components/timebox/date-nav";
-import type { DateViewMode } from "@/components/timebox/types";
-import { DayView } from "@/components/timebox/day-view";
-import { WeekView } from "@/components/timebox/week-view";
-import { MonthView } from "@/components/timebox/month-view";
+import { DateNav } from "@/domains/timebox/components/date-nav";
+import type { DateViewMode } from "@/domains/timebox/components/types";
+import { DayView } from "@/domains/timebox/components/day-view";
+import { WeekView } from "@/domains/timebox/components/week-view";
+import { MonthView } from "@/domains/timebox/components/month-view";
 import { TracePanel } from "@/components/trace-panel";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
@@ -22,10 +22,10 @@ import { Button } from "@/components/ui/button";
 import { ExecutionLogDialog } from "@/components/execution-log-dialog";
 import type { ExecutionRecord } from "@/usom/types/objects";
 import { useAutoTrigger } from "@/hooks/use-auto-trigger";
-import { HabitLibraryView } from "@/components/habit-library-view";
-import { HabitTemplateManager } from "@/components/habit-template-manager";
-import { OKRWorkspace } from "@/components/okr/okr-workspace";
-import { ProjectsView } from "@/components/projects/projects-view";
+import { HabitLibraryView } from "@/domains/habits/components/habit-library-view";
+import { HabitTemplateManager } from "@/domains/habits/components/habit-template-manager";
+import { OKRWorkspace } from "@/domains/okrs/components/okr-workspace";
+import { ProjectsView } from "@/domains/tasks/components/projects-view";
 import {
   startOfDay, endOfDay,
   startOfWeek, endOfWeek,

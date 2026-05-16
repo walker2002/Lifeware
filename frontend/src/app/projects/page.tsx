@@ -1,6 +1,6 @@
-import { ProjectRepository } from "@/lib/db/repositories/project.repository"
-import { TaskRepository } from "@/lib/db/repositories/task.repository"
-import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
+import { ProjectRepository } from "@/domains/tasks/repository/project"
+import { TaskRepository } from "@/domains/tasks/repository/task"
+import { TaskTemplateRepository } from "@/domains/tasks/repository/task-template"
 import { ProjectsClient } from "./projects-client"
 
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"

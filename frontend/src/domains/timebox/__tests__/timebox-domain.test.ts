@@ -372,7 +372,7 @@ describe('Timebox Domain Plugin — manifest', () => {
     const events = timeboxPlugin.manifest.subscribedEvents
     expect(events).toContain('TimeboxCreated')
     expect(events).toContain('TimeboxStarted')
-    expect(events).toContain('TimeboxPaused')
+    expect(events).toContain('TimeboxOvertime')
     expect(events).toContain('TimeboxEnded')
     expect(events).toContain('TimeboxLogged')
   })

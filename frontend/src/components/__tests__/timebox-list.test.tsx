@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { TimeboxList } from "../timebox-list";
+import { TimeboxList } from "@/domains/timebox/components/timebox-list";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 
 // ─── 测试数据 ───────────────────────────────────────────────────

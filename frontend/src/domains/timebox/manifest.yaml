@@ -1,19 +1,184 @@
-# Domain Manifest - Timebox
-# 与 index.ts 中 timeboxManifest 保持一致
+# Domain Manifest - Timebox (六区块完整版)
+# 遵循 Domain 注册指南 manifest.yaml 模板
 
 id: timebox
+version: 1.0.0
 name: Timebox
-version: 0.1.0
+description: 时间盒管理 — 将时间结构化为可执行的专注单元
 
-requiredFields:
-  create_timebox:
-    - title
-    - startTime
-    - duration
+# ─── 区块 A: intent_triggers ─────────────────────────────────────
+intent_triggers:
+  - action: createTimebox
+    description: 创建一个新的时间盒
+    examples:
+      - 帮我创建一个时间盒
+      - 明天9点安排1小时专注写作
+      - 下午2点到3点做代码审查
+    keywords: [时间盒, timebox, 安排, 计划, 专注]
+  - action: startTimebox
+    description: 开始执行一个时间盒
+    examples:
+      - 开始这个时间盒
+      - 启动专注时间
+    keywords: [开始, 启动, start]
+  - action: endTimebox
+    description: 结束当前时间盒
+    examples:
+      - 结束时间盒
+      - 完成这个专注时段
+    keywords: [结束, 完成, end]
+  - action: cancelTimebox
+    description: 取消一个计划中的时间盒
+    examples:
+      - 取消这个时间盒
+    keywords: [取消, cancel]
+  - action: logTimebox
+    description: 记录时间盒的执行结果
+    examples:
+      - 记录执行结果
+      - 这个时间盒完成度80%
+    keywords: [记录, log]
+  - action: viewSchedule
+    description: 查看今日时间盒日程
+    examples:
+      - 查看今天的日程
+      - 今天有什么安排
+    keywords: [日程, schedule, 安排, 今天]
+    view_route: /schedule
 
-subscribedEvents:
+# ─── 区块 B: lifecycle ───────────────────────────────────────────
+lifecycle:
+  timebox:
+    states: [planned, running, overtime, ended, cancelled, logged]
+    initial_state: planned
+    transitions:
+      - from: null
+        to: planned
+        trigger: intent
+        action: create
+        event_type: TimeboxCreated
+      - from: planned
+        to: running
+        trigger: intent
+        action: start
+        event_type: TimeboxStarted
+      - from: running
+        to: ended
+        trigger: intent
+        action: end
+        event_type: TimeboxEnded
+      - from: running
+        to: overtime
+        trigger: time
+        action: overtime
+        event_type: TimeboxOvertime
+      - from: overtime
+        to: ended
+        trigger: intent
+        action: end
+        event_type: TimeboxEnded
+      - from: planned
+        to: cancelled
+        trigger: intent
+        action: cancel
+        event_type: TimeboxCancelled
+      - from: ended
+        to: logged
+        trigger: intent
+        action: log
+        event_type: TimeboxLogged
+    terminal_states: [cancelled, logged]
+
+# ─── 区块 C: field_metadata ──────────────────────────────────────
+field_metadata:
+  title:
+    type: string
+    label: 标题
+    required: true
+  startTime:
+    type: time
+    label: 开始时间
+    required: true
+  duration:
+    type: number
+    label: 时长（分钟）
+    required: true
+  endTime:
+    type: time
+    label: 结束时间
+    required: false
+  startedAt:
+    type: lifecycle_timestamp
+    label: 实际开始时间
+    required: false
+  endedAt:
+    type: lifecycle_timestamp
+    label: 实际结束时间
+    required: false
+  overtimeAt:
+    type: lifecycle_timestamp
+    label: 超时标记时间
+    required: false
+  taskIds:
+    type: json
+    label: 关联任务
+    required: false
+  habitIds:
+    type: json
+    label: 关联习惯
+    required: false
+  executionRecord:
+    type: json
+    label: 执行记录
+    required: false
+
+# ─── 区块 D: list_actions ────────────────────────────────────────
+list_actions:
+  - action: start
+    label: 开始
+    confirm_required: false
+  - action: end
+    label: 结束
+    confirm_required: false
+  - action: cancel
+    label: 取消
+    confirm_required: true
+  - action: log
+    label: 记录结果
+    confirm_required: false
+
+# ─── 区块 E: required_fields + templates ─────────────────────────
+required_fields:
+  createTimebox:
+    - name: title
+      label: 标题
+      type: text
+      required: true
+      placeholder: 例如：专注写作
+    - name: startTime
+      label: 开始时间
+      type: time
+      required: true
+    - name: duration
+      label: 时长（分钟）
+      type: number
+      required: true
+      default_value: 60
+  logTimebox:
+    - name: completionRate
+      label: 完成度
+      type: number
+      required: false
+    - name: energyLevel
+      label: 能量水平
+      type: number
+      required: false
+
+# ─── 区块 F: subscribed_events ───────────────────────────────────
+subscribed_events:
   - TimeboxCreated
   - TimeboxStarted
-  - TimeboxPaused
+  - TimeboxOvertime
   - TimeboxEnded
+  - TimeboxCancelled
   - TimeboxLogged

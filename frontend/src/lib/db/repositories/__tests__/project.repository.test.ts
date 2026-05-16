@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ProjectRepository } from '../project.repository'
+import { ProjectRepository } from '../../../../domains/tasks/repository/project'
 import { Priority } from '../../../../usom/types/primitives'
 
 // Mock db

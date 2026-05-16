@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
-import { ProjectTree } from "@/components/projects/project-tree"
-import { DetailPanel } from "@/components/projects/detail-panel"
-import { TaskImportDialog } from "@/components/projects/task-import-dialog"
-import { TemplateDialog } from "@/components/projects/template-dialog"
+import { ProjectTree } from "@/domains/tasks/components/project-tree"
+import { DetailPanel } from "@/domains/tasks/components/detail-panel"
+import { TaskImportDialog } from "@/domains/tasks/components/task-import-dialog"
+import { TemplateDialog } from "@/domains/tasks/components/template-dialog"
 import {
   createProject, createTask, updateProject, updateTaskStatus,
   updateProjectStatus, saveProjectAsTemplate, importTasks, applyTemplate,

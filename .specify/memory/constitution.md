@@ -1,30 +1,25 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.2.0 → 1.3.0
-  Rationale: MINOR — new Architecture Constraint section (Domain Registration
-  Process) and expanded governance references based on the Domain Registration
-  Guide (LW_domain_注册指南_2026_05_14.md).
-
-  Modified principles:
-    - VI. Domain Plugin Passivity → added reference to Registration Guide
-          for complete manifest requirements (six blocks A–F)
+  Version change: 1.3.0 → 1.4.0
+  Rationale: MINOR — new Architecture Constraint section (Manifest Runtime
+  Consumption) codifying that manifest.yaml is runtime configuration, not
+  development-time documentation. Prevents AI code generation from
+  hardcoding manifest values as constants.
 
   Added sections:
-    - Architecture Constraints > Domain Registration Process (new)
-      Codifies the 8-step mandatory registration process, page component
-      data access rules, and Nexus inviolability boundary.
+    - Architecture Constraints > Manifest Runtime Consumption (new)
+      Three concrete rules, hardcoding detection code smells, and
+      enforcement guidance for runtime manifest consumption.
 
-  Updated sections:
-    - Governance > Document Authority Chain → added Domain Registration
-      Guide between Constitution and 总体设计
+  Follow-up documents requiring updates:
+    - mydocs/core/LW_domain_注册指南_2026_05_14.md  ⚠ pending update
+    - .specify/templates/plan-template.md            ✅ no changes needed
+    - .specify/templates/spec-template.md             ✅ no changes needed
+    - .specify/templates/tasks-template.md            ✅ no changes needed
 
-  Templates requiring updates:
-    - .specify/templates/plan-template.md       ✅ no changes needed
-    - .specify/templates/spec-template.md        ✅ no changes needed
-    - .specify/templates/tasks-template.md       ✅ no changes needed
-
-  Follow-up TODOs: none
+  Follow-up TODOs: update Domain Registration Guide Step 2 and Step 7
+  to include runtime consumption guidance.
 -->
 
 # Lifeware Constitution
@@ -300,6 +295,54 @@ modifying Nexus components — only registering new manifest declarations.
 Domain-specific lifecycle rules. State Machine is a generic executor;
 Domain manifests are the business knowledge source.
 
+### Manifest Runtime Consumption
+
+`manifest.yaml` is a **runtime configuration artifact**, not a
+development-time reference document. Its values MUST be loaded and
+consumed at runtime through the Domain registry — never duplicated as
+hardcoded constants in source code.
+
+**Concrete rules**:
+
+1. **Nexus components MUST read manifest values from the registry at
+   runtime.** If Intent Engine needs to know available actions, it MUST
+   query the manifest registry — not maintain a parallel
+   `SUPPORTED_ACTIONS` constant. If State Machine needs lifecycle rules,
+   it MUST load them from the manifest's `lifecycle` block.
+
+2. **AI code generation MUST treat manifest content as configuration to
+   be loaded, not as documentation to be duplicated.** When generating
+   Domain scaffolding, AI MUST emit code that reads from the manifest
+   via the registry — not code that hardcodes manifest values (action
+   names, lifecycle states, field lists) into TypeScript constants.
+
+3. **The manifest is the single source of truth** for its declared
+   blocks (A–F). Any component needing data from a manifest block MUST
+   obtain it through the manifest loading mechanism, not through code
+   that duplicates the same data.
+
+**Hardcoding detection — code smells indicating violation**:
+
+- A constant array of action names that mirrors `manifest.yaml`
+  `intent_triggers`
+- A state transition map in TypeScript that duplicates `manifest.yaml`
+  `lifecycle`
+- A field validation list in code that copies `manifest.yaml`
+  `required_fields`
+- Inline string literals matching manifest values used for comparison
+  instead of reading from the loaded manifest
+
+**Rationale**: When manifest content is hardcoded, changes to the
+manifest have no effect until the code is also updated, defeating the
+purpose of a declarative manifest. Runtime consumption ensures manifest
+changes take effect immediately, keeping Nexus truly generic and
+enabling zero-code Domain configuration updates.
+
+**How to apply**: Code reviews MUST reject PRs where manifest-derived
+values are duplicated as constants. The Domain registry MUST expose
+manifest data through accessor methods. AI assistants generating Domain
+code MUST generate registry reads, not value copies.
+
 ### Domain Registration Process
 
 All new Domains MUST follow the mandatory 8-step registration process
@@ -476,4 +519,4 @@ is a Tier 1 document and required reading for all Domain development.
 It provides the concrete step-by-step process that operationalizes the
 architectural invariants defined in this constitution.
 
-**Version**: 1.3.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-15
+**Version**: 1.4.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-16

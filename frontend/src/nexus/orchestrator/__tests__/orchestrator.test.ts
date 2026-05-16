@@ -343,6 +343,11 @@ function createMockHabitRepo() {
     findByUserId: vi.fn().mockResolvedValue([]),
     findActive: vi.fn().mockResolvedValue([]),
     findByFrequency: vi.fn().mockResolvedValue([]),
+    calculateStreak: vi.fn().mockResolvedValue(0),
+    calculateLongestStreak: vi.fn().mockResolvedValue(0),
+    calculateCompletion7d: vi.fn().mockResolvedValue(0),
+    updateMetrics: vi.fn().mockResolvedValue(undefined),
+    checkReferences: vi.fn().mockResolvedValue({ habitLogs: 0, templateHabits: 0, timeboxHabits: 0, hasReferences: false }),
     create: vi.fn().mockImplementation(async (data) => ({
       id: 'habit-new-001' as USOM_ID,
       status: 'draft' as const,
@@ -373,7 +378,6 @@ function createMockHabitRepo() {
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
-    checkReferences: vi.fn().mockResolvedValue({ habitLogs: 0, templateHabits: 0, timeboxHabits: 0, hasReferences: false }),
   }
 }
 
@@ -422,7 +426,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
     })
 
     // Act
-    const result = await orchestrator.executeHabitIntent(habitIntent, userId)
+    const result = await orchestrator.executeIntent(habitIntent, userId)
 
     // Assert: 成功
     expect(result.success).toBe(true)
@@ -461,7 +465,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
     })
 
     // Act
-    const result = await orchestrator.executeHabitIntent(habitIntent, userId)
+    const result = await orchestrator.executeIntent(habitIntent, userId)
 
     // Assert
     expect(result.success).toBe(false)
@@ -524,7 +528,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
     }
 
     // Act
-    const result = await orchestrator.executeHabitIntent(activateIntent, userId)
+    const result = await orchestrator.executeIntent(activateIntent, userId)
 
     // Assert
     expect(result.success).toBe(true)
@@ -567,7 +571,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
     }
 
     // Act
-    const result = await orchestrator.executeHabitIntent(intent, userId)
+    const result = await orchestrator.executeIntent(intent, userId)
 
     // Assert
     expect(result.success).toBe(false)
@@ -624,7 +628,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
     }
 
     // Act
-    const result = await orchestrator.executeHabitIntent(intent, userId)
+    const result = await orchestrator.executeIntent(intent, userId)
 
     // Assert
     expect(result.success).toBe(false)
@@ -864,5 +868,458 @@ describe('createOrchestrator — applyTemplate', () => {
     // 绝对不能是 Z 后缀（会导致 UTC+8 时区错位 8 小时）
     expect(tb.startTime).not.toContain('T07:30:00Z')
     expect(tb.endTime).not.toContain('T08:00:00Z')
+  })
+})
+
+// ─── Phase 7: executeIntent 统一入口测试 ──────────────────────────
+describe('Orchestrator — executeIntent 统一入口', () => {
+  const userId = 'user-001' as USOM_ID
+
+  it('不应暴露 executeHabitIntent 方法', () => {
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('pass')
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    expect((orchestrator as Record<string, unknown>).executeHabitIntent).toBeUndefined()
+  })
+
+  it('不应暴露 executeOKRIntent 方法', () => {
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('pass')
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    expect((orchestrator as Record<string, unknown>).executeOKRIntent).toBeUndefined()
+  })
+
+  it('executeIntent 应暴露为方法', () => {
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('pass')
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    expect(typeof orchestrator.executeIntent).toBe('function')
+  })
+
+  it('executeIntent 对 habits 域 createIntent 应调用 onValidate 并返回成功', async () => {
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('pass')
+
+    const habitIntent: StructuredIntent = {
+      id: 'intent-h-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'habits',
+      action: 'createHabit',
+      fields: {
+        title: '每日冥想',
+        defaultTime: '07:00',
+        earliestTime: '06:00',
+        latestStartTime: '08:00',
+        defaultDuration: 30,
+        minDuration: 10,
+        trackable: true,
+        frequencyType: 'daily',
+        startDate: '2026-05-15',
+      },
+      confidence: 0.9,
+      resolvedBy: 'ai',
+      createdAt: '2026-05-15T08:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+      habitRepo: createMockHabitRepo(),
+    })
+
+    const result = await orchestrator.executeIntent(habitIntent, userId)
+
+    expect(result.success).toBe(true)
+    // 应该调用了 rule engine
+    expect(ruleEngine.evaluate).toHaveBeenCalled()
+  })
+
+  it('executeIntent 对 timebox 域 create_timebox 应成功创建', async () => {
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('pass')
+
+    const timeboxIntent: StructuredIntent = {
+      id: 'intent-tb-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'timebox',
+      action: 'create_timebox',
+      fields: {
+        title: '专注工作',
+        startTime: '2026-05-15T09:00:00Z',
+        duration: 120,
+        endTime: '2026-05-15T11:00:00Z',
+        taskIds: [],
+        habitIds: [],
+        isRecurring: false,
+        tags: [],
+      },
+      confidence: 0.95,
+      resolvedBy: 'ai',
+      createdAt: '2026-05-15T08:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo,
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+    })
+
+    const result = await orchestrator.executeIntent(timeboxIntent, userId)
+
+    expect(result.success).toBe(true)
+    expect(result.timebox).toBeDefined()
+    expect(result.timebox!.status).toBe('planned')
+  })
+})
+
+// ─── Tasks 意图分发测试 ─────────────────────────────────────────
+
+/** 创建 mock TaskRepository */
+function createMockTaskRepo() {
+  return {
+    findById: vi.fn().mockResolvedValue(null),
+    findByStatus: vi.fn().mockResolvedValue([]),
+    findByTimebox: vi.fn().mockResolvedValue([]),
+    findActive: vi.fn().mockResolvedValue([]),
+    findByProject: vi.fn().mockResolvedValue([]),
+    findByParent: vi.fn().mockResolvedValue([]),
+    findIndependent: vi.fn().mockResolvedValue([]),
+    findAll: vi.fn().mockResolvedValue([]),
+    findByDateRange: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    updateStatus: vi.fn().mockImplementation(async (id, status) => ({
+      id,
+      status,
+      title: '测试任务',
+      priority: 'medium',
+      energyRequired: 'medium',
+      estimatedDuration: 60,
+      tags: [],
+      createdAt: '2026-05-15T08:00:00Z',
+      updatedAt: new Date().toISOString(),
+    })),
+    bulkCreate: vi.fn().mockImplementation(async (inputs) =>
+      inputs.map((input: Record<string, unknown>, i: number) => ({
+        id: `task-new-${i}` as USOM_ID,
+        status: 'draft',
+        title: input.title,
+        priority: input.priority ?? 'medium',
+        energyRequired: input.energyRequired ?? 'medium',
+        estimatedDuration: input.estimatedDuration ?? 60,
+        tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }))
+    ),
+    archive: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
+/** 创建 mock ProjectRepository */
+function createMockProjectRepo() {
+  return {
+    findById: vi.fn().mockResolvedValue(null),
+    findByUserId: vi.fn().mockResolvedValue([]),
+    findByStatus: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockImplementation(async (input) => ({
+      id: 'project-new-001' as USOM_ID,
+      status: 'planning',
+      name: input.name,
+      description: input.description,
+      priority: input.priority,
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })),
+    update: vi.fn().mockResolvedValue({}),
+    updateStatus: vi.fn().mockImplementation(async (id, status) => ({
+      id,
+      status,
+      name: '测试项目',
+      tags: [],
+      createdAt: '2026-05-15T08:00:00Z',
+      updatedAt: new Date().toISOString(),
+    })),
+    saveAsTemplate: vi.fn().mockResolvedValue({}),
+    delete: vi.fn().mockResolvedValue(undefined),
+    archive: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
+describe('Orchestrator — Tasks 意图分发', () => {
+  const userId = 'user-001' as USOM_ID
+
+  it('createTask 意图 → 调用 taskRepo.bulkCreate 并发布 TaskCreated 事件', async () => {
+    const taskIntent: StructuredIntent = {
+      id: 'intent-task-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'createTask',
+      fields: {
+        title: '完成报告',
+        priority: 'high',
+        energyRequired: 'high',
+        estimatedDuration: 120,
+        projectId: 'proj-001',
+      },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T08:00:00Z',
+    }
+
+    const taskRepo = createMockTaskRepo()
+    const projectRepo = createMockProjectRepo()
+    const ruleEngine = createMockRuleEngine('pass')
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo,
+      intentEngine: createMockIntentEngine(),
+      ruleEngine,
+      taskRepo,
+      projectRepo,
+    })
+
+    const result = await orchestrator.executeIntent(taskIntent, userId)
+
+    expect(result.success).toBe(true)
+    expect(taskRepo.bulkCreate).toHaveBeenCalledWith(
+      [expect.objectContaining({ title: '完成报告', priority: 'high', projectId: 'proj-001' })],
+      userId,
+    )
+    expect(eventRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'TaskCreated' }),
+      userId,
+    )
+  })
+
+  it('completeTask 意图 → 更新任务状态为 completed 并发布事件', async () => {
+    const existingTask = {
+      id: 'task-001' as USOM_ID,
+      status: 'active' as const,
+      title: '测试任务',
+      priority: 'medium' as const,
+      energyRequired: 'medium' as const,
+      estimatedDuration: 60,
+      tags: [],
+      createdAt: '2026-05-15T08:00:00Z',
+      updatedAt: '2026-05-15T08:00:00Z',
+    }
+    const taskRepo = createMockTaskRepo()
+    taskRepo.findById.mockResolvedValue(existingTask)
+    taskRepo.updateStatus.mockResolvedValue({ ...existingTask, status: 'completed', completedAt: '2026-05-15T10:00:00Z' })
+
+    const intent: StructuredIntent = {
+      id: 'intent-complete-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'completeTask',
+      fields: { taskId: 'task-001' },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T09:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo: createMockEventRepo(),
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+      taskRepo,
+    })
+
+    const result = await orchestrator.executeIntent(intent, userId)
+
+    expect(result.success).toBe(true)
+    expect(taskRepo.findById).toHaveBeenCalledWith('task-001', userId)
+    expect(taskRepo.updateStatus).toHaveBeenCalledWith('task-001', 'completed', userId)
+  })
+
+  it('createProject 意图 → 调用 projectRepo.create 并发布 ProjectCreated 事件', async () => {
+    const projectIntent: StructuredIntent = {
+      id: 'intent-proj-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'createProject',
+      fields: {
+        name: '产品重构',
+        description: 'Q3 核心项目',
+        priority: 'high',
+      },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T08:00:00Z',
+    }
+
+    const taskRepo = createMockTaskRepo()
+    const projectRepo = createMockProjectRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo,
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+      taskRepo,
+      projectRepo,
+    })
+
+    const result = await orchestrator.executeIntent(projectIntent, userId)
+
+    expect(result.success).toBe(true)
+    expect(projectRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '产品重构', description: 'Q3 核心项目' }),
+      userId,
+    )
+    expect(eventRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'ProjectCreated' }),
+      userId,
+    )
+  })
+
+  it('archiveProject 意图 → 更新项目状态为 archived', async () => {
+    const existingProject = {
+      id: 'proj-001' as USOM_ID,
+      status: 'completed' as const,
+      name: '已完成项目',
+      tags: [],
+      createdAt: '2026-05-15T08:00:00Z',
+      updatedAt: '2026-05-15T08:00:00Z',
+    }
+    const projectRepo = createMockProjectRepo()
+    projectRepo.findById.mockResolvedValue(existingProject)
+    projectRepo.updateStatus.mockResolvedValue({ ...existingProject, status: 'archived' })
+    const eventRepo = createMockEventRepo()
+
+    const intent: StructuredIntent = {
+      id: 'intent-arch-p-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'archiveProject',
+      fields: { projectId: 'proj-001' },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T09:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo,
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+      taskRepo: createMockTaskRepo(),
+      projectRepo,
+    })
+
+    const result = await orchestrator.executeIntent(intent, userId)
+
+    expect(result.success).toBe(true)
+    expect(projectRepo.findById).toHaveBeenCalledWith('proj-001', userId)
+    expect(projectRepo.updateStatus).toHaveBeenCalledWith('proj-001', 'archived', userId)
+    expect(eventRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'ProjectArchived' }),
+      userId,
+    )
+  })
+
+  it('非法任务状态转换 → 返回错误', async () => {
+    const draftTask = {
+      id: 'task-001' as USOM_ID,
+      status: 'draft' as const,
+      title: '草稿任务',
+      priority: 'medium' as const,
+      energyRequired: 'medium' as const,
+      estimatedDuration: 60,
+      tags: [],
+      createdAt: '2026-05-15T08:00:00Z',
+      updatedAt: '2026-05-15T08:00:00Z',
+    }
+    const taskRepo = createMockTaskRepo()
+    taskRepo.findById.mockResolvedValue(draftTask)
+
+    const intent: StructuredIntent = {
+      id: 'intent-bad-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'completeTask',
+      fields: { taskId: 'task-001' },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T09:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo: createMockEventRepo(),
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+      taskRepo,
+    })
+
+    const result = await orchestrator.executeIntent(intent, userId)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('非法状态转换')
+    expect(taskRepo.updateStatus).not.toHaveBeenCalled()
+  })
+
+  it('taskRepo 未配置 → 返回错误', async () => {
+    const intent: StructuredIntent = {
+      id: 'intent-task-001' as USOM_ID,
+      intentionId: 'intention-001' as USOM_ID,
+      targetDomain: 'tasks',
+      action: 'createTask',
+      fields: { title: '测试' },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: '2026-05-15T08:00:00Z',
+    }
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: createMockTimeboxRepo(),
+      eventRepo: createMockEventRepo(),
+      intentEngine: createMockIntentEngine(),
+      ruleEngine: createMockRuleEngine('pass'),
+    })
+
+    const result = await orchestrator.executeIntent(intent, userId)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('TaskRepository')
   })
 })

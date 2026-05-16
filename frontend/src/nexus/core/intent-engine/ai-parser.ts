@@ -3,7 +3,7 @@
 
 import { chat } from '@/lib/llm/client'
 import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
-import { inferHabitDefaults } from './habit-defaults'
+import { inferHabitDefaults } from '@/domains/habits/habit-defaults'
 
 // ─── 系统提示词 ─────────────────────────────────────────────────
 

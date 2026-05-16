@@ -1,15 +1,61 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { ProjectRepository } from "@/lib/db/repositories/project.repository"
-import { TaskRepository } from "@/lib/db/repositories/task.repository"
-import { TaskTemplateRepository } from "@/lib/db/repositories/task-template.repository"
+import { ProjectRepository } from "@/domains/tasks/repository/project"
+import { TaskRepository } from "@/domains/tasks/repository/task"
+import { TaskTemplateRepository } from "@/domains/tasks/repository/task-template"
 import type { Priority, EnergyLevel, ProjectStatus, TaskStatus } from "@/usom/types/primitives"
 import type { ImportPreview } from "@/lib/task-import/task-extractor"
 import type { Project, Task, ProjectTemplate } from "@/usom/types/objects"
+import { createOrchestrator } from "../../nexus/orchestrator"
+import { createRuleEngine } from "../../nexus/core/rule-engine"
+import { createEventBus } from "../../nexus/infrastructure/event-bus"
+import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository"
+import { TimeboxRepository } from "@/domains/timebox/repository"
+import type { USOM_ID, Timestamp } from "@/usom/types/primitives"
 
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
-const userId = MVP_USER_ID // TODO: get from session
+const userId = MVP_USER_ID
+
+function makeIntent(action: string, fields: Record<string, unknown>) {
+  const now = new Date().toISOString() as Timestamp
+  return {
+    id: crypto.randomUUID() as USOM_ID,
+    intentionId: crypto.randomUUID() as USOM_ID,
+    targetDomain: "tasks" as const,
+    action,
+    fields,
+    confidence: 1.0,
+    resolvedBy: "template_form" as const,
+    createdAt: now,
+  }
+}
+
+async function createTasksOrchestrator() {
+  const taskRepo = new TaskRepository()
+  const projectRepo = new ProjectRepository()
+  const eventRepo = new SystemEventRepository()
+  const timeboxRepo = new TimeboxRepository()
+  const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID })
+
+  return createOrchestrator({
+    timeboxRepo,
+    eventRepo,
+    intentEngine: { parse: async () => { throw new Error("not used") } },
+    ruleEngine: {
+      evaluate: async (intentEval, snapshot) => {
+        const result = await ruleEngine.evaluate(intentEval, snapshot)
+        return {
+          result: result.severity,
+          warnings: result.warnings,
+          confirmations: result.confirmations,
+        }
+      },
+    },
+    taskRepo,
+    projectRepo,
+  })
+}
 
 // ─── Project ────────────────────────────────────────────────
 
@@ -17,19 +63,39 @@ export async function createProject(data: {
   name: string; description?: string; priority?: string
   startDate?: string; endDate?: string; color?: string
 }) {
-  const repo = new ProjectRepository()
-  const project = await repo.create({
-    ...data,
-    priority: data.priority as Priority | undefined,
-  }, userId)
+  const orchestrator = await createTasksOrchestrator()
+  const intent = makeIntent("createProject", {
+    name: data.name,
+    description: data.description,
+    priority: data.priority,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    color: data.color,
+  })
+  const result = await orchestrator.executeIntent(intent, userId)
   revalidatePath("/projects")
   revalidatePath("/")
-  return project
+  if (!result.success) throw new Error(result.error)
+
+  const repo = new ProjectRepository()
+  const projects = await repo.findByUserId(userId)
+  const created = projects.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0]
+  return created
 }
 
 export async function updateProjectStatus(projectId: string, status: ProjectStatus) {
-  const repo = new ProjectRepository()
-  await repo.updateStatus(projectId, status, userId)
+  const actionMap: Record<string, string> = {
+    active: "activateProject",
+    paused: "pauseProject",
+    completed: "completeProject",
+    archived: "archiveProject",
+  }
+  const orchestrator = await createTasksOrchestrator()
+  const intent = makeIntent(actionMap[status], { projectId })
+  const result = await orchestrator.executeIntent(intent, userId)
+  if (!result.success) throw new Error(result.error)
   revalidatePath("/projects")
   revalidatePath(`/projects/${projectId}`)
   revalidatePath("/")
@@ -65,29 +131,46 @@ export async function createTask(data: {
   startDate?: string; endDate?: string
   projectId?: string; parentId?: string
 }) {
-  const repo = new TaskRepository()
-  const tasks = await repo.bulkCreate([{
+  const orchestrator = await createTasksOrchestrator()
+  const intent = makeIntent("createTask", {
     title: data.title,
     description: data.description,
-    priority: data.priority as Priority,
-    energyRequired: data.energyRequired as EnergyLevel,
+    priority: data.priority,
+    energyRequired: data.energyRequired,
     estimatedDuration: data.estimatedDuration,
-    frequencyType: data.frequencyType as "once" | "daily" | "weekly" | "custom" | undefined,
+    frequencyType: data.frequencyType,
     daysOfWeek: data.daysOfWeek,
-    startDate: data.startDate ?? undefined,
-    endDate: data.endDate ?? undefined,
+    startDate: data.startDate,
+    endDate: data.endDate,
     projectId: data.projectId,
     parentId: data.parentId,
-  }], userId)
+  })
+  const result = await orchestrator.executeIntent(intent, userId)
+  if (!result.success) throw new Error(result.error)
+
+  // 获取最新创建的任务
+  const taskRepo = new TaskRepository()
+  const tasks = await taskRepo.findByStatus("draft", userId)
+  const created = tasks.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0]
+
   revalidatePath("/projects")
   if (data.projectId) revalidatePath(`/projects/${data.projectId}`)
   revalidatePath("/")
-  return tasks[0]
+  return created
 }
 
 export async function updateTaskStatus(taskId: string, status: TaskStatus) {
-  const repo = new TaskRepository()
-  await repo.updateStatus(taskId, status, userId)
+  const actionMap: Record<string, string> = {
+    active: "activateTask",
+    completed: "completeTask",
+    archived: "archiveTask",
+  }
+  const orchestrator = await createTasksOrchestrator()
+  const intent = makeIntent(actionMap[status], { taskId })
+  const result = await orchestrator.executeIntent(intent, userId)
+  if (!result.success) throw new Error(result.error)
   revalidatePath("/projects")
   revalidatePath("/")
 }
@@ -97,42 +180,59 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus) {
 export async function importTasks(preview: ImportPreview) {
   if (!preview.project) return
 
-  const projectRepo = new ProjectRepository()
-  const taskRepo = new TaskRepository()
+  const orchestrator = await createTasksOrchestrator()
 
-  const project = await projectRepo.create({
+  // 创建项目
+  const projectIntent = makeIntent("createProject", {
     name: preview.project.name,
     description: preview.project.description,
-    priority: preview.project.priority as Priority | undefined,
-  }, userId)
+    priority: preview.project.priority,
+  })
+  const projectResult = await orchestrator.executeIntent(projectIntent, userId)
+  if (!projectResult.success) throw new Error(projectResult.error)
+
+  // 获取刚创建的项目
+  const projectRepo = new ProjectRepository()
+  const projects = await projectRepo.findByUserId(userId)
+  const project = projects.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0]
 
   if (preview.tasks.length > 0) {
     const idMap = new Map<string, string>()
 
+    // 先创建顶层任务
     for (const t of preview.tasks.filter(t => t.depth === 0)) {
-      const created = await taskRepo.bulkCreate([{
+      const taskIntent = makeIntent("createTask", {
         title: t.title,
-        priority: (t.priority ?? "medium") as Priority,
-        energyRequired: (t.energyRequired ?? "medium") as EnergyLevel,
+        priority: t.priority ?? "medium",
+        energyRequired: t.energyRequired ?? "medium",
         estimatedDuration: t.estimatedDuration ?? 60,
         projectId: project.id,
-      }], userId)
-      if (created[0]) idMap.set(t.tempId, created[0].id)
+      })
+      const taskResult = await orchestrator.executeIntent(taskIntent, userId)
+      if (!taskResult.success) continue
+
+      // 查找刚创建的任务
+      const taskRepo = new TaskRepository()
+      const draftTasks = await taskRepo.findByProject(project.id, userId)
+      const parentTask = draftTasks.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0]
+      if (parentTask) idMap.set(t.tempId, parentTask.id)
     }
 
-    const childTasks = preview.tasks.filter(t => t.depth > 0 && t.parentTempId)
-    if (childTasks.length > 0) {
-      await taskRepo.bulkCreate(
-        childTasks.map(t => ({
-          title: t.title,
-          priority: (t.priority ?? "medium") as Priority,
-          energyRequired: (t.energyRequired ?? "medium") as EnergyLevel,
-          estimatedDuration: t.estimatedDuration ?? 60,
-          projectId: project.id,
-          parentId: idMap.get(t.parentTempId!) ?? undefined,
-        })),
-        userId
-      )
+    // 再创建子任务
+    for (const t of preview.tasks.filter(t => t.depth > 0 && t.parentTempId)) {
+      const taskIntent = makeIntent("createTask", {
+        title: t.title,
+        priority: t.priority ?? "medium",
+        energyRequired: t.energyRequired ?? "medium",
+        estimatedDuration: t.estimatedDuration ?? 60,
+        projectId: project.id,
+        parentId: idMap.get(t.parentTempId!) ?? undefined,
+      })
+      await orchestrator.executeIntent(taskIntent, userId)
     }
   }
 

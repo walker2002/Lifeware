@@ -1,45 +1,229 @@
-# Domain Manifest - Tasks
-# Defines the Tasks domain capabilities and boundaries
+# Domain Manifest - Tasks (六区块完整版)
+# 遵循 Domain 注册指南 manifest.yaml 模板
 
-id: tasks-domain
-name: Tasks & Projects
+id: tasks
 version: 1.1.0
+name: Tasks & Projects
+description: 任务与项目管理 — 将目标分解为可执行的任务单元
 
-# Supported intents that this domain can handle
-supportedIntents:
-  - CreateTask
-  - UpdateTask
-  - CompleteTask
-  - ArchiveTask
-  - ScheduleTask
-  - CreateProject
-  - UpdateProject
-  - ArchiveProject
+# ─── 区块 A: intent_triggers ─────────────────────────────────────
+intent_triggers:
+  - action: createTask
+    description: 创建一个新任务
+    examples:
+      - 创建一个任务
+      - 添加一个新任务叫"完成报告"
+    keywords: [任务, task, 创建, 添加]
+  - action: updateTask
+    description: 更新任务信息
+    examples:
+      - 修改任务标题
+      - 更新任务优先级
+    keywords: [修改, 更新, edit, update]
+  - action: completeTask
+    description: 完成一个任务
+    examples:
+      - 完成这个任务
+      - 标记任务已完成
+    keywords: [完成, complete, done]
+  - action: archiveTask
+    description: 归档一个任务
+    examples:
+      - 归档这个任务
+    keywords: [归档, archive]
+  - action: createProject
+    description: 创建一个新项目
+    examples:
+      - 创建一个新项目
+      - 新建项目叫"产品重构"
+    keywords: [项目, project, 创建, 新建]
+  - action: updateProject
+    description: 更新项目信息
+    examples:
+      - 修改项目名称
+      - 更新项目状态
+    keywords: [修改, 更新, edit, update]
+  - action: archiveProject
+    description: 归档一个项目
+    examples:
+      - 归档这个项目
+    keywords: [归档, archive]
+  - action: view_list
+    description: 查看项目与任务列表
+    examples:
+      - 查看所有项目
+      - 显示任务列表
+    keywords: [项目列表, 任务列表, 查看]
+    view_route: /projects
+  - action: view_detail
+    description: 查看项目或任务详情
+    examples:
+      - 查看项目详情
+      - 打开任务详情
+    keywords: [详情, detail]
+    view_route: /projects/[id]
 
-# Required fields for each intent (validation by Intent Engine)
-requiredFields:
-  CreateTask:
-    - title
-    - optional: [description, priority, estimatedTime, dueDate]
-  UpdateTask:
-    - taskId
-    - optional: [title, description, priority, estimatedTime, dueDate, status]
-  CompleteTask:
-    - taskId
-    - optional: [actualTime, completionNote]
-  ScheduleTask:
-    - taskId
-    - startTime
-    - endTime
-  CreateProject:
-    - name
-    - optional: [description, priority, startDate, endDate, color]
-  UpdateProject:
-    - projectId
-    - optional: [name, description, priority, startDate, endDate, color, status]
+# ─── 区块 B: lifecycle ───────────────────────────────────────────
+lifecycle:
+  task:
+    states: [draft, active, completed, archived]
+    initial_state: draft
+    transitions:
+      - from: null
+        to: draft
+        trigger: intent
+        action: create
+        event_type: TaskCreated
+      - from: draft
+        to: active
+        trigger: intent
+        action: activate
+        event_type: TaskActivated
+      - from: active
+        to: completed
+        trigger: intent
+        action: complete
+        event_type: TaskCompleted
+      - from: active
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: TaskArchived
+    terminal_states: [completed, archived]
+  project:
+    states: [planning, active, paused, completed, archived]
+    initial_state: planning
+    transitions:
+      - from: null
+        to: planning
+        trigger: intent
+        action: create
+        event_type: ProjectCreated
+      - from: planning
+        to: active
+        trigger: intent
+        action: activate
+        event_type: ProjectActivated
+      - from: active
+        to: paused
+        trigger: intent
+        action: pause
+        event_type: ProjectPaused
+      - from: paused
+        to: active
+        trigger: intent
+        action: resume
+        event_type: ProjectResumed
+      - from: active
+        to: completed
+        trigger: intent
+        action: complete
+        event_type: ProjectCompleted
+      - from: completed
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: ProjectArchived
+    terminal_states: [archived]
 
-# Events this domain subscribes to (handles via onEvent)
-subscribedEvents:
+# ─── 区块 C: field_metadata ──────────────────────────────────────
+field_metadata:
+  title:
+    type: string
+    label: 标题
+    required: true
+  name:
+    type: string
+    label: 项目名称
+    required: true
+  description:
+    type: string
+    label: 描述
+    required: false
+  priority:
+    type: enum
+    label: 优先级
+    required: false
+    options: [critical, high, medium, low]
+  estimatedDuration:
+    type: number
+    label: 预估时长（分钟）
+    required: false
+  dueDate:
+    type: date
+    label: 截止日期
+    required: false
+  status:
+    type: enum
+    label: 状态
+    required: false
+  targetStatus:
+    type: string
+    label: 目标状态
+    required: false
+  targetType:
+    type: string
+    label: 目标类型
+    required: false
+
+# ─── 区块 D: list_actions ────────────────────────────────────────
+list_actions:
+  - action: activate
+    label: 激活
+    confirm_required: false
+  - action: complete
+    label: 完成
+    confirm_required: false
+  - action: pause
+    label: 暂停
+    confirm_required: false
+  - action: archive
+    label: 归档
+    confirm_required: true
+
+# ─── 区块 E: required_fields + templates ─────────────────────────
+required_fields:
+  createTask:
+    - name: title
+      label: 标题
+      type: text
+      required: true
+      placeholder: 例如：完成周报
+    - name: description
+      label: 描述
+      type: textarea
+      required: false
+    - name: priority
+      label: 优先级
+      type: select
+      required: false
+      options: [critical, high, medium, low]
+    - name: estimatedDuration
+      label: 预估时长（分钟）
+      type: number
+      required: false
+    - name: dueDate
+      label: 截止日期
+      type: date
+      required: false
+  createProject:
+    - name: name
+      label: 项目名称
+      type: text
+      required: true
+      placeholder: 例如：产品重构
+    - name: description
+      label: 描述
+      type: textarea
+      required: false
+    - name: priority
+      label: 优先级
+      type: select
+      required: false
+      options: [critical, high, medium, low]
+
+# ─── 区块 F: subscribed_events ───────────────────────────────────
+subscribed_events:
   - TimeboxStarted
   - TimeboxEnded
   - ProjectCreated
@@ -52,36 +236,3 @@ subscribedEvents:
   - TaskActivated
   - TaskCompleted
   - TaskArchived
-
-# Action surface templates for Action Surface Engine
-actionSurfaceTemplates:
-  - intent: CreateTask
-    type: guide
-    template: "创建新任务"
-    weight: 80
-  - intent: UpdateTask
-    type: tile
-    template: "编辑任务"
-    weight: 60
-  - intent: CompleteTask
-    type: tile
-    template: "完成任务"
-    weight: 100
-  - intent: CreateProject
-    type: guide
-    template: "创建新项目"
-    weight: 70
-
-# Outbound connectors (optional, MVP not implemented)
-outboundConnectors:
-  - id: feishu_bot
-    trigger: TaskCompleted
-    optional: true
-
-# Inbound sources (optional, MVP not implemented)
-inboundSources:
-  primary: lifeware_internal
-  connectors:
-    - github_webhook
-    - slack_bot
-  fallback: manual_input

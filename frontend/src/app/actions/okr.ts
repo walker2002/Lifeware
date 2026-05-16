@@ -3,10 +3,10 @@
 import type { Objective, KeyResult } from "@/usom/types/objects";
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
 import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
-import { ObjectiveRepository } from "@/lib/db/repositories/objective.repository";
-import { KeyResultRepository } from "@/lib/db/repositories/key-result.repository";
+import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
+import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
-import { TimeboxRepository } from "@/lib/db/repositories/timebox.repository";
+import { TimeboxRepository } from "@/domains/timebox/repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createEventBus } from "../../nexus/infrastructure/event-bus";
@@ -93,7 +93,7 @@ function makeIntent(action: string, fields: Record<string, unknown>) {
   return {
     id: crypto.randomUUID() as import("@/usom/types/primitives").USOM_ID,
     intentionId: crypto.randomUUID() as import("@/usom/types/primitives").USOM_ID,
-    targetDomain: action.includes("KeyResult") || action.includes("keyResult") ? "keyResult" as const : "objective" as const,
+    targetDomain: "okrs" as const,
     action,
     fields,
     confidence: 1.0,
@@ -108,7 +108,7 @@ export async function createObjective(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("createObjective", { ...input, priority: input.priority ?? 'P1' });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     const repo = new ObjectiveRepository();
     const objectives = await repo.findByStatus("draft", MVP_USER_ID);
@@ -150,7 +150,7 @@ export async function activateObjective(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("activateObjective", { objectiveId });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     return { success: true };
   } catch (err) {
@@ -172,7 +172,7 @@ export async function changeObjectiveStatus(
     };
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent(actionMap[action], { objectiveId });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     return { success: true };
   } catch (err) {
@@ -187,7 +187,7 @@ export async function createKeyResult(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("createKeyResult", { objectiveId, ...input });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     const krRepo = new KeyResultRepository();
     const krs = await krRepo.findByObjective(objectiveId, MVP_USER_ID);
@@ -207,7 +207,7 @@ export async function updateKeyResult(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("updateKeyResult", { keyResultId, ...fields });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     const krRepo = new KeyResultRepository();
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
@@ -224,7 +224,7 @@ export async function updateKeyResultProgress(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("updateKeyResultProgress", { keyResultId, currentValue });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     const krRepo = new KeyResultRepository();
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
@@ -240,7 +240,7 @@ export async function deleteDraftKeyResult(
   try {
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("deleteKeyResult", { keyResultId });
-    const result = await orchestrator.executeOKRIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
     return { success: true };
   } catch (err) {

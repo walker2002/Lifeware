@@ -5,8 +5,9 @@ import type { Timebox } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
 import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
-import { createTimeboxStateMachine } from '../index'
-import { findTransition, timeboxTransitions, habitTransitions } from '../transitions'
+import { createTimeboxStateMachine, type StateMachineDeps } from '../index'
+import { findTransition, timeboxTransitions } from '@/domains/timebox/transitions'
+import { habitTransitions } from '@/domains/habits/transitions'
 
 // 测试辅助：封装 timebox 专用的 findTransition
 const findTimeboxTransition = (from: string | null, action: string) =>
@@ -60,7 +61,7 @@ function makeMockRepos() {
     markProcessed: vi.fn().mockResolvedValue(undefined),
   }
 
-  return { timeboxRepo, eventRepo, savedTimeboxes, savedEvents }
+  return { timeboxRepo: timeboxRepo as unknown as StateMachineDeps['timeboxRepo'], eventRepo, savedTimeboxes, savedEvents }
 }
 
 // ─── 测试辅助：构造 Mock EventBus ─────────────────────────────
@@ -113,8 +114,8 @@ describe('State Machine — transitions 表', () => {
     expect(t!.eventType).toBe('TimeboxEnded')
   })
 
-  it('end → planned → ended 应存在（跳过 start）', () => {
-    const t = findTimeboxTransition('planned', 'end')
+  it('end → running → ended 应存在', () => {
+    const t = findTimeboxTransition('running', 'end')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('ended')
     expect(t!.eventType).toBe('TimeboxEnded')

@@ -7,10 +7,10 @@ import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { TimeboxRepository } from "@/lib/db/repositories/timebox.repository";
+import { TimeboxRepository } from "@/domains/timebox/repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
-import { HabitRepository } from "@/lib/db/repositories/habit.repository";
+import { HabitRepository } from "@/domains/habits/repository/habit";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
@@ -535,7 +535,7 @@ export async function submitHabitIntent(
       createdAt: now,
     };
 
-    const result = await orchestrator.executeHabitIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
 
     if (!result.success) {
       return { success: false, error: result.error };
@@ -590,7 +590,7 @@ export async function updateHabitStatus(
       createdAt: now,
     };
 
-    const result = await orchestrator.executeHabitIntent(intent, MVP_USER_ID);
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
 
     if (!result.success) {
       return { success: false, error: result.error };
@@ -648,7 +648,7 @@ export async function updateHabit(
 
 // ─── Template Server Actions ────────────────────────────────────
 
-import { HabitTemplateRepository } from "@/lib/db/repositories/habit-template.repository";
+import { HabitTemplateRepository } from "@/domains/habits/repository/habit-template";
 import type { HabitTemplate } from "@/usom/types/objects";
 import type { CreateTemplateInput, TemplateHabitOverrides } from "@/usom/interfaces/irepository";
 

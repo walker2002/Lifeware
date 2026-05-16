@@ -1,6 +1,6 @@
 // 习惯默认值自动推断 — 单元测试
 import { describe, it, expect } from 'vitest'
-import { inferHabitDefaults } from '../habit-defaults'
+import { inferHabitDefaults } from '@/domains/habits/habit-defaults'
 
 describe('inferHabitDefaults', () => {
   it('根据 defaultTime 和 defaultDuration 计算时间窗口', () => {

@@ -1,32 +1,29 @@
 // State Machine — 对象生命周期执行器
+// 通用版：接收 LifecycleDefinition 驱动多域状态转换
 // 接收已批准的 StateProposal，执行状态转换，持久化并发布事件
-// 支持创建（fromState=null）和已有对象的非创建转换（动态 fromState）
 
-import type { USOM_ID, Timestamp, Tag } from '@/usom/types/primitives'
-import type { Timebox } from '@/usom/types/objects'
+import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { StateProposal, SystemEvent } from '@/usom/types/process'
-import type { ITimeboxRepository, ISystemEventRepository } from '@/usom/interfaces/irepository'
+import type { ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
-import { findTransition, timeboxTransitions } from './transitions'
+import type { LifecycleDefinition, FieldMetadata, LifecycleTransition } from '@/usom/types/domain-types'
+import { findTransition, timeboxTransitions } from '@/domains/timebox/transitions'
 
+// ─── 旧版接口（向后兼容，Phase 7 移除） ─────────────────────────
 export interface StateMachineResult {
   success: boolean
-  object?: Timebox
+  object?: Record<string, unknown>
   event?: SystemEvent
   error?: string
 }
 
 export interface StateMachineDeps {
-  timeboxRepo: ITimeboxRepository
+  timeboxRepo: { findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>; save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void> }
   eventRepo: ISystemEventRepository
 }
 
 export interface TimeboxStateMachine {
-  execute(
-    proposal: StateProposal,
-    eventBus: EventBus,
-    userId: USOM_ID,
-  ): Promise<StateMachineResult>
+  execute(proposal: StateProposal, eventBus: EventBus, userId: USOM_ID): Promise<StateMachineResult>
 }
 
 export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateMachine {
@@ -36,22 +33,18 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
     async execute(proposal, eventBus, userId): Promise<StateMachineResult> {
       const now = new Date().toISOString() as Timestamp
 
-      // 1. 确定 fromState
-      //    create 动作: fromState = null（无已有对象）
-      //    其余动作: 从数据库加载已有对象获取当前状态
-      let fromState: Timebox['status'] | null = null
-      let existingTimebox: Timebox | null = null
+      let fromState: string | null = null
+      let existingObject: Record<string, unknown> | null = null
       const objectId = proposal.targetObject.id
 
       if (objectId) {
-        existingTimebox = await timeboxRepo.findById(objectId, userId)
-        if (!existingTimebox) {
+        existingObject = await timeboxRepo.findById(objectId, userId)
+        if (!existingObject) {
           return { success: false, error: '时间盒不存在' }
         }
-        fromState = existingTimebox.status
+        fromState = existingObject.status as string
       }
 
-      // 2. 查找转换规则
       const transition = findTransition(timeboxTransitions, fromState, proposal.action)
       if (!transition) {
         return {
@@ -60,62 +53,42 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
         }
       }
 
-      // 3. 构造目标 Timebox 对象
-      let timebox: Timebox
+      let object: Record<string, unknown>
 
-      if (existingTimebox) {
-        // 非创建：基于已有对象更新
-        timebox = {
-          ...existingTimebox,
+      if (existingObject) {
+        object = {
+          ...existingObject,
           status: transition.to,
           updatedAt: now,
         }
 
-        // 根据动作设置对应时间戳
         if (proposal.action === 'start') {
-          timebox.startedAt = now
+          object.startedAt = now
         } else if (proposal.action === 'end') {
-          timebox.endedAt = now
+          object.endedAt = now
         } else if (proposal.action === 'overtime') {
-          timebox.overtimeAt = now
-        } else if (proposal.action === 'log') {
-          timebox.loggedAt = now
-          if (proposal.payload.executionRecord) {
-            timebox.executionRecord = proposal.payload.executionRecord as Timebox['executionRecord']
-          }
-        } else if (proposal.action === 'cancel') {
-          // cancelled 只更新 status 和 updatedAt
+          object.overtimeAt = now
         }
       } else {
-        // 创建：从 payload 构造新对象
-        const timeboxId = crypto.randomUUID() as USOM_ID
-        timebox = {
-          id: timeboxId,
+        const id = crypto.randomUUID() as USOM_ID
+        object = {
+          id,
           status: transition.to,
-          title: proposal.payload.title as string,
-          startTime: proposal.payload.startTime as Timestamp,
-          endTime: proposal.payload.endTime as Timestamp,
-          taskIds: (proposal.payload.taskIds as USOM_ID[]) ?? [],
-          habitIds: (proposal.payload.habitIds as USOM_ID[]) ?? [],
-          isRecurring: (proposal.payload.isRecurring as boolean) ?? false,
-          recurrenceRule: proposal.payload.recurrenceRule as Timebox['recurrenceRule'],
-          tags: (proposal.payload.tags as Tag[]) ?? [],
           createdAt: now,
           updatedAt: now,
+          ...proposal.payload,
         }
       }
 
-      // 4. 持久化
-      await timeboxRepo.save(timebox, userId)
+      await timeboxRepo.save(object, userId)
 
-      // 5. 构造并持久化 SystemEvent
       const event: SystemEvent = {
         id: crypto.randomUUID() as USOM_ID,
         type: transition.eventType,
         occurredAt: now,
         triggeredBy: 'state_machine',
         payload: {
-          timeboxId: timebox.id,
+          timeboxId: object.id,
           intentId: proposal.intentId,
           proposalId: proposal.id,
           fromStatus: fromState,
@@ -127,7 +100,166 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
       await eventRepo.append(event, userId)
       eventBus.publish(event)
 
-      return { success: true, object: timebox, event }
+      return { success: true, object, event }
+    },
+  }
+}
+
+// ─── 通用 State Machine ────────────────────────────────────────
+
+export interface GenericRepo {
+  findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
+  save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
+}
+
+export interface GenericStateMachineDeps {
+  getRepository: (objectType: string) => GenericRepo
+  eventRepo: ISystemEventRepository
+  getLifecycle: (domainId: string, objectType: string) => LifecycleDefinition
+  getFieldMetadata?: (domainId: string, objectType: string) => Record<string, FieldMetadata>
+}
+
+function findLifecycleTransition(
+  lifecycle: LifecycleDefinition,
+  fromState: string | null,
+  action: string,
+): LifecycleTransition | undefined {
+  return lifecycle.transitions.find(t => {
+    const fromMatch = t.from === null
+      ? fromState === null
+      : Array.isArray(t.from)
+        ? t.from.includes(fromState!)
+        : t.from === fromState
+    return fromMatch && t.action === action
+  })
+}
+
+function getLifecycleTimestampFields(
+  fieldMeta: Record<string, FieldMetadata> | undefined,
+): string[] {
+  if (!fieldMeta) return []
+  return Object.entries(fieldMeta)
+    .filter(([, meta]) => meta.type === 'lifecycle_timestamp')
+    .map(([fieldName]) => fieldName)
+}
+
+export function createGenericStateMachine(deps: GenericStateMachineDeps) {
+  const { getRepository, eventRepo, getLifecycle, getFieldMetadata } = deps
+
+  return {
+    async execute(
+      proposal: StateProposal,
+      eventBus: EventBus,
+      userId: USOM_ID,
+    ): Promise<StateMachineResult> {
+      const now = new Date().toISOString() as Timestamp
+      const objectType = proposal.targetObject.type
+
+      // 获取该对象类型的 lifecycle
+      const lifecycle = getLifecycle(objectType, objectType)
+      const fieldMeta = getFieldMetadata?.(objectType, objectType)
+
+      // 1. 确定 fromState
+      let fromState: string | null = null
+      let existingObject: Record<string, unknown> | null = null
+      const objectId = proposal.targetObject.id
+
+      if (objectId) {
+        const repo = getRepository(objectType)
+        existingObject = await repo.findById(objectId, userId)
+        if (!existingObject) {
+          return { success: false, error: '对象不存在' }
+        }
+        fromState = existingObject.status as string
+
+        // 检查 terminal state
+        if (lifecycle.terminal_states.includes(fromState)) {
+          return { success: false, error: `非法转换: 当前状态 "${fromState}" 为终态` }
+        }
+      }
+
+      // 2. 查找转换规则
+      const transition = findLifecycleTransition(lifecycle, fromState, proposal.action)
+      if (!transition) {
+        return {
+          success: false,
+          error: `非法状态转换: action="${proposal.action}", fromState="${fromState}"`,
+        }
+      }
+
+      // 3. 构造目标对象
+      let object: Record<string, unknown>
+      const lifecycleTimestampFields = getLifecycleTimestampFields(fieldMeta)
+
+      if (existingObject) {
+        object = {
+          ...existingObject,
+          status: transition.to,
+          updatedAt: now,
+        }
+
+        // 自动设置 lifecycle_timestamp 字段
+        // action → timestamp 字段映射: start→startedAt, end→endedAt, overtime→overtimeAt, log→loggedAt
+        const actionTimestampMap: Record<string, string> = {
+          start: 'startedAt',
+          end: 'endedAt',
+          overtime: 'overtimeAt',
+          log: 'loggedAt',
+          cancel: 'cancelledAt',
+          activate: 'activatedAt',
+          suspend: 'suspendedAt',
+          archive: 'archivedAt',
+          complete: 'completedAt',
+          pause: 'pausedAt',
+          resume: 'resumedAt',
+        }
+        const timestampKey = actionTimestampMap[proposal.action]
+        if (timestampKey && lifecycleTimestampFields.includes(timestampKey)) {
+          object[timestampKey] = now
+        }
+      } else {
+        // 创建：从 payload 构造新对象
+        const id = crypto.randomUUID() as USOM_ID
+        object = {
+          id,
+          status: transition.to,
+          createdAt: now,
+          updatedAt: now,
+          ...proposal.payload,
+        }
+
+        // 初始化 lifecycle_timestamp 字段为 undefined（后续转换时设置）
+        for (const field of lifecycleTimestampFields) {
+          if (!(field in object)) {
+            object[field] = undefined
+          }
+        }
+      }
+
+      // 4. 持久化
+      const repo = getRepository(objectType)
+      await repo.save(object, userId)
+
+      // 5. 构造并持久化 SystemEvent
+      const event: SystemEvent = {
+        id: crypto.randomUUID() as USOM_ID,
+        type: transition.event_type as SystemEvent['type'],
+        occurredAt: now,
+        triggeredBy: 'state_machine',
+        payload: {
+          objectId: object.id,
+          intentId: proposal.intentId,
+          proposalId: proposal.id,
+          fromStatus: fromState,
+          toStatus: transition.to,
+        },
+        snapshotId: '' as USOM_ID,
+      }
+
+      await eventRepo.append(event, userId)
+      eventBus.publish(event)
+
+      return { success: true, object, event }
     },
   }
 }

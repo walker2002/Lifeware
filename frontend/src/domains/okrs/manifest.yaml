@@ -1,0 +1,283 @@
+# Domain Manifest - OKRs (六区块完整版)
+# 遵循 Domain 注册指南 manifest.yaml 模板
+
+id: okrs
+version: 1.0.0
+name: OKRs
+description: 目标与关键结果管理 — 将愿景转化为可衡量的关键结果
+
+# ─── 区块 A: intent_triggers ─────────────────────────────────────
+intent_triggers:
+  - action: createObjective
+    description: 创建一个新的目标
+    examples:
+      - 创建一个新目标
+      - 我想设定一个季度目标
+    keywords: [目标, objective, OKR]
+  - action: activateObjective
+    description: 激活一个目标
+    examples:
+      - 激活这个目标
+      - 开始执行目标
+    keywords: [激活, activate]
+  - action: pauseObjective
+    description: 暂停一个目标
+    examples:
+      - 暂停这个目标
+    keywords: [暂停, pause]
+  - action: resumeObjective
+    description: 恢复一个暂停的目标
+    examples:
+      - 恢复这个目标
+    keywords: [恢复, resume]
+  - action: completeObjective
+    description: 完成一个目标
+    examples:
+      - 完成这个目标
+      - 目标已完成
+    keywords: [完成, complete]
+  - action: discardObjective
+    description: 废弃一个目标
+    examples:
+      - 废弃这个目标
+    keywords: [废弃, discard]
+  - action: archiveObjective
+    description: 归档一个目标
+    examples:
+      - 归档这个目标
+    keywords: [归档, archive]
+  - action: createKeyResult
+    description: 创建一个关键结果
+    examples:
+      - 添加一个关键结果
+      - 新增 KR
+    keywords: [关键结果, KR, key result]
+  - action: updateKeyResult
+    description: 更新关键结果
+    examples:
+      - 更新关键结果
+    keywords: [更新, update]
+  - action: updateKeyResultProgress
+    description: 更新关键结果进度
+    examples:
+      - 更新进度
+      - KR 进度 50%
+    keywords: [进度, progress]
+  - action: view_workspace
+    description: 查看 OKR 工作台
+    examples:
+      - 查看我的 OKR
+      - OKR 工作台
+    keywords: [OKR, 工作台]
+    view_route: /okrs
+  - action: view_detail
+    description: 查看目标详情
+    examples:
+      - 查看目标详情
+    keywords: [详情]
+    view_route: /okrs/:id
+
+# ─── 区块 B: lifecycle ───────────────────────────────────────────
+lifecycle:
+  objective:
+    states: [draft, active, paused, completed, discarded, archived]
+    initial_state: draft
+    transitions:
+      - from: null
+        to: draft
+        trigger: intent
+        action: create
+        event_type: ObjectiveCreated
+      - from: draft
+        to: active
+        trigger: intent
+        action: activate
+        event_type: ObjectiveActivated
+      - from: draft
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: ObjectiveDiscarded
+      - from: active
+        to: paused
+        trigger: intent
+        action: pause
+        event_type: ObjectivePaused
+      - from: active
+        to: completed
+        trigger: intent
+        action: complete
+        event_type: ObjectiveCompleted
+      - from: active
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: ObjectiveDiscarded
+      - from: paused
+        to: active
+        trigger: intent
+        action: resume
+        event_type: ObjectiveResumed
+      - from: paused
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: ObjectiveDiscarded
+      - from: completed
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: ObjectiveArchived
+      - from: discarded
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: ObjectiveArchived
+    terminal_states: [archived]
+  key_result:
+    states: [draft, active, paused, completed, discarded, archived]
+    initial_state: draft
+    transitions:
+      - from: null
+        to: draft
+        trigger: intent
+        action: create
+        event_type: KeyResultUpdated
+      - from: draft
+        to: active
+        trigger: intent
+        action: activate
+        event_type: KeyResultUpdated
+      - from: draft
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: KeyResultUpdated
+      - from: active
+        to: paused
+        trigger: intent
+        action: pause
+        event_type: KeyResultUpdated
+      - from: active
+        to: completed
+        trigger: intent
+        action: complete
+        event_type: KeyResultCompleted
+      - from: active
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: KeyResultUpdated
+      - from: paused
+        to: active
+        trigger: intent
+        action: resume
+        event_type: KeyResultUpdated
+      - from: paused
+        to: discarded
+        trigger: intent
+        action: discard
+        event_type: KeyResultUpdated
+      - from: completed
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: KeyResultUpdated
+      - from: discarded
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: KeyResultUpdated
+    terminal_states: [archived]
+
+# ─── 区块 C: field_metadata ──────────────────────────────────────
+field_metadata:
+  title:
+    type: string
+    label: 标题
+    required: true
+  okrType:
+    type: string
+    label: OKR 类型
+    required: false
+  periodType:
+    type: string
+    label: 周期类型
+    required: false
+  periodStart:
+    type: time
+    label: 周期开始时间
+    required: false
+  periodEnd:
+    type: time
+    label: 周期结束时间
+    required: false
+  targetValue:
+    type: number
+    label: 目标值
+    required: false
+  currentValue:
+    type: number
+    label: 当前值
+    required: false
+  unit:
+    type: string
+    label: 单位
+    required: false
+
+# ─── 区块 D: list_actions ────────────────────────────────────────
+list_actions:
+  - action: activate
+    label: 激活
+    confirm_required: false
+  - action: pause
+    label: 暂停
+    confirm_required: false
+  - action: complete
+    label: 完成
+    confirm_required: false
+  - action: discard
+    label: 废弃
+    confirm_required: true
+  - action: archive
+    label: 归档
+    confirm_required: true
+
+# ─── 区块 E: required_fields + templates ─────────────────────────
+required_fields:
+  createObjective:
+    - name: title
+      label: 标题
+      type: text
+      required: true
+      placeholder: 例如：提升产品质量
+  createKeyResult:
+    - name: title
+      label: 标题
+      type: text
+      required: true
+      placeholder: 例如：代码覆盖率达到 80%
+    - name: targetValue
+      label: 目标值
+      type: number
+      required: true
+    - name: unit
+      label: 单位
+      type: text
+      required: true
+      placeholder: 例如：%
+
+# ─── 区块 F: subscribed_events ───────────────────────────────────
+subscribed_events:
+  - ObjectiveCreated
+  - ObjectiveActivated
+  - ObjectivePaused
+  - ObjectiveResumed
+  - ObjectiveCompleted
+  - ObjectiveDiscarded
+  - ObjectiveArchived
+  - KeyResultUpdated
+  - KeyResultCompleted
+  - KeyResultProgressUpdated
+  - TaskCompleted
+  - HabitLogged

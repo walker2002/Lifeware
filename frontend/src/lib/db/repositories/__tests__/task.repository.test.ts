@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { TaskRepository } from '../task.repository'
+import { TaskRepository } from '../../../../domains/tasks/repository/task'
 import { Priority, EnergyLevel } from '../../../../usom/types/primitives'
 
 // Mock db

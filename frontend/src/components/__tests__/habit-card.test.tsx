@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { HabitCard } from "../habit-card"
+import { HabitCard } from "@/domains/habits/components/habit-card"
 
 describe("HabitCard", () => {
   const baseProps = {
