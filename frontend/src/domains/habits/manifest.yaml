@@ -157,7 +157,7 @@ required_fields:
       default_value: 30
     - name: trackable
       label: 可打卡
-      type: boolean
+      type: toggle
       required: true
       default_value: true
 

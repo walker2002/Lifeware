@@ -143,6 +143,26 @@ function getLifecycleTimestampFields(
     .map(([fieldName]) => fieldName)
 }
 
+function buildActionTimestampMap(
+  lifecycle: LifecycleDefinition,
+  fieldMeta: Record<string, FieldMetadata> | undefined,
+): Record<string, string> {
+  const timestampFields = new Set(getLifecycleTimestampFields(fieldMeta))
+  if (timestampFields.size === 0) return {}
+
+  const map: Record<string, string> = {}
+  for (const t of lifecycle.transitions) {
+    const candidates = [`${t.action}edAt`, `${t.action}At`, `${t.action}dAt`]
+    for (const candidate of candidates) {
+      if (timestampFields.has(candidate)) {
+        map[t.action] = candidate
+        break
+      }
+    }
+  }
+  return map
+}
+
 export function createGenericStateMachine(deps: GenericStateMachineDeps) {
   const { getRepository, eventRepo, getLifecycle, getFieldMetadata } = deps
 
@@ -199,20 +219,7 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
         }
 
         // 自动设置 lifecycle_timestamp 字段
-        // action → timestamp 字段映射: start→startedAt, end→endedAt, overtime→overtimeAt, log→loggedAt
-        const actionTimestampMap: Record<string, string> = {
-          start: 'startedAt',
-          end: 'endedAt',
-          overtime: 'overtimeAt',
-          log: 'loggedAt',
-          cancel: 'cancelledAt',
-          activate: 'activatedAt',
-          suspend: 'suspendedAt',
-          archive: 'archivedAt',
-          complete: 'completedAt',
-          pause: 'pausedAt',
-          resume: 'resumedAt',
-        }
+        const actionTimestampMap = buildActionTimestampMap(lifecycle, fieldMeta)
         const timestampKey = actionTimestampMap[proposal.action]
         if (timestampKey && lifecycleTimestampFields.includes(timestampKey)) {
           object[timestampKey] = now

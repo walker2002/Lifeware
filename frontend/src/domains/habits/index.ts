@@ -1,30 +1,26 @@
 // Habits Domain Plugin — 入口文件
 // 遵循 Constitution Principle VI: 纯粹被动组件
 
-import type { DomainPlugin, DomainManifest } from '@/usom/types/process'
-import { onValidate, onEvent, onActionSurfaceRequest } from './hooks'
+import type { DomainPlugin } from '@/usom/types/process'
+import { loadDomainManifest } from '@/domains/manifest-loader'
+import { createDomainPlugin } from '@/domains/plugin-factory'
+import { createHabitsHooks } from './hooks'
 
-const habitsManifest: DomainManifest = {
-  domainId: 'habits',
-  version: '1.0.0',
-  requiredFields: ['title', 'defaultTime', 'defaultDuration', 'trackable'],
-  subscribedEvents: [
-    'HabitCreated',
-    'HabitActivated',
-    'HabitSuspended',
-    'HabitArchived',
-    'HabitLogged',
-    'HabitSkipped',
-    'HabitStreakMilestone',
-  ],
+const result = loadDomainManifest(__dirname)
+
+if (!result.success) {
+  for (const error of result.errors) {
+    console.warn(`[manifest-loader] ${error.domainId}: ${error.message}`)
+  }
 }
 
-export const habitsPlugin: DomainPlugin = {
-  manifest: habitsManifest,
-  onValidate,
-  onEvent,
-  onActionSurfaceRequest,
-}
+const hooks = result.success
+  ? createHabitsHooks(result.manifest)
+  : null as any
 
-export { onValidate, onEvent, onActionSurfaceRequest } from './hooks'
+export const habitsPlugin: DomainPlugin = result.success
+  ? createDomainPlugin(result.manifest, hooks)
+  : null!
+
+export { createHabitsHooks } from './hooks'
 export { habitTransitions, findTransition } from './transitions'

@@ -1,5 +1,32 @@
 // Habits Domain Plugin 单元测试 — TDD 先写测试
 import { describe, it, expect } from 'vitest'
+import { vi } from 'vitest'
+
+vi.mock('@/domains/manifest-loader', () => ({
+  loadDomainManifest: () => ({
+    success: true,
+    manifest: {
+      id: 'habits',
+      version: '1.0.0',
+      name: '习惯管理',
+      description: '习惯跟踪与管理',
+      intent_triggers: [],
+      lifecycle: {},
+      field_metadata: {
+        frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+      },
+      list_actions: [],
+      required_fields: { createHabit: [
+        { name: 'title', label: '标题', type: 'text', required: true },
+        { name: 'defaultTime', label: '默认时间', type: 'time', required: true },
+        { name: 'defaultDuration', label: '默认时长', type: 'number', required: true },
+        { name: 'trackable', label: '可追踪', type: 'toggle', required: true },
+      ] },
+      subscribed_events: ['HabitCreated', 'HabitActivated', 'HabitSuspended', 'HabitArchived', 'HabitLogged', 'HabitSkipped', 'HabitStreakMilestone'],
+    },
+  }),
+}))
+
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOMSnapshot, SystemEvent, DerivedSignals } from '@/usom/types/process'
 import type { USOM_ID } from '@/usom/types/primitives'

@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { habitsPlugin } from '../index'
-import { onValidate, onEvent, onActionSurfaceRequest } from '../hooks'
+import { createHabitsHooks } from '../hooks'
 import { habitTransitions } from '../transitions'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
@@ -94,16 +94,29 @@ describe('T008: Habits hooks.ts 纯函数验证', () => {
     expect(hooksContent).not.toMatch(/import.*[Rr]epository/)
   })
 
-  it('onValidate 应从 hooks.ts 导出', () => {
-    expect(typeof onValidate).toBe('function')
+  it('createHabitsHooks 工厂函数应从 hooks.ts 导出', () => {
+    expect(typeof createHabitsHooks).toBe('function')
   })
 
-  it('onEvent 应从 hooks.ts 导出', () => {
-    expect(typeof onEvent).toBe('function')
-  })
-
-  it('onActionSurfaceRequest 应从 hooks.ts 导出', () => {
-    expect(typeof onActionSurfaceRequest).toBe('function')
+  it('createHabitsHooks 应返回三个钩子函数', () => {
+    const mockManifest = {
+      id: 'habits',
+      version: '1.0.0',
+      name: '习惯管理',
+      description: '',
+      intent_triggers: [],
+      lifecycle: {},
+      field_metadata: {
+        frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+      },
+      list_actions: [],
+      required_fields: {},
+      subscribed_events: ['HabitCreated', 'HabitActivated', 'HabitSuspended', 'HabitArchived', 'HabitLogged', 'HabitSkipped', 'HabitStreakMilestone'],
+    }
+    const hooks = createHabitsHooks(mockManifest as any)
+    expect(typeof hooks.onValidate).toBe('function')
+    expect(typeof hooks.onEvent).toBe('function')
+    expect(typeof hooks.onActionSurfaceRequest).toBe('function')
   })
 })
 

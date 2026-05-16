@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { timeboxPlugin } from '../index'
-import { onValidate, onEvent, onActionSurfaceRequest } from '../hooks'
+import { createTimeboxHooks } from '../hooks'
 import { timeboxTransitions } from '../transitions'
 import type { DomainManifest } from '@/usom/types/domain-types'
 
@@ -73,16 +73,23 @@ describe('T004: Timebox hooks.ts 纯函数验证', () => {
     expect(hooksContent).not.toMatch(/import.*[Rr]epository/)
   })
 
-  it('onValidate 应从 hooks.ts 导出', () => {
-    expect(typeof onValidate).toBe('function')
+  it('createTimeboxHooks 工厂函数应从 hooks.ts 导出', () => {
+    expect(typeof createTimeboxHooks).toBe('function')
   })
 
-  it('onEvent 应从 hooks.ts 导出', () => {
-    expect(typeof onEvent).toBe('function')
-  })
-
-  it('onActionSurfaceRequest 应从 hooks.ts 导出', () => {
-    expect(typeof onActionSurfaceRequest).toBe('function')
+  it('createTimeboxHooks 应返回三个钩子函数', () => {
+    // 使用 mock manifest 构造 hooks
+    const mockManifest = {
+      id: 'timebox', version: '1.0.0', name: 'Timebox', description: '',
+      intent_triggers: [],
+      lifecycle: { timebox: { states: ['planned'], initial_state: 'planned', transitions: [], terminal_states: [] } },
+      field_metadata: {}, list_actions: [], required_fields: {},
+      subscribed_events: ['TimeboxCreated'],
+    }
+    const hooks = createTimeboxHooks(mockManifest as any)
+    expect(typeof hooks.onValidate).toBe('function')
+    expect(typeof hooks.onEvent).toBe('function')
+    expect(typeof hooks.onActionSurfaceRequest).toBe('function')
   })
 })
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { tasksPlugin } from '../index'
-import { onValidate, onEvent, onActionSurfaceRequest } from '../hooks'
+import { createTasksHooks } from '../hooks'
 import { taskTransitions, projectTransitions, findTransition } from '../transitions'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
@@ -59,19 +59,93 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
     expect(hooksContent).not.toMatch(/import.*[Rr]epository/)
   })
 
-  it('onValidate 应从 hooks.ts 导出', () => {
-    expect(typeof onValidate).toBe('function')
+  it('createTasksHooks 工厂函数应从 hooks.ts 导出', () => {
+    expect(typeof createTasksHooks).toBe('function')
   })
 
-  it('onEvent 应从 hooks.ts 导出', () => {
-    expect(typeof onEvent).toBe('function')
-  })
-
-  it('onActionSurfaceRequest 应从 hooks.ts 导出', () => {
-    expect(typeof onActionSurfaceRequest).toBe('function')
+  it('createTasksHooks 应返回三个钩子函数', () => {
+    const mockManifest = {
+      id: 'tasks',
+      version: '1.1.0',
+      name: '任务管理',
+      description: '',
+      intent_triggers: [],
+      lifecycle: {
+        task: {
+          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
+          initial_state: 'draft',
+          transitions: [
+            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+          ],
+          terminal_states: ['completed', 'archived'],
+        },
+        project: {
+          states: ['planning', 'active', 'paused', 'completed', 'archived'],
+          initial_state: 'planning',
+          transitions: [
+            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
+            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+          ],
+          terminal_states: ['archived'],
+        },
+      },
+      field_metadata: {},
+      list_actions: [],
+      required_fields: {},
+      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+    }
+    const hooks = createTasksHooks(mockManifest as any)
+    expect(typeof hooks.onValidate).toBe('function')
+    expect(typeof hooks.onEvent).toBe('function')
+    expect(typeof hooks.onActionSurfaceRequest).toBe('function')
   })
 
   it('onValidate 创建任务时 title 为空应返回错误', () => {
+    const mockManifest = {
+      id: 'tasks',
+      version: '1.1.0',
+      name: '任务管理',
+      description: '',
+      intent_triggers: [],
+      lifecycle: {
+        task: {
+          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
+          initial_state: 'draft',
+          transitions: [
+            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+          ],
+          terminal_states: ['completed', 'archived'],
+        },
+        project: {
+          states: ['planning', 'active', 'paused', 'completed', 'archived'],
+          initial_state: 'planning',
+          transitions: [
+            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
+            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+          ],
+          terminal_states: ['archived'],
+        },
+      },
+      field_metadata: {},
+      list_actions: [],
+      required_fields: {},
+      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+    }
+    const { onValidate } = createTasksHooks(mockManifest as any)
     const result = onValidate(
       { id: '1', intentionId: 'i1', targetDomain: 'tasks', action: 'createTask', fields: {}, confidence: 1, resolvedBy: 'template_form', createdAt: '' },
       { currentTime: '', currentDate: '', dayOfWeek: 1, timeOfDay: 'morning', energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' }, activeObjectives: [], activeKeyResults: [], activeTasks: [], pendingHabits: [], upcomingTimeboxes: [], pendingIntentions: [] } as any,

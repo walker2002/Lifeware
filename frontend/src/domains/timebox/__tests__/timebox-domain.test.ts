@@ -1,9 +1,46 @@
 // Timebox Domain Plugin 单元测试 — TDD 先写测试
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOMSnapshot, SystemEvent, DerivedSignals } from '@/usom/types/process'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { USOM_ID } from '@/usom/types/primitives'
+
+// Mock manifest-loader 以避免 jsdom 环境下 fs 调用
+vi.mock('@/domains/manifest-loader', () => ({
+  loadDomainManifest: () => ({
+    success: true,
+    manifest: {
+      id: 'timebox',
+      version: '1.0.0',
+      name: 'Timebox',
+      description: '时间盒管理',
+      intent_triggers: [],
+      lifecycle: {
+        timebox: {
+          states: ['planned', 'running', 'overtime', 'ended', 'cancelled', 'logged'],
+          initial_state: 'planned',
+          transitions: [
+            { from: null, to: 'planned', trigger: 'intent', action: 'create', event_type: 'TimeboxCreated' },
+            { from: 'planned', to: 'running', trigger: 'intent', action: 'start', event_type: 'TimeboxStarted' },
+            { from: 'running', to: 'ended', trigger: 'intent', action: 'end', event_type: 'TimeboxEnded' },
+          ],
+          terminal_states: ['cancelled', 'logged'],
+        },
+      },
+      field_metadata: {},
+      list_actions: [],
+      required_fields: {
+        createTimebox: [
+          { name: 'title', label: '标题', type: 'text', required: true },
+          { name: 'startTime', label: '开始时间', type: 'time', required: true },
+          { name: 'duration', label: '时长', type: 'number', required: true },
+        ],
+      },
+      subscribed_events: ['TimeboxCreated', 'TimeboxStarted', 'TimeboxOvertime', 'TimeboxEnded', 'TimeboxCancelled', 'TimeboxLogged'],
+    },
+  }),
+}))
+
 import { timeboxPlugin } from '../index'
 
 // ─── 测试辅助：构造 StructuredIntent ─────────────────────────

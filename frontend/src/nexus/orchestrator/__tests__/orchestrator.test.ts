@@ -5,6 +5,115 @@ import { describe, it, expect, vi } from 'vitest'
 import type { StructuredIntent, Habit, HabitTemplate } from '@/usom/types/objects'
 import type { ActionSurface, ContextSnapshot } from '@/usom/types/process'
 import type { USOM_ID } from '@/usom/types/primitives'
+
+// Mock @/domains/registry to avoid resolving domain index files (which import fs-dependent loader)
+vi.mock('@/domains/registry', () => ({
+  findDomain: () => ({
+    onValidate: () => ({ valid: true, errors: [] as string[] }),
+    onEvent: () => {},
+    onActionSurfaceRequest: () => [],
+    manifest: { domainId: 'test', version: '1.0.0', requiredFields: [], subscribedEvents: [] },
+  }),
+}))
+
+// Mock @/domains/manifest-loader + plugin-factory for jsdom (cannot resolve fs)
+vi.mock('@/domains/manifest-loader', () => ({
+  loadDomainManifest: () => ({ success: false, errors: [{ domainId: 'test', message: 'mocked in jsdom' }] }),
+  formatManifestError: (e: any) => `[${e.phase}] ${e.domainId}: ${e.message}`,
+}))
+
+vi.mock('@/domains/plugin-factory', () => ({
+  createDomainPlugin: (manifest: any, hooks: any) => ({
+    manifest: {
+      domainId: manifest?.id ?? 'test',
+      version: manifest?.version ?? '1.0.0',
+      requiredFields: [] as string[],
+      subscribedEvents: [] as string[],
+    },
+    onValidate: hooks?.onValidate ?? (() => ({ valid: true, errors: [] })),
+    onEvent: hooks?.onEvent ?? (() => {}),
+    onActionSurfaceRequest: hooks?.onActionSurfaceRequest ?? (() => []),
+  }),
+}))
+
+// Mock @/domains/timebox/transitions for jsdom
+vi.mock('@/domains/timebox/transitions', () => ({
+  findTransition: (transitions: any[], fromState: string | null, action: string) =>
+    transitions.find((t: any) => {
+      const fromMatch = t.from === null ? fromState === null : Array.isArray(t.from) ? t.from.includes(fromState!) : t.from === fromState
+      return fromMatch && t.action === action
+    }),
+  timeboxTransitions: [
+    { from: null, to: 'planned', action: 'create', eventType: 'TimeboxCreated' },
+    { from: 'planned', to: 'running', action: 'start', eventType: 'TimeboxStarted' },
+    { from: 'running', to: 'ended', action: 'end', eventType: 'TimeboxEnded' },
+    { from: 'running', to: 'overtime', action: 'overtime', eventType: 'TimeboxOvertime' },
+    { from: 'overtime', to: 'ended', action: 'end', eventType: 'TimeboxEnded' },
+    { from: 'planned', to: 'cancelled', action: 'cancel', eventType: 'TimeboxCancelled' },
+    { from: 'ended', to: 'logged', action: 'log', eventType: 'TimeboxLogged' },
+  ],
+}))
+
+// 模拟 lifecycle-configs，提供稳定的动态函数避免 jsdom 中 fs 不可用
+vi.mock('../lifecycle-configs', () => ({
+  buildActionMap: () => ({
+    createTimebox: 'create', startTimebox: 'start', endTimebox: 'end', overtimeTimebox: 'overtime', cancelTimebox: 'cancel', logTimebox: 'log',
+    create_timebox: 'create', start_timebox: 'start', end_timebox: 'end', overtime_timebox: 'overtime', cancel_timebox: 'cancel', log_timebox: 'log',
+    createHabit: 'create', activateHabit: 'activate', suspendHabit: 'suspend', archiveHabit: 'archive', reactivateHabit: 'reactivate', logHabit: 'log',
+    createObjective: 'create', updateObjective: 'update', activateObjective: 'activate', pauseObjective: 'pause', resumeObjective: 'resume',
+    completeObjective: 'complete', discardObjective: 'discard', archiveObjective: 'archive',
+    createKeyResult: 'create', updateKeyResult: 'update', updateKeyResultProgress: 'updateProgress', deleteKeyResult: 'deleteDraft',
+    create_objective: 'create', create_key_result: 'create',
+    createTask: 'create', updateTask: 'update', completeTask: 'complete', archiveTask: 'archive', activateTask: 'activate',
+    createProject: 'create', updateProject: 'update', activateProject: 'activate', pauseProject: 'pause', resumeProject: 'resume',
+    completeProject: 'complete', archiveProject: 'archive',
+    create_task: 'create', create_project: 'create',
+  }),
+  resolveObjectType: (domainId: string, _action: string) => {
+    const map: Record<string, string> = { timebox: 'timebox', habits: 'habit', okrs: 'objective', tasks: 'task' }
+    return map[domainId] ?? domainId
+  },
+  getTransitionFromManifest: (_domainId: string, objectType: string, fromState: string | null, action: string) => {
+    const lifecycles: Record<string, Array<{ from: string | string[] | null; action: string; to: string; eventType: string }>> = {
+      habit: [
+        { from: null, action: 'create', to: 'draft', eventType: 'HabitCreated' },
+        { from: 'draft', action: 'activate', to: 'active', eventType: 'HabitActivated' },
+        { from: 'active', action: 'suspend', to: 'suspended', eventType: 'HabitSuspended' },
+        { from: 'suspended', action: 'reactivate', to: 'active', eventType: 'HabitActivated' },
+        { from: 'suspended', action: 'archive', to: 'archived', eventType: 'HabitArchived' },
+      ],
+      objective: [
+        { from: null, action: 'create', to: 'draft', eventType: 'ObjectiveCreated' },
+        { from: 'draft', action: 'activate', to: 'active', eventType: 'ObjectiveActivated' },
+        { from: 'active', action: 'pause', to: 'paused', eventType: 'ObjectivePaused' },
+        { from: 'paused', action: 'resume', to: 'active', eventType: 'ObjectiveResumed' },
+        { from: 'active', action: 'complete', to: 'completed', eventType: 'ObjectiveCompleted' },
+        { from: 'draft', action: 'discard', to: 'discarded', eventType: 'ObjectiveDiscarded' },
+        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ObjectiveArchived' },
+      ],
+      task: [
+        { from: null, action: 'create', to: 'draft', eventType: 'TaskCreated' },
+        { from: 'draft', action: 'activate', to: 'active', eventType: 'TaskActivated' },
+        { from: 'active', action: 'complete', to: 'completed', eventType: 'TaskCompleted' },
+        { from: 'active', action: 'archive', to: 'archived', eventType: 'TaskArchived' },
+      ],
+      project: [
+        { from: null, action: 'create', to: 'planning', eventType: 'ProjectCreated' },
+        { from: 'planning', action: 'activate', to: 'active', eventType: 'ProjectActivated' },
+        { from: 'active', action: 'pause', to: 'paused', eventType: 'ProjectPaused' },
+        { from: 'paused', action: 'resume', to: 'active', eventType: 'ProjectResumed' },
+        { from: 'active', action: 'complete', to: 'completed', eventType: 'ProjectCompleted' },
+        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ProjectArchived' },
+      ],
+    }
+    const transitions = lifecycles[objectType] ?? []
+    return transitions.find(t => {
+      const fromMatch = t.from === null ? fromState === null : Array.isArray(t.from) ? t.from.includes(fromState!) : t.from === fromState
+      return fromMatch && t.action === action
+    })
+  },
+}))
+
 import { createOrchestrator } from '../index'
 
 // ─── 测试用 mock 工厂 ─────────────────────────────────────────

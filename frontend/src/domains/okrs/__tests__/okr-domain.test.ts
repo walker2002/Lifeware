@@ -1,4 +1,28 @@
 import { describe, it, expect } from 'vitest'
+import { vi } from 'vitest'
+
+vi.mock('@/domains/manifest-loader', () => ({
+  loadDomainManifest: () => ({
+    success: true,
+    manifest: {
+      id: 'okrs',
+      version: '1.0.0',
+      name: 'OKR管理',
+      description: '目标与关键结果管理',
+      intent_triggers: [],
+      lifecycle: {},
+      field_metadata: {
+        okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+      },
+      list_actions: [],
+      required_fields: { createObjective: [
+        { name: 'title', label: '标题', type: 'text', required: true },
+      ] },
+      subscribed_events: ['ObjectiveCreated', 'ObjectiveActivated', 'ObjectivePaused', 'ObjectiveResumed', 'ObjectiveCompleted', 'ObjectiveDiscarded', 'ObjectiveArchived', 'KeyResultUpdated', 'KeyResultCompleted', 'KeyResultProgressUpdated', 'TaskCompleted', 'HabitLogged'],
+    },
+  }),
+}))
+
 import { okrsPlugin } from '../index'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOMSnapshot, SystemEvent } from '@/usom/types/process'

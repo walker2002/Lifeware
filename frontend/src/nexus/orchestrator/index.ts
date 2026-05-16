@@ -4,9 +4,11 @@
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
+import type { HabitStatus, ObjectiveStatus, TaskStatus, ProjectStatus } from '@/usom/types/primitives'
 import type {
   StateProposal,
   SystemEvent,
+  SystemEventType,
   ActionSurface,
   ContextSnapshot,
 } from '@/usom/types/process'
@@ -24,12 +26,9 @@ import type {
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { USOMSnapshot } from '@/usom/types/process'
 import { createTimeboxStateMachine, createGenericStateMachine } from '../core/state-machine'
-import { findTransition, habitTransitions } from '@/domains/habits/transitions'
-import { objectiveTransitions, keyResultTransitions } from '@/domains/okrs/transitions'
-import { taskTransitions, projectTransitions } from '@/domains/tasks/transitions'
 import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain } from '@/domains/registry'
-import { timeboxLifecycle, timeboxFieldMeta } from './lifecycle-configs'
+import { buildActionMap, resolveObjectType, getTransitionFromManifest } from './lifecycle-configs'
 
 interface IntentEngine {
   parse(rawInput: string, userId: USOM_ID): Promise<StructuredIntent>
@@ -145,55 +144,16 @@ function trace(
   })
 }
 
-// Intent action → SM action 的通用映射
-const ACTION_MAP: Record<string, string> = {
-  create_timebox: 'create',
-  start_timebox: 'start',
-  end_timebox: 'end',
-  overtime_timebox: 'overtime',
-  cancel_timebox: 'cancel',
-  log_timebox: 'log',
-  createHabit: 'create',
-  activateHabit: 'activate',
-  suspendHabit: 'suspend',
-  archiveHabit: 'archive',
-  reactivateHabit: 'reactivate',
-  createObjective: 'create',
-  updateObjective: 'update',
-  activateObjective: 'activate',
-  pauseObjective: 'pause',
-  resumeObjective: 'resume',
-  completeObjective: 'complete',
-  discardObjective: 'discard',
-  archiveObjective: 'archive',
-  createKeyResult: 'create',
-  updateKeyResult: 'update',
-  updateKeyResultProgress: 'updateProgress',
-  deleteKeyResult: 'deleteDraft',
-  createTask: 'create',
-  completeTask: 'complete',
-  archiveTask: 'archive',
-  activateTask: 'activate',
-  createProject: 'create',
-  updateProject: 'update',
-  activateProject: 'activate',
-  pauseProject: 'pause',
-  resumeProject: 'resume',
-  completeProject: 'complete',
-  archiveProject: 'archive',
-}
+// Intent action → SM action 的动态映射（从各域 manifest 构建）
+const ACTION_MAP: Record<string, string> = buildActionMap()
 
 function toStateMachineAction(domainAction: string): string {
   return ACTION_MAP[domainAction] ?? domainAction
 }
 
-// 从 targetDomain 提取 SM targetObject.type
+// 从 targetDomain + action 动态推导 SM targetObject.type（基于 manifest.lifecycle 键）
 function getObjectType(intent: StructuredIntent): string {
-  const domain = intent.targetDomain
-  if (domain === 'okrs') {
-    return intent.action.includes('KeyResult') || intent.action.includes('keyResult') ? 'key_result' : 'objective'
-  }
-  return domain.replace(/s$/, '') // habits→habit, tasks→task, timebox→timebox
+  return resolveObjectType(intent.targetDomain, intent.action)
 }
 
 export function createOrchestrator(deps: OrchestratorDeps) {
@@ -408,7 +368,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         const now = new Date().toISOString() as Timestamp
 
         if (action === 'create') {
-          const transition = findTransition(habitTransitions, null, 'create')
+          const transition = getTransitionFromManifest('habits', 'habit', null, 'create')
           if (!transition) {
             return { success: false, error: '非法状态转换: 习惯创建失败' }
           }
@@ -435,7 +395,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType,
+            type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'state_machine',
             payload: { habitId: habit.id, intentId: intent.id, toStatus: transition.to },
@@ -454,15 +414,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           return { success: false, error: '习惯不存在' }
         }
 
-        const transition = findTransition(habitTransitions, existing.status, action)
+        const transition = getTransitionFromManifest('habits', 'habit', existing.status, action)
         if (!transition) {
           return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
         }
 
-        const updated = await deps.habitRepo.updateStatus(habitId, transition.to, userId)
+        const updated = await deps.habitRepo.updateStatus(habitId, transition.to as HabitStatus, userId)
         const event: SystemEvent = {
           id: crypto.randomUUID() as USOM_ID,
-          type: transition.eventType,
+          type: transition.eventType as SystemEventType,
           occurredAt: now,
           triggeredBy: 'state_machine',
           payload: { habitId, intentId: intent.id, fromStatus: existing.status, toStatus: transition.to },
@@ -485,7 +445,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
         if (target === 'objective') {
           if (action === 'create') {
-            const transition = findTransition(objectiveTransitions, null, 'create')
+            const transition = getTransitionFromManifest('okrs', 'objective', null, 'create')
             if (!transition) {
               return { success: false, error: '非法状态转换: 目标创建失败' }
             }
@@ -514,7 +474,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
             const event: SystemEvent = {
               id: crypto.randomUUID() as USOM_ID,
-              type: transition.eventType,
+              type: transition.eventType as SystemEventType,
               occurredAt: now,
               triggeredBy: 'state_machine',
               payload: { objectiveId: objId, title: objective.title, toStatus: 'draft' },
@@ -533,7 +493,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return { success: false, error: '目标不存在' }
           }
 
-          const transition = findTransition(objectiveTransitions, existing.status, action)
+          const transition = getTransitionFromManifest('okrs', 'objective', existing.status, action)
           if (!transition) {
             return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
           }
@@ -551,7 +511,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           const updated: Objective = {
             ...existing,
-            status: transition.to,
+            status: transition.to as ObjectiveStatus,
             updatedAt: now,
             ...(transition.to === 'discarded' ? { discardedAt: now } : {}),
             ...(transition.to === 'completed' ? { completedAt: now } : {}),
@@ -589,10 +549,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType,
+            type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'state_machine',
-            payload: { objectiveId, title: existing.title, fromStatus: existing.status, toStatus: transition.to },
+            payload: { objectiveId, title: existing.title, fromStatus: existing.status, toStatus: transition.to as string },
             snapshotId: '' as USOM_ID,
           }
           await deps.eventRepo.append(event, userId)
@@ -702,7 +662,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           }
 
           if (action === 'create') {
-            const transition = findTransition(projectTransitions, null, 'create')
+            const transition = getTransitionFromManifest('tasks', 'project', null, 'create')
             if (!transition) {
               return { success: false, error: '非法状态转换: 项目创建失败' }
             }
@@ -721,7 +681,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
             const event: SystemEvent = {
               id: crypto.randomUUID() as USOM_ID,
-              type: transition.eventType,
+              type: transition.eventType as SystemEventType,
               occurredAt: now,
               triggeredBy: 'state_machine',
               payload: { projectId: project.id, name: project.name, toStatus: transition.to },
@@ -740,15 +700,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return { success: false, error: '项目不存在' }
           }
 
-          const transition = findTransition(projectTransitions, existing.status, action)
+          const transition = getTransitionFromManifest('tasks', 'project', existing.status, action)
           if (!transition) {
             return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
           }
 
-          await deps.projectRepo.updateStatus(projectId, transition.to, userId)
+          await deps.projectRepo.updateStatus(projectId, transition.to as ProjectStatus, userId)
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType,
+            type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'state_machine',
             payload: { projectId, name: existing.name, fromStatus: existing.status, toStatus: transition.to },
@@ -762,7 +722,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
         // Task 操作
         if (action === 'create') {
-          const transition = findTransition(taskTransitions, null, 'create')
+          const transition = getTransitionFromManifest('tasks', 'task', null, 'create')
           if (!transition) {
             return { success: false, error: '非法状态转换: 任务创建失败' }
           }
@@ -788,10 +748,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType,
+            type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'state_machine',
-            payload: { taskId: created.id, title: created.title, toStatus: transition.to },
+            payload: { taskId: created.id, title: created.title, toStatus: transition.to as string },
             snapshotId: '' as USOM_ID,
           }
           await deps.eventRepo.append(event, userId)
@@ -807,15 +767,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           return { success: false, error: '任务不存在' }
         }
 
-        const transition = findTransition(taskTransitions, existing.status, action)
+        const transition = getTransitionFromManifest('tasks', 'task', existing.status, action)
         if (!transition) {
           return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
         }
 
-        await deps.taskRepo.updateStatus(taskId, transition.to, userId)
+        await deps.taskRepo.updateStatus(taskId, transition.to as TaskStatus, userId)
         const event: SystemEvent = {
           id: crypto.randomUUID() as USOM_ID,
-          type: transition.eventType,
+          type: transition.eventType as SystemEventType,
           occurredAt: now,
           triggeredBy: 'state_machine',
           payload: { taskId, title: existing.title, fromStatus: existing.status, toStatus: transition.to },

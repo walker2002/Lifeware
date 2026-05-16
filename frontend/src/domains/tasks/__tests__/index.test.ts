@@ -1,4 +1,52 @@
 import { describe, it, expect } from 'vitest'
+import { vi } from 'vitest'
+
+vi.mock('@/domains/manifest-loader', () => ({
+  loadDomainManifest: () => ({
+    success: true,
+    manifest: {
+      id: 'tasks',
+      version: '1.1.0',
+      name: '任务管理',
+      description: '任务与项目管理',
+      intent_triggers: [],
+      lifecycle: {
+        task: {
+          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
+          initial_state: 'draft',
+          transitions: [
+            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
+            { from: 'active', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+          ],
+          terminal_states: ['completed', 'archived'],
+        },
+        project: {
+          states: ['planning', 'active', 'paused', 'completed', 'archived'],
+          initial_state: 'planning',
+          transitions: [
+            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
+            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+          ],
+          terminal_states: ['archived'],
+        },
+      },
+      field_metadata: {},
+      list_actions: [],
+      required_fields: { createTask: [
+        { name: 'title', label: '标题', type: 'text', required: true },
+      ] },
+      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+    },
+  }),
+}))
+
 import { tasksPlugin } from '../index'
 import type { StructuredIntent } from '@/usom/types/objects'
 

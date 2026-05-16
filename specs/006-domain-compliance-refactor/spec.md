@@ -190,6 +190,7 @@
 - Q: Manifest 加载失败时，是阻止整个系统启动还是仅阻止故障域注册？ → A: 仅阻止故障域注册，输出警告日志，其余域正常启动。前端需能检测到缺失的域并隐藏对应 UI 入口。
 - Q: 当前部分验证常量（如 MIN_DURATION=5, MAX_DURATION=480）未在 manifest.yaml 中声明，是否需要在 manifest 中新增 validation_rules 区块？ → A: 本轮不扩展 manifest 结构，验证常量保留在代码中。validation_rules 区块的纳入在后续迭代中统一考虑。
 - Q: Orchestrator ACTION_MAP 动态化后，intent action 的短名提取规则（如 create_timebox → create）是否需要在 manifest 中显式声明 short_action 字段？ → A: 在 manifest intent_triggers 的 action 字段中约定下划线前缀格式（{short_action}_{domain_object}），运行时按约定提取 short_action，无需新增字段
+- Q: manifest 中使用 camelCase 的 action 名（如 `createTimebox`）与 spec 中描述的下划线约定不一致，系统如何处理？ → A: `buildActionMap()` 同时支持两种约定——(1) **camelCase 剥离**：将已知域对象名（PascalCase 形式，从 manifest.lifecycle 键推导）从 action 名中剥离得到短名，如 `createTimebox` 剥离 `Timebox` → `create`；(2) **snake_case 分割**：以下划线分割取首段，如 `create_timebox` 取 `create` → `create`；(3) **复合名补丁**：对 manifest.intent_triggers 中无法通过剥离规则处理的多对象名 action（如 `updateKeyResultProgress`），尝试剥离已知对象名后保留剩余部分作为短名
 
 ### Session 2026-05-15
 

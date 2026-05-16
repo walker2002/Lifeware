@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { okrsPlugin } from '../index'
-import { onValidate, onEvent, onActionSurfaceRequest } from '../hooks'
+import { createOkrsHooks } from '../hooks'
 import { objectiveTransitions, keyResultTransitions } from '../transitions'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
@@ -68,16 +68,29 @@ describe('T012: OKRs hooks.ts 纯函数验证', () => {
     expect(hooksContent).not.toMatch(/import.*[Rr]epository/)
   })
 
-  it('onValidate 应从 hooks.ts 导出', () => {
-    expect(typeof onValidate).toBe('function')
+  it('createOkrsHooks 工厂函数应从 hooks.ts 导出', () => {
+    expect(typeof createOkrsHooks).toBe('function')
   })
 
-  it('onEvent 应从 hooks.ts 导出', () => {
-    expect(typeof onEvent).toBe('function')
-  })
-
-  it('onActionSurfaceRequest 应从 hooks.ts 导出', () => {
-    expect(typeof onActionSurfaceRequest).toBe('function')
+  it('createOkrsHooks 应返回三个钩子函数', () => {
+    const mockManifest = {
+      id: 'okrs',
+      version: '1.0.0',
+      name: 'OKR管理',
+      description: '',
+      intent_triggers: [],
+      lifecycle: {},
+      field_metadata: {
+        okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+      },
+      list_actions: [],
+      required_fields: {},
+      subscribed_events: ['ObjectiveCreated', 'ObjectiveActivated', 'ObjectivePaused', 'ObjectiveResumed', 'ObjectiveCompleted', 'ObjectiveDiscarded', 'ObjectiveArchived', 'KeyResultUpdated', 'KeyResultCompleted', 'KeyResultProgressUpdated', 'TaskCompleted', 'HabitLogged'],
+    }
+    const hooks = createOkrsHooks(mockManifest as any)
+    expect(typeof hooks.onValidate).toBe('function')
+    expect(typeof hooks.onEvent).toBe('function')
+    expect(typeof hooks.onActionSurfaceRequest).toBe('function')
   })
 })
 
