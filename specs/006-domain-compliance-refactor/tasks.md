@@ -5,6 +5,9 @@
 
 **附加要求**: 每个任务 5-15 分钟，包含 Given-When-Then 验收测试，包含文件路径
 
+> **注**: T001-T041 已在前一轮完成（声明层补齐 + State Machine 通用化 + Orchestrator 去领域化 + 文件搬迁）。
+> T043 起为新增任务，覆盖 US5（Manifest 运行时消费）和 US6（YAML 运行时校验）。
+
 ## Phase 1: Setup — 声明层基础设施
 
 **Purpose**: 创建域注册表和共享类型，为四个域的声明层补齐提供基础
@@ -270,22 +273,162 @@
 
 ---
 
-## Dependencies & Execution Order
+## Phase 11: Setup — Manifest Runtime 依赖安装
+
+**Purpose**: 安装 yaml 和 zod 依赖，为 ManifestLoader 提供基础
+
+- [ ] T043 在 `frontend/` 目录执行 `npm install yaml zod`，安装 YAML 1.2 解析器和运行时校验库
+  - **Files**: `frontend/package.json`, `frontend/package-lock.json`
+  - **Test**: Given 依赖已安装, When 在 server-side 代码中执行 `import { parse } from 'yaml'` 和 `import { z } from 'zod'`, Then TypeScript 编译无错误且运行时模块可正常加载
+
+---
+
+## Phase 12: Foundational — ManifestLoader 基础设施 (US6)
+
+**Purpose**: 创建 manifest 加载、解析、校验的完整基础设施。所有后续域改造依赖此 Phase。
+
+**⚠️ CRITICAL**: Phase 13-15 的所有任务依赖此 Phase 完成
+
+- [ ] T044 创建 `frontend/src/domains/manifest-loader/errors.ts`，定义 `ManifestLoadError` 类型（含 domainId、filePath、phase、message、line?、column?、fieldPath? 字段）和 `formatManifestError(error)` 格式化函数
+  - **Files**: `frontend/src/domains/manifest-loader/errors.ts`
+  - **Test**: Given ManifestLoadError 已定义, When 构造 `{ domainId: 'timebox', filePath: '/path/manifest.yaml', phase: 'syntax', message: 'bad indentation', line: 15 }` 并调用 formatManifestError, Then 输出字符串包含 "timebox"、文件路径、"line 15" 和 "bad indentation"
+
+- [ ] T045 创建 `frontend/src/domains/manifest-loader/schema.ts`，用 Zod 定义 manifest 六区块的完整 schema：`ManifestSchema`（id, version, name, description, intent_triggers, lifecycle, field_metadata, list_actions, required_fields, templates?, subscribed_events），用 `z.infer` 导出 `DomainManifest` 类型
+  - **Files**: `frontend/src/domains/manifest-loader/schema.ts`
+  - **Test**: Given schema 已定义, When 用合法的 timebox manifest 数据（JS 对象）调用 `ManifestSchema.parse(data)`, Then 返回类型安全的对象；When 缺少 lifecycle 区块, Then 抛出 ZodError 且 error.issues[0].path 包含 ['lifecycle']
+
+- [ ] T046 创建 `frontend/src/domains/manifest-loader/validator.ts`，实现 `validateSemantics(manifest)` 函数：校验 lifecycle.transitions 中 from/to 状态均在 states 列表中、initial_state 在 states 中、terminal_states 是 states 子集、required_fields 中引用的字段在 field_metadata 中有声明
+  - **Files**: `frontend/src/domains/manifest-loader/validator.ts`
+  - **Test**: Given validator 已实现, When 传入 lifecycle 含 transition `from: 'draft' to: 'active'` 但 states 不含 'active', Then 返回 `[{ fieldPath: ['lifecycle', 'task', 'transitions', 0, 'to'], message: '状态 active 不在 states 列表中' }]`
+
+- [ ] T047 创建 `frontend/src/domains/manifest-loader/loader.ts`，实现 `loadDomainManifest(domainDir: string)` 函数：用 fs.readFileSync 读取 manifest.yaml → yaml.parse（捕获 YAMLParseError 转为结构化错误）→ ManifestSchema.parse（捕获 ZodError）→ validateSemantics → 缓存到模块级 Map → 返回 ManifestLoadResult
+  - **Files**: `frontend/src/domains/manifest-loader/loader.ts`
+  - **Test**: Given loader 已实现, When 调用 `loadDomainManifest('domains/timebox')`, Then 返回 `{ success: true, manifest: DomainManifest }` 且 manifest.id === 'timebox'；When YAML 含语法错误, Then 返回 `{ success: false, errors: [{ phase: 'syntax', line: ... }] }`
+
+- [ ] T048 创建 `frontend/src/domains/manifest-loader/index.ts`，统一导出 `loadDomainManifest`、`ManifestSchema`、`DomainManifest` 类型、`ManifestLoadError`、`formatManifestError`
+  - **Files**: `frontend/src/domains/manifest-loader/index.ts`
+  - **Test**: Given index.ts 已创建, When 执行 `import { loadDomainManifest, type DomainManifest } from '@/domains/manifest-loader'`, Then TypeScript 编译无错误
+
+**Checkpoint**: ManifestLoader 基础设施就绪，可以加载和校验 manifest.yaml 文件
+
+---
+
+## Phase 13: User Story 5 (P1) — plugin-factory + 四域 index.ts 改造
+
+**Purpose**: 消除四个域 index.ts 中的硬编码 requiredFields/subscribedEvents，改为从 manifest 运行时加载
+
+**Independent Test**: 四个域 index.ts 中不存在与 manifest.yaml 值重复的内联常量
+
+- [ ] T049 创建 `frontend/src/domains/plugin-factory.ts`，实现 `createDomainPlugin(rawManifest: DomainManifest)` 工厂函数：从 manifest 提取 process 层 DomainManifest（domainId、version、requiredFields、subscribedEvents），构建运行时辅助数据（subscribedEvents Set、lifecycleMap、actionTimestampMap），返回 `{ manifest, onValidate, onEvent, onActionSurfaceRequest }` 对象，其中 hooks 通过闭包访问 manifest 数据
+  - **Files**: `frontend/src/domains/plugin-factory.ts`
+  - **Test**: Given factory 已创建, When 调用 `createDomainPlugin(timeboxManifest)`, Then 返回的 plugin.manifest.domainId === 'timebox'，plugin.manifest.subscribedEvents 为数组且包含 'TimeboxCreated'
+
+- [ ] T050 重构 `frontend/src/domains/timebox/index.ts`：删除内联的 timeboxManifest 常量（requiredFields/subscribedEvents），改为调用 `loadDomainManifest(__dirname)` 获取 manifest，然后调用 `createDomainPlugin(manifest)` 构建插件对象并导出。确保 loadDomainManifest 失败时输出 console.error 但不阻止模块加载
+  - **Files**: `frontend/src/domains/timebox/index.ts`
+  - **Test**: Given index.ts 已重构, When 搜索 `requiredFields:` 或 `subscribedEvents:`, Then 无匹配（常量已删除）；When import timeboxPlugin, Then timeboxPlugin.manifest.subscribedEvents 包含 'TimeboxCreated'
+
+- [ ] T051 [P] 重构 `frontend/src/domains/habits/index.ts`：同 T050 模式，删除内联 habitsManifest 常量，改用 loadDomainManifest + createDomainPlugin
+  - **Files**: `frontend/src/domains/habits/index.ts`
+  - **Test**: Given index.ts 已重构, When 搜索 `requiredFields:` 或 `subscribedEvents:`, Then 无匹配；When import habitsPlugin, Then habitsPlugin.manifest.subscribedEvents 包含 'HabitCreated'
+
+- [ ] T052 [P] 重构 `frontend/src/domains/okrs/index.ts`：同 T050 模式
+  - **Files**: `frontend/src/domains/okrs/index.ts`
+  - **Test**: Given index.ts 已重构, When 搜索 `requiredFields:` 或 `subscribedEvents:`, Then 无匹配；When import okrsPlugin, Then okrsPlugin.manifest.subscribedEvents 包含 'ObjectiveCreated'
+
+- [ ] T053 [P] 重构 `frontend/src/domains/tasks/index.ts`：同 T050 模式
+  - **Files**: `frontend/src/domains/tasks/index.ts`
+  - **Test**: Given index.ts 已重构, When 搜索 `requiredFields:` 或 `subscribedEvents:`, Then 无匹配；When import tasksPlugin, Then tasksPlugin.manifest.subscribedEvents 包含 'TaskCreated'
+
+**Checkpoint**: 四域 index.ts 硬编码消除完成，manifest 数据从 YAML 运行时加载
+
+---
+
+## Phase 14: User Story 5 (P1) — 四域 hooks.ts 改造
+
+**Purpose**: 消除四个域 hooks.ts 中的 SUBSCRIBED_EVENTS、TASK_TRANSITIONS、VALID_FREQUENCY_TYPES 等硬编码常量
+
+**Independent Test**: hooks.ts 中不存在与 manifest.yaml 值重复的常量定义
+
+- [ ] T054 重构 `frontend/src/domains/timebox/hooks.ts`：将四个独立导出的钩子函数改为导出 `createTimeboxHooks(manifest: DomainManifest)` 工厂函数。函数内部：用 `new Set(manifest.subscribed_events)` 替代 `SUBSCRIBED_EVENTS` 常量；闭包捕获 manifest 数据。保留 MIN_DURATION/MAX_DURATION/UPCOMING_THRESHOLD_MS 等验证常量（不在本轮 scope）
+  - **Files**: `frontend/src/domains/timebox/hooks.ts`
+  - **Test**: Given hooks.ts 已重构, When 搜索 `const SUBSCRIBED_EVENTS`, Then 无匹配；When 调用 `createTimeboxHooks(timeboxManifest)`, Then 返回的对象包含 onValidate/onEvent/onActionSurfaceRequest 三个函数
+
+- [ ] T055 [P] 重构 `frontend/src/domains/habits/hooks.ts`：导出 `createHabitsHooks(manifest)` 工厂函数。消除 `SUBSCRIBED_EVENTS` 和 `VALID_FREQUENCY_TYPES` 硬编码——subscribedEvents 改从 manifest.subscribed_events 构建，VALID_FREQUENCY_TYPES 改从 manifest.field_metadata.frequencyType.options 动态获取
+  - **Files**: `frontend/src/domains/habits/hooks.ts`
+  - **Test**: Given hooks.ts 已重构, When 搜索 `const SUBSCRIBED_EVENTS` 或 `VALID_FREQUENCY_TYPES`, Then 无匹配；When 调用 createHabitsHooks 后 onValidate 验证 frequencyType='daily', Then 验证通过
+
+- [ ] T056 [P] 重构 `frontend/src/domains/okrs/hooks.ts`：导出 `createOkrsHooks(manifest)` 工厂函数。消除 `SUBSCRIBED_EVENTS` 硬编码和 okrType 验证值硬编码（`'visionary' | 'committed'`）——改从 manifest.field_metadata.okrType.options 动态获取
+  - **Files**: `frontend/src/domains/okrs/hooks.ts`
+  - **Test**: Given hooks.ts 已重构, When 搜索 `const SUBSCRIBED_EVENTS` 或 `'visionary' | 'committed'`, Then 无匹配；When 调用 createOkrsHooks 后 onValidate 验证 okrType='visionary', Then 验证通过
+
+- [ ] T057 [P] 重构 `frontend/src/domains/tasks/hooks.ts`：导出 `createTasksHooks(manifest)` 工厂函数。消除 `SUBSCRIBED_EVENTS`、`TASK_TRANSITIONS`、`PROJECT_TRANSITIONS` 硬编码——subscribedEvents 改从 manifest.subscribed_events 构建，transitions 改从 manifest.lifecycle.task / manifest.lifecycle.project.transitions 动态构建转换查找 Map
+  - **Files**: `frontend/src/domains/tasks/hooks.ts`
+  - **Test**: Given hooks.ts 已重构, When 搜索 `const SUBSCRIBED_EVENTS` 或 `TASK_TRANSITIONS` 或 `PROJECT_TRANSITIONS`, Then 无匹配；When 调用 createTasksHooks 后 onEvent 处理 'TaskCreated' 事件, Then 返回结果（非 undefined）
+
+- [ ] T058 更新 `frontend/src/domains/plugin-factory.ts`：将 `createDomainPlugin` 中 hooks 的调用方式从直接引用 hooks 函数改为调用各域的工厂函数（`createTimeboxHooks(manifest)` 等），根据 manifest.id 选择对应工厂函数
+  - **Files**: `frontend/src/domains/plugin-factory.ts`, `frontend/src/domains/*/hooks.ts`
+  - **Test**: Given factory 已更新, When 调用 `createDomainPlugin(timeboxManifest)`, Then 内部调用 createTimeboxHooks(manifest) 并返回四个钩子函数；When 调用 `createDomainPlugin(tasksManifest)`, Then 内部调用 createTasksHooks(manifest)
+
+**Checkpoint**: 四域 hooks.ts 硬编码消除完成，hooks 通过工厂函数接收 manifest 数据
+
+---
+
+## Phase 15: User Story 5 (P1) — Nexus 核心硬编码消除
+
+**Purpose**: 消除 Orchestrator ACTION_MAP、lifecycle-configs.ts、State Machine actionTimestampMap 中的域专属硬编码
+
+**Independent Test**: Nexus 源码中不存在域名称或域专属值的硬编码引用
+
+- [ ] T059 重构 `frontend/src/nexus/orchestrator/lifecycle-configs.ts`：将 `getTimeboxLifecycle()` 等函数改为从 manifest 动态加载。新增 `getLifecycleFromManifest(domainId: string, objectType: string)` 函数，从 registry 中查找域插件并读取 manifest.lifecycle[objectType]。保留旧函数作为 wrapper 调用新函数（过渡期兼容），标记 @deprecated
+  - **Files**: `frontend/src/nexus/orchestrator/lifecycle-configs.ts`, `frontend/src/domains/registry.ts`
+  - **Test**: Given 重构完成, When 调用 `getLifecycleFromManifest('timebox', 'timebox')`, Then 返回的 states 数组与 timebox/manifest.yaml 中 lifecycle.timebox.states 一致
+
+- [ ] T060 重构 `frontend/src/nexus/core/state-machine/index.ts` 中的 `actionTimestampMap`：将硬编码的 action→timestamp 映射（如 `'start_timebox' → 'startedAt'`）改为从 manifest.field_metadata 中 `type: 'lifecycle_timestamp'` 字段动态构建。新增 `buildActionTimestampMap(manifest: DomainManifest)` 工具函数，在 manifest-loader 或 plugin-factory 中实现
+  - **Files**: `frontend/src/nexus/core/state-machine/index.ts`, `frontend/src/domains/plugin-factory.ts`
+  - **Test**: Given 重构完成, When 搜索 State Machine 源码中的 `'startedAt'` 或 `'endedAt'` 等硬编码字符串, Then 仅出现在注释中；When 对 timebox manifest 调用 buildActionTimestampMap, Then 返回 `{ start_timebox: { startedAt: 'now' }, end_timebox: { endedAt: 'now' } }` 类似结构
+
+- [ ] T061 重构 `frontend/src/nexus/orchestrator/index.ts` 中的 `ACTION_MAP`：将 40+ 条硬编码 action→shortAction 映射改为从 registry 中各域 manifest.intent_triggers 动态构建。实现 `buildActionMap(plugins: DomainPlugin[]): Record<string, string>` 函数，规则：遍历每个 plugin 的 manifest.intent_triggers，按 action 名称下划线分割取第一段作为 shortAction
+  - **Files**: `frontend/src/nexus/orchestrator/index.ts`
+  - **Test**: Given 重构完成, When 搜索 `ACTION_MAP` 关键词, Then 无硬编码映射表残留；When 调用 buildActionMap 后查 'create_timebox', Then 返回 'create'；查 'activate_habit', Then 返回 'activate'
+
+- [ ] T062 清理废弃代码：标记 `lifecycle-configs.ts` 中的旧内联对象为 @deprecated；检查各域 `transitions.ts` 文件是否仍被引用，若已完全由 manifest.lifecycle 替代则标记 @deprecated
+  - **Files**: `frontend/src/nexus/orchestrator/lifecycle-configs.ts`, `frontend/src/domains/*/transitions.ts`
+  - **Test**: Given 清理完成, When 搜索 `timeboxLifecycle` 或 `habitTransitions` 非废弃引用, Then 仅在 @deprecated 标记的函数中存在
+
+**Checkpoint**: Nexus 核心硬编码消除完成，所有域数据从 manifest 运行时加载
+
+---
+
+## Phase 16: 集成验证 + Success Criteria 检查
+
+**Purpose**: 端到端验证，确保 US5 和 US6 的所有 Success Criteria 满足
+
+- [ ] T063 更新 `frontend/src/domains/registry.ts`：确保四个域均通过 `loadDomainManifest()` 加载 manifest 并通过 `createDomainPlugin()` 注册。加载失败的域跳过注册并输出 console.warn
+  - **Files**: `frontend/src/domains/registry.ts`
+  - **Test**: Given registry 已更新, When 加载成功, Then domainRegistry 长度为 4 且每个 plugin 的 manifest.id 正确；When 某域 manifest 有语法错误, Then 该域不进入 registry 但其余 3 个域正常注册
+
+- [ ] T064 验证 SC-008 ~ SC-012：逐一检查五个 Success Criteria：SC-008（修改 manifest subscribed_events 后 onEvent 自动响应）、SC-009（index.ts 无内联常量）、SC-010（Orchestrator 无 ACTION_MAP 硬编码）、SC-011（YAML 语法错误输出结构化错误）、SC-012（缺失区块报告缺失名称）
+  - **Files**: `frontend/src/domains/*/index.ts`, `frontend/src/domains/*/hooks.ts`, `frontend/src/nexus/orchestrator/index.ts`, `frontend/src/domains/manifest-loader/`
+  - **Test**: Given 代码已改造, When 执行以下 grep 检查——`grep 'requiredFields:' domains/*/index.ts`（应为空）、`grep 'ACTION_MAP' nexus/orchestrator/index.ts | grep -v buildActionMap`（应为空）、故意制造 YAML 错误后加载（应输出结构化错误）——Then 所有检查通过
+
+- [ ] T065 运行 `npm run build` 最终构建验证，修复所有编译错误。确保无客户端 bundle 引入 yaml/zod（通过搜索 build 输出确认）
+  - **Files**: `frontend/`
+  - **Test**: Given 所有改动完成, When 运行 npm run build, Then 构建成功无错误；When 检查 .next/ 构建输出, Then yaml/zod 包不在客户端 chunk 中
 
 ### Phase Dependencies
 
-- **Phase 1 (Setup)**: 无依赖，立即开始
-- **Phase 2 (Timebox)**: 依赖 Phase 1 的 registry 和类型定义
-- **Phase 3-5 (其他域声明层)**: 依赖 Phase 2 作为模板，三个域可并行
-- **Phase 6-7 (核心引擎)**: 依赖 Phase 2-5 所有声明层完成；Phase 6 和 7 必须顺序执行
-- **Phase 8-9 (文件搬迁)**: 依赖 Phase 7 完成；8 和 9 可部分并行（Repository 先行）
-- **Phase 10 (验证)**: 依赖所有前序 Phase 完成
+- **Phase 1-10**: 前一轮已完成
+- **Phase 11 (Setup)**: 无依赖，立即开始
+- **Phase 12 (ManifestLoader)**: 依赖 Phase 11 yaml+zod 安装
+- **Phase 13 (四域 index.ts)**: 依赖 Phase 12 ManifestLoader 就绪
+- **Phase 14 (四域 hooks.ts)**: 依赖 Phase 13 完成
+- **Phase 15 (Nexus 硬编码)**: 依赖 Phase 13-14 完成
+- **Phase 16 (集成验证)**: 依赖 Phase 12-15 全部完成
 
 ### Parallel Opportunities
 
-- Phase 3/4/5（habits/okrs/tasks 声明层）可完全并行
-- Phase 8 的 T029-T032（四个域 Repository 搬迁）可完全并行
-- Phase 9 的 T035-T037（三个域 UI 搬迁）可完全并行
+- Phase 13 的 T051/T052/T053（habits/okrs/tasks index.ts）可与 T050 并行
+- Phase 14 的 T055/T056/T057（habits/okrs/tasks hooks.ts）可与 T054 并行
 
 ### Within Each Phase
 
@@ -294,22 +437,22 @@
 
 ## Implementation Strategy
 
-### MVP (Phase 1 + Phase 2)
+### 已完成 (Phase 1-10)
 
-完成 registry 和 timebox 域声明层，验证模板正确性。
+声明层补齐 + State Machine 通用化 + Orchestrator 去领域化 + 文件搬迁 + 验证。
 
-### Increment 1 (Phase 3-5)
+### Increment 4 (Phase 11-12) — Manifest 基础设施
 
-三个域声明层并行完成。
+安装依赖 + ManifestLoader 实现，为运行时消费提供基础。
 
-### Increment 2 (Phase 6-7) — 核心改动
+### Increment 5 (Phase 13-14) — 四域运行时消费
 
-State Machine 通用化 + Orchestrator 去领域化 + Actions 对接，原子完成。
+按域逐步消除 index.ts 和 hooks.ts 中的硬编码，可按域并行。
 
-### Increment 3 (Phase 8-9)
+### Increment 6 (Phase 15) — Nexus 核心消除
 
-文件搬迁，按域并行。
+Orchestrator ACTION_MAP + lifecycle-configs + State Machine actionTimestampMap 动态化。
 
-### Final (Phase 10)
+### Final (Phase 16)
 
-完整验证。
+SC-008 ~ SC-012 逐条验证 + 构建通过。

@@ -1,6 +1,6 @@
 # Data Model: Domain 全面合规重构
 
-**Date**: 2026-05-15
+**Date**: 2026-05-16 (updated)
 **Feature**: 006-domain-compliance-refactor
 
 ## Entity Changes
@@ -138,3 +138,66 @@ interface Orchestrator {
 | `app/actions/intent.ts` | 对接新 Orchestrator 入口 |
 | `app/actions/okr.ts` | 对接新 Orchestrator 入口 |
 | `app/projects/actions.ts` | 从直接 repo 调用改为 PrebuiltIntent |
+
+## Manifest Runtime Consumption (新增接口)
+
+### ManifestLoader
+
+```typescript
+// domains/manifest-loader/loader.ts
+
+interface ManifestLoadError {
+  domainId: string
+  filePath: string
+  phase: 'syntax' | 'structure' | 'semantics'
+  message: string
+  line?: number
+  column?: number
+  fieldPath?: string[]   // Zod error path
+}
+
+interface ManifestLoadResult {
+  success: true
+  manifest: DomainManifest  // z.infer<typeof ManifestSchema>
+} | {
+  success: false
+  errors: ManifestLoadError[]
+}
+
+function loadDomainManifest(domainDir: string): ManifestLoadResult
+```
+
+### PluginFactory
+
+```typescript
+// domains/plugin-factory.ts
+
+interface HookContext {
+  manifest: DomainManifest
+  subscribedEvents: Set<string>
+  lifecycleMap: Map<string, LifecycleDefinition>
+}
+
+function createDomainPlugin(rawManifest: DomainManifest): DomainPlugin
+```
+
+### ActionTimestampMap 动态构建
+
+```typescript
+// 从 manifest.field_metadata 中提取 type=lifecycle_timestamp 的字段
+function buildActionTimestampMap(
+  manifest: DomainManifest
+): Record<string, Record<string, string>>
+// 返回: { [actionName]: { [fieldName]: timestampValue } }
+```
+
+### ACTION_MAP 动态构建
+
+```typescript
+// 从 registry 中各域 manifest.intent_triggers 动态构建
+function buildActionMap(
+  plugins: DomainPlugin[]
+): Record<string, string>
+// 返回: { "create_timebox": "create", "start_timebox": "start", ... }
+// 规则：按下划线分割取第一段作为 short_action
+```

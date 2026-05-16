@@ -1,15 +1,82 @@
 # Quickstart: Domain 全面合规重构
 
 **Feature**: 006-domain-compliance-refactor
-**Date**: 2026-05-15
+**Date**: 2026-05-16 (updated)
 
 ## Prerequisites
 
 ```bash
 cd frontend
 docker-compose up -d
-npm install
+npm install          # 会安装 yaml + zod
 npm run db:migrate
+```
+
+## Manifest Runtime Consumption 验证
+
+### Phase 1 (基础设施) 完成后
+
+```bash
+# 1. 确认新依赖已安装
+node -e "require('yaml'); console.log('yaml OK')"
+node -e "require('zod'); console.log('zod OK')"
+
+# 2. 确认 manifest-loader 目录存在
+test -d src/domains/manifest-loader && echo "manifest-loader OK" || echo "MISSING"
+
+# 3. 确认 plugin-factory.ts 存在
+test -f src/domains/plugin-factory.ts && echo "plugin-factory OK" || echo "MISSING"
+```
+
+### Phase 2 (四域改造) 完成后
+
+```bash
+# 1. 四域 index.ts 中不再有内联 requiredFields/subscribedEvents
+grep -n "requiredFields:" src/domains/*/index.ts && echo "FAIL: 硬编码残留" || echo "OK: 无硬编码 requiredFields"
+grep -n "subscribedEvents:" src/domains/*/index.ts && echo "FAIL: 硬编码残留" || echo "OK: 无硬编码 subscribedEvents"
+
+# 2. 四域 hooks.ts 中不再有 SUBSCRIBED_EVENTS 常量
+grep -n "SUBSCRIBED_EVENTS" src/domains/*/hooks.ts && echo "FAIL: 硬编码残留" || echo "OK: 无 SUBSCRIBED_EVENTS 常量"
+
+# 3. 四域 hooks.ts 导出工厂函数
+for domain in timebox habits okrs tasks; do
+  grep -q "export function create" src/domains/$domain/hooks.ts && echo "$domain: factory OK" || echo "$domain: MISSING factory"
+done
+
+# 4. 构建通过
+npm run build
+```
+
+### Phase 3 (Nexus 改造) 完成后
+
+```bash
+# 1. Orchestrator 无 ACTION_MAP 硬编码
+grep -n "ACTION_MAP" src/nexus/orchestrator/index.ts | grep -v "buildActionMap\|getActionMap" && echo "FAIL: ACTION_MAP 残留" || echo "OK: ACTION_MAP 已动态化"
+
+# 2. lifecycle-configs.ts 已废弃或动态化
+grep -n "timeboxLifecycle" src/nexus/orchestrator/lifecycle-configs.ts 2>/dev/null && echo "WARN: lifecycle-configs 未清理" || echo "OK: 已清理"
+
+# 3. State Machine actionTimestampMap 动态化
+grep -n "actionTimestampMap" src/nexus/core/state-machine/index.ts | head -5
+
+# 4. Nexus 无域名称硬编码
+grep -rn "Timebox\b\|Habit\b\|Objective\b\|KeyResult\b" src/nexus/core/state-machine/index.ts src/nexus/orchestrator/index.ts | grep -v "import\|comment\|// " && echo "FAIL: 域耦合残留" || echo "OK: 无域耦合"
+
+# 5. 构建和测试
+npm run build && npm test
+```
+
+### Manifest 校验测试
+
+```bash
+# 1. 制造一个 YAML 语法错误，验证加载器报告行号
+# (手动在 manifest.yaml 中制造缩进错误，观察启动日志)
+
+# 2. 验证合法 manifest 无警告
+# (确认正常启动时无 manifest 相关错误)
+
+# 3. 验证故障域不影响其他域
+# (在某个域的 manifest 中制造错误，确认其他域正常加载)
 ```
 
 ## Verification Steps
