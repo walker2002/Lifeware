@@ -9,6 +9,7 @@ description: 时间盒管理 — 将时间结构化为可执行的专注单元
 # ─── 区块 A: intent_triggers ─────────────────────────────────────
 intent_triggers:
   - action: createTimebox
+    shortcut: /createTimebox
     description: 创建一个新的时间盒
     examples:
       - 帮我创建一个时间盒
@@ -16,29 +17,34 @@ intent_triggers:
       - 下午2点到3点做代码审查
     keywords: [时间盒, timebox, 安排, 计划, 专注]
   - action: startTimebox
+    shortcut: /startTimebox
     description: 开始执行一个时间盒
     examples:
       - 开始这个时间盒
       - 启动专注时间
     keywords: [开始, 启动, start]
   - action: endTimebox
+    shortcut: /endTimebox
     description: 结束当前时间盒
     examples:
       - 结束时间盒
       - 完成这个专注时段
     keywords: [结束, 完成, end]
   - action: cancelTimebox
+    shortcut: /cancelTimebox
     description: 取消一个计划中的时间盒
     examples:
       - 取消这个时间盒
     keywords: [取消, cancel]
   - action: logTimebox
+    shortcut: /logTimebox
     description: 记录时间盒的执行结果
     examples:
       - 记录执行结果
       - 这个时间盒完成度80%
     keywords: [记录, log]
   - action: viewSchedule
+    shortcut: /schedule
     description: 查看今日时间盒日程
     examples:
       - 查看今天的日程
@@ -182,3 +188,19 @@ subscribed_events:
   - TimeboxEnded
   - TimeboxCancelled
   - TimeboxLogged
+
+# ─── 区块 G: view_routes ─────────────────────────────────────────
+view_routes:
+  createTimebox:
+    component: domains/timebox/pages/TimeboxFormPage
+    params:
+      mode: create
+
+# ─── 区块 H: templates ───────────────────────────────────────────
+templates:
+  markdown:
+    createTimebox:
+      template_file: markdown_templates/timebox_plan.md
+      description: 时间盒批量创建模板
+      output_action: createTimebox
+      max_objects: 20

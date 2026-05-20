@@ -21,6 +21,7 @@ LW_overall_项目开发必读_2026_05_01.md          # 项目最高解释文档
 LW_overall_总体设计_2026_05_02.md              # 架构设计-总体设计文档
 LW_overall_技术栈设计演进_2026_03_18.md        # 技术栈选型与演进路径
 LW_overall_意图驱动场景示例_2026_05_01.md      # 意图驱动场景流程示例（Nexus→Domain 全链路验证）
+LW_domain_注册指南_2026_05_14.md               # Domain 注册操作指南（manifest/hooks/repository/schema 全流程）
 image-20260502091924536.png                    # 文档配图
 
 mydocs/methodology/
@@ -80,3 +81,6 @@ database-design.md     # 数据库表结构与设计规范（由 LW_database_数
 | 场景提示词设计方案 | 2026_04_06 | 无 | 创建。确定场景提示词方案方向，替代原知识库方案 |
 | 冲突仲裁矩阵 | 2026_04_06 | 无 | 创建。定义10条方法论冲突仲裁规则和5条仲裁原则 |
 | 意图驱动场景示例 | 2026_05_01 | 无 | 创建。通过两个场景案例验证 Nexus→Domain 全链路 |
+| Domain 注册指南 | 2026_05_15 | 无 | 创建。定义新增 Domain 的 8 步完整操作流程，含 manifest 六区块声明、纯函数钩子、Repository 接口、页面组件模板、硬编码检测清单 |
+| USOM 详细设计 | 2026_05_16 | 2026_03_21 | 新增 ChatMessage/AISession/AISessionSummary/LLMConfig/UserSettings 类型及生命周期约束 |
+| 数据库设计 | 2026_05_16 | 2026_03_21 | 新增 ai_sessions 表（10列+2索引）、user_settings 表（6列+1唯一索引） |

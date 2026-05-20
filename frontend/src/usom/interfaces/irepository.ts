@@ -2,12 +2,13 @@
 // All methods use USOM types only (R-02). No Drizzle types exposed.
 // All methods filter by userId (T-02). Nexus components do not see userId (T-03).
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ProjectStatus } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ProjectStatus, AISessionStatus } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
   Project, ProjectTemplate, TaskTemplate,
+  AISession, AISessionSummary, UserSettings,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
@@ -273,4 +274,23 @@ export interface IDerivedSignalsRepository {
 export interface IEnergyLogRepository {
   findByUserInRange(userId: USOM_ID, startAt: Timestamp, endAt: Timestamp): Promise<EnergyLog[]>
   save(log: EnergyLog, userId: USOM_ID): Promise<void>
+}
+
+// ─── AISession ─────────────────────────────────────────────────
+export interface IAISessionRepository {
+  findById(id: USOM_ID, userId: USOM_ID): Promise<AISession | null>
+  findByUserId(userId: USOM_ID): Promise<AISessionSummary[]>
+  create(session: Omit<AISession, 'id' | 'createdAt' | 'updatedAt'>, userId: USOM_ID): Promise<AISession>
+  updateMessages(id: USOM_ID, messages: AISession['messages'], userId: USOM_ID): Promise<void>
+  updateStateSnapshot(id: USOM_ID, snapshot: AISession['stateSnapshot'], userId: USOM_ID): Promise<void>
+  updateTitle(id: USOM_ID, title: string, userId: USOM_ID): Promise<void>
+  archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+  restore(id: USOM_ID, userId: USOM_ID): Promise<void>
+  delete(id: USOM_ID, userId: USOM_ID): Promise<void>
+}
+
+// ─── UserSettings ──────────────────────────────────────────────
+export interface IUserSettingsRepository {
+  findByUserId(userId: USOM_ID): Promise<UserSettings | null>
+  upsert(settings: Omit<UserSettings, 'id'>, userId: USOM_ID): Promise<UserSettings>
 }

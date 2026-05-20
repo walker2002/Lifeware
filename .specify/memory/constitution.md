@@ -1,25 +1,51 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.3.0 → 1.4.0
-  Rationale: MINOR — new Architecture Constraint section (Manifest Runtime
-  Consumption) codifying that manifest.yaml is runtime configuration, not
-  development-time documentation. Prevents AI code generation from
-  hardcoding manifest values as constants.
+  Version change: 1.4.0 → 1.5.0
+  Rationale: MINOR — Handler + Context Engine architecture expansion.
+  Introduces Generative Path (Handlers, Context Providers, Context Engine)
+  as a new capability track alongside the existing Reactive Path (Hooks),
+  without modifying or removing any existing principles.
+
+  Modified principles:
+    - Principle III (Single-Writer) → Added Context Engine as 5th writer
+    - Principle VI (Domain Plugin) → Expanded from "four-hook, three-
+      prohibition" to dual-track model (Reactive Hooks + Generative
+      Handlers + Context Providers)
+    - Principle VIII (AI/Rule Boundary) → Clarified AI participation
+      in Handler (Domain Plugin scope)
 
   Added sections:
-    - Architecture Constraints > Manifest Runtime Consumption (new)
-      Three concrete rules, hardcoding detection code smells, and
-      enforcement guidance for runtime manifest consumption.
+    - Architecture Constraints > Context Provider Constraints (new)
+      Three constraints (read-only projection, no complex computation,
+      Zod schema validation) and visibility control model.
 
-  Follow-up documents requiring updates:
-    - mydocs/core/LW_domain_注册指南_2026_05_14.md  ⚠ pending update
+  Modified sections:
+    - Architecture Constraints > Orchestrator Purity (expanded:
+      generative path routing)
+    - Architecture Constraints > Domain Manifest Self-Description
+      (added generation_actions block)
+    - Architecture Constraints > Domain Registration Process (updated
+      steps for Handlers and Context Providers)
+
+  Templates requiring updates:
     - .specify/templates/plan-template.md            ✅ no changes needed
     - .specify/templates/spec-template.md             ✅ no changes needed
     - .specify/templates/tasks-template.md            ✅ no changes needed
 
-  Follow-up TODOs: update Domain Registration Guide Step 2 and Step 7
-  to include runtime consumption guidance.
+  Follow-up documents requiring updates:
+    - docs/usom-design.md                            ⚠ pending update
+      (add ContextProvider, ContextCapability, DomainHandler,
+       GenerationRequest, GenerationResult types)
+    - mydocs/core/LW_overall_总体设计_*.md             ⚠ pending update
+      (update Nexus composition, Domain dual-track model)
+    - mydocs/core/LW_domain_注册指南_2026_05_14.md    ⚠ pending update
+      (add Handler and Provider registration steps)
+
+  Follow-up TODOs:
+    - Update Domain Registration Guide with Handler/Provider steps
+    - Update USOM design doc with new process types
+    - Update overall design doc with dual-track model
 -->
 
 # Lifeware Constitution
@@ -85,7 +111,7 @@ energy compatibility. User calibration values override system defaults.
 
 ### III. Single-Writer Invariant
 
-Four components hold exclusive write authority — no other component may
+Five components hold exclusive write authority — no other component may
 usurp their responsibilities:
 
 | Component | Exclusive Authority |
@@ -94,13 +120,16 @@ usurp their responsibilities:
 | Memory Framework | Memory writes (all levels L1–L5); Derived Signals as the sole read interface for external consumers |
 | Intent Engine | Intent parsing and StructuredIntent production |
 | Action Surface Engine | Output presentation (Action Guide, Dynamic Tile, Continuity Cue) |
+| Context Engine | Context assembly for generative operations; reads manifest `generation_actions`, resolves Context Capabilities, produces `GenerationRequest` |
 
 **Rationale**: Prevents race conditions, ensures auditability, and
 enables each component to reason about its invariants without
-coordinating with peers.
+coordinating with peers. Context Engine is the sole authority for
+assembling cross-Domain context data — no Handler may fetch its own
+context, and no other component may produce GenerationRequests.
 
 **How to apply**: Code reviews MUST reject any PR where a component
-outside these four performs its reserved write operation.
+outside these five performs its reserved write operation.
 
 ### IV. USOM Sovereignty & Document Authority
 
@@ -134,10 +163,14 @@ storage implementation.
 **How to apply**: Any `import` of Drizzle symbols in Nexus or Domain
 files is a violation. Repository files are the only permitted location.
 
-### VI. Domain Plugin Passivity
+### VI. Domain Plugin Dual-Track Model
 
-Domain plugins operate under a strict "four-hook, three-prohibition"
-model:
+Domain plugins operate under a dual-track model, separating passive
+constraint checking from active generation:
+
+#### Reactive Track — Hooks (Constraint System)
+
+Four hooks with three prohibitions (unchanged):
 
 **Permitted (four hooks)**:
 1. `onValidate` — structural validation of intents
@@ -150,7 +183,45 @@ model:
 2. Autonomous execution without Nexus orchestration
 3. Accessing other domains' internal data
 
-Domain return values MUST use `USOM_ID` references, not full objects.
+#### Generative Track — Handlers (Planning System)
+
+Domain-defined computational units that receive `GenerationRequest`
+from Context Engine and produce `GenerationResult`. Handlers are the
+sole location for generative AI logic within Domain Plugins.
+
+**Handler constraints**:
+- Handlers MAY call AI (unique among Domain components)
+- Handlers MUST NOT access repositories directly — all data arrives
+  via `GenerationRequest.contexts` assembled by Context Engine
+- Handlers MUST NOT write state — output is `GenerationResult`
+  (structured proposals), which re-enters the Reactive Path via
+  Rule Engine validation and State Machine execution
+- Handlers MUST NOT trigger events directly
+
+#### Context Providers (Controlled Sharing Interface)
+
+Each Domain MAY declare `ContextCapability` entries in the Context
+Registry, exposing read-only projections of its internal data for
+cross-Domain consumption by Handlers.
+
+**Provider constraints**:
+- Providers are limited to read, project, and lightweight aggregate
+  operations from their own Domain's Repository
+- Providers MUST NOT perform planning, decision-making, complex
+  computation, or call AI
+- All Provider output MUST pass Zod schema validation
+
+**Visibility control**:
+
+| Level | Meaning | Consumers |
+|---|---|---|
+| `private` | Domain-internal only | None (reserved) |
+| `planning` | Planning operations | Handlers via Context Engine |
+| `system` | System-global | All Nexus components |
+
+MVP stage: all Providers use `planning` visibility.
+
+#### Manifest Declarations
 
 Domain manifests MUST include two self-description declarations:
 
@@ -173,18 +244,28 @@ required fields and templates (E), and event subscriptions (F).
 Each block serves a distinct consumer (Presentation Layer, Intent
 Engine, Event Bus) and MUST NOT be omitted.
 
-**Rationale**: Keeps domains composable and testable. Prevents
-cross-domain coupling and ensures the Orchestrator remains the sole
-workflow coordinator. Manifest self-description prevents coupling
-leakage into Nexus components. Complete six-block manifests ensure
-every consumer has the data it needs without ad-hoc code.
+For Domains with generative capabilities, manifests MAY include a
+`generation_actions` block declaring Handler entry points and their
+required Context Provider dependencies (see Architecture Constraints >
+Domain Manifest Self-Description).
 
-**How to apply**: Each domain plugin file MUST implement only the four
-hooks. Any state-mutating code inside a domain is a violation. Domain
-manifests MUST include all six blocks (A–F). Adding a new Domain
-MUST NOT require modifying Intent Engine routing logic or State Machine
-transition rules. Refer to `mydocs/core/LW_domain_注册指南_2026_05_14.md`
-for the complete step-by-step registration process.
+**Rationale**: The dual-track model keeps the proven "four-hook,
+three-prohibition" constraint system intact while providing a clean
+home for generative AI operations. Hooks remain pure constraint
+checks; Handlers own the planning logic. Context Providers solve
+cross-Domain data sharing without violating Domain isolation.
+Orchestrator remains the sole workflow coordinator — it dispatches
+to either track based on manifest declarations, never executing
+business logic itself.
+
+**How to apply**: Each domain plugin file MUST implement the four
+hooks for the Reactive Track. Domains with generative needs MUST
+also implement Handler classes and register Context Capabilities.
+Any state-mutating code inside a Domain is a violation regardless
+of track. Adding a new Domain MUST NOT require modifying Intent
+Engine routing logic or State Machine transition rules. Refer to
+`mydocs/core/LW_domain_注册指南_2026_05_14.md` for the complete
+step-by-step registration process.
 
 ### VII. Bridge Layer Readiness
 
@@ -210,10 +291,10 @@ Request/Response objects. Any HTTP-aware type in Nexus is a violation.
 
 AI handles ambiguity; rules handle certainty. AI participates in Intent
 Engine Phase A (routing classification) and Phase B (field extraction),
-Presentation (report generation), and Domain Plugin (domain-specific
-logic). AI MUST NOT participate in Rule Engine, State Machine, or
-time-conflict detection. AI generates proposals — it NEVER directly
-writes system state.
+Presentation (report generation), Domain Plugin Handlers (generative
+planning within Domain scope). AI MUST NOT participate in Rule Engine,
+State Machine, Context Engine, or time-conflict detection. AI generates
+proposals — it NEVER directly writes system state.
 
 The Intent Engine two-phase model enforces this boundary: Phase A
 (routing) is interpretive and AI-dependent; Phase B (field completion)
@@ -221,18 +302,28 @@ and all subsequent stages are contract-type execution where AI assists
 but output types are predetermined. Once `StructuredIntent` is formed,
 the pipeline is fully deterministic.
 
+In the Generative Path, Handler output (`GenerationResult`) re-enters
+the deterministic pipeline: Rule Engine validates, State Machine
+executes. AI participation is confined to the Handler boundary —
+Context Engine assembles data deterministically, Rule Engine validates
+deterministically.
+
 When AI fails, the Intent Engine MUST degrade gracefully to template-form
-fallback, producing an equivalent `StructuredIntent`.
+fallback, producing an equivalent `StructuredIntent`. When Handler AI
+fails, the system MUST degrade to rule-based fallback (e.g., priority
+ordered scheduling) ensuring a proposal is always produced.
 
 **Rationale**: Deterministic rules ensure safety invariants (energy
 mismatch, WIP limits). AI provides flexibility where rules cannot
-cover all cases. The two-phase model makes the boundary explicit and
-testable at each phase transition.
+cover all cases. The Generative Path preserves this boundary by
+wrapping AI output in structured proposals that pass through the same
+deterministic validation pipeline.
 
 **How to apply**: Rule Engine files MUST NOT import AI/LLM SDKs. Intent
 Engine files MUST include a non-AI fallback path tested independently.
-Phase A and Phase B MUST have separate test suites — Phase A tests
-routing accuracy, Phase B tests field extraction completeness.
+Handler files MUST include a rule-based fallback path. Phase A and
+Phase B MUST have separate test suites — Phase A tests routing
+accuracy, Phase B tests field extraction completeness.
 
 ## Architecture Constraints
 
@@ -277,6 +368,13 @@ retries, human-decision pause points, and cross-Domain intent
 splitting (sequential processing of multiple `StructuredIntent`s
 derived from a single user input) only.
 
+For generative operations, the Orchestrator identifies the correct
+path by checking whether the action exists in the Domain manifest's
+`generation_actions` block. If present, it delegates data assembly to
+Context Engine and execution to the Domain Handler — never performing
+either task itself. The Orchestrator remains a pure coordinator for
+both Reactive and Generative paths.
+
 ### Domain Manifest Self-Description
 
 Domain manifests MUST declare two structured fields enabling Nexus
@@ -287,13 +385,31 @@ components to operate generically without per-Domain hard-coding:
 | `intent_triggers` | Intent Engine (Phase A) | Bounded classification context for routing user input to Domain actions |
 | `lifecycle` | State Machine | Object lifecycle definitions and transition rules for validating state changes |
 
+For Domains with generative capabilities, manifests MAY declare a
+third structured field:
+
+| Field | Consumer | Purpose |
+|---|---|---|
+| `generation_actions` | Context Engine + Orchestrator | Handler entry points and their required Context Provider dependencies |
+
+The `generation_actions` block maps each generative action to:
+- Which Context Capabilities to resolve (by id)
+- Query parameters for each Provider
+- Parameter extraction from `intent.fields`
+
+This enables Context Engine to assemble `GenerationRequest` and
+Orchestrator to identify generative vs. reactive paths — both without
+Domain-specific code.
+
 These declarations MUST be structured (not free-form text) to enable
 deterministic processing. Adding a new Domain MUST NOT require
 modifying Nexus components — only registering new manifest declarations.
 
 **Rationale**: Prevents coupling leakage between State Machine and
 Domain-specific lifecycle rules. State Machine is a generic executor;
-Domain manifests are the business knowledge source.
+Domain manifests are the business knowledge source. The
+`generation_actions` block extends this principle to generative
+operations, keeping Context Engine and Orchestrator generic.
 
 ### Manifest Runtime Consumption
 
@@ -343,6 +459,43 @@ values are duplicated as constants. The Domain registry MUST expose
 manifest data through accessor methods. AI assistants generating Domain
 code MUST generate registry reads, not value copies.
 
+### Context Provider Constraints
+
+Context Providers are a controlled sharing mechanism that preserves
+Domain isolation while enabling cross-Domain data access for
+generative operations.
+
+**Three constraints**:
+
+1. **Read-only projection**: Providers MUST only read from their own
+   Domain's Repository. They MAY filter, transform, and aggregate
+   data into a sharing format, but MUST NOT modify any data.
+
+2. **No complex computation**: Providers MUST NOT perform planning,
+   decision-making, complex calculations, or call AI. Complex logic
+   belongs in Handlers. Providers are limited to lightweight
+   operations: query, filter, map, count, sum.
+
+3. **Schema-validated output**: All Provider output MUST pass Zod
+   schema validation registered with the `ContextCapability`. This
+   ensures consumers receive well-typed data and prevents Provider
+   output drift.
+
+**Provider ≠ Repository**: Repository manages Domain internal CRUD
+and transactions. Provider exposes read-only projections for external
+consumption. They serve different consumers and have different
+constraints.
+
+**Rationale**: Without Providers, Handlers would need direct access to
+other Domains' Repositories, violating Domain isolation (Principle VI
+Prohibition 3). Providers create a controlled, validated, visibility-
+gated sharing channel that keeps Domains composable.
+
+**How to apply**: Each Provider MUST be registered in the Context
+Registry with a unique capability id, visibility level, and Zod
+schema. Code reviews MUST reject Providers that contain planning logic,
+AI calls, or write operations.
+
 ### Domain Registration Process
 
 All new Domains MUST follow the mandatory 8-step registration process
@@ -352,20 +505,25 @@ section codifies the architectural invariants enforced by that process.
 **Mandatory registration steps**:
 
 1. Declare new USOM object types (if any) in USOM documentation
-2. Write `manifest.yaml` with all six blocks (A–F)
-3. Implement four hook functions (pure functions, no side effects)
+2. Write `manifest.yaml` with all six blocks (A–F), plus optional
+   `generation_actions` for generative capabilities
+3. Implement four hook functions (Reactive Track, pure functions)
 4. Define Drizzle DB Schema
 5. Implement Repository interface
 6. Implement Domain page components (view_routes)
 7. Register Domain in `domains/registry.ts`
 8. Implement Markdown templates (optional)
+9. (If generative) Implement Handler classes and register in
+   `domains/<domain>/handlers/index.ts`
+10. (If generative) Implement Context Providers and register in
+    Context Registry with capability id, visibility, and Zod schema
 
 **Nexus inviolability**: If completing any step requires modifying Nexus
-core components (Intent Engine, Rule Engine, State Machine, Action
-Surface Engine, Orchestrator), the boundary is broken. Stop and discuss
-before proceeding. The only permitted Nexus modification is adding a new
-object's Summary to `ContextSnapshot` — this is a legitimate aggregation
-need, not coupling leakage.
+core components (Intent Engine, Context Engine, Rule Engine, State
+Machine, Action Surface Engine, Orchestrator), the boundary is broken.
+Stop and discuss before proceeding. The only permitted Nexus
+modification is adding a new object's Summary to `ContextSnapshot` —
+this is a legitimate aggregation need, not coupling leakage.
 
 **Page component data access rules**:
 
@@ -519,4 +677,4 @@ is a Tier 1 document and required reading for all Domain development.
 It provides the concrete step-by-step process that operationalizes the
 architectural invariants defined in this constitution.
 
-**Version**: 1.4.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-16
+**Version**: 1.5.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-20

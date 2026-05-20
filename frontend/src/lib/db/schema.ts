@@ -8,6 +8,7 @@ import {
   check, primaryKey,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+import type { LLMConfig } from '../../usom/types/objects'
 
 // ─── 3.1 users ─────────────────────────────────────────────────
 export const users = pgTable('users', {
@@ -537,4 +538,39 @@ export const derivedSignals = pgTable('derived_signals', {
   schemaVersion: integer('schema_version').notNull().default(1),
 }, (table) => [
   uniqueIndex('uniq_derived_signals_user').on(table.userId),
+])
+
+// ─── 8.1 ai_sessions ─────────────────────────────────────────
+export const aiSessions = pgTable('ai_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  title: text('title').notNull().default('新对话'),
+  status: text('status', { enum: ['active', 'archived', 'deleted'] }).notNull().default('active'),
+
+  messages: jsonb('messages').notNull().$type<Array<{ role: string; content: string; timestamp: string; intentRef?: string }>>().default([]),
+  stateSnapshot: jsonb('state_snapshot').notNull().$type<Record<string, unknown>>().default({}),
+  referencedObjectIds: jsonb('referenced_object_ids').notNull().$type<string[]>().default([]),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_ai_sessions_user_status').on(table.userId, table.status),
+  index('idx_ai_sessions_updated').on(table.userId, table.updatedAt),
+])
+
+// ─── 8.2 user_settings (one row per user) ─────────────────────
+export const userSettings = pgTable('user_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  timezone: text('timezone').notNull().default('Asia/Shanghai'),
+  llmConfig: jsonb('llm_config').$type<LLMConfig>(),
+  uiPrefs: jsonb('ui_prefs').$type<Record<string, unknown>>(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('uniq_user_settings_user').on(table.userId),
 ])

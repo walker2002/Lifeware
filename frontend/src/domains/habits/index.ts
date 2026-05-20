@@ -6,7 +6,7 @@ import { loadDomainManifest } from '@/domains/manifest-loader'
 import { createDomainPlugin } from '@/domains/plugin-factory'
 import { createHabitsHooks } from './hooks'
 
-const result = loadDomainManifest(__dirname)
+const result = loadDomainManifest('habits')
 
 if (!result.success) {
   for (const error of result.errors) {

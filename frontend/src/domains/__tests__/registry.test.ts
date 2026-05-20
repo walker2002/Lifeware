@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { domainRegistry, findDomain } from '../registry'
+import { domainRegistry, findDomain, getActionByShortcut, getViewRoute, getAllDomainActions, validateShortcutUniqueness } from '../registry'
 
 describe('domainRegistry', () => {
   it('应包含四个已注册域', () => {
@@ -47,5 +47,50 @@ describe('domainRegistry', () => {
       expect(typeof plugin.onActionSurfaceRequest).toBe('function')
       // onOutboundRequest 是可选的
     }
+  })
+})
+
+describe('getActionByShortcut', () => {
+  it('should return domain and action for a known shortcut', () => {
+    const result = getActionByShortcut('/createHabit')
+    expect(result).toEqual({ domainId: 'habits', action: 'createHabit' })
+  })
+
+  it('should return undefined for unknown shortcut', () => {
+    const result = getActionByShortcut('/nonexistent')
+    expect(result).toBeUndefined()
+  })
+})
+
+describe('getViewRoute', () => {
+  it('should return view route for known domain+action', () => {
+    const result = getViewRoute('habits', 'createHabit')
+    expect(result).toEqual({ component: 'domains/habits/pages/HabitFormPage', params: { mode: 'create' } })
+  })
+
+  it('should return undefined for unknown domain', () => {
+    const result = getViewRoute('unknown', 'createHabit')
+    expect(result).toBeUndefined()
+  })
+
+  it('should return undefined for unknown action', () => {
+    const result = getViewRoute('habits', 'unknownAction')
+    expect(result).toBeUndefined()
+  })
+})
+
+describe('getAllDomainActions', () => {
+  it('should return actions for all domains', () => {
+    const actions = getAllDomainActions()
+    expect(actions.length).toBeGreaterThan(0)
+    const habitsDomain = actions.find(d => d.domainId === 'habits')
+    expect(habitsDomain).toBeDefined()
+    expect(habitsDomain!.actions.length).toBeGreaterThan(0)
+  })
+})
+
+describe('validateShortcutUniqueness', () => {
+  it('should not throw when all shortcuts are unique', () => {
+    expect(() => validateShortcutUniqueness()).not.toThrow()
   })
 })

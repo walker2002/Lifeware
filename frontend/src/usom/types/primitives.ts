@@ -85,6 +85,7 @@ export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'canc
 export type CompletionStatus = 'completed' | 'partially_completed' | 'not_completed'
 export type ReviewStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
 export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
+export type AISessionStatus = 'active' | 'archived' | 'deleted'
 
 // ─── Domain & Action Types ─────────────────────────────────────
 export type DomainId = 'tasks' | 'habits' | 'okrs' | 'timebox' | 'review'

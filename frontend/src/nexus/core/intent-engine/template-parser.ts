@@ -64,17 +64,32 @@ export function parseTemplateForm(
   const isoStartTime = toISO8601(fields.startTime)
   const endTime = calculateEndTime(isoStartTime, fields.duration)
 
+  return parseDynamicForm('timebox', 'create_timebox', {
+    title: fields.title,
+    startTime: isoStartTime,
+    endTime,
+    duration: fields.duration,
+  }, intentionId)
+}
+
+/**
+ * 通用动态表单 → StructuredIntent 转换
+ *
+ * 接受任意域和 action 的字段映射，构造 StructuredIntent。
+ * confidence=1.0, resolvedBy='template_form'。
+ */
+export function parseDynamicForm(
+  targetDomain: string,
+  action: string,
+  fields: Record<string, unknown>,
+  intentionId: USOM_ID,
+): StructuredIntent {
   return {
     id: crypto.randomUUID() as USOM_ID,
     intentionId,
-    targetDomain: 'timebox',
-    action: 'create_timebox',
-    fields: {
-      title: fields.title,
-      startTime: isoStartTime,
-      endTime,
-      duration: fields.duration,
-    },
+    targetDomain,
+    action,
+    fields,
     confidence: 1.0,
     resolvedBy: 'template_form',
     createdAt: new Date().toISOString() as Timestamp,

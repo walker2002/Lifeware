@@ -1343,6 +1343,44 @@ interface DerivedSignalsRepository {
 
 ---
 
+## 8.x 新增表：AI 会话与用户设置
+
+### `ai_sessions`
+
+| 列名 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| `id` | UUID | PK, defaultRandom() | 主键 |
+| `user_id` | UUID | NOT NULL, FK→users(id) ON DELETE CASCADE | 所属用户 |
+| `title` | TEXT | NOT NULL, DEFAULT '新对话' | 会话标题 |
+| `status` | TEXT | NOT NULL, DEFAULT 'active', ENUM(active/archived/deleted) | 状态 |
+| `messages` | JSONB | NOT NULL, DEFAULT [] | ChatMessage[] |
+| `state_snapshot` | JSONB | NOT NULL, DEFAULT {} | 状态快照 |
+| `referenced_object_ids` | JSONB | NOT NULL, DEFAULT [] | 引用对象 ID 列表 |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 创建时间 |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 更新时间 |
+| `archived_at` | TIMESTAMPTZ | NULLABLE | 归档时间 |
+
+索引：
+- `idx_ai_sessions_user_status` ON (user_id, status)
+- `idx_ai_sessions_updated` ON (user_id, updated_at)
+
+### `user_settings`
+
+| 列名 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| `id` | UUID | PK, defaultRandom() | 主键 |
+| `user_id` | UUID | NOT NULL, FK→users(id) ON DELETE CASCADE, UNIQUE | 用户（一对一） |
+| `timezone` | TEXT | NOT NULL, DEFAULT 'Asia/Shanghai' | 时区 |
+| `llm_config` | JSONB | NULLABLE | LLMConfig |
+| `ui_prefs` | JSONB | NULLABLE | UI 偏好 |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 创建时间 |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 更新时间 |
+
+索引：
+- `uniq_user_settings_user` UNIQUE ON (user_id)
+
+---
+
 ## 十四、本文档的使用方式
 
 - 本文档是 Drizzle Schema 文件（`schema.ts`）的唯一设计依据

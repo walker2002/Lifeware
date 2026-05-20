@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 const IntentTriggerSchema = z.object({
   action: z.string(),
+  shortcut: z.string().optional(),
   description: z.string(),
   examples: z.array(z.string()),
   keywords: z.array(z.string()),
@@ -48,6 +49,18 @@ const FieldPromptSchema = z.object({
   placeholder: z.string().optional(),
 })
 
+const ViewRouteSchema = z.object({
+  component: z.string(),
+  params: z.record(z.string(), z.unknown()).optional(),
+})
+
+const MarkdownTemplateSchema = z.object({
+  template_file: z.string(),
+  description: z.string(),
+  output_action: z.string(),
+  max_objects: z.number().optional(),
+})
+
 export const ManifestSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -65,8 +78,11 @@ export const ManifestSchema = z.object({
   required_fields: z.record(z.string(), z.array(FieldPromptSchema)),
 
   templates: z.object({
-    form: z.record(z.string(), z.array(FieldPromptSchema)),
+    form: z.record(z.string(), z.array(FieldPromptSchema)).optional(),
+    markdown: z.record(z.string(), MarkdownTemplateSchema).optional(),
   }).optional(),
+
+  view_routes: z.record(z.string(), ViewRouteSchema).optional(),
 
   subscribed_events: z.array(z.string()),
 })

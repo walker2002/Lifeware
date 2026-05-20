@@ -1,5 +1,6 @@
 import type { DomainPlugin, DomainManifest as ProcessManifest } from '@/usom/types/process'
 import type { DomainManifest as FullManifest } from './manifest-loader/schema'
+import type { IntentTriggerInfo, ViewRouteInfo } from '@/usom/types/process'
 import { createTimeboxHooks } from './timebox/hooks'
 import { createHabitsHooks } from './habits/hooks'
 import { createOkrsHooks } from './okrs/hooks'
@@ -47,6 +48,12 @@ export function createDomainPlugin(
     version: fullManifest.version,
     requiredFields: extractRequiredFields(fullManifest),
     subscribedEvents: fullManifest.subscribed_events as ProcessManifest['subscribedEvents'],
+    intentTriggers: fullManifest.intent_triggers.map(t => ({
+      action: t.action,
+      shortcut: t.shortcut,
+      description: t.description,
+    })) as IntentTriggerInfo[],
+    viewRoutes: fullManifest.view_routes as Record<string, ViewRouteInfo> | undefined,
   }
 
   return {

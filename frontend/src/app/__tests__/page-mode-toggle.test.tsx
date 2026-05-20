@@ -15,6 +15,12 @@ vi.mock('@/app/actions/intent', () => ({
     success: true,
     timeboxes: [],
   }),
+  getTimeboxesByRange: vi.fn().mockResolvedValue([]),
+  transitionTimebox: vi.fn().mockResolvedValue({ success: true }),
+  submitExecutionIntent: vi.fn().mockResolvedValue({ success: true, timeboxes: [] }),
+  submitBatchIntent: vi.fn().mockResolvedValue({ results: [] }),
+  resolveShortcut: vi.fn().mockResolvedValue(null),
+  fetchDomainActions: vi.fn().mockResolvedValue([]),
 }))
 
 // 模拟 Drizzle ORM（数据库连接）

@@ -4,6 +4,12 @@ import { timeboxPlugin } from './timebox'
 import { habitsPlugin } from './habits'
 import { okrsPlugin } from './okrs'
 import { tasksPlugin } from './tasks'
+import { loadDomainManifest } from './manifest-loader'
+import type { DomainManifest } from './manifest-loader/schema'
+
+type FieldPrompt = DomainManifest['required_fields'][string][number]
+
+const DOMAIN_IDS = ['timebox', 'habits', 'okrs', 'tasks'] as const
 
 const allPlugins = [timeboxPlugin, habitsPlugin, okrsPlugin, tasksPlugin]
 
@@ -13,3 +19,92 @@ export const domainRegistry: DomainPlugin[] = allPlugins.filter(Boolean) as Doma
 export function findDomain(id: DomainId | string): DomainPlugin | undefined {
   return domainRegistry.find(p => p.manifest.domainId === id)
 }
+
+export class ShortcutConflictError extends Error {
+  constructor(
+    public readonly shortcut: string,
+    public readonly domain1: string,
+    public readonly domain2: string,
+  ) {
+    super(`Shortcut "${shortcut}" 冲突: ${domain1} 和 ${domain2} 都定义了此快捷方式`)
+    this.name = 'ShortcutConflictError'
+  }
+}
+
+export function getActionByShortcut(shortcut: string): { domainId: string; action: string } | undefined {
+  for (const plugin of domainRegistry) {
+    const triggers = plugin.manifest.intentTriggers
+    if (!triggers) continue
+    for (const t of triggers) {
+      if (t.shortcut === shortcut) {
+        return { domainId: plugin.manifest.domainId, action: t.action }
+      }
+    }
+  }
+  return undefined
+}
+
+export function getViewRoute(domainId: string, action: string): { component: string; params?: Record<string, unknown> } | undefined {
+  const domain = findDomain(domainId)
+  if (!domain?.manifest.viewRoutes) return undefined
+  return domain.manifest.viewRoutes[action]
+}
+
+export function getAllDomainActions(): Array<{
+  domainId: string
+  domainName: string
+  actions: Array<{ action: string; shortcut?: string; description: string }>
+}> {
+  return domainRegistry.map(plugin => ({
+    domainId: plugin.manifest.domainId,
+    domainName: plugin.manifest.domainId,
+    actions: plugin.manifest.intentTriggers ?? [],
+  }))
+}
+
+export function getMarkdownTemplate(_domainId: string, _action: string): string | undefined {
+  // MVP: 从 manifest templates.markdown 获取模板路径
+  // 目前返回 undefined，T034-T037 时实现
+  return undefined
+}
+
+function getFullManifest(domainId: string): DomainManifest | undefined {
+  const result = loadDomainManifest(domainId)
+  return result.success ? result.manifest : undefined
+}
+
+export function getRequiredFields(domainId: string, action: string): FieldPrompt[] {
+  const full = getFullManifest(domainId)
+  if (!full?.required_fields) return []
+  return full.required_fields[action] ?? []
+}
+
+export function hasRequiredFields(domainId: string, action: string): boolean {
+  return getRequiredFields(domainId, action).length > 0
+}
+
+export function getActionDescription(domainId: string, action: string): string {
+  const domain = findDomain(domainId)
+  if (!domain?.manifest.intentTriggers) return ''
+  const trigger = domain.manifest.intentTriggers.find(t => t.action === action)
+  return trigger?.description ?? ''
+}
+
+export function validateShortcutUniqueness(): void {
+  const shortcutMap = new Map<string, string>()
+  for (const plugin of domainRegistry) {
+    const triggers = plugin.manifest.intentTriggers
+    if (!triggers) continue
+    for (const t of triggers) {
+      if (!t.shortcut) continue
+      const existing = shortcutMap.get(t.shortcut)
+      if (existing) {
+        throw new ShortcutConflictError(t.shortcut, existing, plugin.manifest.domainId)
+      }
+      shortcutMap.set(t.shortcut, plugin.manifest.domainId)
+    }
+  }
+}
+
+// 启动时校验 shortcut 唯一性
+validateShortcutUniqueness()

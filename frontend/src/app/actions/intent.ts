@@ -16,8 +16,9 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
-import { parseTemplateForm } from "../../nexus/core/intent-engine/template-parser";
+import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
+import { getRequiredFields, hasRequiredFields, getActionDescription } from "@/domains/registry";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
 import { timeboxPlugin } from "../../domains/timebox";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
@@ -788,5 +789,78 @@ export async function applyTemplate(
   } catch (err) {
     const message = err instanceof Error ? err.message : "应用模板失败";
     return { success: false, error: message };
+  }
+}
+
+export async function resolveShortcut(rawInput: string): Promise<{ domainId: string; action: string } | null> {
+  const { matchShortcut } = await import("@/nexus/core/intent-engine/shortcut-matcher");
+  const result = matchShortcut(rawInput);
+  if (result) return { domainId: result.domainId, action: result.action };
+  return null;
+}
+
+export async function fetchDomainActions() {
+  const { getAllDomainActions, domainRegistry } = await import("@/domains/registry");
+  const actions = getAllDomainActions();
+  if (actions.length === 0) {
+    console.warn('[fetchDomainActions] 返回空数据 — domainRegistry 长度:', domainRegistry.length);
+    for (const plugin of domainRegistry) {
+      console.warn(`  - ${plugin.manifest.domainId}: intentTriggers=${plugin.manifest.intentTriggers?.length ?? 'undefined'}`);
+    }
+  }
+  return actions;
+}
+
+// ─── 动态表单提交 Server Action ──────────────────────────────────
+
+export async function submitDynamicIntent(
+  domainId: string,
+  action: string,
+  fields: Record<string, unknown>,
+  confirmed?: boolean,
+  traceEnabled?: boolean,
+): Promise<IntentSubmissionResult> {
+  const intentionRepo = new IntentionRepository();
+  const intentionId = crypto.randomUUID();
+  const now = new Date().toISOString() as Timestamp;
+
+  await intentionRepo.save(
+    { id: intentionId, status: "captured", rawInput: `[表单] ${domainId}:${action}`, inputMode: "template_form", capturedAt: now },
+    MVP_USER_ID,
+  );
+
+  const intent = parseDynamicForm(domainId, action, fields, intentionId);
+
+  return executePipeline(
+    `[表单] ${domainId}:${action}`,
+    async () => ({ success: true, intent }),
+    confirmed,
+    traceEnabled,
+  );
+}
+
+/** 查询 action 所需的表单字段和描述（供客户端 DynamicForm/ActionConfirm 使用） */
+export type ActionFieldType = 'text' | 'textarea' | 'number' | 'date' | 'time' | 'select' | 'multiselect' | 'toggle'
+
+export interface ActionFieldDescriptor {
+  name: string
+  label: string
+  type: ActionFieldType
+  required: boolean
+  options?: string[]
+  default_value?: unknown
+  placeholder?: string
+}
+
+export async function fetchActionData(
+  domainId: string,
+  action: string,
+): Promise<{ fields: ActionFieldDescriptor[]; description: string; hasFields: boolean }> {
+  const fields = getRequiredFields(domainId, action)
+  const description = getActionDescription(domainId, action)
+  return {
+    fields: fields as ActionFieldDescriptor[],
+    description,
+    hasFields: fields.length > 0,
   }
 }

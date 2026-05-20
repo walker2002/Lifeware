@@ -110,6 +110,19 @@ export interface DomainManifest {
   version: string
   requiredFields: string[]
   subscribedEvents: SystemEventType[]
+  intentTriggers?: IntentTriggerInfo[]
+  viewRoutes?: Record<string, ViewRouteInfo>
+}
+
+export interface IntentTriggerInfo {
+  action: string
+  shortcut?: string
+  description: string
+}
+
+export interface ViewRouteInfo {
+  component: string
+  params?: Record<string, unknown>
 }
 
 export interface MetricUpdate {

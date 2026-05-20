@@ -7,7 +7,7 @@ import type {
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
   HabitLogStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
-  ProjectStatus,
+  ProjectStatus, AISessionStatus,
 } from './primitives'
 
 // ─── 3.1 User ─────────────────────────────────────────────────
@@ -326,4 +326,56 @@ export interface ReviewMetrics {
   habitsTotal: number
   timeboxedHours: number
   focusScore?: number // 0-100
+}
+
+// ─── ChatMessage (embedded in AISession) ──────────────────────
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: Timestamp
+  intentRef?: string
+}
+
+// ─── 3.12 AISession ──────────────────────────────────────────
+export interface AISession {
+  id: USOM_ID
+  userId: string
+  title: string
+  status: AISessionStatus
+  messages: ChatMessage[]
+  stateSnapshot: Record<string, unknown>
+  referencedObjectIds: USOM_ID[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  archivedAt?: Timestamp
+}
+
+export interface AISessionSummary {
+  id: USOM_ID
+  title: string
+  status: AISessionStatus
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+// ─── 3.13 LLMConfig (embedded in UserSettings) ────────────────
+export interface LLMConfig {
+  activeProvider?: string
+  providers?: Record<string, {
+    baseUrl?: string
+    models?: {
+      default?: string
+      thinking?: string
+      quick?: string
+    }
+  }>
+}
+
+// ─── 3.14 UserSettings ───────────────────────────────────────
+export interface UserSettings {
+  id: USOM_ID
+  userId: string
+  timezone: string
+  llmConfig?: LLMConfig
+  uiPrefs?: Record<string, unknown>
 }

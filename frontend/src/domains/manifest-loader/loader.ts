@@ -11,13 +11,19 @@ export type ManifestLoadResult =
 
 const cache = new Map<string, ManifestLoadResult>()
 
-export function loadDomainManifest(domainDir: string): ManifestLoadResult {
-  const absoluteDir = path.resolve(domainDir)
-  const cached = cache.get(absoluteDir)
+/**
+ * 加载域 manifest 文件。
+ *
+ * Next.js Turbopack 环境下 __dirname 不指向实际源码路径，
+ * 因此改用 process.cwd() + src/domains/<domainId> 构建路径。
+ * domainId 参数即目录名（如 "habits"、"timebox"）。
+ */
+export function loadDomainManifest(domainId: string): ManifestLoadResult {
+  const cached = cache.get(domainId)
   if (cached) return cached
 
-  const filePath = path.join(absoluteDir, 'manifest.yaml')
-  const domainId = path.basename(absoluteDir)
+  const domainDir = path.join(process.cwd(), 'src/domains', domainId)
+  const filePath = path.join(domainDir, 'manifest.yaml')
 
   // Phase 1: YAML 语法解析
   let raw: unknown
@@ -37,7 +43,7 @@ export function loadDomainManifest(domainDir: string): ManifestLoadResult {
         column: err.linePos?.[0]?.col,
       }],
     }
-    cache.set(absoluteDir, result)
+    cache.set(domainId, result)
     return result
   }
 
@@ -52,7 +58,7 @@ export function loadDomainManifest(domainDir: string): ManifestLoadResult {
       fieldPath: issue.path.map(String),
     }))
     const result: ManifestLoadResult = { success: false, errors }
-    cache.set(absoluteDir, result)
+    cache.set(domainId, result)
     return result
   }
 
@@ -69,11 +75,11 @@ export function loadDomainManifest(domainDir: string): ManifestLoadResult {
       fieldPath: se.fieldPath,
     }))
     const result: ManifestLoadResult = { success: false, errors }
-    cache.set(absoluteDir, result)
+    cache.set(domainId, result)
     return result
   }
 
   const result: ManifestLoadResult = { success: true, manifest }
-  cache.set(absoluteDir, result)
+  cache.set(domainId, result)
   return result
 }

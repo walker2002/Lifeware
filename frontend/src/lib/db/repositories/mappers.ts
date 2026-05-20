@@ -8,6 +8,7 @@ import type {
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
   Project, ProjectTemplate, TaskTemplate,
+  AISession, ChatMessage,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -851,5 +852,39 @@ export function taskTemplateUSOMToRow(template: TaskTemplate) {
     estimatedDuration: template.estimatedDuration ?? null,
     frequencyType: template.frequencyType ?? null,
     sortOrder: template.sortOrder,
+  }
+}
+
+// ─── AISession ─────────────────────────────────────────────────
+
+export function aiSessionRowToUSOM(row: any): AISession {
+  return {
+    id: row.id,
+    userId: row.userId ?? row.user_id,
+    title: row.title,
+    status: row.status,
+    messages: (row.messages ?? []) as ChatMessage[],
+    stateSnapshot: row.stateSnapshot ?? row.state_snapshot ?? {},
+    referencedObjectIds: row.referencedObjectIds ?? row.referenced_object_ids ?? [],
+    createdAt: (row.createdAt ?? row.created_at).toISOString() as Timestamp,
+    updatedAt: (row.updatedAt ?? row.updated_at).toISOString() as Timestamp,
+    archivedAt: (row.archivedAt ?? row.archived_at)?.toISOString() as Timestamp ?? undefined,
+  }
+}
+
+export function aiSessionUSOMToRow(session: Omit<AISession, 'id' | 'createdAt' | 'updatedAt'>) {
+  return {
+    userId: session.userId,
+    title: session.title,
+    status: session.status,
+    messages: session.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      intentRef: m.intentRef ?? undefined,
+    })),
+    stateSnapshot: session.stateSnapshot,
+    referencedObjectIds: session.referencedObjectIds,
+    archivedAt: session.archivedAt ? new Date(session.archivedAt) : null,
   }
 }
