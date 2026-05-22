@@ -46,19 +46,30 @@ This is not a traditional MVC application. Lifeware uses a custom four-layer Nex
 - Location: `frontend/src/usom/`
 
 ### 2. Nexus (Core Engine)
-The system brain with four main components:
+The system brain with seven main components:
 - **Intent Engine**: Parses user input (AI-driven with template-form fallback)
 - **Rule Engine**: Validates proposals and detects conflicts
 - **State Machine**: Manages object lifecycles
 - **Action Surface Engine**: Determines UI actions (Action Guide, Dynamic Tile, Continuity Cue)
+- **Context Engine**: Assembles cross-Domain context data for generative operations
+- **AI Runtime**: Unified AI infrastructure (LLM routing, Session management, Token budget, CN-UI protocol) — dependency-injected into Handlers, not called by Orchestrator
+- **Orchestrator**: Pure dispatcher — routes Reactive/Generative/Time Trigger paths, coordinates components, never calls AI directly
 - Location: `frontend/src/nexus/`
 
 ### 3. Domain Plugins
-Extensible domain-specific logic with standard interface (four hooks):
+Extensible domain-specific logic with dual-track model:
+
+**Reactive Track** (four hooks):
 - `onValidate`: Intent validation
 - `onEvent`: Event response, returns metrics and suggestions
 - `onActionSurfaceRequest`: Returns action surface candidates
 - `onOutboundRequest`: Outbound push declarations (not implemented in MVP)
+
+**Generative Track** (Handler + Context Providers):
+- `onGenerate(request, aiRuntime)`: AI-powered planning via injected AI Runtime
+- Handler owns prompt design, tool use, and CN-UI output decisions
+- Context Providers expose read-only Domain data for cross-Domain consumption
+
 - Location: `frontend/src/domains/`
 
 ### 4. Bridge Layer (Phase 2)

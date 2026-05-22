@@ -1,51 +1,53 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.4.0 → 1.5.0
-  Rationale: MINOR — Handler + Context Engine architecture expansion.
-  Introduces Generative Path (Handlers, Context Providers, Context Engine)
-  as a new capability track alongside the existing Reactive Path (Hooks),
-  without modifying or removing any existing principles.
+  Version change: 1.5.0 → 1.6.0
+  Rationale: MINOR — AI Runtime infrastructure subsystem introduction.
+  Adds AI Runtime as a new Nexus infrastructure layer with dependency
+  injection into Handlers, CN-UI Protocol Stack, and Session management.
+  No existing principles are removed or redefined.
 
   Modified principles:
-    - Principle III (Single-Writer) → Added Context Engine as 5th writer
-    - Principle VI (Domain Plugin) → Expanded from "four-hook, three-
-      prohibition" to dual-track model (Reactive Hooks + Generative
-      Handlers + Context Providers)
-    - Principle VIII (AI/Rule Boundary) → Clarified AI participation
-      in Handler (Domain Plugin scope)
+    - Principle III (Single-Writer) → AI Runtime recognized as Nexus
+      infrastructure; Session Manager coordinates with Memory Framework
+      L1 but does not bypass Memory Framework's write authority
+    - Principle VI (Domain Plugin) → Handler gains onGenerate hook
+      with aiRuntime dependency injection; Handler AI autonomy clarified
+    - Principle VIII (AI/Rule Boundary) → AI participation scope
+      expanded: LLMProvider retry/fallback is infrastructure-level,
+      CN-UI Schema validation is generate-time validation; streaming
+      vs non-streaming boundary codified
 
   Added sections:
-    - Architecture Constraints > Context Provider Constraints (new)
-      Three constraints (read-only projection, no complex computation,
-      Zod schema validation) and visibility control model.
+    - Architecture Constraints > AI Runtime Constraints (new)
+      Seven constraints covering dependency injection, Handler autonomy,
+      LLMProvider resilience, Streaming policy, CN-UI Schema validation,
+      Session lifecycle, and MVP scope boundaries.
+    - Architecture Constraints > CN-UI Protocol Constraints (new)
+      Three constraints: declarative-only, component catalog whitelist,
+      conversation-closed-loop.
 
   Modified sections:
     - Architecture Constraints > Orchestrator Purity (expanded:
-      generative path routing)
+      AI Runtime injection as new Orchestrator responsibility in
+      Generative Path)
     - Architecture Constraints > Domain Manifest Self-Description
-      (added generation_actions block)
-    - Architecture Constraints > Domain Registration Process (updated
-      steps for Handlers and Context Providers)
+      (added generation_actions extensions: session_mode, response_mode,
+      cnui_surface, cache_ttl_minutes)
 
   Templates requiring updates:
     - .specify/templates/plan-template.md            ✅ no changes needed
     - .specify/templates/spec-template.md             ✅ no changes needed
-    - .specify/templates/tasks-template.md            ✅ no changes needed
+    - .specify/templates/tasks-template.md             ✅ no changes needed
 
   Follow-up documents requiring updates:
     - docs/usom-design.md                            ⚠ pending update
-      (add ContextProvider, ContextCapability, DomainHandler,
-       GenerationRequest, GenerationResult types)
+      (add AISession, CNUISurface, CNUIMessage, AIRuntimeError types)
     - mydocs/core/LW_overall_总体设计_*.md             ⚠ pending update
-      (update Nexus composition, Domain dual-track model)
+      (update Nexus composition with AI Runtime subsystem)
     - mydocs/core/LW_domain_注册指南_2026_05_14.md    ⚠ pending update
-      (add Handler and Provider registration steps)
-
-  Follow-up TODOs:
-    - Update Domain Registration Guide with Handler/Provider steps
-    - Update USOM design doc with new process types
-    - Update overall design doc with dual-track model
+      (add onGenerate hook implementation guidance, AI Runtime usage
+      patterns, CN-UI Surface definition steps)
 -->
 
 # Lifeware Constitution
@@ -122,6 +124,12 @@ usurp their responsibilities:
 | Action Surface Engine | Output presentation (Action Guide, Dynamic Tile, Continuity Cue) |
 | Context Engine | Context assembly for generative operations; reads manifest `generation_actions`, resolves Context Capabilities, produces `GenerationRequest` |
 
+AI Runtime's Session Manager coordinates with Memory Framework L1 for
+session history but MUST NOT bypass Memory Framework's write authority.
+All session message writes MUST go through Memory Framework's API.
+AI Runtime is infrastructure (model routing, token accounting,
+CN-UI protocol), not a writer of system state.
+
 **Rationale**: Prevents race conditions, ensures auditability, and
 enables each component to reason about its invariants without
 coordinating with peers. Context Engine is the sole authority for
@@ -189,13 +197,22 @@ Domain-defined computational units that receive `GenerationRequest`
 from Context Engine and produce `GenerationResult`. Handlers are the
 sole location for generative AI logic within Domain Plugins.
 
+**Handler entry point**: `onGenerate(request: GenerationRequest,
+aiRuntime: AIRuntime)`. AI Runtime is injected as a dependency —
+Handler decides how to use it (call frequency, model parameters,
+tool use, CN-UI vs. text output). Orchestrator does not call AI
+Runtime directly.
+
 **Handler constraints**:
-- Handlers MAY call AI (unique among Domain components)
+- Handlers MAY call AI via injected `aiRuntime` (unique among Domain
+  components)
+- Handlers own prompt design and Zod schema definition (MVP: inlined
+  in .ts files; PromptTemplate Registry deferred to Phase 2)
 - Handlers MUST NOT access repositories directly — all data arrives
   via `GenerationRequest.contexts` assembled by Context Engine
 - Handlers MUST NOT write state — output is `GenerationResult`
-  (structured proposals), which re-enters the Reactive Path via
-  Rule Engine validation and State Machine execution
+  (structured proposals or CN-UI Payload), which re-enters the
+  Reactive Path via Rule Engine validation and State Machine execution
 - Handlers MUST NOT trigger events directly
 
 #### Context Providers (Controlled Sharing Interface)
@@ -223,7 +240,8 @@ MVP stage: all Providers use `planning` visibility.
 
 #### Manifest Declarations
 
-Domain manifests MUST include two self-description declarations:
+Domain manifests MUST include two structured fields enabling Nexus
+components to operate generically without per-Domain hard-coding:
 
 1. `intent_triggers`: Structured routing context for Intent Engine
    Phase A (action name, description, examples, keywords, signals,
@@ -254,17 +272,16 @@ three-prohibition" constraint system intact while providing a clean
 home for generative AI operations. Hooks remain pure constraint
 checks; Handlers own the planning logic. Context Providers solve
 cross-Domain data sharing without violating Domain isolation.
-Orchestrator remains the sole workflow coordinator — it dispatches
-to either track based on manifest declarations, never executing
-business logic itself.
+AI Runtime is infrastructure — Handlers use it, but are not
+controlled by it.
 
 **How to apply**: Each domain plugin file MUST implement the four
 hooks for the Reactive Track. Domains with generative needs MUST
-also implement Handler classes and register Context Capabilities.
-Any state-mutating code inside a Domain is a violation regardless
-of track. Adding a new Domain MUST NOT require modifying Intent
-Engine routing logic or State Machine transition rules. Refer to
-`mydocs/core/LW_domain_注册指南_2026_05_14.md` for the complete
+also implement `onGenerate` handler methods and register Context
+Capabilities. Any state-mutating code inside a Domain is a violation
+regardless of track. Adding a new Domain MUST NOT require modifying
+Intent Engine routing logic or State Machine transition rules. Refer
+to `mydocs/core/LW_domain_注册指南_2026_05_14.md` for the complete
 step-by-step registration process.
 
 ### VII. Bridge Layer Readiness
@@ -308,10 +325,22 @@ executes. AI participation is confined to the Handler boundary —
 Context Engine assembles data deterministically, Rule Engine validates
 deterministically.
 
+AI Runtime provides infrastructure for Handlers (model routing, retry/
+fallback, token accounting, CN-UI protocol) but does not make business
+decisions. LLMProvider retry/fallback is transparent to Handlers —
+they only see final success or `AIRuntimeError`. Handler AI failures
+MUST degrade to rule-based fallback.
+
 When AI fails, the Intent Engine MUST degrade gracefully to template-form
 fallback, producing an equivalent `StructuredIntent`. When Handler AI
 fails, the system MUST degrade to rule-based fallback (e.g., priority
 ordered scheduling) ensuring a proposal is always produced.
+
+**Streaming boundary**: CN-UI scenarios use non-streaming `generate()`
+because the Payload is structured JSON that cannot be parsed in
+intermediate states. Only pure-text scenarios use streaming `stream()`.
+Frontend loading animations cover the 2–5 second wait for CN-UI
+generation.
 
 **Rationale**: Deterministic rules ensure safety invariants (energy
 mismatch, WIP limits). AI provides flexibility where rules cannot
@@ -363,17 +392,21 @@ architectural violation.
 ### Orchestrator Purity
 
 The Orchestrator is a pure dispatcher. It MUST NOT contain business
-logic, write state, or participate in AI calls. It handles exceptions,
+logic, write state, or call AI Runtime directly. It handles exceptions,
 retries, human-decision pause points, and cross-Domain intent
 splitting (sequential processing of multiple `StructuredIntent`s
 derived from a single user input) only.
 
 For generative operations, the Orchestrator identifies the correct
 path by checking whether the action exists in the Domain manifest's
-`generation_actions` block. If present, it delegates data assembly to
-Context Engine and execution to the Domain Handler — never performing
-either task itself. The Orchestrator remains a pure coordinator for
-both Reactive and Generative paths.
+`generation_actions` block. If present, it:
+1. Delegates data assembly to Context Engine
+2. Prepares Session (if `session_mode === 'conversational'`)
+3. Injects `aiRuntime` as a parameter to `handler.onGenerate()`
+4. Receives Handler output and routes to Rule Engine
+
+The Orchestrator never performs AI calls, prompt assembly, model
+selection, or conversation history management itself.
 
 ### Domain Manifest Self-Description
 
@@ -390,16 +423,20 @@ third structured field:
 
 | Field | Consumer | Purpose |
 |---|---|---|
-| `generation_actions` | Context Engine + Orchestrator | Handler entry points and their required Context Provider dependencies |
+| `generation_actions` | Context Engine + Orchestrator + AI Runtime | Handler entry points and their required Context Provider dependencies |
 
 The `generation_actions` block maps each generative action to:
 - Which Context Capabilities to resolve (by id)
 - Query parameters for each Provider
 - Parameter extraction from `intent.fields`
+- `session_mode`: `'single_shot'` or `'conversational'`
+- `response_mode`: `'text'` or `'cnui'`
+- `cnui_surface`: CNUISurface type identifier (when response_mode is cnui)
+- `cache_ttl_minutes`: Cache validity period (optional)
 
-This enables Context Engine to assemble `GenerationRequest` and
-Orchestrator to identify generative vs. reactive paths — both without
-Domain-specific code.
+This enables Context Engine to assemble `GenerationRequest`,
+Orchestrator to identify generative vs. reactive paths, and AI Runtime
+to determine streaming policy — all without Domain-specific code.
 
 These declarations MUST be structured (not free-form text) to enable
 deterministic processing. Adding a new Domain MUST NOT require
@@ -409,7 +446,8 @@ modifying Nexus components — only registering new manifest declarations.
 Domain-specific lifecycle rules. State Machine is a generic executor;
 Domain manifests are the business knowledge source. The
 `generation_actions` block extends this principle to generative
-operations, keeping Context Engine and Orchestrator generic.
+operations, keeping Context Engine, Orchestrator, and AI Runtime
+generic.
 
 ### Manifest Runtime Consumption
 
@@ -496,9 +534,103 @@ Registry with a unique capability id, visibility level, and Zod
 schema. Code reviews MUST reject Providers that contain planning logic,
 AI calls, or write operations.
 
+### AI Runtime Constraints
+
+AI Runtime is Nexus infrastructure, not a Domain component. It provides
+shared AI capabilities via dependency injection into Handlers.
+
+**Seven constraints**:
+
+1. **Dependency injection, not middleware**: AI Runtime is injected
+   into Handler's `onGenerate` hook as a parameter. Orchestrator does
+   not call AI Runtime directly. AI Runtime is invisible to Reactive
+   Path (onIntent hooks).
+
+2. **Handler AI autonomy**: Handler decides how to use the injected
+   `aiRuntime` — call frequency, model parameters, tool use, CN-UI
+   vs. text output, streaming vs. non-streaming. AI Runtime provides
+   the mechanism; Handler provides the strategy.
+
+3. **LLMProvider resilience is transparent**: Retry (timeout, rate
+   limit), fallback model switching, and error handling happen inside
+   LLMProvider. Handlers see only final success or `AIRuntimeError`.
+   Handlers implement domain-level degradation (e.g., rule-based
+   fallback) by catching `AIRuntimeError`.
+
+4. **Streaming policy**: CN-UI scenarios MUST use non-streaming
+   `generate()` (JSON Payload cannot be parsed in intermediate
+   states). Pure-text scenarios MAY use streaming `stream()`.
+   Handler specifies `stream: boolean` per request.
+
+5. **CN-UI Schema validation at generation time**: LLM-generated
+   CN-UI Payloads MUST pass Zod schema validation inside
+   `generateCNUIObject()`. Failed validation triggers one repair
+   retry with Zod error context. Two consecutive failures raise
+   `CNUISchemaError` for Handler-level degradation.
+
+6. **Session lifecycle**: Session Manager creates/activates/archives
+   sessions per manifest `session_mode`. Sessions are linked to Memory
+   Framework L1 — all message writes go through Memory Framework API.
+   Session history injection into GenerationRequest is Orchestrator's
+   responsibility, not Handler's.
+
+7. **MVP scope**: Token Budget records usage and exposes daily
+   summaries — no hard limits. PromptTemplate Registry is deferred
+   (prompts inlined in Handler .ts files). CNUISurfaceStore is an
+   in-memory Map — no persistence, optimistic locking, or history
+   snapshots.
+
+**Rationale**: AI Runtime provides uniform, safe, cost-effective AI
+infrastructure while preserving Handler autonomy. The dependency-
+injection model prevents AI Runtime from becoming a middleware layer
+that couples Orchestrator to AI decisions.
+
+**How to apply**: Code reviews MUST reject PRs where Orchestrator
+directly calls `aiRuntime.generate()` or `aiRuntime.stream()`. AI
+Runtime imports in Domain hook files (onValidate, onEvent, etc.) are
+violations — AI Runtime is only accessible via `onGenerate`'s injected
+parameter.
+
+### CN-UI Protocol Constraints
+
+CN-UI (Conversation Native UI) is a declarative Payload protocol that
+allows Handlers to produce interactive UI components within the
+conversation flow.
+
+**Three constraints**:
+
+1. **Declarative data, not executable code**: CN-UI Payloads are JSON
+   data describing component structure, props, and actions. They
+   MUST NOT contain executable JavaScript, HTML, or CSS. The CN-UI
+   Renderer interprets Payloads using pre-built React components.
+
+2. **Component catalog whitelist**: Agents (LLM-generated Payloads)
+   MAY only reference components registered in the Component Catalog
+   — both base UI components (text-input, select, slider, etc.) and
+   domain components (habit-creation-card, timebox-list, etc.).
+   Unknown component types in a Payload MUST be rejected by
+   `generateCNUIObject()` schema validation.
+
+3. **Conversation-closed-loop**: CN-UI interactions MUST complete
+   within the conversation flow. User actions (confirm, cancel,
+   modify) are captured as CNUIEvents, processed by SurfaceManager,
+   and result in structured data entering Rule Engine → State Machine.
+   CN-UI MUST NOT navigate users to separate pages.
+
+**Rationale**: CN-UI solves the experience fragmentation problem
+(form jumps, Markdown editing) while maintaining Nexus safety
+guarantees. The declarative + whitelist model prevents security risks
+from LLM-generated executable code.
+
+**How to apply**: Each CN-UI component type MUST be registered in the
+Component Catalog before use. Code reviews MUST reject Payload
+generation that includes components not in the Catalog. CN-UI event
+handling MUST flow through SurfaceManager → Handler → Rule Engine,
+never directly to Repository.
+
 ### Domain Registration Process
 
-All new Domains MUST follow the mandatory 8-step registration process
+All new Domains MUST follow the mandatory registration process
 defined in `mydocs/core/LW_domain_注册指南_2026_05_14.md`. This
 section codifies the architectural invariants enforced by that process.
 
@@ -513,17 +645,18 @@ section codifies the architectural invariants enforced by that process.
 6. Implement Domain page components (view_routes)
 7. Register Domain in `domains/registry.ts`
 8. Implement Markdown templates (optional)
-9. (If generative) Implement Handler classes and register in
-   `domains/<domain>/handlers/index.ts`
+9. (If generative) Implement `onGenerate` handler method and register
+   in `domains/<domain>/handlers/index.ts`
 10. (If generative) Implement Context Providers and register in
     Context Registry with capability id, visibility, and Zod schema
 
 **Nexus inviolability**: If completing any step requires modifying Nexus
 core components (Intent Engine, Context Engine, Rule Engine, State
-Machine, Action Surface Engine, Orchestrator), the boundary is broken.
-Stop and discuss before proceeding. The only permitted Nexus
-modification is adding a new object's Summary to `ContextSnapshot` —
-this is a legitimate aggregation need, not coupling leakage.
+Machine, Action Surface Engine, Orchestrator, AI Runtime), the
+boundary is broken. Stop and discuss before proceeding. The only
+permitted Nexus modification is adding a new object's Summary to
+`ContextSnapshot` — this is a legitimate aggregation need, not
+coupling leakage.
 
 **Page component data access rules**:
 
@@ -677,4 +810,4 @@ is a Tier 1 document and required reading for all Domain development.
 It provides the concrete step-by-step process that operationalizes the
 architectural invariants defined in this constitution.
 
-**Version**: 1.5.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-20
+**Version**: 1.6.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-22

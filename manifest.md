@@ -21,6 +21,7 @@ LW_overall_项目开发必读_2026_05_01.md          # 项目最高解释文档
 LW_overall_总体设计_2026_05_02.md              # 架构设计-总体设计文档
 LW_overall_技术栈设计演进_2026_03_18.md        # 技术栈选型与演进路径
 LW_overall_意图驱动场景示例_2026_05_01.md      # 意图驱动场景流程示例（Nexus→Domain 全链路验证）
+LW_AI_Runtime_Architecture_Design.md           # AI Runtime 架构设计（LLMGateway/SessionManager/CN-UI Protocol/Handler 依赖注入）
 LW_domain_注册指南_2026_05_14.md               # Domain 注册操作指南（manifest/hooks/repository/schema 全流程）
 image-20260502091924536.png                    # 文档配图
 
@@ -81,6 +82,10 @@ database-design.md     # 数据库表结构与设计规范（由 LW_database_数
 | 场景提示词设计方案 | 2026_04_06 | 无 | 创建。确定场景提示词方案方向，替代原知识库方案 |
 | 冲突仲裁矩阵 | 2026_04_06 | 无 | 创建。定义10条方法论冲突仲裁规则和5条仲裁原则 |
 | 意图驱动场景示例 | 2026_05_01 | 无 | 创建。通过两个场景案例验证 Nexus→Domain 全链路 |
-| Domain 注册指南 | 2026_05_15 | 无 | 创建。定义新增 Domain 的 8 步完整操作流程，含 manifest 六区块声明、纯函数钩子、Repository 接口、页面组件模板、硬编码检测清单 |
+| Domain 注册指南 | 2026_05_22 | 2026_05_15 | Step 9 Handler 扩展：onGenerate(request, aiRuntime) 依赖注入模型、AI Runtime 使用要点、generation_actions 新字段（session_mode/response_mode/cnui_surface/cache_ttl_minutes）、CN-UI 约束、Streaming 策略、AIRuntimeError 降级、新增 8 条错误模式 |
 | USOM 详细设计 | 2026_05_16 | 2026_03_21 | 新增 ChatMessage/AISession/AISessionSummary/LLMConfig/UserSettings 类型及生命周期约束 |
 | 数据库设计 | 2026_05_16 | 2026_03_21 | 新增 ai_sessions 表（10列+2索引）、user_settings 表（6列+1唯一索引） |
+| AI Runtime 架构设计 | 2026_05_22 | 无 | 创建。定义 AI Runtime 基础设施（LLMGateway/SessionManager/TokenBudget/Cache）、CN-UI Protocol Stack、Handler 依赖注入模型、Streaming 策略、LLMProvider 重试/降级、MVP 范围边界 |
+| 项目宪章 | 2026_05_22 | 2026_05_20 | v1.5.0→v1.6.0：新增 AI Runtime Constraints（7项）、CN-UI Protocol Constraints（3项）；扩展 Orchestrator Purity（AI Runtime 注入）、Domain Manifest Self-Description（session_mode/response_mode/cnui_surface）、Handler（onGenerate hook + aiRuntime 依赖注入） |
+| USOM 详细设计 | 2026_05_22 | 2026_05_20 | 新增 AI Runtime 类型（AITaskType/TokenUsage/LLMProviderConfig）、CN-UI 类型（CNUISurface/CNUIMessage/CNUIEvent/CNUISurfaceStore）、错误类型（AIRuntimeError/CNUISchemaError） |
+| 总体设计 | 2026_05_22 | 2026_05_02 | Nexus 基础设施层新增 AI Runtime 组件；Orchestrator Generative Path 描述更新（AI Runtime 依赖注入模型） |
