@@ -164,12 +164,14 @@ export type SystemEventType =
   | 'IntentionCaptured' | 'IntentionDissolved'
   | 'ProjectCreated' | 'ProjectActivated' | 'ProjectPaused' | 'ProjectResumed'
   | 'ProjectCompleted' | 'ProjectArchived'
+  | 'GenerativeContextAssembled' | 'GenerativeHandlerCompleted'
+  | 'GenerativeUserConfirmed' | 'GenerativeProposalRejected' | 'GenerativeBatchExecuted'
 
 export interface SystemEvent {
   id: USOM_ID
   type: SystemEventType
   occurredAt: Timestamp
-  triggeredBy: 'state_machine' | 'time_trigger' | 'template_apply'
+  triggeredBy: 'state_machine' | 'time_trigger' | 'template_apply' | 'context_engine' | 'handler'
   payload: Record<string, unknown>
   snapshotId: USOM_ID
 }
@@ -223,4 +225,68 @@ export interface EnergyLog {
   source: 'user' | 'system'
   context: Record<string, unknown>
   loggedAt: Timestamp
+}
+
+// ─── 4.9 Context Provider (Generative Path) ──────────────────
+
+export interface ContextProvider {
+  provide(query: string, params: Record<string, unknown>): Promise<unknown>
+}
+
+export interface ContextCapability {
+  id: string
+  provider: ContextProvider
+  visibility: 'private' | 'planning' | 'system'
+  schema: import('zod').ZodSchema
+  description?: string
+}
+
+// ─── 4.10 Domain Handler (Generative Path) ────────────────────
+
+export interface GenerationRequest {
+  intent: StructuredIntent
+  contexts: Record<string, unknown>
+}
+
+export interface GeneratedProposal {
+  id: string
+  action: string
+  payload: Record<string, unknown>
+  sourceType: 'habit' | 'task' | 'planned' | 'adhoc'
+  priority: string
+  energyMatch?: {
+    required: string
+    actual: string
+    score: number
+  }
+}
+
+export interface ProposalSet {
+  id: string
+  label?: string
+  proposals: GeneratedProposal[]
+  tags?: string[]
+}
+
+export interface Warning {
+  code: string
+  message: string
+  severity: 'info' | 'warn' | 'error'
+  affectedProposalIds?: string[]
+}
+
+export interface PresentationPayload {
+  type: 'markdown' | 'kanban' | 'calendar' | 'timeline' | 'mindmap'
+  content: unknown
+}
+
+export interface GenerationResult {
+  proposalSet: ProposalSet
+  alternatives?: ProposalSet[]
+  presentation?: PresentationPayload
+  warnings?: Warning[]
+}
+
+export interface DomainHandler {
+  handle(request: GenerationRequest): Promise<GenerationResult>
 }

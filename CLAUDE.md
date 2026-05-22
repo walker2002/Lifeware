@@ -166,7 +166,7 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/007-ui-refactor-ai-session/plan.md`.
+at `specs/008-handler-context-engine/plan.md`.
 <!-- SPECKIT END -->
 
 

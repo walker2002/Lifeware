@@ -488,7 +488,7 @@ export const systemEvents = pgTable('system_events', {
 
   type: text('type').notNull(),
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
-  triggeredBy: text('triggered_by', { enum: ['state_machine', 'time_trigger', 'template_apply'] }).notNull(),
+  triggeredBy: text('triggered_by', { enum: ['state_machine', 'time_trigger', 'template_apply', 'context_engine', 'handler'] }).notNull(),
   snapshotId: uuid('snapshot_id').references(() => contextSnapshots.id, { onDelete: 'set null' }),
   payload: jsonb('payload').notNull().$type<Record<string, unknown>>().default({}),
 

@@ -24,3 +24,5 @@ export const timeboxPlugin: DomainPlugin = result.success
 
 export { createTimeboxHooks } from './hooks'
 export { timeboxTransitions, findTransition } from './transitions'
+export { TimeboxProvider, EnergyProfileProvider } from './providers'
+export { timeboxHandlers } from './handlers'

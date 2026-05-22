@@ -16,6 +16,8 @@ export type TraceComponent =
   | 'StateMachine'
   | 'EventBus'
   | 'ActionSurfaceEngine'
+  | 'ContextEngine'
+  | 'Handler'
 
 // ─── 追踪步骤 ─────────────────────────────────────────────────
 

@@ -51,6 +51,21 @@ intent_triggers:
       - 今天有什么安排
     keywords: [日程, schedule, 安排, 今天]
     view_route: /schedule
+  - action: createSmartSchedule
+    shortcut: /smartSchedule
+    description: AI 智能编排日程
+    examples:
+      - 帮我智能安排今天的日程
+      - 智能编排
+      - 自动安排今天
+    keywords: [智能编排, smart, 自动安排, 智能日程]
+  - action: adjustRemainingSchedule
+    shortcut: /adjustSchedule
+    description: 根据剩余任务重新编排日程
+    examples:
+      - 重新安排剩余时间
+      - 调整今天下午的安排
+    keywords: [调整, 重排, adjust]
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -204,3 +219,39 @@ templates:
       description: 时间盒批量创建模板
       output_action: createTimebox
       max_objects: 20
+
+# ─── 区块 I: generation_actions（生成型路径声明）────────────────
+generation_actions:
+  createSmartSchedule:
+    description: 智能编排日程，根据任务/习惯/能量曲线自动生成时间盒方案
+    contexts:
+      - id: existingTimeboxes
+        query: timeboxes_for_date
+        params: [date, userId]
+      - id: activeTasks
+        query: active_with_details
+        params: [userId]
+      - id: pendingHabits
+        query: unlogged_for_date
+        params: [date, userId]
+      - id: habitTemplates
+        query: templates_for_date
+        params: [date, userId]
+      - id: energyProfile
+        query: energy_profile
+        params: []
+  adjustRemainingSchedule:
+    description: 根据已完成项目调整剩余日程
+    contexts:
+      - id: existingTimeboxes
+        query: timeboxes_for_date
+        params: [date, userId]
+      - id: activeTasks
+        query: active_with_details
+        params: [userId]
+      - id: pendingHabits
+        query: unlogged_for_date
+        params: [date, userId]
+      - id: energyProfile
+        query: energy_profile
+        params: []

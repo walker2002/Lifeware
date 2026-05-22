@@ -2,7 +2,7 @@
 // T016: 顺序执行规则，聚合结果，返回最高严重级别
 
 import type { StructuredIntent } from '@/usom/types/objects'
-import type { ContextSnapshot } from '@/usom/types/process'
+import type { ContextSnapshot, GenerationResult, GeneratedProposal } from '@/usom/types/process'
 
 // ─── 规则接口 ─────────────────────────────────────────────────
 
@@ -92,4 +92,67 @@ export async function evaluateRules(
     warnings,
     confirmations,
   }
+}
+
+// ─── 生成型 Proposal 验证 ───────────────────────────────────
+
+export interface ProposalValidationResult {
+  proposalId: string
+  status: 'pass' | 'warning' | 'reject'
+  reasons: string[]
+}
+
+/**
+ * 验证 GenerationResult 中每个 proposal 的时间冲突和能量匹配
+ * 纯函数，不含外部 IO
+ */
+export function evaluateProposals(
+  generationResult: GenerationResult,
+  _snapshot?: ContextSnapshot,
+): ProposalValidationResult[] {
+  const proposals = generationResult.proposalSet.proposals
+
+  return proposals.map(proposal => {
+    const reasons: string[] = []
+
+    // 检查提案内部的时间冲突（与其他 proposal 重叠）
+    const overlap = findProposalOverlap(proposal, proposals)
+    if (overlap) {
+      reasons.push(`时间重叠: 与提案 "${overlap.payload.title}" (${overlap.payload.startTime}-${overlap.payload.endTime}) 冲突`)
+    }
+
+    // 检查能量匹配分数
+    if (proposal.energyMatch && proposal.energyMatch.score < 0.3) {
+      reasons.push(`能量不匹配: 需要 ${proposal.energyMatch.required}，实际 ${proposal.energyMatch.actual}（分数 ${proposal.energyMatch.score.toFixed(1)}）`)
+    }
+
+    const status = reasons.length === 0 ? 'pass' : 'warning' as const
+
+    return {
+      proposalId: proposal.id,
+      status,
+      reasons,
+    }
+  })
+}
+
+function findProposalOverlap(
+  proposal: GeneratedProposal,
+  allProposals: GeneratedProposal[],
+): GeneratedProposal | undefined {
+  const pStart = timeToMinutes(proposal.payload.startTime as string)
+  const pEnd = timeToMinutes(proposal.payload.endTime as string)
+
+  for (const other of allProposals) {
+    if (other.id === proposal.id) continue
+    const oStart = timeToMinutes(other.payload.startTime as string)
+    const oEnd = timeToMinutes(other.payload.endTime as string)
+    if (pStart < oEnd && pEnd > oStart) return other
+  }
+  return undefined
+}
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + (m ?? 0)
 }

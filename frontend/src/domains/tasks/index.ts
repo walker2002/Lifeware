@@ -24,3 +24,4 @@ export const tasksPlugin: DomainPlugin = result.success
 
 export { createTasksHooks } from './hooks'
 export { taskTransitions, projectTransitions, findTransition } from './transitions'
+export { ActiveTasksProvider } from './providers'

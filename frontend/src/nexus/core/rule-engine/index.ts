@@ -2,8 +2,8 @@
 // T018: 工厂函数，注册 timebox 规则，暴露 evaluate 方法
 // T027: 支持异步规则 + TimeOverlapRule 依赖注入
 
-import { evaluateRules } from './evaluator'
-import type { Rule, AggregatedResult } from './evaluator'
+import { evaluateRules, evaluateProposals } from './evaluator'
+import type { Rule, AggregatedResult, ProposalValidationResult } from './evaluator'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ContextSnapshot } from '@/usom/types/process'
 import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
@@ -84,4 +84,5 @@ export function createRuleEngine(deps?: RuleEngineDeps): RuleEngine {
 }
 
 // 重导出类型，供外部使用
-export type { Rule, RuleResult, AggregatedResult } from './evaluator'
+export type { Rule, RuleResult, AggregatedResult, ProposalValidationResult } from './evaluator'
+export { evaluateProposals } from './evaluator'

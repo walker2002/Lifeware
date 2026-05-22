@@ -54,3 +54,36 @@ export function validateSemantics(manifest: DomainManifest): SemanticError[] {
 
   return errors
 }
+
+export function validateGenerationActions(manifest: DomainManifest): SemanticError[] {
+  const errors: SemanticError[] = []
+
+  if (!manifest.generation_actions) return errors
+
+  for (const [actionKey, action] of Object.entries(manifest.generation_actions)) {
+    if (!action.description) {
+      errors.push({
+        fieldPath: ['generation_actions', actionKey, 'description'],
+        message: `generation_actions["${actionKey}"].description 不能为空`,
+      })
+    }
+
+    action.contexts.forEach((ctx, idx) => {
+      if (!ctx.id) {
+        errors.push({
+          fieldPath: ['generation_actions', actionKey, 'contexts', String(idx), 'id'],
+          message: `generation_actions["${actionKey}"].contexts[${idx}].id 不能为空`,
+        })
+      }
+
+      if (!ctx.query) {
+        errors.push({
+          fieldPath: ['generation_actions', actionKey, 'contexts', String(idx), 'query'],
+          message: `generation_actions["${actionKey}"].contexts[${idx}].query 不能为空`,
+        })
+      }
+    })
+  }
+
+  return errors
+}

@@ -11,6 +11,7 @@ import type {
   SystemEventType,
   ActionSurface,
   ContextSnapshot,
+  GenerationResult,
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type {
@@ -27,8 +28,12 @@ import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructu
 import type { USOMSnapshot } from '@/usom/types/process'
 import { createTimeboxStateMachine, createGenericStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
-import { findDomain } from '@/domains/registry'
+import { findDomain, findHandler } from '@/domains/registry'
 import { buildActionMap, resolveObjectType, getTransitionFromManifest } from './lifecycle-configs'
+import { assembleContext } from '@/nexus/context-engine'
+import { loadDomainManifest } from '@/domains/manifest-loader'
+import { evaluateProposals } from '@/nexus/core/rule-engine'
+import type { GeneratedProposal } from '@/usom/types/process'
 
 interface IntentEngine {
   parse(rawInput: string, userId: USOM_ID): Promise<StructuredIntent>
@@ -64,6 +69,7 @@ export interface OrchestratorResult {
   warnings?: string[]
   needsConfirmation?: boolean
   confirmationMessage?: string
+  generativeResult?: GenerationResult
 }
 
 export interface OrchestratorDeps {
@@ -163,7 +169,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     eventRepo: deps.eventRepo,
   })
 
-  return {
+  const orchestrator = {
     eventBus,
 
     /** 通过自然语言输入执行 Nexus 管道（创建路径） */
@@ -313,7 +319,98 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // 2. RuleEngine 评估
+      // 1.5 生成型路径检测（manifest 加载失败时跳过，不阻塞被动型路径）
+      const manifestResult = loadDomainManifest(domainId)
+      const manifest = manifestResult.success ? manifestResult.manifest : null
+      const actionConfig = manifest?.generation_actions?.[intent.action]
+
+      if (actionConfig && manifest) {
+        try {
+          // ContextEngine 组装
+          const ceStart = Date.now()
+          trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id, action: intent.action } })
+
+          const generationRequest = await assembleContext(intent, manifest)
+
+          trace(deps.onTrace, 'ContextEngine', 'end', {
+            input: { intentId: intent.id },
+            output: { contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
+          })
+
+          // 发送 GenerativeContextAssembled 事件
+          const ctxEvent: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'GenerativeContextAssembled',
+            occurredAt: new Date().toISOString() as Timestamp,
+            triggeredBy: 'context_engine',
+            payload: { intentId: intent.id, contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(ctxEvent, userId)
+          eventBus.publish(ctxEvent)
+
+          // Handler 执行
+          const hStart = Date.now()
+          trace(deps.onTrace, 'Handler', 'start', { input: { intentId: intent.id } })
+
+          const handler = await findHandler(domainId, intent.action)
+          if (!handler) {
+            return { success: false, error: `生成型路径未找到 Handler: ${domainId}/${intent.action}` }
+          }
+
+          const generativeResult = await handler.handle(generationRequest)
+
+          trace(deps.onTrace, 'Handler', 'end', {
+            input: { intentId: intent.id },
+            output: { proposalCount: generativeResult.proposalSet.proposals.length, durationMs: Date.now() - hStart },
+          })
+
+          // 发送 GenerativeHandlerCompleted 事件
+          const handlerEvent: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'GenerativeHandlerCompleted',
+            occurredAt: new Date().toISOString() as Timestamp,
+            triggeredBy: 'handler',
+            payload: {
+              intentId: intent.id,
+              proposalCount: generativeResult.proposalSet.proposals.length,
+              durationMs: Date.now() - hStart,
+            },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(handlerEvent, userId)
+          eventBus.publish(handlerEvent)
+
+          return {
+            success: true,
+            generativeResult,
+            warnings: generativeResult.warnings?.map(w => w.message),
+          }
+        } catch (err) {
+          // Handler 异常时记录完整错误上下文
+          const errorEvent: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'GenerativeHandlerCompleted',
+            occurredAt: new Date().toISOString() as Timestamp,
+            triggeredBy: 'handler',
+            payload: {
+              intentId: intent.id,
+              failedAt: 'Handler.handle',
+              completedSteps: ['ContextEngine'],
+              error: err instanceof Error ? err.message : String(err),
+            },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(errorEvent, userId)
+
+          return {
+            success: false,
+            error: `生成型路径执行失败: ${err instanceof Error ? err.message : String(err)}`,
+          }
+        }
+      }
+
+      // 2. RuleEngine 评估（被动型路径）
       trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
       const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
       trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
@@ -790,6 +887,95 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { success: false, error: `未知的域: ${domainId}` }
     },
 
+    /** 生成型方案确认：将已接受的 proposals 转换为批量 intent 并执行 */
+    async executeGenerativeConfirmation(
+      intentId: USOM_ID,
+      acceptedProposals: GeneratedProposal[],
+      userId: USOM_ID,
+    ): Promise<{ success: boolean; results: OrchestratorResult[]; error?: string }> {
+      const results: OrchestratorResult[] = []
+
+      // 发送 GenerativeUserConfirmed 事件
+      const confirmEvent: SystemEvent = {
+        id: crypto.randomUUID() as USOM_ID,
+        type: 'GenerativeUserConfirmed',
+        occurredAt: new Date().toISOString() as Timestamp,
+        triggeredBy: 'handler',
+        payload: { intentId, acceptedProposalIds: acceptedProposals.map(p => p.id) },
+        snapshotId: '' as USOM_ID,
+      }
+      await deps.eventRepo.append(confirmEvent, userId)
+      eventBus.publish(confirmEvent)
+
+      // 二次验证
+      trace(deps.onTrace, 'Handler', 'start', { input: { phase: 'SecondValidation', proposalCount: acceptedProposals.length } })
+      const proposalSet = { id: crypto.randomUUID(), label: 'confirmation', proposals: acceptedProposals, tags: [] }
+      const validationResults = evaluateProposals({ proposalSet } as any)
+      const rejected = validationResults.filter(r => r.status === 'reject')
+      if (rejected.length > 0) {
+        // 记录被拒绝的事件
+        for (const r of rejected) {
+          const rejectEvent: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'GenerativeProposalRejected',
+            occurredAt: new Date().toISOString() as Timestamp,
+            triggeredBy: 'handler',
+            payload: { intentId, proposalId: r.proposalId, reasons: r.reasons },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(rejectEvent, userId)
+        }
+      }
+      trace(deps.onTrace, 'Handler', 'end', { input: { phase: 'SecondValidation' }, output: { rejectedCount: rejected.length } })
+
+      // 批量执行：将每个 proposal 转为 StructuredIntent 并走 Reactive Path
+      const executable = acceptedProposals.filter(
+        p => !rejected.find(r => r.proposalId === p.id),
+      )
+
+      for (const proposal of executable) {
+        const batchIntent: StructuredIntent = {
+          id: crypto.randomUUID() as USOM_ID,
+          intentionId: intentId,
+          targetDomain: 'timebox',
+          action: 'createTimebox',
+          fields: {
+            ...proposal.payload,
+            sourceProposalId: proposal.id,
+          },
+          confidence: 1.0,
+          resolvedBy: 'template_form',
+          createdAt: new Date().toISOString() as Timestamp,
+        }
+
+        const result = await orchestrator.executeIntent(batchIntent, userId)
+        results.push(result)
+      }
+
+      // 发送 GenerativeBatchExecuted 事件
+      const batchEvent: SystemEvent = {
+        id: crypto.randomUUID() as USOM_ID,
+        type: 'GenerativeBatchExecuted',
+        occurredAt: new Date().toISOString() as Timestamp,
+        triggeredBy: 'handler',
+        payload: {
+          intentId,
+          totalProposals: acceptedProposals.length,
+          executedCount: executable.length,
+          rejectedCount: rejected.length,
+          successCount: results.filter(r => r.success).length,
+        },
+        snapshotId: '' as USOM_ID,
+      }
+      await deps.eventRepo.append(batchEvent, userId)
+      eventBus.publish(batchEvent)
+
+      return {
+        success: results.every(r => r.success),
+        results,
+      }
+    },
+
     /** 重新计算习惯打卡指标并持久化 */
     async recalculateHabitMetrics(habitId: USOM_ID, userId: USOM_ID): Promise<void> {
       if (!deps.habitRepo) return
@@ -889,4 +1075,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       return { success: true, generatedTimeboxes: generated }
     },
   }
+
+  return orchestrator
 }

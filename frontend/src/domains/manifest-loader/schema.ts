@@ -61,6 +61,17 @@ const MarkdownTemplateSchema = z.object({
   max_objects: z.number().optional(),
 })
 
+const ContextDeclarationSchema = z.object({
+  id: z.string(),
+  query: z.string(),
+  params: z.array(z.string()).optional(),
+})
+
+const GenerationActionSchema = z.object({
+  description: z.string(),
+  contexts: z.array(ContextDeclarationSchema),
+})
+
 export const ManifestSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -85,6 +96,8 @@ export const ManifestSchema = z.object({
   view_routes: z.record(z.string(), ViewRouteSchema).optional(),
 
   subscribed_events: z.array(z.string()),
+
+  generation_actions: z.record(z.string(), GenerationActionSchema).optional(),
 })
 
 export type DomainManifest = z.infer<typeof ManifestSchema>

@@ -1,5 +1,5 @@
 import type { DomainId } from '@/usom/types/primitives'
-import type { DomainPlugin } from '@/usom/types/process'
+import type { DomainPlugin, DomainHandler } from '@/usom/types/process'
 import { timeboxPlugin } from './timebox'
 import { habitsPlugin } from './habits'
 import { okrsPlugin } from './okrs'
@@ -108,3 +108,23 @@ export function validateShortcutUniqueness(): void {
 
 // 启动时校验 shortcut 唯一性
 validateShortcutUniqueness()
+
+// ─── Handler 查找（Generative Path）───────────────────────────
+
+type HandlerMap = Record<string, DomainHandler>
+
+async function loadHandlers(domainId: string): Promise<HandlerMap> {
+  switch (domainId) {
+    case 'timebox': {
+      const mod = await import('./timebox/handlers')
+      return mod.timeboxHandlers ?? {}
+    }
+    default:
+      return {}
+  }
+}
+
+export async function findHandler(domainId: string, action: string): Promise<DomainHandler | undefined> {
+  const handlers = await loadHandlers(domainId)
+  return handlers[action]
+}

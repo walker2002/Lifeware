@@ -981,10 +981,25 @@ interface DomainPlugin {
 
 // ── 辅助类型 ─────────────────────────────────────────────────────
 interface DomainManifest {
-  domainId:        DomainId
-  version:         string
-  requiredFields:  string[]   // Intent Engine 据此补全 StructuredIntent.fields
+  domainId:         DomainId
+  version:          string
+  requiredFields:   string[]   // Intent Engine 据此补全 StructuredIntent.fields
   subscribedEvents: SystemEventType[]
+  intentTriggers?:  IntentTriggerInfo[]  // 域声明的意图触发器（用于 AI 面板快捷操作）
+  viewRoutes?:      Record<string, ViewRouteInfo>  // 域声明的视图路由
+}
+
+// 意图触发器：描述域支持的意图动作及快捷方式
+interface IntentTriggerInfo {
+  action:      string    // 域内动作名，e.g. 'create_habit'
+  shortcut?:   string    // 快捷指令，e.g. '/habit'
+  description: string    // 动作描述
+}
+
+// 视图路由：域声明的 UI 组件路由
+interface ViewRouteInfo {
+  component: string                      // 组件名
+  params?:   Record<string, unknown>     // 路由参数
 }
 
 interface MetricUpdate {

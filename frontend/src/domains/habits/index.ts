@@ -24,3 +24,4 @@ export const habitsPlugin: DomainPlugin = result.success
 
 export { createHabitsHooks } from './hooks'
 export { habitTransitions, findTransition } from './transitions'
+export { PendingHabitsProvider, HabitTemplatesProvider } from './providers'
