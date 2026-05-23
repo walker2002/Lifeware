@@ -316,9 +316,16 @@ export default function Home() {
   }, [saveCurrentConversation]);
 
   // T031: conversation 消息发送 → 可能触发 splitWith
-  const handleConversationSend = useCallback(async (content: string) => {
-    const userMsg: ChatMessage = { role: 'user', content, timestamp: new Date().toISOString() }
+  const handleConversationSend = useCallback(async (content: string, attachments?: File[]) => {
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: content || (attachments && attachments.length > 0 ? `上传了 ${attachments.length} 个文件` : ''),
+      timestamp: new Date().toISOString(),
+    }
     setConversationMessages(prev => [...prev, userMsg])
+    if (attachments && attachments.length > 0) {
+      console.log('[conversation] 附件:', attachments.map(f => f.name))
+    }
 
     setIsLoading(true)
     try {
