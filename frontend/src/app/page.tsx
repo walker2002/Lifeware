@@ -396,6 +396,8 @@ export default function Home() {
           messages={conversationMessages}
           onSendMessage={handleConversationSend}
           isLoading={isLoading}
+          recentSessions={sessions.slice(0, 3)}
+          onSelectSession={handleSelectSession}
         />
       )
       if (splitWith) {
