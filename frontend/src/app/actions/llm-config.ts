@@ -3,6 +3,8 @@
 import {
   getProviderSummaries,
   setCachedUserPrefs,
+  getActiveProviderId,
+  getMergedConfig,
   type ProviderSummary,
   type UserLLMPreferences,
 } from '@/lib/llm/config'
@@ -37,6 +39,16 @@ export async function saveLLMSettings(prefs: UserLLMPreferences): Promise<void> 
   }, MVP_USER_ID)
 
   setCachedUserPrefs(prefs)
+}
+
+/** 检查默认供应商是否已配置 API Key 和默认模型 */
+export async function checkLLMConfigured(): Promise<boolean> {
+  const providerId = getActiveProviderId()
+  const config = getMergedConfig(providerId)
+  const apiKey = process.env[config.apiKeyEnv]
+  const hasApiKey = !!apiKey
+  const hasModel = !!config.models.default && config.models.default !== 'unknown'
+  return hasApiKey && hasModel
 }
 
 // 向后兼容别名
