@@ -21,6 +21,7 @@ import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
 import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData } from "./actions/intent"
+import { checkLLMConfigured } from "./actions/llm-config"
 import { DynamicForm } from "@/components/editor/dynamic-form"
 import { ActionConfirm } from "@/components/editor/action-confirm"
 import { getTraceConfig } from "@/lib/config/trace-config";
@@ -84,6 +85,10 @@ export default function Home() {
       .then(setDomainActions)
       .catch(err => console.error('[fetchDomainActions] 加载失败:', err))
   }, []);
+
+  useEffect(() => {
+    checkLLMConfigured().then(setLlmConfigured)
+  }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
 
   const [traceEnabled] = useState(() => getTraceConfig().enabled);
@@ -96,7 +101,7 @@ export default function Home() {
     message: string; rawInput?: string; formFields?: TemplateFormFields;
   } | null>(null);
 
-  const [llmConfigured] = useState(() => typeof window !== 'undefined' ? !!localStorage.getItem('lw-llm-config') : false);
+  const [llmConfigured, setLlmConfigured] = useState(true)
   const [actionViewData, setActionViewData] = useState<Awaited<ReturnType<typeof fetchActionData>> | null>(null);
 
   // 加载 action 视图的表单字段数据（Server Action，避免客户端引用 node:fs）
