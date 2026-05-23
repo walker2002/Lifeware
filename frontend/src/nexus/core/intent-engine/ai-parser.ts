@@ -1,7 +1,7 @@
 // AI Parser — 意图引擎的自然语言解析模块
 // 使用 LLM 将用户输入解析为 StructuredIntent
 
-import { chat } from '@/lib/llm/client'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
 import { inferHabitDefaults } from '@/domains/habits/habit-defaults'
 
@@ -209,18 +209,20 @@ interface LLMIntentResponse {
 export async function parseWithAI(
   rawInput: string,
   intentionId: USOM_ID,
+  aiRuntime: AIRuntime,
 ): Promise<AIParserResult> {
   try {
-    // 1. 调用 LLM
-    const response = await chat(
-      [
-        { role: 'system', content: TIMEBOX_SYSTEM_PROMPT(new Date()) },
-        { role: 'user', content: rawInput },
-      ],
-      { temperature: 0.3 },
-    )
+    // 1. 调用 AIRuntime
+    const response = await aiRuntime.generate({
+      domainId: 'timebox',
+      action: 'parseIntent',
+      systemPrompt: TIMEBOX_SYSTEM_PROMPT(new Date()),
+      messages: [{ role: 'user', content: rawInput }],
+      taskType: 'intent_routing',
+      temperature: 0.3,
+    })
 
-    const content = response.choices[0]?.message?.content
+    const content = response.content
     if (!content) {
       return {
         success: false,
@@ -228,8 +230,8 @@ export async function parseWithAI(
       }
     }
 
-    // 2. 从响应中提取 JSON（处理 markdown 代码块包裹的情况）
-    const jsonStr = extractJSON(content)
+    // 2. 提取 JSON（content 可能是对象或字符串）
+    const jsonStr = typeof content === 'string' ? extractJSON(content) : JSON.stringify(content)
 
     let parsed: LLMIntentResponse
     try {
@@ -360,22 +362,24 @@ interface LLMMultiTaskResponse {
 export async function parseMultiTask(
   rawInput: string,
   intentionId: USOM_ID,
+  aiRuntime: AIRuntime,
 ): Promise<MultiTaskParserResult> {
   try {
-    const response = await chat(
-      [
-        { role: 'system', content: MULTI_TASK_PROMPT(new Date()) },
-        { role: 'user', content: rawInput },
-      ],
-      { temperature: 0.3 },
-    )
+    const response = await aiRuntime.generate({
+      domainId: 'timebox',
+      action: 'parseMultiTask',
+      systemPrompt: MULTI_TASK_PROMPT(new Date()),
+      messages: [{ role: 'user', content: rawInput }],
+      taskType: 'field_extraction',
+      temperature: 0.3,
+    })
 
-    const content = response.choices[0]?.message?.content
+    const content = response.content
     if (!content) {
       return { success: false, intents: [], error: 'LLM 返回内容为空' }
     }
 
-    const jsonStr = extractJSON(content)
+    const jsonStr = typeof content === 'string' ? extractJSON(content) : JSON.stringify(content)
     let parsed: LLMMultiTaskResponse
     try {
       parsed = JSON.parse(jsonStr) as LLMMultiTaskResponse
@@ -442,22 +446,24 @@ function generateUUID(): string {
 export async function parseHabitWithAI(
   rawInput: string,
   intentionId: USOM_ID,
+  aiRuntime: AIRuntime,
 ): Promise<AIParserResult> {
   try {
-    const response = await chat(
-      [
-        { role: 'system', content: HABIT_SYSTEM_PROMPT(new Date()) },
-        { role: 'user', content: rawInput },
-      ],
-      { temperature: 0.3 },
-    )
+    const response = await aiRuntime.generate({
+      domainId: 'habits',
+      action: 'parseHabitIntent',
+      systemPrompt: HABIT_SYSTEM_PROMPT(new Date()),
+      messages: [{ role: 'user', content: rawInput }],
+      taskType: 'field_extraction',
+      temperature: 0.3,
+    })
 
-    const content = response.choices[0]?.message?.content
+    const content = response.content
     if (!content) {
       return { success: false, error: 'LLM 返回内容为空' }
     }
 
-    const jsonStr = extractJSON(content)
+    const jsonStr = typeof content === 'string' ? extractJSON(content) : JSON.stringify(content)
     let parsed: LLMIntentResponse
     try {
       parsed = JSON.parse(jsonStr) as LLMIntentResponse

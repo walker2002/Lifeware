@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { parse } from '../index'
 import { parseWithAI } from '../ai-parser'
 import type { AIParserResult } from '../ai-parser'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 
 // 模拟 ai-parser 模块
 vi.mock('../ai-parser', () => ({
@@ -12,6 +13,8 @@ vi.mock('../ai-parser', () => ({
 }))
 
 const mockParseWithAI = vi.mocked(parseWithAI)
+
+const mockAIRuntime = {} as AIRuntime
 
 describe('Intent Engine — parse()', () => {
   const rawInput = '我今天10:00开始做市场调研报告，花费2小时'
@@ -22,7 +25,6 @@ describe('Intent Engine — parse()', () => {
   })
 
   it('parse() 委托给 parseWithAI 并返回成功结果', async () => {
-    // Arrange
     const mockResult: AIParserResult = {
       success: true,
       intent: {
@@ -42,44 +44,34 @@ describe('Intent Engine — parse()', () => {
     }
     mockParseWithAI.mockResolvedValueOnce(mockResult)
 
-    // Act
-    const result = await parse(rawInput, intentionId)
+    const result = await parse(rawInput, intentionId, mockAIRuntime)
 
-    // Assert: 返回值与 ai-parser 返回值一致
     expect(result).toEqual(mockResult)
-
-    // Assert: parseWithAI 被正确调用
-    expect(mockParseWithAI).toHaveBeenCalledWith(rawInput, intentionId)
+    expect(mockParseWithAI).toHaveBeenCalledWith(rawInput, intentionId, mockAIRuntime)
   })
 
-  it('parse() 传递正确的 intentionId', async () => {
-    // Arrange
+  it('parse() 传递正确的 intentionId 和 aiRuntime', async () => {
     const customIntentionId = 'custom-intention-id-999'
     mockParseWithAI.mockResolvedValueOnce({
       success: false,
       error: '测试错误',
     })
 
-    // Act
-    await parse('测试输入', customIntentionId)
+    await parse('测试输入', customIntentionId, mockAIRuntime)
 
-    // Assert: intentionId 正确传递
-    expect(mockParseWithAI).toHaveBeenCalledWith('测试输入', customIntentionId)
+    expect(mockParseWithAI).toHaveBeenCalledWith('测试输入', customIntentionId, mockAIRuntime)
     expect(mockParseWithAI).toHaveBeenCalledTimes(1)
   })
 
   it('parse() 透传 parseWithAI 的错误结果', async () => {
-    // Arrange
     const errorResult: AIParserResult = {
       success: false,
       error: 'AI 置信度过低',
     }
     mockParseWithAI.mockResolvedValueOnce(errorResult)
 
-    // Act
-    const result = await parse('低置信度输入', intentionId)
+    const result = await parse('低置信度输入', intentionId, mockAIRuntime)
 
-    // Assert
     expect(result.success).toBe(false)
     expect(result.error).toBe('AI 置信度过低')
     expect(result.intent).toBeUndefined()

@@ -16,6 +16,7 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
+import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
 import { getRequiredFields, hasRequiredFields, getActionDescription } from "@/domains/registry";
@@ -197,7 +198,8 @@ export async function submitIntent(
   return executePipeline(
     rawInput,
     async () => {
-      const parseResult = await parseIntent(rawInput, intentionId);
+      const aiRuntime = createAIRuntime();
+      const parseResult = await parseIntent(rawInput, intentionId, aiRuntime);
       return parseResult;
     },
     confirmed,
@@ -356,7 +358,8 @@ export async function submitExecutionIntent(
     );
 
     // 2. AI 解析
-    const parseResult = await parseIntent(rawInput, intentionId);
+    const aiRuntime = createAIRuntime();
+    const parseResult = await parseIntent(rawInput, intentionId, aiRuntime);
     if (!parseResult.success || !parseResult.intent) {
       const timeboxes = await fetchTimeboxSummaries();
       return { success: false, timeboxes, error: parseResult.error ?? "解析失败" };
@@ -427,7 +430,8 @@ export async function submitBatchIntent(
   );
 
   // 2. AI 批量解析
-  const parseResult = await parseBatch(rawInput, intentionId);
+  const aiRuntime = createAIRuntime();
+  const parseResult = await parseBatch(rawInput, intentionId, aiRuntime);
   if (!parseResult.success || parseResult.intents.length === 0) {
     return { results: [{ index: 0, title: rawInput.slice(0, 50), error: parseResult.error ?? "未识别到有效任务" }] };
   }

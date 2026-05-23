@@ -85,7 +85,7 @@ database-design.md     # 数据库表结构与设计规范（由 LW_database_数
 | Domain 注册指南 | 2026_05_22 | 2026_05_15 | Step 9 Handler 扩展：onGenerate(request, aiRuntime) 依赖注入模型、AI Runtime 使用要点、generation_actions 新字段（session_mode/response_mode/cnui_surface/cache_ttl_minutes）、CN-UI 约束、Streaming 策略、AIRuntimeError 降级、新增 8 条错误模式 |
 | USOM 详细设计 | 2026_05_16 | 2026_03_21 | 新增 ChatMessage/AISession/AISessionSummary/LLMConfig/UserSettings 类型及生命周期约束 |
 | 数据库设计 | 2026_05_16 | 2026_03_21 | 新增 ai_sessions 表（10列+2索引）、user_settings 表（6列+1唯一索引） |
-| AI Runtime 架构设计 | 2026_05_22 | 无 | 创建。定义 AI Runtime 基础设施（LLMGateway/SessionManager/TokenBudget/Cache）、CN-UI Protocol Stack、Handler 依赖注入模型、Streaming 策略、LLMProvider 重试/降级、MVP 范围边界 |
+| AI Runtime 架构设计 | 2026_05_23 | 2026_05_22 | V3.1 修正：统一 single_shot 命名、Provider 列表新增中国 Provider（DashScope/DeepSeek/智谱）、Intent Engine 纳入 AI Runtime 统一路由、LLMGateway.call 签名修正+默认路由配置、Section 10 全章编号重排（10.1~10.9）、CnuiSurface 命名统一（PascalCase 类型/camelCase 字段）、新增 AITaskType 映射表、新增 LLMGateway 与 /lib/llm/ 迁移关系、新增 CN-UI Payload LLM 生成机制、CN-UI 确认复用现有 Proposal 流程、核心设计决策扩展至 11 条 |
 | 项目宪章 | 2026_05_22 | 2026_05_20 | v1.5.0→v1.6.0：新增 AI Runtime Constraints（7项）、CN-UI Protocol Constraints（3项）；扩展 Orchestrator Purity（AI Runtime 注入）、Domain Manifest Self-Description（session_mode/response_mode/cnui_surface）、Handler（onGenerate hook + aiRuntime 依赖注入） |
 | USOM 详细设计 | 2026_05_22 | 2026_05_20 | 新增 AI Runtime 类型（AITaskType/TokenUsage/LLMProviderConfig）、CN-UI 类型（CNUISurface/CNUIMessage/CNUIEvent/CNUISurfaceStore）、错误类型（AIRuntimeError/CNUISchemaError） |
 | 总体设计 | 2026_05_22 | 2026_05_02 | Nexus 基础设施层新增 AI Runtime 组件；Orchestrator Generative Path 描述更新（AI Runtime 依赖注入模型） |

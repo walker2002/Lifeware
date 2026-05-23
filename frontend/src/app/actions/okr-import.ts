@@ -2,7 +2,7 @@
 
 import type { ParsedObjective, ImportReport, ImportResult, SaveImportResult } from "@/lib/okr-import/types"
 import { renderOKRsToMarkdown, parseOKRMarkdown } from "@/lib/okr-import/markdown-parser"
-import { chat } from "@/lib/llm/client"
+import { createAIRuntime } from "@/nexus/ai-runtime"
 import { createObjective, createKeyResult } from "./okr"
 
 // ─── LLM Prompt ─────────────────────────────────────────────
@@ -72,19 +72,21 @@ export async function importOKRFromFile(
       }
     }
 
-    // 30s 超时保护
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30_000)
+    const aiRuntime = createAIRuntime()
 
-    const response = await chat(
-      [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `文件名: ${fileName}\n\n${fileContent}` },
-      ],
-      { temperature: 0.3, maxTokens: 4096 },
-    ).finally(() => clearTimeout(timeout))
+    const response = await aiRuntime.generate({
+      domainId: 'okrs',
+      action: 'importOKR',
+      systemPrompt: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `文件名: ${fileName}\n\n${fileContent}` }],
+      taskType: 'field_extraction',
+      temperature: 0.3,
+      maxTokens: 4096,
+    })
 
-    const rawText = response.choices[0]?.message?.content ?? ''
+    const rawText = typeof response.content === 'string'
+      ? response.content
+      : JSON.stringify(response.content)
 
     const jsonStr = extractJSON(rawText)
     const parsed = JSON.parse(jsonStr)

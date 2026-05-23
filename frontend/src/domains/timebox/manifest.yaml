@@ -240,6 +240,9 @@ generation_actions:
       - id: energyProfile
         query: energy_profile
         params: []
+    response_mode: cnui
+    cnui_surface_type: timebox-list
+    session_enabled: true
   adjustRemainingSchedule:
     description: 根据已完成项目调整剩余日程
     contexts:

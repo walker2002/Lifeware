@@ -33,6 +33,8 @@ import { buildActionMap, resolveObjectType, getTransitionFromManifest } from './
 import { assembleContext } from '@/nexus/context-engine'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { evaluateProposals } from '@/nexus/core/rule-engine'
+import { createAIRuntime } from '@/nexus/ai-runtime'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { GeneratedProposal } from '@/usom/types/process'
 
 interface IntentEngine {
@@ -358,7 +360,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return { success: false, error: `生成型路径未找到 Handler: ${domainId}/${intent.action}` }
           }
 
-          const generativeResult = await handler.handle(generationRequest)
+          let generativeResult: GenerationResult
+          if (handler.onGenerate) {
+            const aiRuntime: AIRuntime = createAIRuntime()
+            generativeResult = await handler.onGenerate(generationRequest, aiRuntime)
+          } else {
+            generativeResult = await handler.handle(generationRequest)
+          }
 
           trace(deps.onTrace, 'Handler', 'end', {
             input: { intentId: intent.id },

@@ -246,6 +246,11 @@ export interface ContextCapability {
 export interface GenerationRequest {
   intent: StructuredIntent
   contexts: Record<string, unknown>
+  sessionId?: string
+  sessionHistory?: Array<{ role: string; content: string }>
+  reviseTarget?: string
+  previousProposals?: GeneratedProposal[]
+  tokenBudget?: { totalTokens: number; remainingTokens: number }
 }
 
 export interface GeneratedProposal {
@@ -289,4 +294,5 @@ export interface GenerationResult {
 
 export interface DomainHandler {
   handle(request: GenerationRequest): Promise<GenerationResult>
+  onGenerate?(request: GenerationRequest, aiRuntime: import('@/nexus/ai-runtime').AIRuntime): Promise<GenerationResult>
 }
