@@ -6,6 +6,7 @@ import type { AIParserResult, MultiTaskParserResult, BatchIntentResult, BatchIte
 import { matchShortcut } from './shortcut-matcher'
 import type { ShortcutMatch } from './shortcut-matcher'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 
 /**
  * 将 ShortcutMatch 转换为 AIParserResult
@@ -34,11 +35,12 @@ function shortcutToResult(match: ShortcutMatch, intentionId: USOM_ID): AIParserR
 export async function parse(
   rawInput: string,
   intentionId: USOM_ID,
+  aiRuntime: AIRuntime,
 ): Promise<AIParserResult> {
   const shortcut = matchShortcut(rawInput)
   if (shortcut) return shortcutToResult(shortcut, intentionId)
 
-  return parseWithAI(rawInput, intentionId)
+  return parseWithAI(rawInput, intentionId, aiRuntime)
 }
 
 /**
@@ -47,8 +49,9 @@ export async function parse(
 export async function parseBatch(
   rawInput: string,
   intentionId: USOM_ID,
+  aiRuntime: AIRuntime,
 ): Promise<MultiTaskParserResult> {
-  return parseMultiTask(rawInput, intentionId)
+  return parseMultiTask(rawInput, intentionId, aiRuntime)
 }
 
 // 重导出 ai-parser 的类型

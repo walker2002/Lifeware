@@ -17,6 +17,7 @@ import type {
   PresentationPayload,
 } from '@/usom/types/process'
 import type { TaskSummary, HabitSummary, TimeboxSummary } from '@/usom/types/summaries'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { HabitTemplate } from '@/usom/types/objects'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -86,6 +87,37 @@ export class SchedulingHandler implements DomainHandler {
       presentation,
       warnings,
     }
+  }
+
+  async onGenerate(request: GenerationRequest, aiRuntime: AIRuntime): Promise<GenerationResult> {
+    const baseResult = await this.handle(request)
+
+    const response = await aiRuntime.generate({
+      domainId: request.intent.targetDomain,
+      action: request.intent.action,
+      systemPrompt: '你是智能时间编排助手。根据已有的编排方案，优化时间分配建议。',
+      messages: [
+        { role: 'user', content: JSON.stringify(baseResult.proposalSet) },
+      ],
+      taskType: 'content_generation',
+      temperature: 0.5,
+    })
+
+    if (response.content) {
+      const aiContent = typeof response.content === 'string'
+        ? response.content
+        : JSON.stringify(response.content)
+
+      return {
+        ...baseResult,
+        presentation: {
+          type: 'markdown',
+          content: (baseResult.presentation?.content ?? '') + '\n\n---\n### AI 优化建议\n' + aiContent,
+        },
+      }
+    }
+
+    return baseResult
   }
 
   // ─── collectMaterials: 从通用 contexts 提取类型化数据 ──────

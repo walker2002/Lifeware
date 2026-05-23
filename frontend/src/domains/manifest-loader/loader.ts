@@ -22,7 +22,10 @@ export function loadDomainManifest(domainId: string): ManifestLoadResult {
   const cached = cache.get(domainId)
   if (cached) return cached
 
-  const domainDir = path.join(process.cwd(), 'src/domains', domainId)
+  // 支持绝对路径（测试用）或域名 ID（生产用）
+  const domainDir = path.isAbsolute(domainId)
+    ? domainId
+    : path.join(process.cwd(), 'src/domains', domainId)
   const filePath = path.join(domainDir, 'manifest.yaml')
 
   // Phase 1: YAML 语法解析

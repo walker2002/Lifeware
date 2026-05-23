@@ -18,7 +18,14 @@ export async function assembleContext(
     contexts[ctx.id] = await resolveContext(ctx.id, ctx.query, params)
   }
 
-  return { intent, contexts }
+  const request: GenerationRequest = { intent, contexts }
+
+  // 注入 manifest 声明的扩展字段（Session、修订等）
+  if (actionConfig.session_enabled) {
+    request.sessionId = undefined // 由 Orchestrator 在运行时注入
+  }
+
+  return request
 }
 
 function extractParams(

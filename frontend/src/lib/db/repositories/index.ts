@@ -19,5 +19,6 @@ export { DerivedSignalsRepository } from './derived-signals.repository'
 export { EnergyLogRepository } from './energy-log.repository'
 export { AISessionRepository } from './session.repository'
 export { UserSettingsRepository } from './user-settings.repository'
+export { EpisodeRepository } from './episode.repository'
 
 export * as mappers from './mappers'

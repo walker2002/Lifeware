@@ -15,9 +15,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.79",
+    "@ai-sdk/openai": "^3.0.65",
     "@gorules/zen-engine": "^0.54.0",
     "@types/pg": "^8.18.0",
     "@types/uuid": "^10.0.0",
+    "ai": "^6.0.191",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

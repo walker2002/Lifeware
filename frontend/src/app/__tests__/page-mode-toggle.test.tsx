@@ -1,9 +1,8 @@
-// 模式切换集成测试
-// T026: 验证 AI/表单模式切换行为
+// 页面渲染集成测试
+// 验证 Home 组件默认渲染 schedule 视图和左面板
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 
 // 模拟 Server Actions
 vi.mock('@/app/actions/intent', () => ({
@@ -21,6 +20,8 @@ vi.mock('@/app/actions/intent', () => ({
   submitBatchIntent: vi.fn().mockResolvedValue({ results: [] }),
   resolveShortcut: vi.fn().mockResolvedValue(null),
   fetchDomainActions: vi.fn().mockResolvedValue([]),
+  submitDynamicIntent: vi.fn().mockResolvedValue({ success: true }),
+  fetchActionData: vi.fn().mockResolvedValue({ hasFields: false, description: '' }),
 }))
 
 // 模拟 Drizzle ORM（数据库连接）
@@ -28,66 +29,45 @@ vi.mock('@/lib/db', () => ({
   db: {},
 }))
 
+// 模拟 useAutoTrigger hook
+vi.mock('@/hooks/use-auto-trigger', () => ({
+  useAutoTrigger: vi.fn(),
+}))
+
 // 需要在 mock 后导入
 import Home from '@/app/page'
 
-describe('模式切换', () => {
+describe('Home 页面渲染', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('默认显示 AI 模式（IntentInput）', () => {
+  it('默认渲染 schedule 视图（DateNav）', () => {
     render(<Home />)
 
-    // AI 模式应显示自然语言输入框
-    expect(screen.getByLabelText('意图输入')).toBeInTheDocument()
-    // 不应显示表单字段
-    expect(screen.queryByLabelText('标题')).not.toBeInTheDocument()
+    // schedule 视图包含 DateNav 组件
+    expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
-  it('切换到表单模式时显示 IntentForm', async () => {
-    const user = userEvent.setup()
+  it('默认显示 assistant 标签面板（SessionList）', () => {
     render(<Home />)
 
-    // 点击表单模式切换按钮
-    await user.click(screen.getByRole('button', { name: '表单填写' }))
-
-    // 应显示表单字段
-    expect(screen.getByLabelText('标题')).toBeInTheDocument()
-    expect(screen.getByLabelText('开始时间')).toBeInTheDocument()
-    expect(screen.getByLabelText(/时长/)).toBeInTheDocument()
-    // 不应显示 AI 输入框
-    expect(screen.queryByLabelText('意图输入')).not.toBeInTheDocument()
+    // 左侧面板应包含 "+ 新对话" 按钮（SessionList 组件）
+    expect(screen.getByText('+ 新对话')).toBeInTheDocument()
   })
 
-  it('从表单模式切换回 AI 模式', async () => {
-    const user = userEvent.setup()
+  it('未配置 LLM 时显示配置提示', () => {
     render(<Home />)
 
-    // 切换到表单
-    await user.click(screen.getByRole('button', { name: '表单填写' }))
-    expect(screen.getByLabelText('标题')).toBeInTheDocument()
-
-    // 切换回 AI
-    await user.click(screen.getByRole('button', { name: 'AI 对话' }))
-    expect(screen.getByLabelText('意图输入')).toBeInTheDocument()
-    expect(screen.queryByLabelText('标题')).not.toBeInTheDocument()
+    expect(screen.getByText('请先配置大语言模型')).toBeInTheDocument()
+    expect(screen.getByText('前往设置')).toBeInTheDocument()
   })
 
-  it('模式切换按钮有正确的激活状态', async () => {
-    const user = userEvent.setup()
+  it('设置按钮在导航栏中可点击', () => {
     render(<Home />)
 
-    const aiButton = screen.getByRole('button', { name: 'AI 对话' })
-    const formButton = screen.getByRole('button', { name: '表单填写' })
-
-    // 默认 AI 模式激活
-    expect(aiButton.className).toContain('bg-background')
-    expect(formButton.className).toContain('text-body')
-
-    // 切换到表单
-    await user.click(formButton)
-    expect(formButton.className).toContain('bg-background')
-    expect(aiButton.className).toContain('text-body')
+    // AppShell 的导航栏包含设置按钮
+    const settingsButton = screen.getByLabelText('设置')
+    expect(settingsButton).toBeInTheDocument()
   })
 })

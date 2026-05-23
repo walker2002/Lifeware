@@ -546,7 +546,10 @@ export const aiSessions = pgTable('ai_sessions', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   title: text('title').notNull().default('新对话'),
-  status: text('status', { enum: ['active', 'archived', 'deleted'] }).notNull().default('active'),
+  status: text('status', { enum: ['created', 'active', 'completing', 'archived', 'deleted', 'closed'] }).notNull().default('created'),
+  domainId: text('domain_id'),
+  action: text('action'),
+  sessionMode: text('session_mode').notNull().default('single_shot'),
 
   messages: jsonb('messages').notNull().$type<Array<{ role: string; content: string; timestamp: string; intentRef?: string }>>().default([]),
   stateSnapshot: jsonb('state_snapshot').notNull().$type<Record<string, unknown>>().default({}),
@@ -573,4 +576,20 @@ export const userSettings = pgTable('user_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('uniq_user_settings_user').on(table.userId),
+])
+
+// ─── 8.3 memory_episodes ──────────────────────────────────────
+export const memoryEpisodes = pgTable('memory_episodes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: uuid('session_id').references(() => aiSessions.id, { onDelete: 'set null' }),
+  domainId: text('domain_id'),
+  action: text('action'),
+  episodeType: text('episode_type').notNull().default('session_summary'),
+  summary: text('summary').notNull(),
+  metadata: jsonb('metadata').notNull().$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_memory_episodes_user_created').on(table.userId, table.createdAt),
+  index('idx_memory_episodes_session').on(table.sessionId),
 ])
