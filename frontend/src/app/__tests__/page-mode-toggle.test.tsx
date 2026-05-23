@@ -5,6 +5,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 // 模拟 Server Actions
+vi.mock('@/app/actions/llm-config', () => ({
+  checkLLMConfigured: vi.fn().mockResolvedValue(false),
+}))
+
 vi.mock('@/app/actions/intent', () => ({
   submitIntent: vi.fn().mockResolvedValue({
     success: true,
@@ -56,10 +60,10 @@ describe('Home 页面渲染', () => {
     expect(screen.getByText('+ 新对话')).toBeInTheDocument()
   })
 
-  it('未配置 LLM 时显示配置提示', () => {
+  it('未配置 LLM 时显示配置提示', async () => {
     render(<Home />)
 
-    expect(screen.getByText('请先配置大语言模型')).toBeInTheDocument()
+    expect(await screen.findByText('请先配置大语言模型')).toBeInTheDocument()
     expect(screen.getByText('前往设置')).toBeInTheDocument()
   })
 
