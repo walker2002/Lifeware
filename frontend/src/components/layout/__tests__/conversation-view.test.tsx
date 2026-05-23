@@ -75,7 +75,7 @@ describe('ConversationView', () => {
     expect(onSend).toHaveBeenCalledWith('创建任务')
   })
 
-  it('should have input area', () => {
+  it('should have input area in conversation mode', () => {
     render(
       <ConversationView
         messages={messages}
@@ -83,6 +83,28 @@ describe('ConversationView', () => {
       />
     )
     expect(screen.getByPlaceholderText('输入消息...')).toBeInTheDocument()
+  })
+
+  it('should have input area in welcome page mode', () => {
+    render(
+      <ConversationView
+        messages={[]}
+        onSendMessage={vi.fn()}
+      />
+    )
+    expect(screen.getByPlaceholderText('输入消息...')).toBeInTheDocument()
+  })
+
+  it('should have attachment button', () => {
+    render(
+      <ConversationView
+        messages={messages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    const attachmentBtn = screen.getByTitle('添加附件')
+    expect(attachmentBtn).toBeInTheDocument()
+    expect(attachmentBtn.tagName).toBe('BUTTON')
   })
 
   it('should call onSendMessage when form submitted', async () => {
@@ -97,7 +119,7 @@ describe('ConversationView', () => {
     const input = screen.getByPlaceholderText('输入消息...')
     fireEvent.change(input, { target: { value: '测试消息' } })
     fireEvent.submit(input.closest('form')!)
-    expect(onSend).toHaveBeenCalledWith('测试消息')
+    expect(onSend).toHaveBeenCalledWith('测试消息', undefined)
   })
 
   it('should render messages with role indicators', () => {
