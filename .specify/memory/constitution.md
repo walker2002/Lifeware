@@ -1,39 +1,40 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.5.0 → 1.6.0
-  Rationale: MINOR — AI Runtime infrastructure subsystem introduction.
-  Adds AI Runtime as a new Nexus infrastructure layer with dependency
-  injection into Handlers, CN-UI Protocol Stack, and Session management.
-  No existing principles are removed or redefined.
+  Version change: 1.6.0 → 1.7.0
+  Rationale: MINOR — Query Path introduced as third routing path
+  alongside Contract Path and Generative Path. Adds query_actions
+  manifest block, onQuery Handler hook, Query Session lifecycle,
+  and read-only query execution path. No existing principles are
+  removed or redefined.
 
   Modified principles:
-    - Principle III (Single-Writer) → AI Runtime recognized as Nexus
-      infrastructure; Session Manager coordinates with Memory Framework
-      L1 but does not bypass Memory Framework's write authority
-    - Principle VI (Domain Plugin) → Handler gains onGenerate hook
-      with aiRuntime dependency injection; Handler AI autonomy clarified
-    - Principle VIII (AI/Rule Boundary) → AI participation scope
-      expanded: LLMProvider retry/fallback is infrastructure-level,
-      CN-UI Schema validation is generate-time validation; streaming
-      vs non-streaming boundary codified
+    - Principle I (Intent-Driven) → Phase A routing now produces
+      three path types: contract, generative, query. Query intents
+      are identified by query_actions manifest match.
+    - Principle VI (Domain Plugin) → Handler gains optional onQuery
+      hook for complex analysis queries; query_actions added as
+      manifest declaration block; Shortcut Path permits Orchestrator
+      to assemble read-only CN-UI without Handler involvement
+    - Principle VIII (AI/Rule Boundary) → Query Path explicitly
+      bypasses Rule Engine and State Machine — read-only queries
+      have no state mutation to validate or execute
 
   Added sections:
-    - Architecture Constraints > AI Runtime Constraints (new)
-      Seven constraints covering dependency injection, Handler autonomy,
-      LLMProvider resilience, Streaming policy, CN-UI Schema validation,
-      Session lifecycle, and MVP scope boundaries.
-    - Architecture Constraints > CN-UI Protocol Constraints (new)
-      Three constraints: declarative-only, component catalog whitelist,
-      conversation-closed-loop.
+    - Architecture Constraints > Query Path Constraints (new)
+      Six constraints covering read-only invariant, forced
+      multi_turn, Shortcut vs Handler path split, session context
+      injection, Orchestrator CN-UI assembly permission, and
+      Memory recording authority.
 
   Modified sections:
     - Architecture Constraints > Orchestrator Purity (expanded:
-      AI Runtime injection as new Orchestrator responsibility in
-      Generative Path)
+      Query Path routing, Shortcut Path CN-UI assembly for
+      read-only display)
     - Architecture Constraints > Domain Manifest Self-Description
-      (added generation_actions extensions: session_mode, response_mode,
-      cnui_surface, cache_ttl_minutes)
+      (added query_actions as fourth manifest block)
+    - Architecture Constraints > Domain Registration Process
+      (added query_actions declaration and onQuery hook)
 
   Templates requiring updates:
     - .specify/templates/plan-template.md            ✅ no changes needed
@@ -41,13 +42,14 @@
     - .specify/templates/tasks-template.md             ✅ no changes needed
 
   Follow-up documents requiring updates:
-    - docs/usom-design.md                            ⚠ pending update
-      (add AISession, CNUISurface, CNUIMessage, AIRuntimeError types)
-    - mydocs/core/LW_overall_总体设计_*.md             ⚠ pending update
-      (update Nexus composition with AI Runtime subsystem)
+    - mydocs/core/LW_overall_总体设计_2026_05_02.md    ⚠ pending update
+      (add Query Path as third path, update Orchestrator routing,
+       update Intent Engine routing, add three-path overview)
     - mydocs/core/LW_domain_注册指南_2026_05_14.md    ⚠ pending update
-      (add onGenerate hook implementation guidance, AI Runtime usage
-      patterns, CN-UI Surface definition steps)
+      (add query_actions manifest block, add onQuery hook guidance,
+       update Handler interface, add Query Session lifecycle notes)
+    - manifest.md                                     ⚠ pending update
+      (version history entries for constitution, 总体设计, 注册指南)
 -->
 
 # Lifeware Constitution
@@ -65,11 +67,15 @@ intent-to-action pipeline.
 Intent Engine processing has two distinct phases:
 
 - **Phase A (Routing)**: A bounded classification task that maps user
-  input to a `(targetDomain, action)` pair with confidence score.
-  This is "interpretive execution" — AI MUST participate. Domain
-  manifests provide `intent_triggers` as structured routing context.
-  The output space is bounded: only registered Domain actions are
-  candidates. Low confidence triggers user clarification.
+  input to a `(targetDomain, action, pathType)` triple with
+  confidence score. This is "interpretive execution" — AI MUST
+  participate. Domain manifests provide `intent_triggers` as
+  structured routing context. The output space is bounded: only
+  registered Domain actions are candidates. `pathType` is one of
+  `contract`, `generative`, or `query` — determined by matching
+  the action against manifest `actions`, `generation_actions`, or
+  `query_actions` respectively. Low confidence triggers user
+  clarification.
 - **Phase B (Field Completion)**: A structured extraction task that
   populates `StructuredIntent` fields from user input and Domain
   `required_fields`. This is "contract execution" — output types are
@@ -197,11 +203,19 @@ Domain-defined computational units that receive `GenerationRequest`
 from Context Engine and produce `GenerationResult`. Handlers are the
 sole location for generative AI logic within Domain Plugins.
 
-**Handler entry point**: `onGenerate(request: GenerationRequest,
-aiRuntime: AIRuntime)`. AI Runtime is injected as a dependency —
-Handler decides how to use it (call frequency, model parameters,
-tool use, CN-UI vs. text output). Orchestrator does not call AI
-Runtime directly.
+**Handler entry points**:
+- `onGenerate(request: GenerationRequest, aiRuntime: AIRuntime)` —
+  for generative operations. AI Runtime is injected as a dependency —
+  Handler decides how to use it (call frequency, model parameters,
+  tool use, CN-UI vs. text output).
+- `onQuery(context: QueryContext, aiRuntime?: AIRuntime)` — optional
+  hook for complex analysis queries (Handler Path). Only needed when
+  query results require LLM processing or data aggregation. AI Runtime
+  is provided when `response_mode === 'text'` or when the Handler
+  needs AI for data analysis. Shortcut Path queries bypass Handler
+  entirely — Orchestrator assembles read-only CN-UI directly.
+
+Orchestrator does not call AI Runtime directly in any path.
 
 **Handler constraints**:
 - Handlers MAY call AI via injected `aiRuntime` (unique among Domain
@@ -267,6 +281,15 @@ For Domains with generative capabilities, manifests MAY include a
 required Context Provider dependencies (see Architecture Constraints >
 Domain Manifest Self-Description).
 
+For Domains with query capabilities, manifests MAY include a
+`query_actions` block declaring read-only query actions. Query actions
+bypass Rule Engine and State Machine — they produce no state mutation.
+Each query action declares `response_mode` (text or cnui), optional
+`cnui_surface`, and `context_capabilities` for data assembly.
+`session_mode` is forced to `multi_turn` for all query actions — no
+`single_round` option is permitted (see Architecture Constraints >
+Query Path Constraints).
+
 **Rationale**: The dual-track model keeps the proven "four-hook,
 three-prohibition" constraint system intact while providing a clean
 home for generative AI operations. Hooks remain pure constraint
@@ -309,7 +332,8 @@ Request/Response objects. Any HTTP-aware type in Nexus is a violation.
 AI handles ambiguity; rules handle certainty. AI participates in Intent
 Engine Phase A (routing classification) and Phase B (field extraction),
 Presentation (report generation), Domain Plugin Handlers (generative
-planning within Domain scope). AI MUST NOT participate in Rule Engine,
+planning within Domain scope), and Domain Plugin Handler onQuery
+(complex analysis queries). AI MUST NOT participate in Rule Engine,
 State Machine, Context Engine, or time-conflict detection. AI generates
 proposals — it NEVER directly writes system state.
 
@@ -317,7 +341,9 @@ The Intent Engine two-phase model enforces this boundary: Phase A
 (routing) is interpretive and AI-dependent; Phase B (field completion)
 and all subsequent stages are contract-type execution where AI assists
 but output types are predetermined. Once `StructuredIntent` is formed,
-the pipeline is fully deterministic.
+the pipeline is fully deterministic — except for the Query Path, which
+bypasses Rule Engine and State Machine entirely by design (read-only
+queries produce no state mutation to validate or execute).
 
 In the Generative Path, Handler output (`GenerationResult`) re-enters
 the deterministic pipeline: Rule Engine validates, State Machine
@@ -405,6 +431,21 @@ path by checking whether the action exists in the Domain manifest's
 3. Injects `aiRuntime` as a parameter to `handler.onGenerate()`
 4. Receives Handler output and routes to Rule Engine
 
+For query operations, the Orchestrator checks the Domain manifest's
+`query_actions` block. If present, it:
+1. Delegates data assembly to Context Engine (same `assemble()`
+   call, reading `query_actions.context_capabilities`)
+2. Determines sub-path:
+   - **Shortcut Path** (simple display queries): Orchestrator
+     directly assembles read-only CN-UI Payload from Context Engine
+     data. No Handler involvement. This is UI assembly, not business
+     logic — Orchestrator packages data into display format using
+     manifest-declared `cnui_surface` type.
+   - **Handler Path** (complex analysis queries): Orchestrator calls
+     `handler.onQuery(context, aiRuntime)` for LLM-powered analysis.
+3. Records query result summary to Session via `memoryFramework.record()`
+4. Session remains active (forced `multi_turn`)
+
 The Orchestrator never performs AI calls, prompt assembly, model
 selection, or conversation history management itself.
 
@@ -433,6 +474,21 @@ The `generation_actions` block maps each generative action to:
 - `response_mode`: `'text'` or `'cnui'`
 - `cnui_surface`: CNUISurface type identifier (when response_mode is cnui)
 - `cache_ttl_minutes`: Cache validity period (optional)
+
+For Domains with query capabilities, manifests MAY declare a fourth
+structured field:
+
+| Field | Consumer | Purpose |
+|---|---|---|
+| `query_actions` | Orchestrator + Context Engine | Read-only query actions with response mode and data requirements |
+
+The `query_actions` block maps each query action to:
+- `action`: Unique action name within the Domain
+- `description`: Human-readable description for Intent Engine routing
+- `response_mode`: `'text'` (LLM-generated answer) or `'cnui'` (read-only display)
+- `cnui_surface`: CNUISurface type identifier (when response_mode is cnui)
+- `context_capabilities`: Required Context Provider dependencies for data assembly
+- No `session_mode` field — all query actions are forced `multi_turn`
 
 This enables Context Engine to assemble `GenerationRequest`,
 Orchestrator to identify generative vs. reactive paths, and AI Runtime
@@ -628,6 +684,90 @@ generation that includes components not in the Catalog. CN-UI event
 handling MUST flow through SurfaceManager → Handler → Rule Engine,
 never directly to Repository.
 
+### Query Path Constraints
+
+Query Path is the third routing path in the Orchestrator, handling
+read-only data queries. It bypasses Rule Engine and State Machine
+by design — queries produce no state mutation.
+
+**Six constraints**:
+
+1. **Read-only invariant**: Query Path MUST NOT modify any system
+   state. It produces no `StateProposal`, requires no user
+   confirmation, and triggers no `StateChanged` events. Query
+   results are display-only — the data equivalent of a SELECT
+   statement without side effects.
+
+2. **Forced multi_turn**: All `query_actions` MUST use `multi_turn`
+   session mode. The `session_mode` field is not declared in
+   `query_actions` — it is forced by the system. This ensures
+   query results remain available for follow-up conversation
+   (追问, cross-reference, intent transition) within the same
+   Session.
+
+3. **Two sub-paths determined by response_mode**:
+   - **Shortcut Path** (`response_mode === 'cnui'` and data is
+     directly displayable): Orchestrator assembles read-only CN-UI
+     Payload from Context Engine data without Handler involvement.
+     Permitted because this is UI packaging, not business logic.
+   - **Handler Path** (`response_mode === 'text'` or data needs
+     LLM processing): Orchestrator delegates to
+     `handler.onQuery(context, aiRuntime)` for AI-powered analysis.
+     Handler decides how to use AI Runtime — same autonomy as
+     `onGenerate`.
+
+4. **Session context injection**: Context Engine MUST inject
+   `session_context.priorQueries` into all subsequent requests
+   within a Query Session. This enables follow-up questions
+   ("why is the meditation streak so low?") to reference prior
+   query results. Context Engine applies time-based relevance
+   decay (not deletion) to manage staleness.
+
+5. **Orchestrator CN-UI assembly permission**: For Shortcut Path,
+   Orchestrator MAY directly assemble read-only CN-UI Payloads.
+   This is an explicit exception to Orchestrator Purity — it is
+   UI packaging (data → display format), not business logic.
+   The assembled CN-UI MUST be read-only (no editable inputs,
+   no confirm/cancel actions, only optional dismiss).
+
+6. **Memory recording by Orchestrator**: After query execution,
+   Orchestrator calls `memoryFramework.record()` with a query
+   result summary (action, domain, object IDs, key metrics,
+   timestamp). Full objects are NOT stored — only summaries that
+   enable re-query when needed. Handler MUST NOT call
+   `memoryFramework.record()` directly.
+
+**Hard boundaries**:
+
+```
+✓ Permitted: Shortcut Path Orchestrator assembles read-only CN-UI
+✓ Permitted: Handler Path onQuery calls AI Runtime for analysis
+✓ Permitted: Orchestrator records query summary via Memory Framework
+✓ Permitted: Context Engine injects session_context.priorQueries
+✓ Permitted: Query Session transitions to Contract or Generative Path
+
+✗ Prohibited: Shortcut Path calling Handler.onQuery
+✗ Prohibited: Handler.onQuery calling State Machine
+✗ Prohibited: Handler.onQuery directly accessing Repository
+✗ Prohibited: Handler.onQuery calling memoryFramework.record()
+✗ Prohibited: Query Path entering Rule Engine or State Machine
+✗ Prohibited: query_actions declaring session_mode (forced multi_turn)
+```
+
+**Rationale**: Query Path addresses the "query as conversation
+starter" pattern — users almost always follow up after seeing data.
+The read-only invariant simplifies the execution chain (no Rule
+Engine, no State Machine, no confirmation), while forced multi_turn
+and session context injection enable natural follow-up conversation.
+The Shortcut/Handler split avoids requiring a Handler for every
+simple display query.
+
+**How to apply**: Domains with queryable data MUST declare
+`query_actions` in their manifest. Only Domains with complex
+analysis queries (requiring LLM summarization or data aggregation)
+MUST implement `onQuery`. Code reviews MUST reject any Query Path
+code that produces state mutations or enters Rule Engine.
+
 ### Domain Registration Process
 
 All new Domains MUST follow the mandatory registration process
@@ -638,7 +778,8 @@ section codifies the architectural invariants enforced by that process.
 
 1. Declare new USOM object types (if any) in USOM documentation
 2. Write `manifest.yaml` with all six blocks (A–F), plus optional
-   `generation_actions` for generative capabilities
+   `generation_actions` for generative capabilities and optional
+   `query_actions` for query capabilities
 3. Implement four hook functions (Reactive Track, pure functions)
 4. Define Drizzle DB Schema
 5. Implement Repository interface
@@ -649,6 +790,10 @@ section codifies the architectural invariants enforced by that process.
    in `domains/<domain>/handlers/index.ts`
 10. (If generative) Implement Context Providers and register in
     Context Registry with capability id, visibility, and Zod schema
+11. (If query-capable) Declare `query_actions` in manifest with
+    action, response_mode, cnui_surface, and context_capabilities
+12. (If query-capable, complex queries only) Implement `onQuery`
+    handler method and register in `domains/<domain>/handlers/index.ts`
 
 **Nexus inviolability**: If completing any step requires modifying Nexus
 core components (Intent Engine, Context Engine, Rule Engine, State
@@ -810,4 +955,4 @@ is a Tier 1 document and required reading for all Domain development.
 It provides the concrete step-by-step process that operationalizes the
 architectural invariants defined in this constitution.
 
-**Version**: 1.6.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-22
+**Version**: 1.7.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-23
