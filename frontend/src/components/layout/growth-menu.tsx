@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { CheckSquare, Clock, Repeat, Target, Pin, PinOff, ChevronDown } from "lucide-react"
 
 interface DomainAction {
   action: string
@@ -19,11 +20,52 @@ interface GrowthMenuProps {
   onAction: (domainId: string, action: string) => void
 }
 
+const DOMAIN_META: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
+  tasks: { icon: CheckSquare, label: '任务' },
+  timebox: { icon: Clock, label: '时间盒' },
+  habits: { icon: Repeat, label: '习惯' },
+  okrs: { icon: Target, label: 'OKR' },
+}
+
+const UNPINNED_STORAGE_KEY = 'lw-unpinned-actions'
+
 export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [unpinned, setUnpinned] = useState<Record<string, string[]>>(() => {
+    try {
+      const raw = localStorage.getItem(UNPINNED_STORAGE_KEY)
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [expandedUnpinned, setExpandedUnpinned] = useState<Set<string>>(new Set())
 
   const toggleGroup = useCallback((domainId: string) => {
     setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(domainId)) next.delete(domainId)
+      else next.add(domainId)
+      return next
+    })
+  }, [])
+
+  const togglePin = useCallback((domainId: string, action: string) => {
+    setUnpinned(prev => {
+      const current = prev[domainId] ?? []
+      const next = current.includes(action)
+        ? current.filter(a => a !== action)
+        : [...current, action]
+      const newState = { ...prev, [domainId]: next }
+      try {
+        localStorage.setItem(UNPINNED_STORAGE_KEY, JSON.stringify(newState))
+      } catch {}
+      return newState
+    })
+  }, [])
+
+  const toggleUnpinned = useCallback((domainId: string) => {
+    setExpandedUnpinned(prev => {
       const next = new Set(prev)
       if (next.has(domainId)) next.delete(domainId)
       else next.add(domainId)
@@ -36,29 +78,83 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
       {domainActions.length === 0 && (
         <p className="px-3 py-6 text-center text-sm text-body/40">加载中...</p>
       )}
-      {domainActions.map(domain => (
-        <div key={domain.domainId}>
-          <button
-            type="button"
-            onClick={() => toggleGroup(domain.domainId)}
-            className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium text-body/60 hover:text-body transition-colors"
-          >
-            <span>{domain.domainId}</span>
-            <span className="text-[10px]">{collapsed.has(domain.domainId) ? '▸' : '▾'}</span>
-          </button>
-          {!collapsed.has(domain.domainId) && domain.actions.map(act => (
+      {domainActions.map(domain => {
+        const meta = DOMAIN_META[domain.domainId]
+        const Icon = meta?.icon
+        const unpinnedList = unpinned[domain.domainId] ?? []
+        const pinnedActions = domain.actions.filter(a => !unpinnedList.includes(a.action))
+        const unpinnedActions = domain.actions.filter(a => unpinnedList.includes(a.action))
+
+        return (
+          <div key={domain.domainId}>
             <button
-              key={act.action}
               type="button"
-              onClick={() => onAction(domain.domainId, act.action)}
-              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+              onClick={() => toggleGroup(domain.domainId)}
+              className="flex w-full items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-body/60 hover:text-body transition-colors"
             >
-              <span>{act.description}</span>
-              <span className="text-xs text-body/40">{act.shortcut}</span>
+              {Icon && <Icon className="size-3.5" />}
+              <span>{meta?.label ?? domain.domainId}</span>
+              <span className="ml-auto text-[10px]">{collapsed.has(domain.domainId) ? '▸' : '▾'}</span>
             </button>
-          ))}
-        </div>
-      ))}
+
+            {!collapsed.has(domain.domainId) && (
+              <>
+                {pinnedActions.map(act => (
+                  <button
+                    key={act.action}
+                    type="button"
+                    onClick={() => onAction(domain.domainId, act.action)}
+                    title={act.shortcut ?? undefined}
+                    className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                  >
+                    <span className="truncate">{act.description}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={e => { e.stopPropagation(); togglePin(domain.domainId, act.action) }}
+                      className="ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"
+                    >
+                      <Pin className="size-3" />
+                    </span>
+                  </button>
+                ))}
+
+                {unpinnedActions.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleUnpinned(domain.domainId)}
+                      className="flex w-full items-center gap-1 px-3 py-1 text-xs text-body/40 hover:text-body transition-colors"
+                    >
+                      <ChevronDown className={`size-3 transition-transform ${expandedUnpinned.has(domain.domainId) ? 'rotate-180' : ''}`} />
+                      更多行动
+                    </button>
+                    {expandedUnpinned.has(domain.domainId) && unpinnedActions.map(act => (
+                      <button
+                        key={act.action}
+                        type="button"
+                        onClick={() => onAction(domain.domainId, act.action)}
+                        title={act.shortcut ?? undefined}
+                        className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                      >
+                        <span className="truncate">{act.description}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={e => { e.stopPropagation(); togglePin(domain.domainId, act.action) }}
+                          className="ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"
+                        >
+                          <PinOff className="size-3" />
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
