@@ -22,14 +22,57 @@ describe('ConversationView', () => {
     expect(screen.getByText('对象状态变化')).toBeInTheDocument()
   })
 
-  it('should show empty state when no messages', () => {
+  it('should show welcome page when no messages', () => {
     render(
       <ConversationView
         messages={[]}
         onSendMessage={vi.fn()}
       />
     )
-    expect(screen.getByText('开始新对话')).toBeInTheDocument()
+    expect(screen.getByText('有什么可以帮你的？')).toBeInTheDocument()
+  })
+
+  it('should show default quick actions when no recent sessions provided', () => {
+    render(
+      <ConversationView
+        messages={[]}
+        onSendMessage={vi.fn()}
+      />
+    )
+    expect(screen.getByText('创建任务')).toBeInTheDocument()
+    expect(screen.getByText('规划日程')).toBeInTheDocument()
+    expect(screen.getByText('设定目标')).toBeInTheDocument()
+    expect(screen.getByText('添加习惯')).toBeInTheDocument()
+    expect(screen.getByText('能量记录')).toBeInTheDocument()
+  })
+
+  it('should show recent sessions when provided', () => {
+    render(
+      <ConversationView
+        messages={[]}
+        onSendMessage={vi.fn()}
+        recentSessions={[
+          { id: '1', title: '学习计划', status: 'active', createdAt: '2026-05-23T10:00:00Z', updatedAt: '2026-05-23T10:00:00Z' },
+          { id: '2', title: '时间回顾', status: 'active', createdAt: '2026-05-22T10:00:00Z', updatedAt: '2026-05-22T10:00:00Z' },
+        ]}
+        onSelectSession={vi.fn()}
+      />
+    )
+    expect(screen.getByText('学习计划')).toBeInTheDocument()
+    expect(screen.getByText('时间回顾')).toBeInTheDocument()
+  })
+
+  it('should click quick action to send message', async () => {
+    const onSend = vi.fn()
+    render(
+      <ConversationView
+        messages={[]}
+        onSendMessage={onSend}
+      />
+    )
+    const btn = screen.getByText('创建任务')
+    btn.click()
+    expect(onSend).toHaveBeenCalledWith('创建任务')
   })
 
   it('should have input area', () => {
