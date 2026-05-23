@@ -3,12 +3,13 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import type { ChatMessage } from "@/usom/types/objects"
 import type { AISessionSummary } from "@/usom/types/objects"
+import { validateFile } from "@/lib/task-import/file-parser"
 
 const DEFAULT_QUICK_ACTIONS = ['创建任务', '规划日程', '设定目标', '添加习惯', '能量记录']
 
 interface ConversationViewProps {
   messages: ChatMessage[]
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, attachments?: File[]) => void
   isLoading?: boolean
   recentSessions?: AISessionSummary[]
   onSelectSession?: (sessionId: string) => void
@@ -22,8 +23,10 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
 
 export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession }: ConversationViewProps) {
   const [input, setInput] = useState("")
+  const [attachments, setAttachments] = useState<File[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" })
@@ -35,52 +38,151 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
     }
   }, [messages.length])
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const validFiles: File[] = []
+
+    for (const file of files) {
+      const validation = validateFile(file)
+      if (validation.valid) {
+        validFiles.push(file)
+      } else {
+        alert(validation.error)
+      }
+    }
+
+    if (validFiles.length > 0) {
+      setAttachments(prev => [...prev, ...validFiles])
+    }
+
+    // Reset input so same file can be selected again if needed
+    e.target.value = ''
+  }, [])
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = input.trim()
-    if (!trimmed) return
-    onSendMessage(trimmed)
+    if (!trimmed && attachments.length === 0) return
+    onSendMessage(trimmed, attachments.length > 0 ? attachments : undefined)
     setInput("")
-  }, [input, onSendMessage])
+    setAttachments([])
+  }, [input, attachments, onSendMessage])
+
+  // Hidden file input
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".md,.txt,.docx,.xlsx"
+      multiple
+      className="hidden"
+      onChange={handleFileSelect}
+    />
+  )
+
+  // Attachment tags display
+  const attachmentTags = attachments.length > 0 && (
+    <div className="flex flex-wrap gap-2 mb-2">
+      {attachments.map((file, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-1 rounded-md bg-surface-soft px-2 py-1 text-xs text-body"
+        >
+          <span className="max-w-[200px] truncate">{file.name}</span>
+          <button
+            type="button"
+            onClick={() => removeAttachment(index)}
+            className="ml-1 text-body/50 hover:text-body"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+
+  // Input bar with attachment button
+  const inputBar = (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="text-body/50 hover:text-body transition-colors p-1"
+        title="添加附件"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+        </svg>
+      </button>
+      <input
+        ref={inputRef}
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        placeholder="输入消息..."
+        className="flex-1 rounded-md border border-hairline bg-background px-3 py-2 text-sm text-ink placeholder:text-body/40 focus:outline-none focus:ring-1 focus:ring-primary"
+        disabled={isLoading}
+      />
+      <button
+        type="submit"
+        disabled={isLoading || (!input.trim() && attachments.length === 0)}
+        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+      >
+        发送
+      </button>
+    </div>
+  )
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center">
-            <h2 className="text-lg font-semibold text-ink">有什么可以帮你的？</h2>
-            <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
-              {DEFAULT_QUICK_ACTIONS.map(action => (
-                <button
-                  key={action}
-                  type="button"
-                  onClick={() => onSendMessage(action)}
-                  className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
-                >
-                  {action}
-                </button>
-              ))}
-            </div>
-            {recentSessions && recentSessions.length > 0 && (
-              <div className="mt-6 w-full max-w-xl">
-                <p className="mb-2 text-xs text-body/50">最近对话</p>
-                <div className="flex flex-col gap-1">
-                  {recentSessions.slice(0, 3).map(session => (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => onSelectSession?.(session.id)}
-                      className="rounded-md px-3 py-2 text-left text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
-                    >
-                      {session.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+      {fileInput}
+
+      {messages.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center px-4">
+          <h2 className="text-lg font-semibold text-ink">有什么可以帮你的？</h2>
+          <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
+            {DEFAULT_QUICK_ACTIONS.map(action => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => onSendMessage(action)}
+                className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+              >
+                {action}
+              </button>
+            ))}
           </div>
-        ) : (
-          <>
+
+          <form onSubmit={handleSubmit} className="mt-8 w-full max-w-xl">
+            {attachmentTags}
+            {inputBar}
+          </form>
+
+          {recentSessions && recentSessions.length > 0 && (
+            <div className="mt-6 w-full max-w-xl">
+              <p className="mb-2 text-xs text-body/50">最近对话</p>
+              <div className="flex flex-col gap-1">
+                {recentSessions.slice(0, 3).map(session => (
+                  <button
+                    key={session.id}
+                    type="button"
+                    onClick={() => onSelectSession?.(session.id)}
+                    className="rounded-md px-3 py-2 text-left text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                  >
+                    {session.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto px-4 py-3">
             {messages.map((msg, i) => (
               <div key={i} className="mb-3">
                 <span className="text-xs font-medium text-body/50">{ROLE_LABELS[msg.role]}</span>
@@ -93,29 +195,15 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                 </div>
               </div>
             ))}
-          </>
-        )}
-        <div ref={bottomRef} />
-      </div>
+            <div ref={bottomRef} />
+          </div>
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-hairline px-4 py-3">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="输入消息..."
-          className="flex-1 rounded-md border border-hairline bg-background px-3 py-2 text-sm text-ink placeholder:text-body/40 focus:outline-none focus:ring-1 focus:ring-primary"
-          disabled={isLoading}
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-        >
-          发送
-        </button>
-      </form>
+          <form onSubmit={handleSubmit} className="border-t border-hairline px-4 py-3">
+            {attachmentTags}
+            {inputBar}
+          </form>
+        </>
+      )}
     </div>
   )
 }
