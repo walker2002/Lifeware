@@ -107,6 +107,51 @@ describe('Assembler', () => {
     const intent = makeIntent('unknownAction')
     const manifest = makeManifest('otherAction', [])
 
-    await expect(assembleContext(intent, manifest)).rejects.toThrow(/No generation_actions/)
+    await expect(assembleContext(intent, manifest)).rejects.toThrow(/No action config/)
+  })
+
+  describe('Query Path support', () => {
+    it('assembles query context from query_actions', async () => {
+      registerContextCapability(makeCap('activeHabits', {}))
+
+      const intent = makeIntent('list_active_habits', { userId: 'u1' })
+      const manifest = makeManifest('list_active_habits', [], [])
+      // 注入 query_actions
+      ;(manifest as any).query_actions = {
+        list_active_habits: {
+          description: 'test',
+          response_mode: 'cnui',
+          context_capabilities: [
+            { id: 'activeHabits', query: 'test_query', params: ['userId'] },
+          ],
+        },
+      }
+
+      const result = await assembleContext(intent, manifest)
+
+      expect(result.intent).toBe(intent)
+      // QueryContext 应有 contexts + intent
+      expect(result).toHaveProperty('contexts')
+      expect((result as any).contexts.activeHabits).toBeDefined()
+    })
+
+    it('still assembles generation context from generation_actions', async () => {
+      registerContextCapability(makeCap('ctx1', {}))
+
+      const intent = makeIntent('createSmartSchedule', { date: '2026-05-20' })
+      const manifest = makeManifest('createSmartSchedule', ['ctx1'], [['date']])
+
+      const result = await assembleContext(intent, manifest)
+
+      expect(result.intent).toBe(intent)
+      expect((result as any).contexts.ctx1).toEqual({ value: 'ctx1-2026-05-20' })
+    })
+
+    it('throws when action is in neither', async () => {
+      const intent = makeIntent('unknownAction')
+      const manifest = makeManifest('otherAction', [])
+
+      await expect(assembleContext(intent, manifest)).rejects.toThrow(/No action config/)
+    })
   })
 })
