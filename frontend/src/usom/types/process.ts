@@ -295,4 +295,52 @@ export interface GenerationResult {
 export interface DomainHandler {
   handle(request: GenerationRequest): Promise<GenerationResult>
   onGenerate?(request: GenerationRequest, aiRuntime: import('@/nexus/ai-runtime').AIRuntime): Promise<GenerationResult>
+  onQuery?(context: QueryContext, aiRuntime: import('@/nexus/ai-runtime').AIRuntime): Promise<QueryResult>
 }
+
+// ─── CN-UI Surface Payload（Query Path 输出用）──────────
+
+export interface CNUISurfacePayload {
+  surfaceType: string
+  components: Array<{
+    type: string
+    props: Record<string, unknown>
+  }>
+  actions: Array<{
+    type: string
+    label: string
+  }>
+}
+
+// ─── Query Path 类型 ───────────────────────────────────
+
+/** 查询上下文 — Context Engine 产出，注入到 Handler.onQuery */
+export interface QueryContext {
+  intent: import('./objects').StructuredIntent
+  contexts: Record<string, unknown>
+  sessionId?: string
+  sessionContext?: SessionQueryContext
+}
+
+/** 同 Session 中的历史查询上下文 */
+export interface SessionQueryContext {
+  priorQueries: PriorQueryEntry[]
+}
+
+export interface PriorQueryEntry {
+  action: string
+  resultSummary: {
+    count: number
+    objectIds: string[]
+    keyMetrics: Record<string, unknown>
+  }
+  answerText?: string
+  cnuiSurfaceType?: string
+  timestamp: string
+  relevance: number
+}
+
+/** 查询结果 — Handler.onQuery 或 Shortcut Path 的输出 */
+export type QueryResult =
+  | { type: 'text'; content: string }
+  | { type: 'cnui'; payload: CNUISurfacePayload }
