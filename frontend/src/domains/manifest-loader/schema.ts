@@ -72,6 +72,13 @@ const GenerationActionSchema = z.object({
   contexts: z.array(ContextDeclarationSchema),
 })
 
+const QueryActionSchema = z.object({
+  description: z.string(),
+  response_mode: z.enum(['text', 'cnui']),
+  cnui_surface: z.string().optional(),
+  context_capabilities: z.array(ContextDeclarationSchema),
+})
+
 export const ManifestSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -98,6 +105,7 @@ export const ManifestSchema = z.object({
   subscribed_events: z.array(z.string()),
 
   generation_actions: z.record(z.string(), GenerationActionSchema).optional(),
+  query_actions: z.record(z.string(), QueryActionSchema).optional(),
 })
 
 export type DomainManifest = z.infer<typeof ManifestSchema>
