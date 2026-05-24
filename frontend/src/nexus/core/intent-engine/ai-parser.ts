@@ -4,6 +4,7 @@
 import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { StructuredIntent, USOM_ID, Timestamp } from '@/usom'
 import { inferHabitDefaults } from '@/domains/habits/habit-defaults'
+import { buildRoutingContext, formatRoutingContextForPrompt } from './routing-context'
 
 // ─── 系统提示词 ─────────────────────────────────────────────────
 
@@ -212,11 +213,39 @@ export async function parseWithAI(
   aiRuntime: AIRuntime,
 ): Promise<AIParserResult> {
   try {
+    // 构建动态路由上下文（替换硬编码 domain prompt）
+    const routingActions = buildRoutingContext()
+    const routingText = formatRoutingContextForPrompt(routingActions)
+
+    const now = new Date()
+    const systemPrompt = `你是 Lifeware 意图解析器。根据用户输入，判断目标域和动作。
+
+路由规则：
+- 用户说"打开XX页面" "进入XX管理" "XX设置" → view_route（页面导航）
+- 用户说"看看XX" "有哪些XX" "统计XX" "查一下XX" → query（对话内查询）
+- 模糊情况默认走 query（用户可后续说"打开详细页面"切换到 view_route）
+- "创建" "新增" "修改" "删除" → contract（变更操作）
+- "帮我安排" "生成" "规划" → generative（AI生成）
+
+可用动作列表：
+${routingText}
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+
+输出 JSON 格式：
+{
+  "targetDomain": "域名",
+  "action": "动作名",
+  "pathType": "contract|generative|query",
+  "fields": {},
+  "confidence": 0.0-1.0
+}`
+
     // 1. 调用 AIRuntime
     const response = await aiRuntime.generate({
-      domainId: 'timebox',
+      domainId: 'system',
       action: 'parseIntent',
-      systemPrompt: TIMEBOX_SYSTEM_PROMPT(new Date()),
+      systemPrompt,
       messages: [{ role: 'user', content: rawInput }],
       taskType: 'intent_routing',
       temperature: 0.3,
@@ -268,7 +297,7 @@ export async function parseWithAI(
       fields.endTime = start.toISOString()
     }
 
-    // 6. 构建 StructuredIntent 并返回
+    // 6. 构建 StructuredIntent 并返回（新增 pathType）
     const intent: StructuredIntent = {
       id: generateUUID(),
       intentionId,
@@ -277,6 +306,7 @@ export async function parseWithAI(
       fields,
       confidence: parsed.confidence,
       resolvedBy: 'ai',
+      pathType: (parsed as any).pathType,
       createdAt: new Date().toISOString() as Timestamp,
     }
 
