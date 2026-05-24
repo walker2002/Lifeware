@@ -119,6 +119,10 @@ async function loadHandlers(domainId: string): Promise<HandlerMap> {
       const mod = await import('./timebox/handlers')
       return mod.timeboxHandlers ?? {}
     }
+    case 'habits': {
+      const mod = await import('./habits/handlers')
+      return mod.habitHandlers ?? {}
+    }
     default:
       return {}
   }
