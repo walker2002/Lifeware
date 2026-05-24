@@ -36,6 +36,10 @@ import { evaluateProposals } from '@/nexus/core/rule-engine'
 import { createAIRuntime } from '@/nexus/ai-runtime'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { GeneratedProposal } from '@/usom/types/process'
+import { resolvePathType } from './path-router'
+import { formatCNUIFromContext, formatTextSummary } from './query-cnui-formatter'
+import { createAISessionManager } from '@/nexus/ai-runtime/session'
+import type { QueryResultEntry } from '@/nexus/ai-runtime/session'
 
 interface IntentEngine {
   parse(rawInput: string, userId: USOM_ID): Promise<StructuredIntent>
@@ -72,6 +76,7 @@ export interface OrchestratorResult {
   needsConfirmation?: boolean
   confirmationMessage?: string
   generativeResult?: GenerationResult
+  queryResult?: import('@/usom/types/process').QueryResult
 }
 
 export interface OrchestratorDeps {
@@ -162,6 +167,22 @@ function toStateMachineAction(domainAction: string): string {
 // 从 targetDomain + action 动态推导 SM targetObject.type（基于 manifest.lifecycle 键）
 function getObjectType(intent: StructuredIntent): string {
   return resolveObjectType(intent.targetDomain, intent.action)
+}
+
+function buildQueryResultSummary(intent: StructuredIntent, result: import('@/usom/types/process').QueryResult): QueryResultEntry {
+  const surfaceType = result.type === 'cnui' ? result.payload.surfaceType : undefined
+  return {
+    action: intent.action,
+    domain: intent.targetDomain,
+    resultSummary: {
+      count: 0,
+      objectIds: [],
+      keyMetrics: {},
+    },
+    answerText: result.type === 'text' ? result.content : undefined,
+    cnuiSurfaceType: surfaceType,
+    timestamp: new Date().toISOString(),
+  }
 }
 
 export function createOrchestrator(deps: OrchestratorDeps) {
@@ -321,102 +342,26 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // 1.5 生成型路径检测（manifest 加载失败时跳过，不阻塞被动型路径）
+      // 1.5 路径路由 — 根据 manifest 声明判定路径类型
       const manifestResult = loadDomainManifest(domainId)
       const manifest = manifestResult.success ? manifestResult.manifest : null
-      const actionConfig = manifest?.generation_actions?.[intent.action]
+      const pathType = intent.pathType ?? resolvePathType(domainId, intent.action, manifest)
 
-      if (actionConfig && manifest) {
-        try {
-          // ContextEngine 组装
-          const ceStart = Date.now()
-          trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id, action: intent.action } })
+      if (pathType === 'query') {
+        if (!manifest) {
+          return { success: false, error: `未找到 Domain manifest: ${domainId}` }
+        }
+        return orchestrator.executeQueryPath(intent, userId, manifest)
+      }
 
-          const generationRequest = await assembleContext(intent, manifest)
-
-          trace(deps.onTrace, 'ContextEngine', 'end', {
-            input: { intentId: intent.id },
-            output: { contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
-          })
-
-          // 发送 GenerativeContextAssembled 事件
-          const ctxEvent: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: 'GenerativeContextAssembled',
-            occurredAt: new Date().toISOString() as Timestamp,
-            triggeredBy: 'context_engine',
-            payload: { intentId: intent.id, contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(ctxEvent, userId)
-          eventBus.publish(ctxEvent)
-
-          // Handler 执行
-          const hStart = Date.now()
-          trace(deps.onTrace, 'Handler', 'start', { input: { intentId: intent.id } })
-
-          const handler = await findHandler(domainId, intent.action)
-          if (!handler) {
-            return { success: false, error: `生成型路径未找到 Handler: ${domainId}/${intent.action}` }
-          }
-
-          let generativeResult: GenerationResult
-          if (handler.onGenerate) {
-            const aiRuntime: AIRuntime = createAIRuntime()
-            generativeResult = await handler.onGenerate(generationRequest, aiRuntime)
-          } else {
-            generativeResult = await handler.handle(generationRequest)
-          }
-
-          trace(deps.onTrace, 'Handler', 'end', {
-            input: { intentId: intent.id },
-            output: { proposalCount: generativeResult.proposalSet.proposals.length, durationMs: Date.now() - hStart },
-          })
-
-          // 发送 GenerativeHandlerCompleted 事件
-          const handlerEvent: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: 'GenerativeHandlerCompleted',
-            occurredAt: new Date().toISOString() as Timestamp,
-            triggeredBy: 'handler',
-            payload: {
-              intentId: intent.id,
-              proposalCount: generativeResult.proposalSet.proposals.length,
-              durationMs: Date.now() - hStart,
-            },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(handlerEvent, userId)
-          eventBus.publish(handlerEvent)
-
-          return {
-            success: true,
-            generativeResult,
-            warnings: generativeResult.warnings?.map(w => w.message),
-          }
-        } catch (err) {
-          // Handler 异常时记录完整错误上下文
-          const errorEvent: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: 'GenerativeHandlerCompleted',
-            occurredAt: new Date().toISOString() as Timestamp,
-            triggeredBy: 'handler',
-            payload: {
-              intentId: intent.id,
-              failedAt: 'Handler.handle',
-              completedSteps: ['ContextEngine'],
-              error: err instanceof Error ? err.message : String(err),
-            },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(errorEvent, userId)
-
-          return {
-            success: false,
-            error: `生成型路径执行失败: ${err instanceof Error ? err.message : String(err)}`,
-          }
+      if (pathType === 'generative' && manifest) {
+        const genActionConfig = manifest.generation_actions?.[intent.action]
+        if (genActionConfig) {
+          return orchestrator.executeGenerativePath(intent, userId, manifest, genActionConfig)
         }
       }
+
+      // pathType === 'contract' — 继续走现有被动型路径（行 421 起不变）
 
       // 2. RuleEngine 评估（被动型路径）
       trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
@@ -893,6 +838,155 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       return { success: false, error: `未知的域: ${domainId}` }
+    },
+
+    /** 生成型路径 — 从 executeIntent 提取的独立方法 */
+    async executeGenerativePath(
+      intent: StructuredIntent,
+      userId: USOM_ID,
+      manifest: import('@/domains/manifest-loader/schema').DomainManifest,
+      _actionConfig: unknown,
+    ): Promise<OrchestratorResult> {
+      try {
+        // ContextEngine 组装
+        const ceStart = Date.now()
+        trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id, action: intent.action } })
+
+        const generationRequest = await assembleContext(intent, manifest) as GenerationRequest
+
+        trace(deps.onTrace, 'ContextEngine', 'end', {
+          input: { intentId: intent.id },
+          output: { contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
+        })
+
+        // 发送 GenerativeContextAssembled 事件
+        const ctxEvent: SystemEvent = {
+          id: crypto.randomUUID() as USOM_ID,
+          type: 'GenerativeContextAssembled',
+          occurredAt: new Date().toISOString() as Timestamp,
+          triggeredBy: 'context_engine',
+          payload: { intentId: intent.id, contextCount: Object.keys(generationRequest.contexts).length, durationMs: Date.now() - ceStart },
+          snapshotId: '' as USOM_ID,
+        }
+        await deps.eventRepo.append(ctxEvent, userId)
+        eventBus.publish(ctxEvent)
+
+        // Handler 执行
+        const hStart = Date.now()
+        trace(deps.onTrace, 'Handler', 'start', { input: { intentId: intent.id } })
+
+        const handler = await findHandler(intent.targetDomain, intent.action)
+        if (!handler) {
+          return { success: false, error: `生成型路径未找到 Handler: ${intent.targetDomain}/${intent.action}` }
+        }
+
+        let generativeResult: GenerationResult
+        if (handler.onGenerate) {
+          const aiRuntime: AIRuntime = createAIRuntime()
+          generativeResult = await handler.onGenerate(generationRequest, aiRuntime)
+        } else {
+          generativeResult = await handler.handle(generationRequest)
+        }
+
+        trace(deps.onTrace, 'Handler', 'end', {
+          input: { intentId: intent.id },
+          output: { proposalCount: generativeResult.proposalSet.proposals.length, durationMs: Date.now() - hStart },
+        })
+
+        // 发送 GenerativeHandlerCompleted 事件
+        const handlerEvent: SystemEvent = {
+          id: crypto.randomUUID() as USOM_ID,
+          type: 'GenerativeHandlerCompleted',
+          occurredAt: new Date().toISOString() as Timestamp,
+          triggeredBy: 'handler',
+          payload: {
+            intentId: intent.id,
+            proposalCount: generativeResult.proposalSet.proposals.length,
+            durationMs: Date.now() - hStart,
+          },
+          snapshotId: '' as USOM_ID,
+        }
+        await deps.eventRepo.append(handlerEvent, userId)
+        eventBus.publish(handlerEvent)
+
+        return {
+          success: true,
+          generativeResult,
+          warnings: generativeResult.warnings?.map(w => w.message),
+        }
+      } catch (err) {
+        const errorEvent: SystemEvent = {
+          id: crypto.randomUUID() as USOM_ID,
+          type: 'GenerativeHandlerCompleted',
+          occurredAt: new Date().toISOString() as Timestamp,
+          triggeredBy: 'handler',
+          payload: {
+            intentId: intent.id,
+            failedAt: 'Handler.handle',
+            completedSteps: ['ContextEngine'],
+            error: err instanceof Error ? err.message : String(err),
+          },
+          snapshotId: '' as USOM_ID,
+        }
+        await deps.eventRepo.append(errorEvent, userId)
+
+        return {
+          success: false,
+          error: `生成型路径执行失败: ${err instanceof Error ? err.message : String(err)}`,
+        }
+      }
+    },
+
+    /** Query Path — Shortcut/Handler 双轨查询 */
+    async executeQueryPath(
+      intent: StructuredIntent,
+      userId: USOM_ID,
+      manifest: import('@/domains/manifest-loader/schema').DomainManifest,
+    ): Promise<OrchestratorResult> {
+      const actionConfig = manifest.query_actions?.[intent.action]
+      if (!actionConfig) {
+        return { success: false, error: `未找到 query_action: ${intent.action}` }
+      }
+
+      // Session 管理：复用同一 Domain 的 active Session
+      const sessionManager = createAISessionManager()
+      let session = sessionManager.findActiveSessionByDomain(userId as string, intent.targetDomain)
+      if (!session) {
+        session = await sessionManager.create({ domainId: intent.targetDomain, action: intent.action, userId: userId as string })
+        session = await sessionManager.activate(session.id)
+      }
+
+      // Context Engine 组装查询上下文
+      trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id } })
+      const queryContext = await assembleContext(intent, manifest, session) as import('@/usom/types/process').QueryContext
+      trace(deps.onTrace, 'ContextEngine', 'end', {
+        input: { intentId: intent.id },
+        output: { contextCount: Object.keys(queryContext.contexts).length },
+      })
+
+      // 判定子路径
+      let result: import('@/usom/types/process').QueryResult
+      const handler = await findHandler(intent.targetDomain, intent.action)
+
+      if (handler?.onQuery) {
+        // Handler Path（复杂分析型查询）
+        trace(deps.onTrace, 'Handler', 'start', { input: { intentId: intent.id, subPath: 'handler' } })
+        const aiRuntime: AIRuntime = createAIRuntime()
+        result = await handler.onQuery(queryContext, aiRuntime)
+        trace(deps.onTrace, 'Handler', 'end', { input: { intentId: intent.id }, output: { type: result.type } })
+      } else if (actionConfig.response_mode === 'cnui') {
+        // Shortcut Path（简单展示型查询）
+        result = formatCNUIFromContext(queryContext, actionConfig)
+      } else {
+        // 降级：文本摘要
+        result = { type: 'text', content: formatTextSummary(queryContext) }
+      }
+
+      // 记录查询摘要到 Session
+      const summary = buildQueryResultSummary(intent, result)
+      sessionManager.recordQueryResult(session.id, summary)
+
+      return { success: true, queryResult: result }
     },
 
     /** 生成型方案确认：将已接受的 proposals 转换为批量 intent 并执行 */
