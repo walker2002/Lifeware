@@ -66,6 +66,7 @@ export interface StructuredIntent {
   fields: Record<string, unknown>
   confidence: number
   resolvedBy: 'ai' | 'template_form'
+  pathType?: 'contract' | 'generative' | 'query'
   createdAt: Timestamp
 }
 
