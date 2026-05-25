@@ -34,11 +34,13 @@ interface HabitTemplateFormProps {
   onSubmit: (data: { templateId?: string; name: string; applicableDays: number[]; habits: TemplateHabitEntry[] }) => void
   onCancel: () => void
   isLoading?: boolean
+  /** 通知父组件表单已修改 */
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
 
-export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, onCancel, isLoading }: HabitTemplateFormProps) {
+export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, onCancel, isLoading, onDirtyChange }: HabitTemplateFormProps) {
   const [name, setName] = useState(initial?.name ?? "")
   const [selectedDays, setSelectedDays] = useState<number[]>(initial?.applicableDays ?? [1, 2, 3, 4, 5])
   const [entries, setEntries] = useState<TemplateHabitEntry[]>(initial?.habits ?? [])
@@ -73,6 +75,7 @@ export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, 
     setSelectedDays(prev =>
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort(),
     )
+    onDirtyChange?.(true)
   }
 
   const addHabit = useCallback(() => {
@@ -93,6 +96,7 @@ export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, 
     setEntries(prev => [...prev, entry])
     setSelectedHabitId("")
     setTimeOverride("")
+    onDirtyChange?.(true)
   }, [selectedHabitId, timeOverride, availableHabits, entries])
 
   const removeHabit = useCallback((habitId: string) => {
@@ -100,12 +104,14 @@ export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, 
       .filter(e => e.habitId !== habitId)
       .map((e, i) => ({ ...e, sortOrder: i + 1 })),
     )
+    onDirtyChange?.(true)
   }, [])
 
   const updateTimeOverride = useCallback((habitId: string, time: string) => {
     setEntries(prev => prev.map(e =>
       e.habitId === habitId ? { ...e, timeOverride: time } : e,
     ))
+    onDirtyChange?.(true)
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -127,7 +133,7 @@ export function HabitTemplateForm({ availableHabits, habits, initial, onSubmit, 
       {/* 模板名称 */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="tpl-name">模板名称 *</Label>
-        <Input id="tpl-name" value={name} onChange={e => setName(e.target.value)} placeholder="例如：工作日" />
+        <Input id="tpl-name" value={name} onChange={e => { setName(e.target.value); onDirtyChange?.(true) }} placeholder="例如：工作日" />
       </div>
 
       {/* 适用日期 */}
