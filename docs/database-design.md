@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- 2026_05_25 (sync)：同步代码变更 — 移除 tasks/projects/project_templates/task_templates 时间字段；更新 ai_sessions 表（新增 domain_id/action/session_mode，扩展状态枚举为 6 值）；新增 memory_episodes 表；system_events.triggered_by 新增 context_engine/handler；reviews.type 新增 semi_annual
 - 2026_05_11 (enhancement)：objectives 新增 objective_number/priority 列、period_type 枚举新增 semi_annual
 - 2026_05_11：objectives 表新增 okr_type/discarded_at 列、key_results 表新增 discarded_at 列、状态枚举新增 discarded
 - 2026_05_09：habits 表时间模型升级（三字段时间窗口 + 双时长 + trackable）、新增 habit_templates 和 template_habits 表、timeboxes 状态枚举更新（paused→overtime, 新增 cancelled）、system_events.triggered_by 新增 template_apply
@@ -141,7 +142,12 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── context_snapshots      ← 上下文快照（持久化，支持历史查询）
 ├── system_events          ← 事件存储（Memory Framework 原始数据源，append-only）
 ├── action_surfaces        ← 行动切面快照（审计用）
-└── derived_signals        ← Memory Framework 计算缓存（每用户一行）
+├── derived_signals        ← Memory Framework 计算缓存（每用户一行）
+
+AI 与记忆
+├── ai_sessions            ← AI 会话
+├── user_settings          ← 用户设置（LLM 配置、UI 偏好）
+└── memory_episodes        ← 记忆片段（Session 归档摘要）
 
 阶段二预留
 ├── memories               ← 记忆表
@@ -392,12 +398,6 @@ CREATE TABLE tasks (
   -- 时间字段（查询关键）
   due_date          date,
 
-  -- 时间窗口字段（弹性排程）
-  earliest_time     text,  -- HH:MM
-  latest_start_time text,  -- HH:MM
-  default_time      text,  -- HH:MM
-  default_duration  integer,  -- 分钟
-
   -- 频率字段
   frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
 
@@ -452,11 +452,6 @@ CREATE TABLE projects (
   start_date  date,
   end_date    date,
 
-  -- 默认排程参数
-  default_earliest_time     text,  -- HH:MM
-  default_latest_start_time text,  -- HH:MM
-  default_duration          integer,  -- 分钟
-
   -- 其他
   priority    text check (priority in ('critical', 'high', 'medium', 'low')),
   color       text,
@@ -492,11 +487,6 @@ CREATE TABLE project_templates (
   name        text not null,
   description text,
 
-  -- 默认排程参数
-  default_earliest_time     text,  -- HH:MM
-  default_latest_start_time text,  -- HH:MM
-  default_duration          integer,  -- 分钟
-
   -- 其他
   priority    text check (priority in ('critical', 'high', 'medium', 'low')),
   color       text,
@@ -531,12 +521,6 @@ CREATE TABLE task_templates (
   priority     text check (priority in ('critical', 'high', 'medium', 'low')),
   energy_required text check (energy_required in ('high', 'medium', 'low')),
   estimated_duration integer,  -- 分钟
-
-  -- 时间窗口字段
-  earliest_time     text,  -- HH:MM
-  latest_start_time text,  -- HH:MM
-  default_time      text,  -- HH:MM
-  default_duration  integer,  -- 分钟
 
   -- 频率
   frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
@@ -758,7 +742,7 @@ CREATE TABLE reviews (
 
   -- 查询关键字段（独立列）
   status      text not null check (status in ('draft', 'in_progress', 'completed', 'archived')),
-  type        text not null check (type in ('daily', 'weekly', 'monthly', 'quarterly', 'annual')),
+  type        text not null check (type in ('daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual')),
   period_start date not null,
   period_end   date not null,
   generated_by text not null check (generated_by in ('ai', 'manual')),
@@ -959,7 +943,7 @@ CREATE TABLE system_events (
   -- 查询关键字段（独立列）
   type         text not null,
   occurred_at  timestamptz not null default now(),
-  triggered_by text not null check (triggered_by in ('state_machine', 'time_trigger', 'template_apply')),
+  triggered_by text not null check (triggered_by in ('state_machine', 'time_trigger', 'template_apply', 'context_engine', 'handler')),
   snapshot_id  uuid references context_snapshots(id) on delete set null,
 
   -- JSONB 允许：payload 结构可变
@@ -1317,6 +1301,18 @@ interface DerivedSignalsRepository {
 |---|---|
 | `reviews` | 复盘表 |
 
+### 第四批（AI 会话与记忆）
+
+| 表名 | 说明 |
+|---|---|
+| `ai_sessions` | AI 会话表 |
+| `user_settings` | 用户设置表 |
+| `memory_episodes` | 记忆片段表 |
+| `projects` | 项目表 |
+| `project_templates` | 项目模板表 |
+| `task_templates` | 任务模板表 |
+| `energy_logs` | 能量日志表 |
+
 ### 可选 / 推迟
 
 | 表名 | 说明 |
@@ -1352,7 +1348,10 @@ interface DerivedSignalsRepository {
 | `id` | UUID | PK, defaultRandom() | 主键 |
 | `user_id` | UUID | NOT NULL, FK→users(id) ON DELETE CASCADE | 所属用户 |
 | `title` | TEXT | NOT NULL, DEFAULT '新对话' | 会话标题 |
-| `status` | TEXT | NOT NULL, DEFAULT 'active', ENUM(active/archived/deleted) | 状态 |
+| `status` | TEXT | NOT NULL, DEFAULT 'created', ENUM(created/active/completing/archived/deleted/closed) | 状态 |
+| `domain_id` | TEXT | NULLABLE | 关联的 Domain ID |
+| `action` | TEXT | NULLABLE | 触发的 action |
+| `session_mode` | TEXT | NOT NULL, DEFAULT 'single_shot' | 会话模式 |
 | `messages` | JSONB | NOT NULL, DEFAULT [] | ChatMessage[] |
 | `state_snapshot` | JSONB | NOT NULL, DEFAULT {} | 状态快照 |
 | `referenced_object_ids` | JSONB | NOT NULL, DEFAULT [] | 引用对象 ID 列表 |
@@ -1379,6 +1378,26 @@ interface DerivedSignalsRepository {
 索引：
 - `uniq_user_settings_user` UNIQUE ON (user_id)
 
+### `memory_episodes`
+
+Session 归档时自动生成的摘要记录，用于跨会话记忆。
+
+| 列名 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| `id` | UUID | PK, defaultRandom() | 主键 |
+| `user_id` | UUID | NOT NULL, FK→users(id) ON DELETE CASCADE | 所属用户 |
+| `session_id` | UUID | FK→ai_sessions(id) ON DELETE SET NULL | 关联的 AI Session |
+| `domain_id` | TEXT | NULLABLE | 关联的 Domain ID |
+| `action` | TEXT | NULLABLE | 触发的 action |
+| `episode_type` | TEXT | NOT NULL, DEFAULT 'session_summary' | 片段类型 |
+| `summary` | TEXT | NOT NULL | 摘要内容 |
+| `metadata` | JSONB | NOT NULL, DEFAULT {} | 元数据 |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 创建时间 |
+
+索引：
+- `idx_memory_episodes_user_created` ON (user_id, created_at)
+- `idx_memory_episodes_session` ON (session_id)
+
 ---
 
 ## 十四、本文档的使用方式
@@ -1390,5 +1409,5 @@ interface DerivedSignalsRepository {
 
 ---
 
-*文档版本：2026_03_21*
+*文档版本：2026_05_25*
 *关联上游文档：LW_USOM_详细设计_2026_03_20.md*
