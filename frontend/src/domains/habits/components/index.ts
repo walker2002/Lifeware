@@ -7,3 +7,6 @@ export { HabitTemplateCard } from "./habit-template-card"
 export { HabitTemplateForm, type TemplateHabitEntry } from "./habit-template-form"
 export { HabitTemplateManager } from "./habit-template-manager"
 export { HabitTemplateView } from "./habit-template-view"
+// Pages
+export { HabitListPage } from "../pages/HabitListPage"
+export { HabitTemplatePage } from "../pages/HabitTemplatePage"
