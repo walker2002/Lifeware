@@ -1,7 +1,6 @@
 export { HabitCard } from "./habit-card"
 export { HabitCheckin } from "./habit-checkin"
 export { HabitForm, type HabitFormFields } from "./habit-form"
-export { HabitLibraryView } from "./habit-library-view"
 export { HabitList } from "./habit-list"
 export { HabitTemplateCard } from "./habit-template-card"
 export { HabitTemplateForm, type TemplateHabitEntry } from "./habit-template-form"
