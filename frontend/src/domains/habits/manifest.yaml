@@ -201,6 +201,10 @@ view_routes:
     component: domains/habits/pages/HabitFormPage
     params:
       mode: create
+  view_list:
+    component: domains/habits/pages/HabitListPage
+  view_templates:
+    component: domains/habits/pages/HabitTemplatePage
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
