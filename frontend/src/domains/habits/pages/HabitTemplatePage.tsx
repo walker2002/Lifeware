@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -19,7 +19,7 @@ export function HabitTemplatePage() {
   const [pageState, setPageState] = useState<PageState>("idle")
   const [dirtyLabel, setDirtyLabel] = useState("")
   const [showExitDialog, setShowExitDialog] = useState(false)
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  const [cancelTrigger, setCancelTrigger] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const handleDirtyChange = useCallback((dirty: boolean) => {
@@ -29,6 +29,28 @@ export function HabitTemplatePage() {
 
   const handleSubmitError = useCallback((error: { type: string; message: string }) => {
     setSubmitError(error.message)
+  }, [])
+
+  const handleSubmittingChange = useCallback((submitting: boolean) => {
+    setPageState(submitting ? "submitting" : "idle")
+  }, [])
+
+  const handleCancelRequest = useCallback(() => {
+    if (pageState === "dirty") {
+      setShowExitDialog(true)
+    } else {
+      setCancelTrigger((n) => n + 1)
+    }
+  }, [pageState])
+
+  const handleExitDiscard = useCallback(() => {
+    setShowExitDialog(false)
+    setPageState("idle")
+    setCancelTrigger((n) => n + 1)
+  }, [])
+
+  const handleExitContinue = useCallback(() => {
+    setShowExitDialog(false)
   }, [])
 
   // 浏览器离开拦截
@@ -46,11 +68,13 @@ export function HabitTemplatePage() {
     <div className="flex flex-col gap-4">
       {/* 脏状态指示器 */}
       {pageState !== "idle" && (
-        <div className={`flex items-center justify-between rounded-md px-4 py-2 text-sm ${
-          pageState === "dirty"
-            ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
-            : "bg-blue-50 text-blue-800 border border-blue-200"
-        }`}>
+        <div
+          className={`flex items-center justify-between rounded-lg border px-4 py-2 text-sm ${
+            pageState === "dirty"
+              ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+              : "bg-blue-50 border-blue-300 text-blue-800"
+          }`}
+        >
           <span>
             {pageState === "dirty"
               ? `有未保存的修改 — ${dirtyLabel}`
@@ -61,22 +85,25 @@ export function HabitTemplatePage() {
 
       {/* 提交错误 */}
       {submitError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
-          {submitError}
+        <div className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
+          <span>{submitError}</span>
           <button
             type="button"
             onClick={() => setSubmitError(null)}
-            className="ml-2 text-xs underline hover:no-underline"
+            className="rounded-md bg-red-200 px-3 py-1 text-xs font-medium hover:bg-red-300 transition-colors"
           >
             关闭
           </button>
         </div>
       )}
 
-      {/* 模板管理器（已有组件，Task 4 已添加 onDirtyChange/onSubmitError props） */}
+      {/* 模板管理器 */}
       <HabitTemplateManager
         onDirtyChange={handleDirtyChange}
         onSubmitError={handleSubmitError}
+        onCancelRequest={handleCancelRequest}
+        cancelTrigger={cancelTrigger}
+        onSubmittingChange={handleSubmittingChange}
       />
 
       {/* 退出确认弹窗 */}
@@ -89,23 +116,13 @@ export function HabitTemplatePage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
-              setShowExitDialog(false)
-              pendingAction?.()
-            }}>
+            <AlertDialogAction onClick={handleExitContinue}>
               保存并退出
             </AlertDialogAction>
-            <AlertDialogCancel onClick={() => {
-              setShowExitDialog(false)
-              setPageState("idle")
-              pendingAction?.()
-            }}>
+            <AlertDialogCancel onClick={handleExitDiscard}>
               放弃修改
             </AlertDialogCancel>
-            <AlertDialogCancel onClick={() => {
-              setShowExitDialog(false)
-              setPendingAction(null)
-            }}>
+            <AlertDialogCancel onClick={handleExitContinue}>
               取消，继续编辑
             </AlertDialogCancel>
           </AlertDialogFooter>

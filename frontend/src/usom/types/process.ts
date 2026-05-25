@@ -118,6 +118,7 @@ export interface IntentTriggerInfo {
   action: string
   shortcut?: string
   description: string
+  view_route?: string
 }
 
 export interface ViewRouteInfo {

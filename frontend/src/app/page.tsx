@@ -16,6 +16,8 @@ import type { DateViewMode } from "@/domains/timebox/components/types";
 import { DayView } from "@/domains/timebox/components/day-view";
 import { WeekView } from "@/domains/timebox/components/week-view";
 import { MonthView } from "@/domains/timebox/components/month-view";
+import { HabitListPage } from "@/domains/habits/pages/HabitListPage";
+import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
@@ -37,6 +39,15 @@ import {
   addDays, addWeeks, addMonths,
 } from "date-fns";
 import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/main-view-state";
+
+// view_route 页面组件映射（domainId → action → Component）
+// 在 AppShell 主内容区内渲染，保留左侧面板和顶部导航
+const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType>> = {
+  habits: {
+    view_list: HabitListPage,
+    view_templates: HabitTemplatePage,
+  },
+};
 
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 
@@ -105,10 +116,20 @@ export default function Home() {
   const [actionViewData, setActionViewData] = useState<Awaited<ReturnType<typeof fetchActionData>> | null>(null);
 
   // 加载 action 视图的表单字段数据（Server Action，避免客户端引用 node:fs）
+  // view_route + viewComponent 同时存在 → 主内容区内渲染页面组件，保留 AppShell 布局
+  // 仅 view_route（无 viewComponent）→ 回到日程默认视图（页面路由尚未实现）
   useEffect(() => {
     if (mainViewState.type === 'action') {
       setActionViewData(null)
-      fetchActionData(mainViewState.domainId, mainViewState.action).then(setActionViewData)
+      fetchActionData(mainViewState.domainId, mainViewState.action).then(data => {
+        if (data.viewRoute && data.viewComponent) {
+          setMainViewState({ type: 'view', domainId: mainViewState.domainId, action: mainViewState.action })
+        } else if (data.viewRoute) {
+          setMainViewState({ type: 'schedule', date: new Date(), viewMode: 'day' })
+        } else {
+          setActionViewData(data)
+        }
+      })
     }
   }, [mainViewState.type === 'action' ? `${mainViewState.domainId}/${mainViewState.action}` : null])
 
@@ -428,6 +449,19 @@ export default function Home() {
         );
       }
       return convView;
+    }
+
+    if (mainViewState.type === 'view') {
+      const { domainId, action } = mainViewState
+      const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
+      if (ViewComponent) {
+        return (
+          <div className="flex-1 overflow-y-auto">
+            <ViewComponent />
+          </div>
+        )
+      }
+      return <div className="p-4"><p className="text-sm text-body">页面未找到</p></div>
     }
 
     if (mainViewState.type === 'action') {

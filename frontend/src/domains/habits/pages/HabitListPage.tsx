@@ -168,7 +168,8 @@ export function HabitListPage() {
 
   // ─── 脏状态追踪 ────────────────────────────────────────────────
 
-  const handleFormChange = useCallback(() => {
+  const handleFormChange = useCallback((isDirty: boolean) => {
+    if (!isDirty) return
     if (pageState === "idle") {
       setPageState("dirty")
       setDirtyLabel(editingHabit?.title ?? "新建习惯")
@@ -456,7 +457,7 @@ export function HabitListPage() {
               submitTrigger={submitTrigger}
             />
           </div>
-          {/* 字段级错误 */}
+          {/* 字段级错误（TODO: 服务端字段验证通过 server action 返回后写入 fieldErrors） */}
           {Object.keys(fieldErrors).length > 0 && (
             <div className="mt-4 space-y-1">
               {Object.entries(fieldErrors).map(([field, msg]) => (

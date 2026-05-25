@@ -32,9 +32,15 @@ interface HabitTemplateManagerProps {
   onDirtyChange?: (dirty: boolean) => void
   /** 提交失败时通知父组件 */
   onSubmitError?: (error: { type: string; message: string; fields?: Record<string, string> }) => void
+  /** 取消操作请求（由父组件决定是否弹窗确认） */
+  onCancelRequest?: () => void
+  /** 外部触发的取消计数，每次递增时关闭表单/编辑器 */
+  cancelTrigger?: number
+  /** 通知父组件提交状态变化 */
+  onSubmittingChange?: (submitting: boolean) => void
 }
 
-export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemplateManagerProps) {
+export function HabitTemplateManager({ onDirtyChange, onSubmitError, onCancelRequest, cancelTrigger, onSubmittingChange }: HabitTemplateManagerProps) {
   const [templates, setTemplates] = useState<HabitTemplate[]>([])
   const [habits, setHabits] = useState<Habit[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -62,6 +68,15 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemp
 
   useEffect(() => { refresh() }, [refresh])
 
+  // 外部取消触发（父组件确认后递增 cancelTrigger）
+  useEffect(() => {
+    if (cancelTrigger && cancelTrigger > 0) {
+      setShowForm(false)
+      setEditingTemplateId(null)
+      onDirtyChange?.(false)
+    }
+  }, [cancelTrigger])
+
   const handleCreateTemplate = useCallback(async (data: {
     templateId?: string
     name: string
@@ -69,26 +84,31 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemp
     habits: TemplateHabitEntry[]
   }) => {
     onDirtyChange?.(true)
-    const result = await createTemplate({ name: data.name, applicableDays: data.applicableDays })
-    if (!result.success || !result.template) {
-      setError(result.error ?? "创建模板失败")
-      onSubmitError?.({ type: "validation", message: result.error ?? "创建模板失败" })
-      return
-    }
+    onSubmittingChange?.(true)
+    try {
+      const result = await createTemplate({ name: data.name, applicableDays: data.applicableDays })
+      if (!result.success || !result.template) {
+        setError(result.error ?? "创建模板失败")
+        onSubmitError?.({ type: "validation", message: result.error ?? "创建模板失败" })
+        return
+      }
 
-    // 添加习惯到模板
-    for (const entry of data.habits) {
-      await addHabitToTemplate(
-        result.template.id,
-        entry.habitId,
-        { timeOverride: entry.timeOverride, durationOverride: entry.durationOverride },
-      )
-    }
+      // 添加习惯到模板
+      for (const entry of data.habits) {
+        await addHabitToTemplate(
+          result.template.id,
+          entry.habitId,
+          { timeOverride: entry.timeOverride, durationOverride: entry.durationOverride },
+        )
+      }
 
-    setShowForm(false)
-    await refresh()
-    onDirtyChange?.(false)
-  }, [refresh, onDirtyChange, onSubmitError])
+      setShowForm(false)
+      await refresh()
+      onDirtyChange?.(false)
+    } finally {
+      onSubmittingChange?.(false)
+    }
+  }, [refresh, onDirtyChange, onSubmitError, onSubmittingChange])
 
   const handleUpdateTemplate = useCallback(async (data: {
     templateId?: string
@@ -98,37 +118,41 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemp
   }) => {
     if (!editingTemplateId) return
     onDirtyChange?.(true)
-
-    // 1. 更新模板基本信息
-    const updateResult = await updateTemplate(editingTemplateId, {
-      name: data.name,
-      applicableDays: data.applicableDays,
-    })
-    if (!updateResult.success) {
-      setError(updateResult.error ?? "更新模板失败")
-      onSubmitError?.({ type: "validation", message: updateResult.error ?? "更新模板失败" })
-      return
-    }
-
-    // 2. 移除旧习惯，添加新习惯
-    const existing = templates.find(t => t.id === editingTemplateId)
-    if (existing) {
-      for (const h of existing.habits) {
-        await removeHabitFromTemplate(editingTemplateId, h.habitId)
+    onSubmittingChange?.(true)
+    try {
+      // 1. 更新模板基本信息
+      const updateResult = await updateTemplate(editingTemplateId, {
+        name: data.name,
+        applicableDays: data.applicableDays,
+      })
+      if (!updateResult.success) {
+        setError(updateResult.error ?? "更新模板失败")
+        onSubmitError?.({ type: "validation", message: updateResult.error ?? "更新模板失败" })
+        return
       }
-    }
-    for (const entry of data.habits) {
-      await addHabitToTemplate(
-        editingTemplateId,
-        entry.habitId,
-        { timeOverride: entry.timeOverride, durationOverride: entry.durationOverride },
-      )
-    }
 
-    setEditingTemplateId(null)
-    await refresh()
-    onDirtyChange?.(false)
-  }, [editingTemplateId, templates, refresh, onDirtyChange, onSubmitError])
+      // 2. 移除旧习惯，添加新习惯
+      const existing = templates.find(t => t.id === editingTemplateId)
+      if (existing) {
+        for (const h of existing.habits) {
+          await removeHabitFromTemplate(editingTemplateId, h.habitId)
+        }
+      }
+      for (const entry of data.habits) {
+        await addHabitToTemplate(
+          editingTemplateId,
+          entry.habitId,
+          { timeOverride: entry.timeOverride, durationOverride: entry.durationOverride },
+        )
+      }
+
+      setEditingTemplateId(null)
+      await refresh()
+      onDirtyChange?.(false)
+    } finally {
+      onSubmittingChange?.(false)
+    }
+  }, [editingTemplateId, templates, refresh, onDirtyChange, onSubmitError, onSubmittingChange])
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteConfirm) return
@@ -237,7 +261,7 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemp
               }),
             }}
             onSubmit={handleUpdateTemplate}
-            onCancel={() => { setEditingTemplateId(null); onDirtyChange?.(false) }}
+            onCancel={() => { onCancelRequest?.() }}
             onDirtyChange={onDirtyChange}
           />
         </div>
@@ -292,7 +316,7 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemp
             }))}
             habits={habits}
             onSubmit={handleCreateTemplate}
-            onCancel={() => { setShowForm(false); onDirtyChange?.(false) }}
+            onCancel={() => { onCancelRequest?.() }}
             onDirtyChange={onDirtyChange}
           />
         </DialogContent>

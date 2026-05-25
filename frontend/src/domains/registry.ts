@@ -90,6 +90,14 @@ export function getActionDescription(domainId: string, action: string): string {
   return trigger?.description ?? ''
 }
 
+/** 获取 intent trigger 中定义的 view_route URL（如 /habits），用于导航类意图直接跳转 */
+export function getIntentTriggerViewRoute(domainId: string, action: string): string | undefined {
+  const domain = findDomain(domainId)
+  if (!domain?.manifest.intentTriggers) return undefined
+  const trigger = domain.manifest.intentTriggers.find(t => t.action === action)
+  return trigger?.view_route
+}
+
 export function validateShortcutUniqueness(): void {
   const shortcutMap = new Map<string, string>()
   for (const plugin of domainRegistry) {

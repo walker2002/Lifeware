@@ -19,7 +19,7 @@ export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
-import { getRequiredFields, hasRequiredFields, getActionDescription } from "@/domains/registry";
+import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute } from "@/domains/registry";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
 import { timeboxPlugin } from "../../domains/timebox";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
@@ -859,12 +859,16 @@ export interface ActionFieldDescriptor {
 export async function fetchActionData(
   domainId: string,
   action: string,
-): Promise<{ fields: ActionFieldDescriptor[]; description: string; hasFields: boolean }> {
+): Promise<{ fields: ActionFieldDescriptor[]; description: string; hasFields: boolean; viewRoute?: string; viewComponent?: string }> {
   const fields = getRequiredFields(domainId, action)
   const description = getActionDescription(domainId, action)
+  const viewRoute = getIntentTriggerViewRoute(domainId, action)
+  const viewRouteInfo = getViewRoute(domainId, action)
   return {
     fields: fields as ActionFieldDescriptor[],
     description,
     hasFields: fields.length > 0,
+    viewRoute,
+    viewComponent: viewRouteInfo?.component,
   }
 }
