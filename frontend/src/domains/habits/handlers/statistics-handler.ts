@@ -15,9 +15,9 @@ export class HabitStatisticsHandler implements DomainHandler {
   }
 
   async onQuery(context: QueryContext, aiRuntime: AIRuntime): Promise<QueryResult> {
-    const { habitLogs, habitStreaks } = context.contexts as {
-      habitLogs: Array<{ habitId: string; date: string; completed: boolean }>
-      habitStreaks: Array<{
+    const { habitLogs = [], habitStreaks = [] } = context.contexts as {
+      habitLogs?: Array<{ habitId: string; date: string; completed: boolean }>
+      habitStreaks?: Array<{
         habitId: string
         title: string
         currentStreak: number

@@ -7,7 +7,6 @@ export type PathType = 'contract' | 'generative' | 'query'
  * 查找优先级：query_actions > generation_actions > 默认 contract。
  */
 export function resolvePathType(
-  _domainId: string,
   action: string,
   manifest: DomainManifest | null,
 ): PathType {

@@ -56,8 +56,8 @@ describe('parseWithAI (migrated to AIRuntime)', () => {
     expect(aiRuntime.generate).toHaveBeenCalledOnce()
     const callArg = (aiRuntime.generate as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(callArg.taskType).toBe('intent_routing')
-    expect(callArg.systemPrompt).toContain('时间盒意图解析器')
-    expect(callArg.domainId).toBe('timebox')
+    expect(callArg.systemPrompt).toContain('Lifeware 意图解析器')
+    expect(callArg.domainId).toBe('system')
   })
 
   it('should parse structured object response', async () => {

@@ -196,6 +196,7 @@ interface LLMIntentResponse {
   action: string
   fields: Record<string, unknown>
   confidence: number
+  pathType?: string
 }
 
 // ─── 核心解析函数 ─────────────────────────────────────────────────
@@ -306,7 +307,7 @@ ${routingText}
       fields,
       confidence: parsed.confidence,
       resolvedBy: 'ai',
-      pathType: (parsed as any).pathType,
+      pathType: parsed.pathType as StructuredIntent['pathType'],
       createdAt: new Date().toISOString() as Timestamp,
     }
 

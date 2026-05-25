@@ -17,7 +17,9 @@ export function formatCNUIFromContext(
   const surfaceType = actionConfig.cnui_surface ?? 'generic-list'
 
   const contextEntries = Object.values(queryContext.contexts)
-  const items = Array.isArray(contextEntries[0]) ? contextEntries[0] : [contextEntries[0]]
+  const items = contextEntries.flatMap(entry =>
+    Array.isArray(entry) ? entry : entry ? [entry] : [],
+  )
 
   return {
     type: 'cnui',

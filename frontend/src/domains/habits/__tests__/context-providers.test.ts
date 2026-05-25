@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock @/nexus/context-engine/registry
-vi.mock('@/nexus/context-engine/registry', () => {
-  const caps = new Map<string, any>()
-  return {
-    registerContextCapability: (cap: any) => { caps.set(cap.id, cap) },
-    clearRegistry: () => { caps.clear() },
-    resolveContext: vi.fn(),
-    getRegisteredCapabilities: () => Array.from(caps.keys()),
-  }
-})
+const registeredCaps = new Map<string, any>()
+vi.mock('@/nexus/context-engine/registry', () => ({
+  registerContextCapability: (cap: any) => { registeredCaps.set(cap.id, cap) },
+  clearRegistry: () => { registeredCaps.clear() },
+  resolveContext: vi.fn(),
+}))
 
 import { registerHabitProviders } from '../context-providers'
-import { clearRegistry } from '@/nexus/context-engine/registry'
 
 function makeHabitRepo(habits: any[] = []) {
   return {
@@ -36,31 +32,69 @@ function makeHabitRepo(habits: any[] = []) {
 
 describe('registerHabitProviders', () => {
   beforeEach(() => {
-    clearRegistry()
+    registeredCaps.clear()
   })
 
-  it('registers active_habits provider', () => {
+  it('registers activeHabits provider and returns mapped data', async () => {
     const repo = makeHabitRepo([
       { id: 'h1', title: '晨跑', status: 'active', defaultTime: '07:00', trackable: true, streak: 5, longestStreak: 10, completionRate7d: 0.8 },
     ])
     registerHabitProviders(repo as any)
 
-    // 验证注册成功（不抛异常）
-    expect(() => registerHabitProviders(repo as any)).not.toThrow()
+    const cap = registeredCaps.get('activeHabits')
+    expect(cap).toBeDefined()
+    expect(cap.description).toBe('活跃习惯列表')
+
+    const result = await cap.provider.provide({}, { userId: 'u1' })
+    expect(result).toEqual([{
+      id: 'h1',
+      title: '晨跑',
+      status: 'active',
+      defaultTime: '07:00',
+      trackable: true,
+      streak: 5,
+      todayLogged: false,
+    }])
   })
 
-  it('registers habit_streaks provider', () => {
+  it('registers habitStreaks provider and returns streak data', async () => {
     const repo = makeHabitRepo([
       { id: 'h1', title: '晨跑', status: 'active', defaultTime: '07:00', trackable: true, streak: 5, longestStreak: 10, completionRate7d: 0.8 },
     ])
     registerHabitProviders(repo as any)
-    // 验证注册成功
-    expect(true).toBe(true)
+
+    const cap = registeredCaps.get('habitStreaks')
+    expect(cap).toBeDefined()
+    expect(cap.description).toBe('习惯连续打卡统计')
+
+    const result = await cap.provider.provide({}, { userId: 'u1' })
+    expect(result).toEqual([{
+      habitId: 'h1',
+      title: '晨跑',
+      currentStreak: 5,
+      longestStreak: 10,
+      completionRate7d: 0.8,
+    }])
   })
 
-  it('registers recent_habit_logs provider', () => {
+  it('registers habitLogs provider (returns empty until log repo available)', async () => {
     const repo = makeHabitRepo()
     registerHabitProviders(repo as any)
-    expect(true).toBe(true)
+
+    const cap = registeredCaps.get('habitLogs')
+    expect(cap).toBeDefined()
+    expect(cap.description).toBe('最近习惯打卡记录')
+
+    const result = await cap.provider.provide({}, { userId: 'u1' })
+    expect(result).toEqual([])
+  })
+
+  it('handles empty active habits gracefully', async () => {
+    const repo = makeHabitRepo([])
+    registerHabitProviders(repo as any)
+
+    const cap = registeredCaps.get('activeHabits')
+    const result = await cap.provider.provide({}, { userId: 'u1' })
+    expect(result).toEqual([])
   })
 })

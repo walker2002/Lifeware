@@ -12,6 +12,8 @@ import type {
   ActionSurface,
   ContextSnapshot,
   GenerationResult,
+  QueryResult,
+  QueryContext,
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type {
@@ -76,7 +78,7 @@ export interface OrchestratorResult {
   needsConfirmation?: boolean
   confirmationMessage?: string
   generativeResult?: GenerationResult
-  queryResult?: import('@/usom/types/process').QueryResult
+  queryResult?: QueryResult
 }
 
 export interface OrchestratorDeps {
@@ -169,16 +171,29 @@ function getObjectType(intent: StructuredIntent): string {
   return resolveObjectType(intent.targetDomain, intent.action)
 }
 
-function buildQueryResultSummary(intent: StructuredIntent, result: import('@/usom/types/process').QueryResult): QueryResultEntry {
+function buildQueryResultSummary(intent: StructuredIntent, result: QueryResult): QueryResultEntry {
   const surfaceType = result.type === 'cnui' ? result.payload.surfaceType : undefined
+
+  let count = 0
+  let objectIds: string[] = []
+
+  if (result.type === 'cnui') {
+    const components = result.payload.components ?? []
+    for (const comp of components) {
+      const items = (comp.props as any)?.items
+      if (Array.isArray(items)) {
+        count = items.length
+        objectIds = items.map((i: any) => i.id).filter(Boolean)
+      }
+    }
+  } else if (result.type === 'text') {
+    count = 1
+  }
+
   return {
     action: intent.action,
     domain: intent.targetDomain,
-    resultSummary: {
-      count: 0,
-      objectIds: [],
-      keyMetrics: {},
-    },
+    resultSummary: { count, objectIds, keyMetrics: {} },
     answerText: result.type === 'text' ? result.content : undefined,
     cnuiSurfaceType: surfaceType,
     timestamp: new Date().toISOString(),
@@ -187,6 +202,7 @@ function buildQueryResultSummary(intent: StructuredIntent, result: import('@/uso
 
 export function createOrchestrator(deps: OrchestratorDeps) {
   const eventBus = createEventBus()
+  const sessionManager = createAISessionManager()
   const timeboxSM = createTimeboxStateMachine({
     timeboxRepo: deps.timeboxRepo as unknown as import('../core/state-machine').StateMachineDeps['timeboxRepo'],
     eventRepo: deps.eventRepo,
@@ -345,7 +361,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // 1.5 路径路由 — 根据 manifest 声明判定路径类型
       const manifestResult = loadDomainManifest(domainId)
       const manifest = manifestResult.success ? manifestResult.manifest : null
-      const pathType = intent.pathType ?? resolvePathType(domainId, intent.action, manifest)
+      const pathType = intent.pathType ?? resolvePathType(intent.action, manifest)
 
       if (pathType === 'query') {
         if (!manifest) {
@@ -949,7 +965,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       // Session 管理：复用同一 Domain 的 active Session
-      const sessionManager = createAISessionManager()
       let session = sessionManager.findActiveSessionByDomain(userId as string, intent.targetDomain)
       if (!session) {
         session = await sessionManager.create({ domainId: intent.targetDomain, action: intent.action, userId: userId as string })
@@ -958,14 +973,14 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
       // Context Engine 组装查询上下文
       trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id } })
-      const queryContext = await assembleContext(intent, manifest, session) as import('@/usom/types/process').QueryContext
+      const queryContext = await assembleContext(intent, manifest, session) as QueryContext
       trace(deps.onTrace, 'ContextEngine', 'end', {
         input: { intentId: intent.id },
         output: { contextCount: Object.keys(queryContext.contexts).length },
       })
 
       // 判定子路径
-      let result: import('@/usom/types/process').QueryResult
+      let result: QueryResult
       const handler = await findHandler(intent.targetDomain, intent.action)
 
       if (handler?.onQuery) {

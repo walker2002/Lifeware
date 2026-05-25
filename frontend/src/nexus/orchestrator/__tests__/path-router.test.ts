@@ -30,7 +30,7 @@ describe('resolvePathType', () => {
         },
       },
     })
-    expect(resolvePathType('test', 'list_items', manifest)).toBe('query')
+    expect(resolvePathType('list_items', manifest)).toBe('query')
   })
 
   it('returns "generative" when action is in generation_actions', () => {
@@ -42,7 +42,7 @@ describe('resolvePathType', () => {
         },
       },
     })
-    expect(resolvePathType('test', 'createItem', manifest)).toBe('generative')
+    expect(resolvePathType('createItem', manifest)).toBe('generative')
   })
 
   it('query_actions takes priority over generation_actions', () => {
@@ -61,20 +61,20 @@ describe('resolvePathType', () => {
         },
       },
     })
-    expect(resolvePathType('test', 'sharedAction', manifest)).toBe('query')
+    expect(resolvePathType('sharedAction', manifest)).toBe('query')
   })
 
   it('returns "contract" when action is in neither', () => {
     const manifest = makeManifest({})
-    expect(resolvePathType('test', 'unknownAction', manifest)).toBe('contract')
+    expect(resolvePathType('unknownAction', manifest)).toBe('contract')
   })
 
   it('returns "contract" when manifest is null', () => {
-    expect(resolvePathType('test', 'anyAction', null)).toBe('contract')
+    expect(resolvePathType('anyAction', null)).toBe('contract')
   })
 
   it('returns "contract" when query_actions is undefined', () => {
     const manifest = makeManifest({ query_actions: undefined })
-    expect(resolvePathType('test', 'anyAction', manifest)).toBe('contract')
+    expect(resolvePathType('anyAction', manifest)).toBe('contract')
   })
 })

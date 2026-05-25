@@ -54,6 +54,7 @@ export function registerHabitProviders(habitRepo: IHabitRepository) {
     id: 'habitLogs',
     provider: {
       async provide(_query, _params) {
+        // TODO: 需要习惯日志 Repository 支持按日期范围查询，目前返回空数组
         return []
       },
     },
