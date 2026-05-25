@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,10 @@ interface HabitFormProps {
   onCancel: () => void
   /** 是否提交中 */
   isLoading?: boolean
+  /** 通知父组件表单已修改（用于页面级脏状态追踪） */
+  onDirtyChange?: (isDirty: boolean) => void
+  /** 外部触发的提交计数（用于退出保存场景），每次递增触发一次 requestSubmit */
+  submitTrigger?: number
 }
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
@@ -62,7 +66,7 @@ function autoComplete(
   }
 }
 
-export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormProps) {
+export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChange, submitTrigger }: HabitFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [defaultTime, setDefaultTime] = useState(initial?.defaultTime ?? "07:00")
@@ -78,6 +82,14 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
   const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // 监听外部提交触发
+  useEffect(() => {
+    if (submitTrigger && submitTrigger > 0 && formRef.current) {
+      formRef.current.requestSubmit()
+    }
+  }, [submitTrigger])
 
   const handleDefaultTimeBlur = useCallback(() => {
     if (/^\d{2}:\d{2}$/.test(defaultTime)) {
@@ -104,6 +116,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
     setDaysOfWeek((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
     )
+    onDirtyChange?.(true)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -132,14 +145,14 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
   const isValid = title.trim().length > 0 && /^\d{2}:\d{2}$/.test(defaultTime) && defaultDuration > 0
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
       {/* 标题 */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="habit-title">标题 *</Label>
         <Input
           id="habit-title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => { setTitle(e.target.value); onDirtyChange?.(true) }}
           placeholder="例如：晨跑、午休冥想"
         />
       </div>
@@ -150,7 +163,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
         <Textarea
           id="habit-desc"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => { setDescription(e.target.value); onDirtyChange?.(true) }}
           placeholder="可选"
           rows={2}
         />
@@ -162,7 +175,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
           id="habit-trackable"
           type="checkbox"
           checked={trackable}
-          onChange={(e) => setTrackable(e.target.checked)}
+          onChange={(e) => { setTrackable(e.target.checked); onDirtyChange?.(true) }}
           className="size-4 rounded border-input"
         />
         <Label htmlFor="habit-trackable">可追踪（打卡记录完成情况）</Label>
@@ -176,7 +189,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             id="habit-default-time"
             type="time"
             value={defaultTime}
-            onChange={(e) => setDefaultTime(e.target.value)}
+            onChange={(e) => { setDefaultTime(e.target.value); onDirtyChange?.(true) }}
             onBlur={handleDefaultTimeBlur}
           />
         </div>
@@ -186,7 +199,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             id="habit-earliest"
             type="time"
             value={earliestTime}
-            onChange={(e) => setEarliestTime(e.target.value)}
+            onChange={(e) => { setEarliestTime(e.target.value); onDirtyChange?.(true) }}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -195,7 +208,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             id="habit-latest"
             type="time"
             value={latestStartTime}
-            onChange={(e) => setLatestEndTime(e.target.value)}
+            onChange={(e) => { setLatestEndTime(e.target.value); onDirtyChange?.(true) }}
           />
         </div>
       </div>
@@ -210,7 +223,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             min={5}
             max={480}
             value={defaultDuration}
-            onChange={(e) => setDefaultDuration(Number(e.target.value))}
+            onChange={(e) => { setDefaultDuration(Number(e.target.value)); onDirtyChange?.(true) }}
             onBlur={handleDurationBlur}
           />
         </div>
@@ -222,7 +235,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             min={5}
             max={defaultDuration}
             value={minDuration}
-            onChange={(e) => setMinDuration(Number(e.target.value))}
+            onChange={(e) => { setMinDuration(Number(e.target.value)); onDirtyChange?.(true) }}
           />
         </div>
       </div>
@@ -235,7 +248,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             <button
               key={ft}
               type="button"
-              onClick={() => setFrequencyType(ft)}
+              onClick={() => { setFrequencyType(ft); onDirtyChange?.(true) }}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 frequencyType === ft
                   ? "bg-primary text-primary-foreground"
@@ -279,7 +292,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             id="habit-start"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => { setStartDate(e.target.value); onDirtyChange?.(true) }}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -288,7 +301,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading }: HabitFormP
             id="habit-end"
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => { setEndDate(e.target.value); onDirtyChange?.(true) }}
           />
         </div>
       </div>
