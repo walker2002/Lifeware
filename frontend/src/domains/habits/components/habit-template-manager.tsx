@@ -27,7 +27,14 @@ import {
 } from "@/app/actions/intent"
 import type { HabitTemplate, Habit } from "@/usom/types/objects"
 
-export function HabitTemplateManager() {
+interface HabitTemplateManagerProps {
+  /** 通知父组件表单已修改 */
+  onDirtyChange?: (dirty: boolean) => void
+  /** 提交失败时通知父组件 */
+  onSubmitError?: (error: { type: string; message: string; fields?: Record<string, string> }) => void
+}
+
+export function HabitTemplateManager({ onDirtyChange, onSubmitError }: HabitTemplateManagerProps) {
   const [templates, setTemplates] = useState<HabitTemplate[]>([])
   const [habits, setHabits] = useState<Habit[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -61,9 +68,11 @@ export function HabitTemplateManager() {
     applicableDays: number[]
     habits: TemplateHabitEntry[]
   }) => {
+    onDirtyChange?.(true)
     const result = await createTemplate({ name: data.name, applicableDays: data.applicableDays })
     if (!result.success || !result.template) {
       setError(result.error ?? "创建模板失败")
+      onSubmitError?.({ type: "validation", message: result.error ?? "创建模板失败" })
       return
     }
 
@@ -78,7 +87,8 @@ export function HabitTemplateManager() {
 
     setShowForm(false)
     await refresh()
-  }, [refresh])
+    onDirtyChange?.(false)
+  }, [refresh, onDirtyChange, onSubmitError])
 
   const handleUpdateTemplate = useCallback(async (data: {
     templateId?: string
@@ -87,6 +97,7 @@ export function HabitTemplateManager() {
     habits: TemplateHabitEntry[]
   }) => {
     if (!editingTemplateId) return
+    onDirtyChange?.(true)
 
     // 1. 更新模板基本信息
     const updateResult = await updateTemplate(editingTemplateId, {
@@ -95,6 +106,7 @@ export function HabitTemplateManager() {
     })
     if (!updateResult.success) {
       setError(updateResult.error ?? "更新模板失败")
+      onSubmitError?.({ type: "validation", message: updateResult.error ?? "更新模板失败" })
       return
     }
 
@@ -115,7 +127,8 @@ export function HabitTemplateManager() {
 
     setEditingTemplateId(null)
     await refresh()
-  }, [editingTemplateId, templates, refresh])
+    onDirtyChange?.(false)
+  }, [editingTemplateId, templates, refresh, onDirtyChange, onSubmitError])
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteConfirm) return
@@ -224,7 +237,8 @@ export function HabitTemplateManager() {
               }),
             }}
             onSubmit={handleUpdateTemplate}
-            onCancel={() => setEditingTemplateId(null)}
+            onCancel={() => { setEditingTemplateId(null); onDirtyChange?.(false) }}
+            onDirtyChange={onDirtyChange}
           />
         </div>
       ) : (
@@ -278,7 +292,8 @@ export function HabitTemplateManager() {
             }))}
             habits={habits}
             onSubmit={handleCreateTemplate}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => { setShowForm(false); onDirtyChange?.(false) }}
+            onDirtyChange={onDirtyChange}
           />
         </DialogContent>
       </Dialog>
