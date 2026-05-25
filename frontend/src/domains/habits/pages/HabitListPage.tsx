@@ -103,7 +103,6 @@ export function HabitListPage() {
 
   // 退出确认对话框
   const [showExitDialog, setShowExitDialog] = useState(false)
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
 
   // 提交状态
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -240,15 +239,23 @@ export function HabitListPage() {
   const handleStatusChange = useCallback(
     async (habitId: string, action: string) => {
       try {
-        // 归档前检查引用（展示信息，不阻塞操作）
+        // HabitCard 发出的 "delete" action → 弹出确认弹窗
+        if (action === "delete") {
+          const habit = habits.find(h => h.id === habitId)
+          if (habit) setDeleteConfirm(habit)
+          return
+        }
+
+        // 归档前检查引用，展示引用信息
         if (action === "archive") {
           const refResult = await checkHabitReferences(habitId)
           if (refResult.success && refResult.references) {
             const { habitLogs, templateHabits, timeboxHabits } = refResult.references
             const total = habitLogs + templateHabits + timeboxHabits
             if (total > 0) {
-              // 有引用数据但不阻塞操作，仅作为信息展示
-              // 实际反馈由操作结果体现
+              setSubmitError(
+                `该习惯有 ${habitLogs} 条打卡记录、${templateHabits} 个模板关联、${timeboxHabits} 个时间盒关联，将归档而非删除。`
+              )
             }
           }
         }
@@ -266,7 +273,7 @@ export function HabitListPage() {
         setSubmitError(message)
       }
     },
-    [loadHabits],
+    [habits, loadHabits],
   )
 
   // ─── 删除操作 ──────────────────────────────────────────────────
