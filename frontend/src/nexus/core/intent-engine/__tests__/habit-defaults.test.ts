@@ -7,18 +7,18 @@ describe('inferHabitDefaults', () => {
     const result = inferHabitDefaults({ defaultTime: '07:00', defaultDuration: 30 })
     expect(result.earliestTime).toBe('06:30')
     expect(result.latestStartTime).toBe('07:30')
-    expect(result.minDuration).toBe(15)
+    expect(result.minDuration).toBe(30)
   })
 
-  it('defaultDuration=60 → minDuration=30', () => {
+  it('defaultDuration=60 → minDuration=60', () => {
     const result = inferHabitDefaults({ defaultTime: '12:00', defaultDuration: 60 })
-    expect(result.minDuration).toBe(30)
+    expect(result.minDuration).toBe(60)
     expect(result.latestStartTime).toBe('12:30')
   })
 
-  it('defaultDuration=15 → minDuration=5 (最低 5 分钟)', () => {
+  it('defaultDuration=15 → minDuration=15', () => {
     const result = inferHabitDefaults({ defaultTime: '07:00', defaultDuration: 15 })
-    expect(result.minDuration).toBe(5)
+    expect(result.minDuration).toBe(15)
   })
 
   it('标题含"午餐"关键词 → trackable=false', () => {

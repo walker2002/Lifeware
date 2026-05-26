@@ -32,7 +32,7 @@ export function inferHabitDefaults(input: InferInput): InferOutput {
 
   const earlyMin = Math.max(0, toMin(defaultTime) - 30)
   const lateMin = toMin(defaultTime) + 30
-  const minDur = Math.max(5, Math.floor((defaultDuration * 0.5) / 5) * 5)
+  const minDur = defaultDuration
   const trackable = title
     ? !NON_TRACKABLE_KEYWORDS.some(kw => title.includes(kw))
     : true

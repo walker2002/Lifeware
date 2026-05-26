@@ -56,8 +56,7 @@ function autoComplete(
   const lateH = Math.floor(lateMin / 60) % 24
   const lateM = lateMin % 60
 
-  // minDuration = floor(defaultDuration * 0.5 / 5) * 5
-  const minDur = Math.max(5, Math.floor((defaultDuration * 0.5) / 5) * 5)
+  const minDur = defaultDuration
 
   return {
     earliestTime: `${String(earlyH).padStart(2, "0")}:${String(earlyM).padStart(2, "0")}`,
