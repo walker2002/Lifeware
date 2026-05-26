@@ -68,6 +68,11 @@ function habitToItem(h: Habit): HabitItem {
   }
 }
 
+interface HabitListPageProps {
+  autoOpenCreate?: boolean
+  initialFields?: Partial<HabitFormFields>
+}
+
 function formFieldsToCreateInput(fields: HabitFormFields): CreateHabitInput {
   return {
     title: fields.title,
@@ -88,7 +93,7 @@ function formFieldsToCreateInput(fields: HabitFormFields): CreateHabitInput {
 
 // ─── 组件 ──────────────────────────────────────────────────────────
 
-export function HabitListPage() {
+export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPageProps) {
   // 核心数据
   const [habits, setHabits] = useState<Habit[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -254,6 +259,8 @@ export function HabitListPage() {
         onStatusChange={handleStatusChange}
         onUpdateHabit={handleUpdateHabit}
         onRefresh={loadHabits}
+        autoOpenCreate={autoOpenCreate}
+        initialFields={initialFields}
       />
 
       {/* 删除确认对话框 */}

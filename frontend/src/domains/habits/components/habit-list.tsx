@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { HabitCard } from "./habit-card"
 import { HabitForm, type HabitFormFields } from "./habit-form"
@@ -40,11 +40,13 @@ interface HabitListProps {
   onStatusChange: (id: string, action: string) => void
   onUpdateHabit: (id: string, fields: HabitFormFields) => Promise<{ success: boolean; error?: string }>
   onRefresh: () => Promise<void>
+  autoOpenCreate?: boolean
+  initialFields?: Partial<HabitFormFields>
 }
 
 type PanelMode = null | "create" | string
 
-export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh }: HabitListProps) {
+export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh, autoOpenCreate, initialFields }: HabitListProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     for (const g of STATUS_GROUPS) {
@@ -56,6 +58,12 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
   const [panelMode, setPanelMode] = useState<PanelMode>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (autoOpenCreate && panelMode === null) {
+      setPanelMode("create")
+    }
+  }, [autoOpenCreate])
 
   const editingHabit = typeof panelMode === "string" && panelMode !== "create"
     ? habits.find((h) => h.id === panelMode) ?? null
@@ -225,7 +233,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
 
           <HabitForm
             key={panelMode}
-            initial={panelMode === "create" ? undefined : editInitial}
+            initial={panelMode === "create" ? initialFields : editInitial}
             onSubmit={panelMode === "create" ? handleCreateSave : handleEditSave}
             onCancel={handlePanelClose}
             isLoading={isSubmitting}
