@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { HabitCard } from "./habit-card"
 import { HabitForm, type HabitFormFields } from "./habit-form"
@@ -61,11 +61,12 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const handleEditSave = async (fields: HabitFormFields) => {
-    if (!editingHabitId) return
+  const handleEditSave = useCallback(async (fields: HabitFormFields) => {
+    const targetId = editingHabitId
+    if (!targetId) return
     setIsSubmitting(true)
     setSubmitError(null)
-    const result = await onUpdateHabit(editingHabitId, fields)
+    const result = await onUpdateHabit(targetId, fields)
     if (result.success) {
       setEditingHabitId(null)
       await onRefresh()
@@ -73,12 +74,12 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
       setSubmitError(result.error ?? "更新失败")
     }
     setIsSubmitting(false)
-  }
+  }, [editingHabitId, onUpdateHabit, onRefresh])
 
-  const handleEditCancel = () => {
+  const handleEditCancel = useCallback(() => {
     setEditingHabitId(null)
     setSubmitError(null)
-  }
+  }, [])
 
   const editInitial: Partial<HabitFormFields> | undefined = editingHabit
     ? {
