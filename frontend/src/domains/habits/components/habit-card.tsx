@@ -114,8 +114,15 @@ export function HabitCard({
   const showStats = streak > 0 || longestStreak > 0 || completionRate7d > 0
 
   return (
-    <Card className={cn("transition-opacity", isSuspended && "opacity-60", isArchived && "opacity-40")}>
-      <CardContent className="flex flex-col gap-3">
+    <Card className={cn("relative overflow-hidden transition-opacity", isSuspended && "opacity-60", isArchived && "opacity-40")}>
+      <CardContent className="relative flex flex-col gap-3">
+        {/* 角标：可追踪=主色调，仅占时=柔和色 */}
+        <div className="absolute -top-6 -right-6 w-7 h-7">
+          <div
+            className={cn("w-full h-full", trackable ? "bg-primary/70" : "bg-muted")}
+            style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%)" }}
+          />
+        </div>
         {/* 顶栏: 标题 + 标记 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
