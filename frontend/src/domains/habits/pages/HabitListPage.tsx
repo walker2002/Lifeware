@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,8 +25,6 @@ import {
 } from "@/app/actions/intent"
 
 // ─── 类型与辅助函数 ────────────────────────────────────────────────
-
-type PageState = "idle" | "dirty" | "submitting"
 
 interface HabitItem {
   id: string
@@ -96,28 +93,11 @@ export function HabitListPage() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // 抽屉状态
-  const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null)
-
-  // 页面级脏状态追踪: idle → dirty → submitting
-  const [pageState, setPageState] = useState<PageState>("idle")
-  const [dirtyLabel, setDirtyLabel] = useState("")
-
-  // 表单错误
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-
-  // 退出确认对话框
-  const [showExitDialog, setShowExitDialog] = useState(false)
-
-  // 提交状态
+  // 提交错误
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 删除确认
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null)
-
-  // 外部触发表单提交（退出保存场景）
-  const [submitTrigger, setSubmitTrigger] = useState(0)
 
   // ─── 数据加载 ──────────────────────────────────────────────────
 
@@ -136,23 +116,19 @@ export function HabitListPage() {
     loadHabits()
   }, [loadHabits])
 
-  // ─── 抽屉操作 ──────────────────────────────────────────────────
+  // ─── 创建/更新处理 ──────────────────────────────────────────────
 
-  const closeDrawer = useCallback(() => {
-    setDrawerMode(null)
-    setPageState("idle")
-    setDirtyLabel("")
-    setFieldErrors({})
-    setSubmitError(null)
-  }, [])
-
-  const openCreateDrawer = useCallback(() => {
-    setDrawerMode("create")
-    setPageState("idle")
-    setDirtyLabel("")
-    setFieldErrors({})
-    setSubmitError(null)
-  }, [])
+  const handleCreate = useCallback(
+    async (fields: HabitFormFields): Promise<{ success: boolean; error?: string }> => {
+      const input = formFieldsToCreateInput(fields)
+      const result = await submitHabitIntent(input)
+      if (result.success) {
+        await loadHabits()
+      }
+      return { success: result.success, error: result.error }
+    },
+    [loadHabits],
+  )
 
   const handleUpdateHabit = useCallback(
     async (id: string, fields: HabitFormFields): Promise<{ success: boolean; error?: string }> => {
@@ -174,48 +150,6 @@ export function HabitListPage() {
       return { success: result.success, error: result.error }
     },
     [],
-  )
-
-  // ─── 脏状态追踪 ────────────────────────────────────────────────
-
-  const handleFormChange = useCallback((isDirty: boolean) => {
-    if (!isDirty) return
-    if (pageState === "idle") {
-      setPageState("dirty")
-      setDirtyLabel("新建习惯")
-    }
-  }, [pageState])
-
-  // ─── 表单提交 ──────────────────────────────────────────────────
-
-  const handleSubmit = useCallback(
-    async (fields: HabitFormFields) => {
-      setIsSubmitting(true)
-      setPageState("submitting")
-      setSubmitError(null)
-      setFieldErrors({})
-
-      try {
-        const input = formFieldsToCreateInput(fields)
-        const result = await submitHabitIntent(input)
-
-        if (!result.success) {
-          setSubmitError(result.error ?? "创建习惯失败")
-          setPageState("dirty")
-          return
-        }
-
-        closeDrawer()
-        await loadHabits()
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "操作失败"
-        setSubmitError(message)
-        setPageState("dirty")
-      } finally {
-        setIsSubmitting(false)
-      }
-    },
-    [closeDrawer, loadHabits],
   )
 
   // ─── 状态变更 ──────────────────────────────────────────────────
@@ -285,45 +219,6 @@ export function HabitListPage() {
     [loadHabits],
   )
 
-  // ─── 取消 / 退出确认 ───────────────────────────────────────────
-
-  const handleCancel = useCallback(() => {
-    if (pageState === "dirty") {
-      setShowExitDialog(true)
-    } else {
-      closeDrawer()
-    }
-  }, [pageState, closeDrawer])
-
-  const handleExitSave = useCallback(() => {
-    setShowExitDialog(false)
-    // 递增触发计数器，HabitForm 内部会通过 submitTrigger 的 useEffect 触发 requestSubmit
-    setSubmitTrigger((n) => n + 1)
-  }, [])
-
-  const handleExitDiscard = useCallback(() => {
-    setShowExitDialog(false)
-    closeDrawer()
-  }, [closeDrawer])
-
-  const handleExitContinue = useCallback(() => {
-    setShowExitDialog(false)
-    // 不做任何操作，留在表单继续编辑
-  }, [])
-
-  // ─── 浏览器关闭防护 ────────────────────────────────────────────
-
-  useEffect(() => {
-    if (pageState === "dirty") {
-      const handler = (e: BeforeUnloadEvent) => {
-        e.preventDefault()
-        e.returnValue = ""
-      }
-      window.addEventListener("beforeunload", handler)
-      return () => window.removeEventListener("beforeunload", handler)
-    }
-  }, [pageState])
-
   // ─── 渲染 ──────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -338,42 +233,7 @@ export function HabitListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 1. 脏状态指示条 */}
-      {pageState !== "idle" && (
-        <div
-          className={`flex items-center justify-between rounded-lg border px-4 py-2 text-sm ${
-            pageState === "dirty"
-              ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-              : "bg-blue-50 border-blue-300 text-blue-800"
-          }`}
-        >
-          <span>
-            {pageState === "dirty"
-              ? `有未保存的修改 — ${dirtyLabel}`
-              : "正在保存..."}
-          </span>
-          {pageState === "dirty" && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-md bg-yellow-200 px-3 py-1 text-xs font-medium hover:bg-yellow-300 transition-colors"
-                onClick={() => setSubmitTrigger((n) => n + 1)}
-              >
-                全部提交
-              </button>
-              <button
-                type="button"
-                className="rounded-md bg-yellow-200 px-3 py-1 text-xs font-medium hover:bg-yellow-300 transition-colors"
-                onClick={handleExitDiscard}
-              >
-                放弃修改
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 2. 错误横幅 */}
+      {/* 错误横幅 */}
       {submitError && (
         <div className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
           <span>{submitError}</span>
@@ -387,67 +247,16 @@ export function HabitListPage() {
         </div>
       )}
 
-      {/* 3. 习惯列表 */}
+      {/* 习惯列表 */}
       <HabitList
         habits={habitItems}
-        onCreate={openCreateDrawer}
+        onCreate={handleCreate}
         onStatusChange={handleStatusChange}
         onUpdateHabit={handleUpdateHabit}
         onRefresh={loadHabits}
       />
 
-      {/* 4. 新建/编辑抽屉 */}
-      <Sheet open={drawerMode === "create"} onOpenChange={(open) => { if (!open) handleCancel() }}>
-        <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>新建习惯</SheetTitle>
-          </SheetHeader>
-          <div className="mt-6">
-            <HabitForm
-              key="create"
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              isLoading={isSubmitting}
-              onDirtyChange={handleFormChange}
-              submitTrigger={submitTrigger}
-            />
-          </div>
-          {Object.keys(fieldErrors).length > 0 && (
-            <div className="mt-4 space-y-1">
-              {Object.entries(fieldErrors).map(([field, msg]) => (
-                <p key={field} className="text-xs text-red-600">
-                  {field}: {msg}
-                </p>
-              ))}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* 5. 退出确认对话框（三选项） */}
-      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>有未保存的修改</AlertDialogTitle>
-            <AlertDialogDescription>
-              {dirtyLabel} 有未提交的修改。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={handleExitSave}>
-              保存并退出
-            </AlertDialogAction>
-            <AlertDialogCancel onClick={handleExitDiscard}>
-              放弃修改
-            </AlertDialogCancel>
-            <AlertDialogCancel onClick={handleExitContinue}>
-              取消，继续编辑
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 6. 删除确认对话框 */}
+      {/* 删除确认对话框 */}
       <AlertDialog
         open={deleteConfirm !== null}
         onOpenChange={(open) => {

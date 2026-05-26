@@ -36,11 +36,13 @@ const STATUS_GROUPS = [
 
 interface HabitListProps {
   habits: HabitItem[]
-  onCreate: () => void
+  onCreate: (fields: HabitFormFields) => Promise<{ success: boolean; error?: string }>
   onStatusChange: (id: string, action: string) => void
   onUpdateHabit: (id: string, fields: HabitFormFields) => Promise<{ success: boolean; error?: string }>
   onRefresh: () => Promise<void>
 }
+
+type PanelMode = null | "create" | string
 
 export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh }: HabitListProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -51,33 +53,47 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
     return init
   })
 
-  const [editingHabitId, setEditingHabitId] = useState<string | null>(null)
+  const [panelMode, setPanelMode] = useState<PanelMode>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const editingHabit = editingHabitId ? habits.find((h) => h.id === editingHabitId) ?? null : null
+  const editingHabit = typeof panelMode === "string" && panelMode !== "create"
+    ? habits.find((h) => h.id === panelMode) ?? null
+    : null
 
   const toggleGroup = (key: string) => {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const handleEditSave = useCallback(async (fields: HabitFormFields) => {
-    const targetId = editingHabitId
-    if (!targetId) return
+  const handleCreateSave = useCallback(async (fields: HabitFormFields) => {
     setIsSubmitting(true)
     setSubmitError(null)
-    const result = await onUpdateHabit(targetId, fields)
+    const result = await onCreate(fields)
     if (result.success) {
-      setEditingHabitId(null)
+      setPanelMode(null)
+      await onRefresh()
+    } else {
+      setSubmitError(result.error ?? "创建失败")
+    }
+    setIsSubmitting(false)
+  }, [onCreate, onRefresh])
+
+  const handleEditSave = useCallback(async (fields: HabitFormFields) => {
+    if (typeof panelMode !== "string" || panelMode === "create") return
+    setIsSubmitting(true)
+    setSubmitError(null)
+    const result = await onUpdateHabit(panelMode, fields)
+    if (result.success) {
+      setPanelMode(null)
       await onRefresh()
     } else {
       setSubmitError(result.error ?? "更新失败")
     }
     setIsSubmitting(false)
-  }, [editingHabitId, onUpdateHabit, onRefresh])
+  }, [panelMode, onUpdateHabit, onRefresh])
 
-  const handleEditCancel = useCallback(() => {
-    setEditingHabitId(null)
+  const handlePanelClose = useCallback(() => {
+    setPanelMode(null)
     setSubmitError(null)
   }, [])
 
@@ -110,7 +126,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-muted-foreground">{habits.length} 个习惯</span>
-          <Button size="sm" onClick={onCreate}>
+          <Button size="sm" onClick={() => setPanelMode("create")}>
             + 新建习惯
           </Button>
         </div>
@@ -166,7 +182,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                           completionRate7d={habit.completionRate7d}
                           status={habit.status}
                           frequencyType={habit.frequencyType}
-                          onEdit={() => setEditingHabitId(habit.id)}
+                          onEdit={() => setPanelMode(habit.id)}
                           onStatusChange={(action) => onStatusChange(habit.id, action)}
                         />
                       ))}
@@ -178,14 +194,16 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         </div>
       </div>
 
-      {/* 右侧：编辑面板 */}
-      {editingHabitId && (
-        <div className="w-[480px] shrink-0 border-l pl-4 overflow-y-auto">
+      {/* 右侧：编辑/创建面板 */}
+      {panelMode && (
+        <div className="w-[480px] shrink-0 border-l px-4 overflow-y-auto">
           <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
-            <h3 className="text-sm font-medium">编辑习惯</h3>
+            <h3 className="text-sm font-medium">
+              {panelMode === "create" ? "新建习惯" : "编辑习惯"}
+            </h3>
             <button
               type="button"
-              onClick={handleEditCancel}
+              onClick={handlePanelClose}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="size-4" />
@@ -206,10 +224,10 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
           )}
 
           <HabitForm
-            key={editingHabitId}
-            initial={editInitial}
-            onSubmit={handleEditSave}
-            onCancel={handleEditCancel}
+            key={panelMode}
+            initial={panelMode === "create" ? undefined : editInitial}
+            onSubmit={panelMode === "create" ? handleCreateSave : handleEditSave}
+            onCancel={handlePanelClose}
             isLoading={isSubmitting}
           />
         </div>
