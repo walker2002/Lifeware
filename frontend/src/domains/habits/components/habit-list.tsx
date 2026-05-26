@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { HabitCard } from "./habit-card"
+import { HabitForm, type HabitFormFields } from "./habit-form"
+import { ChevronDown, ChevronRight, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface HabitItem {
@@ -20,171 +22,195 @@ interface HabitItem {
   description?: string
   longestStreak?: number
   completionRate7d?: number
+  startDate: string
+  endDate?: string
+  daysOfWeek?: number[]
 }
 
-type FilterType = "all" | "trackable" | "timeonly"
-type StatusFilter = "all" | "draft" | "active" | "suspended" | "archived"
+const STATUS_GROUPS = [
+  { key: "draft", label: "草稿", defaultOpen: true },
+  { key: "active", label: "活跃", defaultOpen: true },
+  { key: "suspended", label: "暂停", defaultOpen: false },
+  { key: "archived", label: "归档", defaultOpen: false },
+] as const
 
 interface HabitListProps {
-  /** 习惯列表 */
   habits: HabitItem[]
-  /** 新建习惯回调 */
   onCreate: () => void
-  /** 编辑回调 */
-  onEdit: (id: string) => void
-  /** 状态切换回调 */
   onStatusChange: (id: string, action: string) => void
+  onUpdateHabit: (id: string, fields: HabitFormFields) => Promise<{ success: boolean; error?: string }>
+  onRefresh: () => Promise<void>
 }
 
-const filterLabels: { value: FilterType; label: string }[] = [
-  { value: "all", label: "全部" },
-  { value: "trackable", label: "可追踪" },
-  { value: "timeonly", label: "仅占时" },
-]
-
-const statusLabels: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "全部" },
-  { value: "draft", label: "草稿" },
-  { value: "active", label: "活跃" },
-  { value: "suspended", label: "暂停" },
-  { value: "archived", label: "归档" },
-]
-
-export function HabitList({ habits, onCreate, onEdit, onStatusChange }: HabitListProps) {
-  const [typeFilter, setTypeFilter] = useState<FilterType>("all")
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-
-  // 组合筛选：取交集
-  const filtered = habits.filter((h) => {
-    // 类型筛选
-    if (typeFilter === "trackable" && !h.trackable) return false
-    if (typeFilter === "timeonly" && h.trackable) return false
-    // 状态筛选
-    if (statusFilter !== "all" && h.status !== statusFilter) return false
-    return true
+export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh }: HabitListProps) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    for (const g of STATUS_GROUPS) {
+      init[g.key] = !g.defaultOpen
+    }
+    return init
   })
 
-  // 按 trackable 分组，每组内按 defaultTime 排序
-  const trackableGroup = filtered
-    .filter((h) => h.trackable)
-    .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime))
+  const [editingHabitId, setEditingHabitId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const timeOnlyGroup = filtered
-    .filter((h) => !h.trackable)
-    .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime))
+  const editingHabit = editingHabitId ? habits.find((h) => h.id === editingHabitId) ?? null : null
 
-  const activeCount = habits.filter((h) => h.status === "active" || h.status === "draft").length
+  const toggleGroup = (key: string) => {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleEditSave = async (fields: HabitFormFields) => {
+    if (!editingHabitId) return
+    setIsSubmitting(true)
+    setSubmitError(null)
+    const result = await onUpdateHabit(editingHabitId, fields)
+    if (result.success) {
+      setEditingHabitId(null)
+      await onRefresh()
+    } else {
+      setSubmitError(result.error ?? "更新失败")
+    }
+    setIsSubmitting(false)
+  }
+
+  const handleEditCancel = () => {
+    setEditingHabitId(null)
+    setSubmitError(null)
+  }
+
+  const editInitial: Partial<HabitFormFields> | undefined = editingHabit
+    ? {
+        title: editingHabit.title,
+        description: editingHabit.description,
+        defaultTime: editingHabit.defaultTime,
+        earliestTime: editingHabit.earliestTime,
+        latestStartTime: editingHabit.latestStartTime,
+        defaultDuration: editingHabit.defaultDuration,
+        minDuration: editingHabit.minDuration,
+        trackable: editingHabit.trackable,
+        frequencyType: (editingHabit.frequencyType as "daily" | "weekly" | "custom") ?? "daily",
+        daysOfWeek: editingHabit.daysOfWeek,
+        startDate: editingHabit.startDate,
+        endDate: editingHabit.endDate,
+      }
+    : undefined
 
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-200px)]">
-      {/* 顶部操作栏 */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {activeCount} 个习惯
-        </span>
-        <Button size="sm" onClick={onCreate}>
-          + 新建习惯
-        </Button>
-      </div>
-
-      {/* 类型筛选标签 */}
-      <div className="flex items-center gap-1">
-        {filterLabels.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setTypeFilter(f.value)}
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              typeFilter === f.value
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 状态筛选标签 */}
-      <div className="flex items-center gap-1">
-        {statusLabels.map((s) => (
-          <button
-            key={s.value}
-            onClick={() => setStatusFilter(s.value)}
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              statusFilter === s.value
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 习惯卡片列表（分组渲染） */}
-      {filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          {habits.length === 0
-            ? "还没有习惯，点击「新建习惯」开始"
-            : "当前筛选条件下没有习惯"}
+    <div className="flex gap-0 overflow-y-auto max-h-[calc(100vh-200px)]">
+      {/* 左侧：卡片列表 */}
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          editingHabitId ? "flex-1 min-w-0" : "w-full",
+        )}
+      >
+        {/* 顶部操作栏 */}
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm text-muted-foreground">{habits.length} 个习惯</span>
+          <Button size="sm" onClick={onCreate}>
+            + 新建习惯
+          </Button>
         </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {/* 可追踪分组 */}
-          {trackableGroup.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              <h3 className="text-sm font-medium text-muted-foreground col-span-full">可追踪</h3>
-              {trackableGroup.map((habit) => (
-                <HabitCard
-                  key={habit.id}
-                  title={habit.title}
-                  trackable={habit.trackable}
-                  defaultTime={habit.defaultTime}
-                  earliestTime={habit.earliestTime}
-                  latestStartTime={habit.latestStartTime}
-                  defaultDuration={habit.defaultDuration}
-                  minDuration={habit.minDuration}
-                  streak={habit.streak}
-                  description={habit.description}
-                  longestStreak={habit.longestStreak}
-                  completionRate7d={habit.completionRate7d}
-                  status={habit.status}
-                  frequencyType={habit.frequencyType}
-                  onEdit={() => onEdit(habit.id)}
-                  onStatusChange={(action) => onStatusChange(habit.id, action)}
-                />
-              ))}
+
+        {/* 状态分组 */}
+        <div className="flex flex-col gap-4">
+          {STATUS_GROUPS.map((group) => {
+            const groupHabits = habits
+              .filter((h) => h.status === group.key)
+              .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime))
+            const isCollapsed = collapsed[group.key]
+
+            return (
+              <div key={group.key}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className="flex items-center gap-1.5 mb-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="size-4" />
+                  ) : (
+                    <ChevronDown className="size-4" />
+                  )}
+                  {group.label} ({groupHabits.length})
+                </button>
+
+                {!isCollapsed &&
+                  (groupHabits.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 pl-6">暂无习惯</p>
+                  ) : (
+                    <div
+                      className={cn(
+                        "grid gap-3 pl-6 transition-all",
+                        editingHabitId
+                          ? "grid-cols-1 sm:grid-cols-2"
+                          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+                      )}
+                    >
+                      {groupHabits.map((habit) => (
+                        <HabitCard
+                          key={habit.id}
+                          title={habit.title}
+                          trackable={habit.trackable}
+                          defaultTime={habit.defaultTime}
+                          earliestTime={habit.earliestTime}
+                          latestStartTime={habit.latestStartTime}
+                          defaultDuration={habit.defaultDuration}
+                          minDuration={habit.minDuration}
+                          streak={habit.streak}
+                          description={habit.description}
+                          longestStreak={habit.longestStreak}
+                          completionRate7d={habit.completionRate7d}
+                          status={habit.status}
+                          frequencyType={habit.frequencyType}
+                          onEdit={() => setEditingHabitId(habit.id)}
+                          onStatusChange={(action) => onStatusChange(habit.id, action)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 右侧：编辑面板 */}
+      {editingHabitId && (
+        <div className="w-[480px] shrink-0 border-l pl-4 overflow-y-auto">
+          <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
+            <h3 className="text-sm font-medium">编辑习惯</h3>
+            <button
+              type="button"
+              onClick={handleEditCancel}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {submitError && (
+            <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+              {submitError}
+              <button
+                type="button"
+                className="ml-2 underline"
+                onClick={() => setSubmitError(null)}
+              >
+                关闭
+              </button>
             </div>
           )}
 
-          {/* 仅占时分组 */}
-          {timeOnlyGroup.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              <h3 className="text-sm font-medium text-muted-foreground col-span-full">仅占时</h3>
-              {timeOnlyGroup.map((habit) => (
-                <HabitCard
-                  key={habit.id}
-                  title={habit.title}
-                  trackable={habit.trackable}
-                  defaultTime={habit.defaultTime}
-                  earliestTime={habit.earliestTime}
-                  latestStartTime={habit.latestStartTime}
-                  defaultDuration={habit.defaultDuration}
-                  minDuration={habit.minDuration}
-                  streak={habit.streak}
-                  description={habit.description}
-                  longestStreak={habit.longestStreak}
-                  completionRate7d={habit.completionRate7d}
-                  status={habit.status}
-                  frequencyType={habit.frequencyType}
-                  onEdit={() => onEdit(habit.id)}
-                  onStatusChange={(action) => onStatusChange(habit.id, action)}
-                />
-              ))}
-            </div>
-          )}
+          <HabitForm
+            key={editingHabitId}
+            initial={editInitial}
+            onSubmit={handleEditSave}
+            onCancel={handleEditCancel}
+            isLoading={isSubmitting}
+          />
         </div>
       )}
     </div>

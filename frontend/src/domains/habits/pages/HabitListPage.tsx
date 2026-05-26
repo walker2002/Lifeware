@@ -44,6 +44,9 @@ interface HabitItem {
   description?: string
   longestStreak?: number
   completionRate7d?: number
+  startDate: string
+  endDate?: string
+  daysOfWeek?: number[]
 }
 
 function habitToItem(h: Habit): HabitItem {
@@ -62,6 +65,9 @@ function habitToItem(h: Habit): HabitItem {
     description: h.description,
     longestStreak: h.longestStreak,
     completionRate7d: h.completionRate7d,
+    startDate: h.startDate,
+    endDate: h.endDate,
+    daysOfWeek: h.frequency.daysOfWeek,
   }
 }
 
@@ -92,7 +98,6 @@ export function HabitListPage() {
 
   // 抽屉状态
   const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null)
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
 
   // 页面级脏状态追踪: idle → dirty → submitting
   const [pageState, setPageState] = useState<PageState>("idle")
@@ -135,7 +140,6 @@ export function HabitListPage() {
 
   const closeDrawer = useCallback(() => {
     setDrawerMode(null)
-    setEditingHabit(null)
     setPageState("idle")
     setDirtyLabel("")
     setFieldErrors({})
@@ -144,26 +148,32 @@ export function HabitListPage() {
 
   const openCreateDrawer = useCallback(() => {
     setDrawerMode("create")
-    setEditingHabit(null)
     setPageState("idle")
     setDirtyLabel("")
     setFieldErrors({})
     setSubmitError(null)
   }, [])
 
-  const openEditDrawer = useCallback(
-    (habitId: string) => {
-      const habit = habits.find((h) => h.id === habitId)
-      if (!habit) return
-
-      setEditingHabit(habit)
-      setDrawerMode("edit")
-      setPageState("idle")
-      setDirtyLabel("")
-      setFieldErrors({})
-      setSubmitError(null)
+  const handleUpdateHabit = useCallback(
+    async (id: string, fields: HabitFormFields): Promise<{ success: boolean; error?: string }> => {
+      const input: UpdateHabitInput = {
+        title: fields.title,
+        description: fields.description,
+        defaultTime: fields.defaultTime,
+        earliestTime: fields.earliestTime,
+        latestStartTime: fields.latestStartTime,
+        defaultDuration: fields.defaultDuration,
+        minDuration: fields.minDuration,
+        trackable: fields.trackable,
+        frequencyType: fields.frequencyType,
+        daysOfWeek: fields.daysOfWeek,
+        startDate: fields.startDate,
+        endDate: fields.endDate,
+      }
+      const result = await updateHabit(id, input)
+      return { success: result.success, error: result.error }
     },
-    [habits],
+    [],
   )
 
   // ─── 脏状态追踪 ────────────────────────────────────────────────
@@ -172,9 +182,9 @@ export function HabitListPage() {
     if (!isDirty) return
     if (pageState === "idle") {
       setPageState("dirty")
-      setDirtyLabel(editingHabit?.title ?? "新建习惯")
+      setDirtyLabel("新建习惯")
     }
-  }, [pageState, editingHabit])
+  }, [pageState])
 
   // ─── 表单提交 ──────────────────────────────────────────────────
 
@@ -186,42 +196,15 @@ export function HabitListPage() {
       setFieldErrors({})
 
       try {
-        if (drawerMode === "create") {
-          const input = formFieldsToCreateInput(fields)
-          const result = await submitHabitIntent(input)
+        const input = formFieldsToCreateInput(fields)
+        const result = await submitHabitIntent(input)
 
-          if (!result.success) {
-            setSubmitError(result.error ?? "创建习惯失败")
-            setPageState("dirty")
-            return
-          }
-        } else if (drawerMode === "edit" && editingHabit) {
-          const input: UpdateHabitInput = {
-            title: fields.title,
-            description: fields.description,
-            defaultTime: fields.defaultTime,
-            earliestTime: fields.earliestTime,
-            latestStartTime: fields.latestStartTime,
-            defaultDuration: fields.defaultDuration,
-            minDuration: fields.minDuration,
-            trackable: fields.trackable,
-            frequencyType: fields.frequencyType,
-            daysOfWeek: fields.daysOfWeek,
-            startDate: fields.startDate,
-            endDate: fields.endDate,
-          }
-          const result = await updateHabit(editingHabit.id, input)
-          // NOTE: 编辑暂用 updateHabit 直接操作 Repository，
-          // 后续 TODO: 完整 Nexus 链支持编辑场景
-
-          if (!result.success) {
-            setSubmitError(result.error ?? "更新习惯失败")
-            setPageState("dirty")
-            return
-          }
+        if (!result.success) {
+          setSubmitError(result.error ?? "创建习惯失败")
+          setPageState("dirty")
+          return
         }
 
-        // 提交成功：关闭抽屉，刷新数据
         closeDrawer()
         await loadHabits()
       } catch (err) {
@@ -232,7 +215,7 @@ export function HabitListPage() {
         setIsSubmitting(false)
       }
     },
-    [drawerMode, editingHabit, closeDrawer, loadHabits],
+    [closeDrawer, loadHabits],
   )
 
   // ─── 状态变更 ──────────────────────────────────────────────────
@@ -312,15 +295,6 @@ export function HabitListPage() {
     }
   }, [pageState, closeDrawer])
 
-  const handleSheetOpenChange = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        handleCancel()
-      }
-    },
-    [handleCancel],
-  )
-
   const handleExitSave = useCallback(() => {
     setShowExitDialog(false)
     // 递增触发计数器，HabitForm 内部会通过 submitTrigger 的 useEffect 触发 requestSubmit
@@ -361,23 +335,6 @@ export function HabitListPage() {
   }
 
   const habitItems: HabitItem[] = habits.map(habitToItem)
-
-  const editInitial = editingHabit
-    ? {
-        title: editingHabit.title,
-        description: editingHabit.description,
-        defaultTime: editingHabit.defaultTime,
-        earliestTime: editingHabit.earliestTime,
-        latestStartTime: editingHabit.latestStartTime,
-        defaultDuration: editingHabit.defaultDuration,
-        minDuration: editingHabit.minDuration,
-        trackable: editingHabit.trackable,
-        frequencyType: editingHabit.frequency.type,
-        daysOfWeek: editingHabit.frequency.daysOfWeek,
-        startDate: editingHabit.startDate,
-        endDate: editingHabit.endDate,
-      }
-    : undefined
 
   return (
     <div className="flex flex-col gap-4">
@@ -434,22 +391,20 @@ export function HabitListPage() {
       <HabitList
         habits={habitItems}
         onCreate={openCreateDrawer}
-        onEdit={openEditDrawer}
         onStatusChange={handleStatusChange}
+        onUpdateHabit={handleUpdateHabit}
+        onRefresh={loadHabits}
       />
 
       {/* 4. 新建/编辑抽屉 */}
-      <Sheet open={drawerMode !== null} onOpenChange={handleSheetOpenChange}>
+      <Sheet open={drawerMode === "create"} onOpenChange={(open) => { if (!open) handleCancel() }}>
         <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>
-              {drawerMode === "create" ? "新建习惯" : "编辑习惯"}
-            </SheetTitle>
+            <SheetTitle>新建习惯</SheetTitle>
           </SheetHeader>
           <div className="mt-6">
             <HabitForm
-              key={drawerMode === "edit" ? editingHabit?.id : "create"}
-              initial={editInitial}
+              key="create"
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isLoading={isSubmitting}
@@ -457,7 +412,6 @@ export function HabitListPage() {
               submitTrigger={submitTrigger}
             />
           </div>
-          {/* 字段级错误（TODO: 服务端字段验证通过 server action 返回后写入 fieldErrors） */}
           {Object.keys(fieldErrors).length > 0 && (
             <div className="mt-4 space-y-1">
               {Object.entries(fieldErrors).map(([field, msg]) => (
