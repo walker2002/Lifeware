@@ -1,40 +1,20 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.6.0 → 1.7.0
-  Rationale: MINOR — Query Path introduced as third routing path
-  alongside Contract Path and Generative Path. Adds query_actions
-  manifest block, onQuery Handler hook, Query Session lifecycle,
-  and read-only query execution path. No existing principles are
-  removed or redefined.
-
-  Modified principles:
-    - Principle I (Intent-Driven) → Phase A routing now produces
-      three path types: contract, generative, query. Query intents
-      are identified by query_actions manifest match.
-    - Principle VI (Domain Plugin) → Handler gains optional onQuery
-      hook for complex analysis queries; query_actions added as
-      manifest declaration block; Shortcut Path permits Orchestrator
-      to assemble read-only CN-UI without Handler involvement
-    - Principle VIII (AI/Rule Boundary) → Query Path explicitly
-      bypasses Rule Engine and State Machine — read-only queries
-      have no state mutation to validate or execute
-
-  Added sections:
-    - Architecture Constraints > Query Path Constraints (new)
-      Six constraints covering read-only invariant, forced
-      multi_turn, Shortcut vs Handler path split, session context
-      injection, Orchestrator CN-UI assembly permission, and
-      Memory recording authority.
+  Version change: 1.7.0 → 1.7.1
+  Rationale: PATCH — Clarified view_routes implementation detail:
+  build-time route generation from manifest.url field to maintain
+  Domain independence despite Next.js App Router constraints.
+  No new principles or governance changes.
 
   Modified sections:
-    - Architecture Constraints > Orchestrator Purity (expanded:
-      Query Path routing, Shortcut Path CN-UI assembly for
-      read-only display)
-    - Architecture Constraints > Domain Manifest Self-Description
-      (added query_actions as fourth manifest block)
-    - Architecture Constraints > Domain Registration Process
-      (added query_actions declaration and onQuery hook)
+    - Architecture Constraints > Domain Registration Process (Step 6
+      clarified: view_routes now include url field; routes generated
+      at build time via scripts/generate-routes.ts; app/ routes are
+      auto-generated thin wrappers)
+
+  Modified principles:
+    - None (implementation detail only)
 
   Templates requiring updates:
     - .specify/templates/plan-template.md            ✅ no changes needed
@@ -42,14 +22,8 @@
     - .specify/templates/tasks-template.md             ✅ no changes needed
 
   Follow-up documents requiring updates:
-    - mydocs/core/LW_overall_总体设计_2026_05_02.md    ⚠ pending update
-      (add Query Path as third path, update Orchestrator routing,
-       update Intent Engine routing, add three-path overview)
-    - mydocs/core/LW_domain_注册指南_2026_05_14.md    ⚠ pending update
-      (add query_actions manifest block, add onQuery hook guidance,
-       update Handler interface, add Query Session lifecycle notes)
-    - manifest.md                                     ⚠ pending update
-      (version history entries for constitution, 总体设计, 注册指南)
+    - docs/route-generation-spec.md                   ✅ created
+    - manifest.md                                     ✅ updated (added route-generation-spec)
 -->
 
 # Lifeware Constitution
@@ -290,21 +264,34 @@ Each query action declares `response_mode` (text or cnui), optional
 `single_round` option is permitted (see Architecture Constraints >
 Query Path Constraints).
 
+For Domains with view routes (page navigation), manifests MUST include a
+`view_routes` block declaring page component mappings. Each entry
+includes the `component` path (relative to `src/`) and a `url` field
+declaring the Next.js App Router path. Routes are generated at build
+time by `scripts/generate-routes.ts` from these declarations. This
+build-time generation maintains Domain independence despite Next.js
+App Router's constraint that routes must exist in the `app/` directory
+(see Architecture Constraints > Domain Registration Process for details).
+
 **Rationale**: The dual-track model keeps the proven "four-hook,
 three-prohibition" constraint system intact while providing a clean
 home for generative AI operations. Hooks remain pure constraint
 checks; Handlers own the planning logic. Context Providers solve
 cross-Domain data sharing without violating Domain isolation.
 AI Runtime is infrastructure — Handlers use it, but are not
-controlled by it.
+controlled by it. Build-time route generation from `view_routes.url`
+maintains Domain independence while accommodating Next.js constraints.
 
 **How to apply**: Each domain plugin file MUST implement the four
 hooks for the Reactive Track. Domains with generative needs MUST
 also implement `onGenerate` handler methods and register Context
-Capabilities. Any state-mutating code inside a Domain is a violation
-regardless of track. Adding a new Domain MUST NOT require modifying
-Intent Engine routing logic or State Machine transition rules. Refer
-to `mydocs/core/LW_domain_注册指南_2026_05_14.md` for the complete
+Capabilities. Domains with view routes MUST declare `url` in
+`view_routes` and run `npm run generate:routes` (or `npm run dev` which
+runs it automatically) to generate `app/` route files. Any state-mutating
+code inside a Domain is a violation regardless of track. Adding a new
+Domain MUST NOT require modifying Intent Engine routing logic or State
+Machine transition rules. Refer to
+`mydocs/core/LW_domain_注册指南_2026_05_14.md` for the complete
 step-by-step registration process.
 
 ### VII. Bridge Layer Readiness
@@ -451,16 +438,17 @@ selection, or conversation history management itself.
 
 ### Domain Manifest Self-Description
 
-Domain manifests MUST declare two structured fields enabling Nexus
+Domain manifests MUST declare structured fields enabling Nexus
 components to operate generically without per-Domain hard-coding:
 
 | Field | Consumer | Purpose |
 |---|---|---|
 | `intent_triggers` | Intent Engine (Phase A) | Bounded classification context for routing user input to Domain actions |
 | `lifecycle` | State Machine | Object lifecycle definitions and transition rules for validating state changes |
+| `view_routes` | Build-time route generator | Maps component paths to Next.js App Router URLs for auto-generating `app/` route files |
 
 For Domains with generative capabilities, manifests MAY declare a
-third structured field:
+fourth structured field:
 
 | Field | Consumer | Purpose |
 |---|---|---|
@@ -475,7 +463,7 @@ The `generation_actions` block maps each generative action to:
 - `cnui_surface`: CNUISurface type identifier (when response_mode is cnui)
 - `cache_ttl_minutes`: Cache validity period (optional)
 
-For Domains with query capabilities, manifests MAY declare a fourth
+For Domains with query capabilities, manifests MAY declare a fifth
 structured field:
 
 | Field | Consumer | Purpose |
@@ -494,6 +482,23 @@ This enables Context Engine to assemble `GenerationRequest`,
 Orchestrator to identify generative vs. reactive paths, and AI Runtime
 to determine streaming policy — all without Domain-specific code.
 
+For view routes, the `view_routes` block maps each view action to:
+- `action`: Unique action name within the Domain
+- `component`: Component path (relative to `src/`, e.g., `domains/habits/pages/HabitListPage`)
+- `url`: Next.js App Router path (e.g., `/habits`, `/habits/templates`, `/okrs/:id`)
+- `params`: Optional static parameters to pass to the component
+
+The build-time route generator (`scripts/generate-routes.ts`) reads all
+Domain manifests' `view_routes.url` declarations and generates the
+corresponding `app/` directory route files. Only routes for components
+that actually exist are generated. Generated files include an
+"Auto-generated" header comment and MUST NOT be manually edited.
+
+This enables Domain independence: adding a Domain requires no manual
+edits to the `app/` directory — the build script auto-generates the
+necessary route files from manifest declarations. Deleting a Domain
+and running `npm run generate:routes --clean` removes orphaned routes.
+
 These declarations MUST be structured (not free-form text) to enable
 deterministic processing. Adding a new Domain MUST NOT require
 modifying Nexus components — only registering new manifest declarations.
@@ -503,7 +508,9 @@ Domain-specific lifecycle rules. State Machine is a generic executor;
 Domain manifests are the business knowledge source. The
 `generation_actions` block extends this principle to generative
 operations, keeping Context Engine, Orchestrator, and AI Runtime
-generic.
+generic. Build-time route generation extends this principle to view
+routes, maintaining Domain independence despite Next.js App Router's
+constraint that routes must exist in `app/`.
 
 ### Manifest Runtime Consumption
 
@@ -527,9 +534,16 @@ hardcoded constants in source code.
    names, lifecycle states, field lists) into TypeScript constants.
 
 3. **The manifest is the single source of truth** for its declared
-   blocks (A–F). Any component needing data from a manifest block MUST
-   obtain it through the manifest loading mechanism, not through code
-   that duplicates the same data.
+   blocks (A–F, plus optional G–J). Any component needing data from a
+   manifest block MUST obtain it through the manifest loading mechanism,
+   not through code that duplicates the same data.
+
+4. **Build-time route generation MUST read view_routes from manifests.**
+   The `scripts/generate-routes.ts` script loads all Domain manifests
+   at build time, reads the `view_routes.url` declarations, validates
+   component existence, and generates `app/` route files. This is the
+   authoritative source for route URLs — manual `app/` route files
+   are thin wrappers that MUST NOT diverge from manifest declarations.
 
 **Hardcoding detection — code smells indicating violation**:
 
@@ -541,17 +555,23 @@ hardcoded constants in source code.
   `required_fields`
 - Inline string literals matching manifest values used for comparison
   instead of reading from the loaded manifest
+- Manually created `app/` route files that don't match `view_routes.url`
+  declarations
 
 **Rationale**: When manifest content is hardcoded, changes to the
 manifest have no effect until the code is also updated, defeating the
 purpose of a declarative manifest. Runtime consumption ensures manifest
 changes take effect immediately, keeping Nexus truly generic and
-enabling zero-code Domain configuration updates.
+enabling zero-code Domain configuration updates. Build-time route
+generation ensures `app/` routes stay in sync with `view_routes`
+declarations without manual maintenance.
 
 **How to apply**: Code reviews MUST reject PRs where manifest-derived
 values are duplicated as constants. The Domain registry MUST expose
 manifest data through accessor methods. AI assistants generating Domain
-code MUST generate registry reads, not value copies.
+code MUST generate registry reads, not value copies. Route files
+MUST include "Auto-generated" headers; manual edits to generated
+routes are overwritten on the next `npm run generate:routes`.
 
 ### Context Provider Constraints
 
@@ -709,7 +729,7 @@ by design — queries produce no state mutation.
    - **Shortcut Path** (`response_mode === 'cnui'` and data is
      directly displayable): Orchestrator assembles read-only CN-UI
      Payload from Context Engine data without Handler involvement.
-     Permitted because this is UI packaging, not business logic.
+     Permitted because this is UI assembly, not business logic.
    - **Handler Path** (`response_mode === 'text'` or data needs
      LLM processing): Orchestrator delegates to
      `handler.onQuery(context, aiRuntime)` for AI-powered analysis.
@@ -778,22 +798,62 @@ section codifies the architectural invariants enforced by that process.
 
 1. Declare new USOM object types (if any) in USOM documentation
 2. Write `manifest.yaml` with all six blocks (A–F), plus optional
-   `generation_actions` for generative capabilities and optional
-   `query_actions` for query capabilities
+   `generation_actions` for generative capabilities, optional
+   `query_actions` for query capabilities, and optional `view_routes`
+   for page navigation
 3. Implement four hook functions (Reactive Track, pure functions)
 4. Define Drizzle DB Schema
 5. Implement Repository interface
-6. Implement Domain page components (view_routes)
-7. Register Domain in `domains/registry.ts`
-8. Implement Markdown templates (optional)
-9. (If generative) Implement `onGenerate` handler method and register
-   in `domains/<domain>/handlers/index.ts`
-10. (If generative) Implement Context Providers and register in
+6. Implement Domain page components (in `domains/{domain}/pages/`)
+7. Declare `view_routes` with `url` field in `manifest.yaml`
+8. Run `npm run generate:routes` to auto-generate `app/` route files from
+   manifest declarations
+9. Register Domain in `domains/registry.ts`
+10. Implement Markdown templates (optional)
+11. (If generative) Implement `onGenerate` handler method and register
+    in `domains/<domain>/handlers/index.ts`
+12. (If generative) Implement Context Providers and register in
     Context Registry with capability id, visibility, and Zod schema
-11. (If query-capable) Declare `query_actions` in manifest with
+13. (If query-capable) Declare `query_actions` in manifest with
     action, response_mode, cnui_surface, and context_capabilities
-12. (If query-capable, complex queries only) Implement `onQuery`
+14. (If query-capable, complex queries only) Implement `onQuery`
     handler method and register in `domains/<domain>/handlers/index.ts`
+
+**Build-time route generation (Step 6-8)**:
+
+The `scripts/generate-routes.ts` script handles view route generation:
+- Scans all Domain `manifest.yaml` files for `view_routes` blocks
+- Validates that `url` field is present and properly formatted
+- Validates that the declared `component` file exists
+- Generates `app/{url_path}/page.tsx` files with "Auto-generated" header
+- Skips generation for components that don't exist (warnings only)
+- `--force` flag overwrites existing auto-generated files
+- `--clean` flag removes orphaned routes (Domains deleted but app/
+  files remain)
+
+The generated `app/` route files are thin wrappers:
+```tsx
+// Auto-generated from domains/{domain}/manifest.yaml
+// DO NOT EDIT MANUALLY
+import { ComponentPage } from "@/domains/{domain}/pages/ComponentPage"
+export default function ComponentPagePage() {
+  return <ComponentPage />
+}
+```
+
+package.json integration:
+```json
+{
+  "scripts": {
+    "generate:routes": "npx tsx scripts/generate-routes.ts",
+    "predev": "npm run generate:routes",
+    "prebuild": "npm run generate:routes"
+  }
+}
+```
+
+This ensures routes are regenerated on every dev server start and
+production build, keeping `app/` in sync with manifest declarations.
 
 **Nexus inviolability**: If completing any step requires modifying Nexus
 core components (Intent Engine, Context Engine, Rule Engine, State
@@ -816,15 +876,17 @@ Page components MUST NOT:
 - Bypass Repository interface for data access
 
 **Manifest completeness**: Every registered Domain MUST have a
-`manifest.yaml` containing all six blocks. Incomplete manifests
+`manifest.yaml` containing all six blocks (A–F). Incomplete manifests
 (block C–F omitted) are a registration violation and MUST be resolved
 before the Domain is considered production-ready.
 
 **Rationale**: The registration process ensures every Domain is
 self-contained, fully declared, and operates within Nexus boundaries
-without requiring Nexus modifications. This is the operational
-foundation for Domain Plugin Passivity (VI) and the Single-Writer
-Invariant (III).
+without requiring Nexus modifications. Build-time route generation
+from `view_routes.url` maintains Domain independence despite Next.js
+App Router's constraint that routes must exist in the `app/` directory.
+This is the operational foundation for Domain Plugin Passivity (VI) and
+the Single-Writer Invariant (III).
 
 **How to apply**: Before implementing any new Domain, read the
 Registration Guide in full. Verify each step's checklist before
@@ -898,9 +960,10 @@ expertise. Claude MUST NOT modify them unless the user issues an
 explicit instruction referencing a specific discussion outcome.
 
 **Tier 2 documents** (`docs/`): Implementation-level design that MUST
-stay in sync with code (`usom-design.md`, `database-design.md`). The
-user describes intent ("add a HabitLog object"); Claude updates the
-document, schema code, and cross-references in one atomic change.
+stay in sync with code (`usom-design.md`, `database-design.md`,
+`route-generation-spec.md`). The user describes intent ("add a
+HabitLog object"); Claude updates the document, schema code, and
+cross-references in one atomic change.
 
 **Tier 3 documents**: `manifest.md` (version tracking), `CLAUDE.md`
 (developer guidance), this constitution, and `specs/` (speckit
@@ -943,6 +1006,8 @@ mydocs/core/总体设计             (overall design constraints — Tier 1)
     ↓
 mydocs/core/Domain注册指南       (Domain development process — Tier 1)
     ↓
+docs/route-generation-spec.md    (route generation implementation — Tier 2)
+    ↓
 docs/usom-design.md             (object model definitions — Tier 2)
     ↓
 docs/database-design.md         (physical schema — Tier 2)
@@ -953,6 +1018,10 @@ Drizzle Schema Code             (implementation)
 The Domain Registration Guide (`mydocs/core/LW_domain_注册指南_*`)
 is a Tier 1 document and required reading for all Domain development.
 It provides the concrete step-by-step process that operationalizes the
-architectural invariants defined in this constitution.
+architectural invariants defined in this constitution. The Route
+Generation Spec (`docs/route-generation-spec.md`) is a Tier 2
+document that specifies the build-time route generation mechanism
+detailing how `view_routes.url` declarations become Next.js App Router
+files.
 
-**Version**: 1.7.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-23
+**Version**: 1.7.1 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-26

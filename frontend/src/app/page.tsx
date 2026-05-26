@@ -344,8 +344,18 @@ export default function Home() {
       timestamp: new Date().toISOString(),
     }
     setConversationMessages(prev => [...prev, userMsg])
-    if (attachments && attachments.length > 0) {
-      console.log('[conversation] 附件:', attachments.map(f => f.name))
+
+    // 快捷命令拦截 — view_route 动作不走 AI 管道，直接切换视图
+    const shortcut = await resolveShortcut(content)
+    if (shortcut) {
+      setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
+      const navMsg: ChatMessage = {
+        role: 'assistant',
+        content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
+        timestamp: new Date().toISOString(),
+      }
+      setConversationMessages(prev => [...prev, navMsg])
+      return
     }
 
     setIsLoading(true)

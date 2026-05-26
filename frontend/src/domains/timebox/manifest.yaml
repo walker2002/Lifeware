@@ -208,8 +208,12 @@ subscribed_events:
 view_routes:
   createTimebox:
     component: domains/timebox/pages/TimeboxFormPage
+    url: /timeboxes/new
     params:
       mode: create
+  view_schedule:
+    component: domains/timebox/pages/SchedulePage
+    url: /schedule
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:

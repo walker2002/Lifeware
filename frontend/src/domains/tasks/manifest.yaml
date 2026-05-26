@@ -250,9 +250,12 @@ subscribed_events:
 view_routes:
   createTask:
     component: domains/tasks/pages/TaskFormPage
+    url: /tasks/new
     params:
       mode: create
   createProject:
     component: domains/tasks/pages/ProjectFormPage
+    url: /projects/new
     params:
       mode: create
+  # view_list: 手动维护在 app/projects/page.tsx（服务器组件，含数据获取）

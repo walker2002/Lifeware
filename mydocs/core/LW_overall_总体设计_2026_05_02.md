@@ -1193,7 +1193,40 @@ DomainPlugin {
 
 ---
 
-## 4.4 当前 Domain 及扩展路径
+## 4.4 Domain 独立性保证：构建时路由生成
+
+Domain 插件化的核心承诺是：新增或删除 Domain 时，不需要修改框架层代码。但 Next.js App Router 的约束（路由必须存在于 `app/` 目录）与 Domain 独立性产生了冲突。
+
+**解决方案**：构建时路由生成机制。
+
+### 工作原理
+
+1. **声明式路由**：Domain 在 `manifest.yaml` 中声明 `view_routes` 区块，每个 view action 包含：
+   - `component`：组件路径（相对于 `src/`）
+   - `url`：Next.js App Router 路径（如 `/habits`、`/habits/[id]`）
+   - `params`：可选的静态参数
+
+2. **自动生成**：`scripts/generate-routes.ts` 脚本：
+   - 扫描所有 Domain 的 `manifest.yaml`
+   - 读取 `view_routes.url` 声明
+   - 验证组件文件存在
+   - 生成 `app/{url_path}/page.tsx` 薄壳路由文件
+
+3. **构建集成**：package.json 中的 `predev` 和 `prebuild` hooks 确保每次开发或构建时自动重新生成路由
+
+### Domain 独立性保证
+
+| 操作 | 旧方式（手动） | 新方式（自动生成） |
+|---|---|---|
+| 新增 Domain | 手动创建 `app/` 路由文件 | 在 manifest 中声明 `url`，运行生成脚本 |
+| 删除 Domain | 手动删除 `app/` 路由文件 | 删除 Domain 目录，运行 `--clean` 清理 |
+| 修改路由 URL | 手动编辑 `app/` 路由文件 | 修改 manifest `url`，重新生成 |
+
+这种方式保持了 Domain 的完全独立性：`app/` 目录仅作为自动生成的薄壳层，Domain 拥有完整的路由控制权。
+
+---
+
+## 4.5 当前 Domain 及扩展路径
 
 | 阶段 | Domain |
 |---|---|

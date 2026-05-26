@@ -35,8 +35,9 @@ LW_methodology_冲突仲裁矩阵_2026_04_06.md       # 方法论原则冲突仲
 
 ```
 docs/
-usom-design.md         # USOM 对象定义文档（由 LW_USOM_详细设计 演化）
-database-design.md     # 数据库表结构与设计规范（由 LW_database_数据库设计 演化）
+usom-design.md           # USOM 对象定义文档（由 LW_USOM_详细设计 演化）
+database-design.md       # 数据库表结构与设计规范（由 LW_database_数据库设计 演化）
+route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app/ 路由文件）
 ```
 
 ### 第三层：Claude 自动维护
@@ -91,4 +92,8 @@ database-design.md     # 数据库表结构与设计规范（由 LW_database_数
 | 总体设计 | 2026_05_22 | 2026_05_02 | Nexus 基础设施层新增 AI Runtime 组件；Orchestrator Generative Path 描述更新（AI Runtime 依赖注入模型） |
 | 项目宪章 | 2026_05_23 | 2026_05_22 | v1.6.0→v1.7.0：Query Path 三路径路由；Principle I 路由输出从 (domain, action) 扩展为 (domain, action, pathType)；Principle VI Handler 新增 onQuery hook + query_actions manifest block；Principle VIII Query Path 绕过 Rule Engine 显式例外；新增 Query Path Constraints（6项）；扩展 Orchestrator Purity（Shortcut Path CN-UI 组装）、Domain Manifest Self-Description（query_actions 第四 manifest block）、Domain Registration Process（Step 11–12） |
 | 总体设计 | 2026_05_23 | 2026_05_22 | 新增 Query Path 执行链（第三条路径）；Orchestrator 三路径识别（Reactive/Generative/Query）；Intent Engine 阶段 A 路由输出新增 pathType；AI 意图驱动形式标注路径对应关系 |
+| 总体设计 | 2026_05_26 | 2026_05_23 | 新增 Domain 独立性保证章节（4.4 构建时路由生成机制）：说明构建时路由生成方案如何保持 Domain 完全独立性；自动生成 app/ 路由文件的原理和流程 |
 | Domain 注册指南 | 2026_05_23 | 2026_05_22 | 新增 Step 11（query_actions manifest 声明）、Step 12（onQuery Handler 方法）；manifest 模板新增区块 G（query_actions）；新增 query_actions 与 view_route 边界区分；新增 onQuery 与 onGenerate 对比表；完成检查清单新增 Query Actions 和 onQuery Handler 项；新增 6 条错误模式 |
+| Domain 注册指南 | 2026_05_26 | 2026_05_23 | 新增构建时路由生成流程说明：manifest.view_routes 新增 url 字段规范；scripts/generate-routes.ts 工作原理；package.json 集成（predev/prebuild hooks）；废弃手动创建 app/ 路由方式；更新 Next.js 路由注册章节和检查清单 |
+| 项目宪章 | 2026_05_26 | 2026_05_23 | v1.7.0→v1.7.1：PATCH 修订 — 阐明 view_routes 实现细节：build-time route generation from manifest.url 字段 to maintain Domain independence despite Next.js App Router constraints；更新 Domain Registration Process section (Step 6-8)；扩展 Manifest Self-Description with view_routes.url field；添加 build-time route generation constraint |
+| Domain 路由生成规范 | 2026_05_26 | 无 | 创建。定义构建时路由生成方案（方案 B），实现 Domain 完全独立性；规范 manifest.yaml 的 view_routes.url 字段；定义生成脚本行为和 package.json 集成；明确 Domain 新增/删除/修改流程 |
