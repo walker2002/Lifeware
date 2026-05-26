@@ -120,7 +120,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
       <div
         className={cn(
           "transition-all duration-300 ease-in-out",
-          editingHabitId ? "flex-1 min-w-0" : "w-full",
+          panelMode ? "flex-1 min-w-0" : "w-full",
         )}
       >
         {/* 顶部操作栏 */}
@@ -161,7 +161,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                     <div
                       className={cn(
                         "grid gap-3 pl-6 transition-all",
-                        editingHabitId
+                        panelMode
                           ? "grid-cols-1 sm:grid-cols-2"
                           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
                       )}
