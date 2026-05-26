@@ -72,11 +72,11 @@ const HABIT_SYSTEM_PROMPT = (now: Date) => `
   "action": "createHabit",
   "fields": {
     "title": "string",
-    "defaultTime": "HH:MM（24小时制）",
-    "defaultDuration": number（分钟）,
-    "trackable": boolean,
-    "frequencyType": "daily" | "weekly" | "custom",
-    "daysOfWeek": number[]（0=日，6=六，可选，weekly/custom 时必填）
+    "defaultTime": "HH:MM（24小时制，如 22:00、07:30）",
+    "defaultDuration": "整数分钟数（如 30、60、90）",
+    "trackable": "boolean",
+    "frequencyType": "daily | weekly | custom",
+    "daysOfWeek": "number[]（0=日，6=六，可选，weekly/custom 时必填）"
   },
   "confidence": 0-1
 }
@@ -87,7 +87,7 @@ const HABIT_SYSTEM_PROMPT = (now: Date) => `
   "action": "createTemplate",
   "fields": {
     "name": "string（模板名称）",
-    "applicableDays": number[]（适用星期）
+    "applicableDays": "number[]（适用星期）"
   },
   "confidence": 0-1
 }
@@ -115,8 +115,15 @@ const HABIT_SYSTEM_PROMPT = (now: Date) => `
   "confidence": 0-1
 }
 
+格式规则（严格遵守）：
+- defaultTime 必须是 "HH:MM" 格式的24小时制字符串
+- defaultDuration 必须是整数分钟数
+- 时长转换：半小时/30分钟 → 30，1小时 → 60，1个半小时/90分钟 → 90，2小时 → 120
+- 时间转换：晚上10点 → "22:00"，下午3点半 → "15:30"，上午9点 → "09:00"，中午12点 → "12:00"，凌晨2点 → "02:00"
+
 推断规则：
-- "每天早上7点运动30分钟" → createHabit, title="运动", defaultTime="07:00", defaultDuration=30, trackable=true, frequencyType="daily"
+- "添加一个晚上读书的习惯，晚上22:00开始，半小时" → createHabit, title="读书", defaultTime="22:00", defaultDuration=30, trackable=true, frequencyType="daily"
+- "每天早上7点运动1小时" → createHabit, title="运动", defaultTime="07:00", defaultDuration=60, trackable=true, frequencyType="daily"
 - "午餐12点，1小时" → createHabit, title="午餐", defaultTime="12:00", defaultDuration=60, trackable=false（用餐关键词）, frequencyType="daily"
 - "工作日晚上10点复盘15分钟" → createHabit, title="复盘", defaultTime="22:00", defaultDuration=15, trackable=true, frequencyType="weekly", daysOfWeek=[1,2,3,4,5]
 - 用餐/睡眠/午休类习惯 → trackable=false
