@@ -22,7 +22,7 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { DynamicForm } from "@/components/editor/dynamic-form"
 import { ActionConfirm } from "@/components/editor/action-confirm"
@@ -42,10 +42,11 @@ import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/mai
 
 // view_route 页面组件映射（domainId → action → Component）
 // 在 AppShell 主内容区内渲染，保留左侧面板和顶部导航
-const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType>> = {
+const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
   habits: {
     view_list: HabitListPage,
     view_templates: HabitTemplatePage,
+    createHabit: HabitListPage,
   },
 };
 
@@ -360,6 +361,25 @@ export default function Home() {
 
     setIsLoading(true)
     try {
+      // 习惯创建意图 → 仅解析不执行，导航到 HabitListPage 填入字段
+      const habitParse = await parseHabitIntentOnly(content)
+      if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
+        setMainViewState({
+          type: 'view',
+          domainId: 'habits',
+          action: 'createHabit',
+          initialFields: habitParse.fields,
+        })
+        const navMsg: ChatMessage = {
+          role: 'assistant',
+          content: '已识别习惯创建意图，请在右侧面板中确认并创建。',
+          timestamp: new Date().toISOString(),
+        }
+        setConversationMessages(prev => [...prev, navMsg])
+        setIsLoading(false)
+        return
+      }
+
       const result = await submitIntent(content, false, traceEnabled)
       setTimeboxes(result.timeboxes)
 
@@ -375,6 +395,18 @@ export default function Home() {
             fields: {},
           })
         }
+      }
+
+      // 习惯解析失败但可能是习惯相关 → 提示用户
+      if (!habitParse.success && (content.includes('习惯') || content.includes('habit'))) {
+        const aiMsg: ChatMessage = {
+          role: 'assistant',
+          content: `未能识别习惯创建意图：${habitParse.error}。请尝试更具体的描述，或使用左侧「成长领域」→「创建一个新习惯」。`,
+          timestamp: new Date().toISOString(),
+        }
+        setConversationMessages(prev => [...prev, aiMsg])
+        setIsLoading(false)
+        return
       }
 
       const aiMsg: ChatMessage = {
@@ -462,12 +494,15 @@ export default function Home() {
     }
 
     if (mainViewState.type === 'view') {
-      const { domainId, action } = mainViewState
+      const { domainId, action, initialFields } = mainViewState
       const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
       if (ViewComponent) {
+        const props = action === 'createHabit'
+          ? { autoOpenCreate: true, initialFields: initialFields as any }
+          : {}
         return (
           <div className="flex-1 overflow-y-auto">
-            <ViewComponent />
+            <ViewComponent {...props} />
           </div>
         )
       }
