@@ -197,11 +197,6 @@ subscribed_events:
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
-  createHabit:
-    component: domains/habits/pages/HabitFormPage
-    url: /habits/new
-    params:
-      mode: create
   view_list:
     component: domains/habits/pages/HabitListPage
     url: /habits
