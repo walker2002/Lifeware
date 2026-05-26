@@ -64,8 +64,8 @@ describe('getActionByShortcut', () => {
 
 describe('getViewRoute', () => {
   it('should return view route for known domain+action', () => {
-    const result = getViewRoute('habits', 'createHabit')
-    expect(result).toEqual({ component: 'domains/habits/pages/HabitFormPage', params: { mode: 'create' } })
+    const result = getViewRoute('habits', 'view_list')
+    expect(result).toEqual({ component: 'domains/habits/pages/HabitListPage' })
   })
 
   it('should return undefined for unknown domain', () => {
