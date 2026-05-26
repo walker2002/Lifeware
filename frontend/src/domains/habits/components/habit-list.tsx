@@ -120,7 +120,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
       <div
         className={cn(
           "transition-all duration-300 ease-in-out",
-          panelMode ? "flex-1 min-w-0" : "w-full",
+          panelMode ? "flex-1 min-w-0 pr-4" : "w-full",
         )}
       >
         {/* 顶部操作栏 */}
