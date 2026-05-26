@@ -14,6 +14,7 @@ import { HabitRepository } from "@/domains/habits/repository/habit";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
+import { parseHabitWithAI } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
@@ -870,5 +871,36 @@ export async function fetchActionData(
     hasFields: fields.length > 0,
     viewRoute,
     viewComponent: viewRouteInfo?.component,
+  }
+}
+
+// ─── 习惯意图仅解析（不执行）Server Action ────────────────────────
+
+export interface HabitParseResult {
+  success: boolean;
+  action?: string;
+  fields?: Record<string, unknown>;
+  error?: string;
+}
+
+/** 仅解析习惯意图，不执行管道。供 AI 助手路径使用。 */
+export async function parseHabitIntentOnly(rawInput: string): Promise<HabitParseResult> {
+  try {
+    const intentionId = crypto.randomUUID();
+    const aiRuntime = createAIRuntime();
+    const parseResult = await parseHabitWithAI(rawInput, intentionId as any, aiRuntime);
+
+    if (!parseResult.success || !parseResult.intent) {
+      return { success: false, error: parseResult.error ?? "解析失败" };
+    }
+
+    return {
+      success: true,
+      action: parseResult.intent.action,
+      fields: parseResult.intent.fields as Record<string, unknown>,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "解析失败";
+    return { success: false, error: message };
   }
 }
