@@ -51,7 +51,7 @@ intent_triggers:
     keywords: [打卡, log, 完成]
   - action: view_list
     shortcut: /habits
-    description: 查看习惯列表
+    description: 习惯管理
     examples:
       - 查看我的习惯
       - 有哪些习惯
@@ -59,7 +59,7 @@ intent_triggers:
     view_route: /habits
   - action: view_templates
     shortcut: /habitTemplates
-    description: 查看习惯模板
+    description: 习惯模板配置
     examples:
       - 查看习惯模板
       - 有什么模板可以用
