@@ -330,14 +330,27 @@ export default function Home() {
   }, []);
 
   const handleNewSession = useCallback(() => {
-    const newId = crypto.randomUUID();
+    // 如果当前有空会话（无实质消息），不创建新会话，直接显示空对话界面
+    const hasSubstantialMessages = conversationMessages.some(
+      m => m.role === 'user' || (m.role === 'assistant' && m.content.trim().length > 0)
+    )
+    if (!hasSubstantialMessages && mainViewState.type === 'conversation') {
+      // 直接清空并停留在空对话界面
+      setConversationMessages([])
+      return
+    }
+
+    // 清理当前对话消息，显示空对话界面
+    setConversationMessages([])
+
+    const newId = crypto.randomUUID()
     setSessions(prev => [{
       id: newId, title: '新对话', status: 'active',
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, ...prev]);
-    setMainViewState({ type: 'conversation', sessionId: newId });
-    setActiveSessionId(newId);
-  }, []);
+    }, ...prev])
+    setMainViewState({ type: 'conversation', sessionId: newId })
+    setActiveSessionId(newId)
+  }, [conversationMessages, mainViewState])
 
   const handleGrowthAction = useCallback((domainId: string, action: string) => {
     saveCurrentConversation();
