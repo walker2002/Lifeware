@@ -20,7 +20,8 @@ export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
-import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute } from "@/domains/registry";
+import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, findDomain } from "@/domains/registry";
+import { FormRegistry } from "@/lib/form-registry";
 import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
 import { timeboxPlugin } from "../../domains/timebox";
@@ -539,6 +540,7 @@ export async function submitHabitIntent(
       fields: { ...input },
       confidence: 1.0,
       resolvedBy: "template_form",
+      pathType: "contract",
       createdAt: now,
     };
 
@@ -832,10 +834,14 @@ export async function applyTemplate(
   }
 }
 
-export async function resolveShortcut(rawInput: string): Promise<{ domainId: string; action: string } | null> {
+export async function resolveShortcut(rawInput: string): Promise<{ domainId: string; action: string; view_route?: string } | null> {
   const { matchShortcut } = await import("@/nexus/core/intent-engine/shortcut-matcher");
   const result = matchShortcut(rawInput);
-  if (result) return { domainId: result.domainId, action: result.action };
+  if (result) {
+    const { getIntentTriggerViewRoute } = await import("@/domains/registry");
+    const view_route = getIntentTriggerViewRoute(result.domainId, result.action);
+    return { domainId: result.domainId, action: result.action, view_route };
+  }
   return null;
 }
 
@@ -967,4 +973,64 @@ export async function parseHabitIntentOnly(rawInput: string): Promise<HabitParse
     const message = err instanceof Error ? err.message : HABIT_ERRORS.PARSE_FAILED;
     return { success: false, error: message };
   }
+}
+
+// ─── CN-UI Surface Server Actions ──────────────────────────────────
+
+import type { CnuiSurfaceRef } from "@/usom/types/objects";
+
+export interface OpenCnuiSurfaceResult {
+  content: string
+  surface: CnuiSurfaceRef
+}
+
+/** 打开 CN-UI 表面（在对话流内渲染表单） */
+export async function openCnuiSurface(
+  domainId: string,
+  action: string,
+): Promise<OpenCnuiSurfaceResult> {
+  const domain = findDomain(domainId)
+  const manifest = domain?.manifest as Record<string, any> | undefined
+  const genActions = manifest?.generation_actions as Record<string, any> | undefined
+  const genAction = genActions?.[action]
+  const surfaceType: string = genAction?.cnui_surface_type ?? `${domainId}-${action}`
+
+  const config = FormRegistry.get(domainId, action)
+  const dataModel = config?.defaults ? { ...config.defaults } : {}
+
+  return {
+    content: `请填写${action === 'createHabit' ? '习惯' : action}信息`,
+    surface: {
+      cnuiSurfaceId: crypto.randomUUID(),
+      cnuiSurfaceType: surfaceType,
+      domainId,
+      action,
+      dataSnapshot: dataModel,
+    },
+  }
+}
+
+/** 提交 CN-UI 表面数据 */
+export async function submitCnuiSurface(
+  _cnuiSurfaceId: string,
+  domainId: string,
+  action: string,
+  fields: Record<string, unknown>,
+): Promise<HabitActionResult> {
+  const config = FormRegistry.get(domainId, action)
+  let mappedFields = fields
+  if (config) {
+    mappedFields = {}
+    for (const [cnuiKey, formKey] of Object.entries(config.fieldMapping)) {
+      if (cnuiKey in fields) {
+        mappedFields[formKey] = fields[cnuiKey]
+      }
+    }
+  }
+
+  if (domainId === "habits" && action === "createHabit") {
+    return submitHabitIntent(mappedFields as CreateHabitInput)
+  }
+
+  return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
 }
