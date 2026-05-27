@@ -70,6 +70,10 @@ const ContextDeclarationSchema = z.object({
 const GenerationActionSchema = z.object({
   description: z.string(),
   contexts: z.array(ContextDeclarationSchema),
+  response_mode: z.enum(['text', 'cnui']).optional(),
+  cnui_surface_type: z.string().optional(),
+  session_enabled: z.boolean().optional(),
+  cache_ttl_minutes: z.number().optional(),
 })
 
 const QueryActionSchema = z.object({
