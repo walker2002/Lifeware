@@ -1,7 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { ConversationView } from '../conversation-view'
 import type { ChatMessage } from '@/usom/types/objects'
+
+vi.mock('@/components/cnui/CnuiRenderer', () => ({
+  CnuiRenderer: ({ surfaceType, onConfirm, isLoading }: any) => (
+    <div data-testid="cnui-renderer" data-surface-type={surfaceType} data-loading={isLoading?.toString()}>
+      <span>CN-UI: {surfaceType}</span>
+      <button onClick={() => onConfirm({ name: '测试习惯', defaultTime: '07:00' })}>提交</button>
+    </div>
+  ),
+}))
 
 const messages: ChatMessage[] = [
   { role: 'user', content: '你好', timestamp: '2026-05-16T10:00:00Z' },
@@ -32,18 +41,30 @@ describe('ConversationView', () => {
     expect(screen.getByText('有什么可以帮你的？')).toBeInTheDocument()
   })
 
-  it('should show default quick actions when no recent sessions provided', () => {
+  it('should show quick actions from intentTriggers prop', () => {
     render(
       <ConversationView
         messages={[]}
         onSendMessage={vi.fn()}
+        intentTriggers={[
+          { label: '添加习惯', shortcut: '/createHabit', domainId: 'habits', action: 'createHabit' },
+          { label: '创建任务', shortcut: '/createTask', domainId: 'tasks', action: 'createTask' },
+        ]}
       />
     )
-    expect(screen.getByText('创建任务')).toBeInTheDocument()
-    expect(screen.getByText('规划日程')).toBeInTheDocument()
-    expect(screen.getByText('设定目标')).toBeInTheDocument()
-    expect(screen.getByText('添加习惯')).toBeInTheDocument()
-    expect(screen.getByText('能量记录')).toBeInTheDocument()
+    expect(screen.getByText('添加习惯 (/createHabit)')).toBeInTheDocument()
+    expect(screen.getByText('创建任务 (/createTask)')).toBeInTheDocument()
+  })
+
+  it('should show no quick actions when intentTriggers is empty', () => {
+    render(
+      <ConversationView
+        messages={[]}
+        onSendMessage={vi.fn()}
+        intentTriggers={[]}
+      />
+    )
+    expect(screen.queryByText('创建任务')).not.toBeInTheDocument()
   })
 
   it('should show recent sessions when provided', () => {
@@ -62,17 +83,24 @@ describe('ConversationView', () => {
     expect(screen.getByText('时间回顾')).toBeInTheDocument()
   })
 
-  it('should click quick action to send message', async () => {
-    const onSend = vi.fn()
+  it('should fill input with shortcut on quick action click', async () => {
     render(
       <ConversationView
         messages={[]}
-        onSendMessage={onSend}
+        onSendMessage={vi.fn()}
+        intentTriggers={[
+          { label: '添加习惯', shortcut: '/createHabit', domainId: 'habits', action: 'createHabit' },
+        ]}
       />
     )
-    const btn = screen.getByText('创建任务')
-    btn.click()
-    expect(onSend).toHaveBeenCalledWith('创建任务')
+    const btn = screen.getByText('添加习惯 (/createHabit)')
+    // eslint-disable-next-line testing-library/no-unnecessary-act
+    await act(async () => {
+      btn.click()
+    })
+    // 新行为：点击后填入 /shortcut + 空格到输入框，不是直接发送
+    const input = screen.getByPlaceholderText('输入消息...') as HTMLInputElement
+    expect(input.value).toBe('/createHabit ')
   })
 
   it('should have input area in conversation mode', () => {
@@ -131,5 +159,77 @@ describe('ConversationView', () => {
     )
     expect(screen.getByText('你')).toBeInTheDocument()
     expect(screen.getByText('AI')).toBeInTheDocument()
+  })
+})
+
+// ─── CN-UI 表面渲染测试 ──────────────────────────────────────────
+
+describe('ConversationView CN-UI 渲染', () => {
+  const cnuiMessages: ChatMessage[] = [
+    { role: 'user', content: '/createHabit', timestamp: '2026-05-27T10:00:00Z' },
+    {
+      role: 'assistant',
+      content: '请填写习惯信息',
+      timestamp: '2026-05-27T10:00:01Z',
+      cnuiSurface: {
+        cnuiSurfaceId: 'test-surface-1',
+        cnuiSurfaceType: 'habit-creation-card',
+        domainId: 'habits',
+        action: 'createHabit',
+        dataSnapshot: { defaultDuration: 30 },
+      },
+    },
+  ]
+
+  it('should render CnuiRenderer when message has cnuiSurface', () => {
+    render(
+      <ConversationView
+        messages={cnuiMessages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('cnui-renderer')).toBeInTheDocument()
+    expect(screen.getByText('CN-UI: habit-creation-card')).toBeInTheDocument()
+  })
+
+  it('should pass correct surfaceType to CnuiRenderer', () => {
+    render(
+      <ConversationView
+        messages={cnuiMessages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    const renderer = screen.getByTestId('cnui-renderer')
+    expect(renderer).toHaveAttribute('data-surface-type', 'habit-creation-card')
+  })
+
+  it('should call onCnuiConfirm when CN-UI form is submitted', async () => {
+    const onCnuiConfirm = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ConversationView
+        messages={cnuiMessages}
+        onSendMessage={vi.fn()}
+        onCnuiConfirm={onCnuiConfirm}
+      />
+    )
+    await act(async () => {
+      screen.getByText('提交').click()
+    })
+    expect(onCnuiConfirm).toHaveBeenCalledWith(
+      'test-surface-1',
+      'habits',
+      'createHabit',
+      { name: '测试习惯', defaultTime: '07:00' },
+    )
+  })
+
+  it('should not render CnuiRenderer for messages without cnuiSurface', () => {
+    render(
+      <ConversationView
+        messages={messages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    expect(screen.queryByTestId('cnui-renderer')).not.toBeInTheDocument()
   })
 })

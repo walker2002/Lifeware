@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import type { ChatMessage } from "@/usom/types/objects"
 import type { AISessionSummary } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
+import { CnuiRenderer } from "@/components/cnui/CnuiRenderer"
 
 interface IntentTrigger {
   label: string
@@ -19,6 +20,7 @@ interface ConversationViewProps {
   recentSessions?: AISessionSummary[]
   onSelectSession?: (sessionId: string) => void
   intentTriggers?: IntentTrigger[]
+  onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
 }
 
 const ROLE_LABELS: Record<ChatMessage['role'], string> = {
@@ -27,9 +29,10 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
   system: '系统',
 }
 
-export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers }: ConversationViewProps) {
+export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, onCnuiConfirm }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
+  const [loadingSurfaceId, setLoadingSurfaceId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -258,6 +261,25 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                 }`}>
                   {msg.content}
                 </div>
+                {msg.cnuiSurface && (
+                  <div className="mt-3 rounded-lg border border-hairline bg-surface-soft p-4">
+                    <CnuiRenderer
+                      surfaceType={msg.cnuiSurface.cnuiSurfaceType as any}
+                      dataModel={msg.cnuiSurface.dataSnapshot ?? {}}
+                      onDataChange={() => {}}
+                      onConfirm={async (data) => {
+                        if (!onCnuiConfirm) return
+                        setLoadingSurfaceId(msg.cnuiSurface!.cnuiSurfaceId)
+                        try {
+                          await onCnuiConfirm(msg.cnuiSurface!.cnuiSurfaceId, msg.cnuiSurface!.domainId, msg.cnuiSurface!.action, data)
+                        } finally {
+                          setLoadingSurfaceId(null)
+                        }
+                      }}
+                      isLoading={loadingSurfaceId === msg.cnuiSurface.cnuiSurfaceId}
+                    />
+                  </div>
+                )}
               </div>
             ))}
             <div ref={bottomRef} />
