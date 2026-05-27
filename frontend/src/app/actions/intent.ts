@@ -28,6 +28,7 @@ import { timeboxPlugin } from "../../domains/timebox";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
 import { getTraceConfig } from "../../lib/config/trace-config";
 import { eq, desc } from "drizzle-orm";
+import { validateHabitFields } from "@/domains/habits/validation";
 
 // ─── 类型定义 ───────────────────────────────────────────────────
 
@@ -1027,6 +1028,14 @@ export async function submitCnuiSurface(
   action: string,
   fields: Record<string, unknown>,
 ): Promise<HabitActionResult> {
+  // 服务端二次校验（防御性校验，客户端已校验过）
+  if (domainId === "habits" && action === "createHabit") {
+    const result = validateHabitFields(fields, "createHabit")
+    if (!result.valid) {
+      return { success: false, error: result.errors.join("；") }
+    }
+  }
+
   const config = FormRegistry.get(domainId, action)
   let mappedFields = fields
   if (config) {

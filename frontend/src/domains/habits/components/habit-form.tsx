@@ -34,6 +34,8 @@ interface HabitFormProps {
   onDirtyChange?: (isDirty: boolean) => void
   /** 外部触发的提交计数（用于退出保存场景），每次递增触发一次 requestSubmit */
   submitTrigger?: number
+  /** CN-UI 场景下禁用回车触发表单提交 */
+  disableEnterSubmit?: boolean
 }
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
@@ -65,7 +67,7 @@ function autoComplete(
   }
 }
 
-export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChange, submitTrigger }: HabitFormProps) {
+export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChange, submitTrigger, disableEnterSubmit }: HabitFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [defaultTime, setDefaultTime] = useState(initial?.defaultTime ?? "07:00")
@@ -144,7 +146,16 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const isValid = title.trim().length > 0 && /^\d{2}:\d{2}$/.test(defaultTime) && defaultDuration > 0
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => {
+        if (disableEnterSubmit && e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+          e.preventDefault()
+        }
+      }}
+      className="flex flex-col gap-4"
+    >
       {/* 标题 */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="habit-title">标题 *</Label>
