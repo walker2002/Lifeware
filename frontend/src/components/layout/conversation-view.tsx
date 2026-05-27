@@ -279,7 +279,9 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                           setLoadingSurfaceId(null)
                         }
                       }}
+                      onCancel={() => {}}
                       isLoading={loadingSurfaceId === msg.cnuiSurface.cnuiSurfaceId}
+                      isDone={false}
                     />
                   </div>
                 )}
