@@ -372,23 +372,34 @@ export default function Home() {
     }
     setConversationMessages(prev => [...prev, userMsg])
 
-    // 快捷命令拦截 — view_route 动作不走 AI 管道，直接切换视图
-    const shortcut = await resolveShortcut(content)
-    if (shortcut) {
-      setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
-      const navMsg: ChatMessage = {
-        role: 'assistant',
-        content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
-        timestamp: new Date().toISOString(),
-      }
-      setConversationMessages(prev => [...prev, navMsg])
-      return
-    }
-
-    // slash 命令处理 — 无 payload 走 CN-UI Handler 管道
+    // slash 命令处理 — 必须在 resolveShortcut 之前，否则 /createHabit 无 payload 会被错误路由
     const slashResult = resolveSlashCommand(content)
     if (slashResult.isSlashCommand) {
-      const { hasPayload, payload } = slashResult
+      const { action, hasPayload, payload, domainId: explicitDomainId } = slashResult
+
+      // 解析 domainId：长格式 /domain:action 已填入，短格式 /actionName 需查找
+      let resolvedDomainId = explicitDomainId
+      if (!resolvedDomainId) {
+        const shortcut = await resolveShortcut(content)
+        if (shortcut) resolvedDomainId = shortcut.domainId
+      }
+
+      // 如果是 view_route 导航类快捷方式（如 /habits），直接导航到页面
+      const shortcut = await resolveShortcut(content)
+      if (shortcut) {
+        const { getIntentTriggerViewRoute } = await import("@/domains/registry")
+        const viewRoute = getIntentTriggerViewRoute(resolvedDomainId || shortcut.domainId, shortcut.action)
+        if (viewRoute) {
+          setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
+          const navMsg: ChatMessage = {
+            role: 'assistant',
+            content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
+            timestamp: new Date().toISOString(),
+          }
+          setConversationMessages(prev => [...prev, navMsg])
+          return
+        }
+      }
 
       if (hasPayload && payload) {
         // 有附加内容 → AI 解析字段 → 导航到 HabitListPage 填入
@@ -415,11 +426,41 @@ export default function Home() {
           console.error('[slashCommand] AI 解析失败:', err)
         }
         setIsLoading(false)
-        // AI 解析失败 → 继续走 submitIntent 通用管道
+        // AI 解析失败 → 继续走 submitIntent 通用管道（fallthrough 到下面）
       } else {
         // 无附加内容 → 让 submitIntent 走 Handler → CN-UI 管道
-        // 不拦截，继续执行下面的 submitIntent
+        setIsLoading(true)
+        try {
+          const result = await submitIntent(content, false, traceEnabled)
+          setTimeboxes(result.timeboxes)
+
+          const aiMsg: ChatMessage = {
+            role: 'assistant',
+            content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
+            timestamp: new Date().toISOString(),
+          }
+          setConversationMessages(prev => [...prev, aiMsg])
+        } catch {
+          const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
+          setConversationMessages(prev => [...prev, errMsg])
+        } finally {
+          setIsLoading(false)
+        }
+        return
       }
+    }
+
+    // 非 slash 命令 → 快捷命令拦截（view_route 动作不走 AI 管道）
+    const shortcut = await resolveShortcut(content)
+    if (shortcut) {
+      setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
+      const navMsg: ChatMessage = {
+        role: 'assistant',
+        content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
+        timestamp: new Date().toISOString(),
+      }
+      setConversationMessages(prev => [...prev, navMsg])
+      return
     }
 
     setIsLoading(true)
