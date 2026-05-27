@@ -371,7 +371,7 @@ export default function Home() {
         if (result.success) {
           const msg: ChatMessage = {
             role: 'assistant',
-            content: `习惯"${result.habit?.title ?? ''}"创建成功！`,
+            content: result.habit?.title ? `习惯"${result.habit.title}"创建成功！` : '习惯创建成功！',
             timestamp: new Date().toISOString(),
           }
           setConversationMessages(prev => [...prev, msg])

@@ -56,6 +56,5 @@ FormRegistry.register('habits', 'createHabit', {
     trackable: true,
     frequencyType: 'daily',
     daysOfWeek: [1, 2, 3, 4, 5],
-    startDate: new Date().toISOString().slice(0, 10),
   },
 })

@@ -996,10 +996,20 @@ export async function openCnuiSurface(
   const surfaceType: string = genAction?.cnui_surface_type ?? `${domainId}-${action}`
 
   const config = FormRegistry.get(domainId, action)
-  const dataModel = config?.defaults ? { ...config.defaults } : {}
+  const dataModel = config?.defaults ? JSON.parse(JSON.stringify(config.defaults)) : {}
+
+  // 动态注入日期默认值（不能在模块加载时固化）
+  if (domainId === 'habits' && action === 'createHabit' && !dataModel.startDate) {
+    dataModel.startDate = new Date().toISOString().slice(0, 10)
+  }
+
+  // 从 manifest intent_triggers 获取可读描述
+  const intentTriggers = (manifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
+  const trigger = intentTriggers.find((t) => t.action === action)
+  const actionLabel = trigger?.description ?? action
 
   return {
-    content: `请填写${action === 'createHabit' ? '习惯' : action}信息`,
+    content: `请填写${actionLabel}信息`,
     surface: {
       cnuiSurfaceId: crypto.randomUUID(),
       cnuiSurfaceType: surfaceType,

@@ -33,6 +33,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
   const [loadingSurfaceId, setLoadingSurfaceId] = useState<string | null>(null)
+  const [surfaceDataCache, setSurfaceDataCache] = useState<Record<string, Record<string, unknown>>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -265,8 +266,10 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                   <div className="mt-3 rounded-lg border border-hairline bg-surface-soft p-4">
                     <CnuiRenderer
                       surfaceType={msg.cnuiSurface.cnuiSurfaceType as any}
-                      dataModel={msg.cnuiSurface.dataSnapshot ?? {}}
-                      onDataChange={() => {}}
+                      dataModel={surfaceDataCache[msg.cnuiSurface.cnuiSurfaceId] ?? msg.cnuiSurface.dataSnapshot ?? {}}
+                      onDataChange={(data) => {
+                        setSurfaceDataCache(prev => ({ ...prev, [msg.cnuiSurface!.cnuiSurfaceId]: data }))
+                      }}
                       onConfirm={async (data) => {
                         if (!onCnuiConfirm) return
                         setLoadingSurfaceId(msg.cnuiSurface!.cnuiSurfaceId)
