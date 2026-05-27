@@ -217,7 +217,7 @@ generation_actions:
   createHabit:
     description: AI 辅助习惯创建，通过对话补全习惯参数
     contexts:
-      - id: existingHabits
+      - id: activeHabits
         query: active_habits
         params: [userId]
       - id: habitTemplates
