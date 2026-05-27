@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { HabitCard } from "./habit-card"
 import { HabitForm, type HabitFormFields } from "./habit-form"
@@ -46,6 +46,8 @@ interface HabitListProps {
 
 type PanelMode = null | "create" | string
 
+const EDIT_PANEL_WIDTH = "w-[480px]"
+
 export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh, autoOpenCreate, initialFields }: HabitListProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
@@ -63,7 +65,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
     if (autoOpenCreate && panelMode === null) {
       setPanelMode("create")
     }
-  }, [autoOpenCreate])
+  }, [autoOpenCreate, panelMode])
 
   const editingHabit = typeof panelMode === "string" && panelMode !== "create"
     ? habits.find((h) => h.id === panelMode) ?? null
@@ -122,6 +124,16 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
       }
     : undefined
 
+  const groupedHabits = useMemo(() =>
+    STATUS_GROUPS.map(group => ({
+      ...group,
+      habits: habits
+        .filter(h => h.status === group.key)
+        .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime)),
+    })),
+    [habits],
+  )
+
   return (
     <div className="flex gap-0 overflow-y-auto max-h-[calc(100vh-200px)]">
       {/* 左侧：卡片列表 */}
@@ -141,10 +153,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
 
         {/* 状态分组 */}
         <div className="flex flex-col gap-4">
-          {STATUS_GROUPS.map((group) => {
-            const groupHabits = habits
-              .filter((h) => h.status === group.key)
-              .sort((a, b) => a.defaultTime.localeCompare(b.defaultTime))
+          {groupedHabits.map((group) => {
             const isCollapsed = collapsed[group.key]
 
             return (
@@ -159,11 +168,11 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                   ) : (
                     <ChevronDown className="size-4" />
                   )}
-                  {group.label} ({groupHabits.length})
+                  {group.label} ({group.habits.length})
                 </button>
 
                 {!isCollapsed &&
-                  (groupHabits.length === 0 ? (
+                  (group.habits.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2 pl-6">暂无习惯</p>
                   ) : (
                     <div
@@ -174,7 +183,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
                       )}
                     >
-                      {groupHabits.map((habit) => (
+                      {group.habits.map((habit) => (
                         <HabitCard
                           key={habit.id}
                           title={habit.title}
@@ -204,7 +213,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
 
       {/* 右侧：编辑/创建面板 */}
       {panelMode && (
-        <div className="w-[480px] shrink-0 border-l px-4 overflow-y-auto">
+        <div className={`${EDIT_PANEL_WIDTH} shrink-0 border-l px-4 overflow-y-auto`}>
           <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
             <h3 className="text-sm font-medium">
               {panelMode === "create" ? "新建习惯" : "编辑习惯"}

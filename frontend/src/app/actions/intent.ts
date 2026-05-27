@@ -21,6 +21,7 @@ import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
 import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute } from "@/domains/registry";
+import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
 import { timeboxPlugin } from "../../domains/timebox";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
@@ -115,7 +116,7 @@ async function executePipeline(
       return {
         success: false,
         timeboxes,
-        error: parseResult.error ?? "意图解析失败，请重试",
+        error: parseResult.error ?? HABIT_ERRORS.INTENT_PARSE_FAILED,
         traceSession: logger?.getSessions()[0],
       };
     }
@@ -500,7 +501,7 @@ export async function getHabits(): Promise<HabitActionResult> {
     const habits = await repo.findByUserId(MVP_USER_ID);
     return { success: true, habits };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "获取习惯列表失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.FETCH_FAILED;
     return { success: false, error: message };
   }
 }
@@ -549,7 +550,7 @@ export async function submitHabitIntent(
 
     return { success: true, habit: result.habit };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "创建习惯失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.CREATE_FAILED;
     return { success: false, error: message };
   }
 }
@@ -604,7 +605,7 @@ export async function updateHabitStatus(
 
     return { success: true, habit: result.habit };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "更新习惯状态失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.STATUS_UPDATE_FAILED;
     return { success: false, error: message };
   }
 }
@@ -618,7 +619,7 @@ export async function deleteHabit(
     await repo.delete(habitId, MVP_USER_ID);
     return { success: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "删除习惯失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.DELETE_FAILED;
     return { success: false, error: message };
   }
 }
@@ -632,7 +633,7 @@ export async function checkHabitReferences(
     const references = await repo.checkReferences(habitId, MVP_USER_ID);
     return { success: true, references };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "检查引用失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.CHECK_REFS_FAILED;
     return { success: false, error: message };
   }
 }
@@ -643,11 +644,45 @@ export async function updateHabit(
   input: UpdateHabitInput,
 ): Promise<HabitActionResult> {
   try {
-    const repo = await getHabitRepo();
-    const habit = await repo.update(habitId, input, MVP_USER_ID);
-    return { success: true, habit };
+    const habitRepo = await getHabitRepo();
+    const eventRepo = new SystemEventRepository();
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: new TimeboxRepository(),
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error("not used") } },
+      ruleEngine: {
+        evaluate: async () => ({
+          result: "pass" as const,
+          warnings: [],
+          confirmations: [],
+        }),
+      },
+      habitRepo,
+    });
+
+    const now = new Date().toISOString() as Timestamp;
+
+    const intent: import("@/usom/types/objects").StructuredIntent = {
+      id: crypto.randomUUID(),
+      intentionId: crypto.randomUUID(),
+      targetDomain: "habits",
+      action: "updateHabit",
+      fields: { habitId, ...input },
+      confidence: 1.0,
+      resolvedBy: "template_form",
+      createdAt: now,
+    };
+
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, habit: result.habit };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "更新习惯失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.UPDATE_FAILED;
     return { success: false, error: message };
   }
 }
@@ -879,7 +914,7 @@ export async function fetchActionData(
 export interface HabitParseResult {
   success: boolean;
   action?: string;
-  fields?: Record<string, unknown>;
+  fields?: Partial<import("@/domains/habits/components/habit-form").HabitFormFields>;
   error?: string;
 }
 
@@ -891,16 +926,16 @@ export async function parseHabitIntentOnly(rawInput: string): Promise<HabitParse
     const parseResult = await parseHabitWithAI(rawInput, intentionId as any, aiRuntime);
 
     if (!parseResult.success || !parseResult.intent) {
-      return { success: false, error: parseResult.error ?? "解析失败" };
+      return { success: false, error: parseResult.error ?? HABIT_ERRORS.PARSE_FAILED };
     }
 
     return {
       success: true,
       action: parseResult.intent.action,
-      fields: parseResult.intent.fields as Record<string, unknown>,
+      fields: parseResult.intent.fields as Partial<import("@/domains/habits/components/habit-form").HabitFormFields>,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "解析失败";
+    const message = err instanceof Error ? err.message : HABIT_ERRORS.PARSE_FAILED;
     return { success: false, error: message };
   }
 }

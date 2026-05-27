@@ -13,6 +13,7 @@ import type { TemplateFormFields } from "@/components/intent-form";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { DateNav } from "@/domains/timebox/components/date-nav";
 import type { DateViewMode } from "@/domains/timebox/components/types";
+import { HABIT_USER_FACING } from "@/lib/constants/habit-messages";
 import { DayView } from "@/domains/timebox/components/day-view";
 import { WeekView } from "@/domains/timebox/components/week-view";
 import { MonthView } from "@/domains/timebox/components/month-view";
@@ -372,7 +373,7 @@ export default function Home() {
         })
         const navMsg: ChatMessage = {
           role: 'assistant',
-          content: '已识别习惯创建意图，请在右侧面板中确认并创建。',
+          content: HABIT_USER_FACING.INTENT_RECOGNIZED,
           timestamp: new Date().toISOString(),
         }
         setConversationMessages(prev => [...prev, navMsg])
@@ -401,7 +402,7 @@ export default function Home() {
       if (!habitParse.success && (content.includes('习惯') || content.includes('habit'))) {
         const aiMsg: ChatMessage = {
           role: 'assistant',
-          content: `未能识别习惯创建意图：${habitParse.error}。请尝试更具体的描述，或使用左侧「成长领域」→「创建一个新习惯」。`,
+          content: HABIT_USER_FACING.INTENT_UNRECOGNIZED(habitParse.error),
           timestamp: new Date().toISOString(),
         }
         setConversationMessages(prev => [...prev, aiMsg])
@@ -498,7 +499,7 @@ export default function Home() {
       const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
       if (ViewComponent) {
         const props = action === 'createHabit'
-          ? { autoOpenCreate: true, initialFields: initialFields as any }
+          ? { autoOpenCreate: true, initialFields }
           : {}
         return (
           <div className="flex-1 overflow-y-auto">

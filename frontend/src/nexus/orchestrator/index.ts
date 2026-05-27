@@ -473,7 +473,31 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           return { success: true, habit, warnings: ruleResult.warnings }
         }
 
-        // 非 create: 状态转换
+        if (action === 'updateHabit') {
+          const habitId = intent.fields.habitId as USOM_ID
+          const existing = await deps.habitRepo.findById(habitId, userId)
+          if (!existing) {
+            return { success: false, error: '习惯不存在' }
+          }
+
+          const { habitId: _hid, ...updateFields } = intent.fields
+          const updated = await deps.habitRepo.update(habitId, updateFields as import('@/usom/interfaces/irepository').UpdateHabitInput, userId)
+
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'habit.updated' as SystemEventType,
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: { habitId, intentId: intent.id },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(event, userId)
+          eventBus.publish(event)
+
+          return { success: true, habit: updated, warnings: ruleResult.warnings }
+        }
+
+        // 状态转换（activate/suspend/reactivate/archive）
         const habitId = intent.fields.habitId as USOM_ID
         const existing = await deps.habitRepo.findById(habitId, userId)
         if (!existing) {
