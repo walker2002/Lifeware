@@ -26,6 +26,18 @@ vi.mock('@/app/actions/intent', () => ({
   fetchDomainActions: vi.fn().mockResolvedValue([]),
   submitDynamicIntent: vi.fn().mockResolvedValue({ success: true }),
   fetchActionData: vi.fn().mockResolvedValue({ hasFields: false, description: '' }),
+  fetchIntentTriggers: vi.fn().mockResolvedValue([]),
+  openCnuiSurface: vi.fn().mockResolvedValue({
+    content: '请填写习惯信息',
+    surface: {
+      cnuiSurfaceId: 'test-id',
+      cnuiSurfaceType: 'habit-creation-card',
+      domainId: 'habits',
+      action: 'createHabit',
+      dataSnapshot: {},
+    },
+  }),
+  submitCnuiSurface: vi.fn().mockResolvedValue({ success: true, habit: { title: '测试习惯' } }),
 }))
 
 // 模拟 Drizzle ORM（数据库连接）

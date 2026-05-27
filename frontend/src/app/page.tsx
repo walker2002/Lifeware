@@ -23,7 +23,7 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { DynamicForm } from "@/components/editor/dynamic-form"
 import { ActionConfirm } from "@/components/editor/action-confirm"
@@ -363,6 +363,38 @@ export default function Home() {
     }
   }, [saveCurrentConversation]);
 
+  /** 处理 CN-UI 表面提交 */
+  const handleCnuiConfirm = useCallback(
+    async (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
+      try {
+        const result = await submitCnuiSurface(cnuiSurfaceId, domainId, action, data)
+        if (result.success) {
+          const msg: ChatMessage = {
+            role: 'assistant',
+            content: `习惯"${result.habit?.title ?? ''}"创建成功！`,
+            timestamp: new Date().toISOString(),
+          }
+          setConversationMessages(prev => [...prev, msg])
+        } else {
+          const msg: ChatMessage = {
+            role: 'system',
+            content: `创建失败: ${result.error}`,
+            timestamp: new Date().toISOString(),
+          }
+          setConversationMessages(prev => [...prev, msg])
+        }
+      } catch {
+        const msg: ChatMessage = {
+          role: 'system',
+          content: '网络错误，请重试',
+          timestamp: new Date().toISOString(),
+        }
+        setConversationMessages(prev => [...prev, msg])
+      }
+    },
+    [],
+  )
+
   // T031: conversation 消息发送 → 可能触发 splitWith
   const handleConversationSend = useCallback(async (content: string, attachments?: File[]) => {
     const userMsg: ChatMessage = {
@@ -375,30 +407,26 @@ export default function Home() {
     // slash 命令处理 — 必须在 resolveShortcut 之前，否则 /createHabit 无 payload 会被错误路由
     const slashResult = resolveSlashCommand(content)
     if (slashResult.isSlashCommand) {
-      const { action, hasPayload, payload, domainId: explicitDomainId } = slashResult
+      const { hasPayload, payload, domainId: explicitDomainId } = slashResult
 
-      // 解析 domainId：长格式 /domain:action 已填入，短格式 /actionName 需查找
+      // domainId 解析 + view_route 导航检查共用一次 resolveShortcut
       let resolvedDomainId = explicitDomainId
-      if (!resolvedDomainId) {
-        const shortcut = await resolveShortcut(content)
-        if (shortcut) resolvedDomainId = shortcut.domainId
+      const shortcut = await resolveShortcut(content)
+
+      if (!resolvedDomainId && shortcut) {
+        resolvedDomainId = shortcut.domainId
       }
 
       // 如果是 view_route 导航类快捷方式（如 /habits），直接导航到页面
-      const shortcut = await resolveShortcut(content)
-      if (shortcut) {
-        const { getIntentTriggerViewRoute } = await import("@/domains/registry")
-        const viewRoute = getIntentTriggerViewRoute(resolvedDomainId || shortcut.domainId, shortcut.action)
-        if (viewRoute) {
-          setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
-          const navMsg: ChatMessage = {
-            role: 'assistant',
-            content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
-            timestamp: new Date().toISOString(),
-          }
-          setConversationMessages(prev => [...prev, navMsg])
-          return
+      if (shortcut?.view_route) {
+        setMainViewState({ type: 'action', domainId: shortcut.domainId, action: shortcut.action })
+        const navMsg: ChatMessage = {
+          role: 'assistant',
+          content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
+          timestamp: new Date().toISOString(),
         }
+        setConversationMessages(prev => [...prev, navMsg])
+        return
       }
 
       if (hasPayload && payload) {
@@ -425,10 +453,48 @@ export default function Home() {
         } catch (err) {
           console.error('[slashCommand] AI 解析失败:', err)
         }
-        setIsLoading(false)
-        // AI 解析失败 → 继续走 submitIntent 通用管道（fallthrough 到下面）
+        // AI 解析失败 → 直接走 submitIntent 通用管道，不 fallthrough 到非 slash 路径
+        setIsLoading(true)
+        try {
+          const result = await submitIntent(content, false, traceEnabled)
+          setTimeboxes(result.timeboxes)
+
+          const aiMsg: ChatMessage = {
+            role: 'assistant',
+            content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
+            timestamp: new Date().toISOString(),
+          }
+          setConversationMessages(prev => [...prev, aiMsg])
+        } catch {
+          const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
+          setConversationMessages(prev => [...prev, errMsg])
+        } finally {
+          setIsLoading(false)
+        }
+        return
       } else {
-        // 无附加内容 → 让 submitIntent 走 Handler → CN-UI 管道
+        // 无附加内容 → 在对话流内打开 CN-UI 表面
+        const targetDomain = resolvedDomainId || shortcut?.domainId || slashResult.domainId
+        const targetAction = slashResult.action
+
+        if (targetDomain && targetAction) {
+          try {
+            const result = await openCnuiSurface(targetDomain, targetAction)
+            const cnuiMsg: ChatMessage = {
+              role: 'assistant',
+              content: result.content,
+              timestamp: new Date().toISOString(),
+              cnuiSurface: result.surface,
+            }
+            setConversationMessages(prev => [...prev, cnuiMsg])
+          } catch {
+            const errMsg: ChatMessage = { role: 'assistant', content: '打开表单失败，请重试', timestamp: new Date().toISOString() }
+            setConversationMessages(prev => [...prev, errMsg])
+          }
+          return
+        }
+
+        // 无法解析 domain/action → 回退 submitIntent 通用管道
         setIsLoading(true)
         try {
           const result = await submitIntent(content, false, traceEnabled)
@@ -573,6 +639,7 @@ export default function Home() {
           recentSessions={sessions.slice(0, 3)}
           onSelectSession={handleSelectSession}
           intentTriggers={intentTriggers}
+          onCnuiConfirm={handleCnuiConfirm}
         />
       )
       if (splitWith) {
