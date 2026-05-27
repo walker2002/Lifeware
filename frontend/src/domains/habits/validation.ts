@@ -72,5 +72,14 @@ export function validateHabitFields(
     if (minDuration > defaultDuration) errors.push('最短时长不能大于默认时长')
   }
 
+  // 频率类型校验
+  const frequencyType = fields['frequencyType']
+  if (frequencyType !== undefined && typeof frequencyType === 'string') {
+    const validTypes = ['daily', 'weekly', 'custom']
+    if (!validTypes.includes(frequencyType)) {
+      errors.push('频率类型必须是 daily/weekly/custom')
+    }
+  }
+
   return { valid: errors.length === 0, errors, warnings }
 }

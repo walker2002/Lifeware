@@ -159,7 +159,7 @@ describe('Habits Domain Plugin — onValidate', () => {
     })
     const result = habitsPlugin.onValidate(intent, makeSnapshot())
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('title'))).toBe(true)
+    expect(result.errors.some(e => e.includes('标题'))).toBe(true)
   })
 
   it('defaultTime 格式非法应返回 valid=false', () => {
@@ -177,7 +177,7 @@ describe('Habits Domain Plugin — onValidate', () => {
     })
     const result = habitsPlugin.onValidate(intent, makeSnapshot())
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('defaultTime'))).toBe(true)
+    expect(result.errors.some(e => e.includes('默认时间'))).toBe(true)
   })
 
   it('minDuration > defaultDuration 应返回 valid=false', () => {
@@ -195,7 +195,7 @@ describe('Habits Domain Plugin — onValidate', () => {
     })
     const result = habitsPlugin.onValidate(intent, makeSnapshot())
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('minDuration'))).toBe(true)
+    expect(result.errors.some(e => e.includes('最短时长'))).toBe(true)
   })
 
   it('defaultDuration <= 0 应返回 valid=false', () => {
@@ -213,7 +213,7 @@ describe('Habits Domain Plugin — onValidate', () => {
     })
     const result = habitsPlugin.onValidate(intent, makeSnapshot())
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('defaultDuration'))).toBe(true)
+    expect(result.errors.some(e => e.includes('默认时长'))).toBe(true)
   })
 
   it('frequencyType 不合法应返回 valid=false', () => {
@@ -231,7 +231,7 @@ describe('Habits Domain Plugin — onValidate', () => {
     })
     const result = habitsPlugin.onValidate(intent, makeSnapshot())
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('frequencyType'))).toBe(true)
+    expect(result.errors.some(e => e.includes('频率类型'))).toBe(true)
   })
 
   it('logHabit 意图缺少 habitId 应返回 valid=false', () => {

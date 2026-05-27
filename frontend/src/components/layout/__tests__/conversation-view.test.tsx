@@ -3,11 +3,34 @@ import { render, screen, act } from '@testing-library/react'
 import { ConversationView } from '../conversation-view'
 import type { ChatMessage } from '@/usom/types/objects'
 
-vi.mock('@/components/cnui/CnuiRenderer', () => ({
-  CnuiRenderer: ({ surfaceType, onConfirm, isLoading }: any) => (
-    <div data-testid="cnui-renderer" data-surface-type={surfaceType} data-loading={isLoading?.toString()}>
+vi.mock('@/components/cnui/use-cnui-lifecycle', () => ({
+  useCnuiLifecycle: (onSubmit: Function) => {
+    const state = {
+      surfaceStates: {} as Record<string, string>,
+      surfaceData: {} as Record<string, Record<string, unknown>>,
+      submittingId: null as string | null,
+      validationErrors: {} as Record<string, string[]>,
+      confirmDialog: { open: false, type: 'save' as const, surfaceId: '', title: '', message: '' },
+    }
+    const actions = {
+      requestSave: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
+        onSubmit(surfaceId, domainId, action, data)
+      },
+      requestCancel: () => {},
+      confirmDialogAction: () => {},
+      dismissDialog: () => {},
+      updateData: () => {},
+      clearValidationErrors: () => {},
+    }
+    return [state, actions]
+  },
+}))
+
+vi.mock('@/components/cnui/CnuiSurfaceWrapper', () => ({
+  CnuiSurfaceWrapper: ({ surfaceId, domainId, action, surfaceType, lifecycleActions }: any) => (
+    <div data-testid="cnui-surface-wrapper" data-surface-type={surfaceType} data-surface-id={surfaceId} data-domain-id={domainId} data-action={action}>
       <span>CN-UI: {surfaceType}</span>
-      <button onClick={() => onConfirm({ name: '测试习惯', defaultTime: '07:00' })}>提交</button>
+      <button onClick={() => lifecycleActions.requestSave(surfaceId, domainId, action, { name: '测试习惯', defaultTime: '07:00' })}>提交</button>
     </div>
   ),
 }))
@@ -181,26 +204,49 @@ describe('ConversationView CN-UI 渲染', () => {
     },
   ]
 
-  it('should render CnuiRenderer when message has cnuiSurface', () => {
+  it('should render CnuiSurfaceWrapper when message has cnuiSurface', () => {
     render(
       <ConversationView
         messages={cnuiMessages}
         onSendMessage={vi.fn()}
       />
     )
-    expect(screen.getByTestId('cnui-renderer')).toBeInTheDocument()
+    expect(screen.getByTestId('cnui-surface-wrapper')).toBeInTheDocument()
     expect(screen.getByText('CN-UI: habit-creation-card')).toBeInTheDocument()
   })
 
-  it('should pass correct surfaceType to CnuiRenderer', () => {
+  it('should pass correct surfaceId to CnuiSurfaceWrapper', () => {
     render(
       <ConversationView
         messages={cnuiMessages}
         onSendMessage={vi.fn()}
       />
     )
-    const renderer = screen.getByTestId('cnui-renderer')
-    expect(renderer).toHaveAttribute('data-surface-type', 'habit-creation-card')
+    const wrapper = screen.getByTestId('cnui-surface-wrapper')
+    expect(wrapper).toHaveAttribute('data-surface-id', 'test-surface-1')
+  })
+
+  it('should pass correct domainId and action to CnuiSurfaceWrapper', () => {
+    render(
+      <ConversationView
+        messages={cnuiMessages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    const wrapper = screen.getByTestId('cnui-surface-wrapper')
+    expect(wrapper).toHaveAttribute('data-domain-id', 'habits')
+    expect(wrapper).toHaveAttribute('data-action', 'createHabit')
+  })
+
+  it('should pass correct surfaceType to CnuiSurfaceWrapper', () => {
+    render(
+      <ConversationView
+        messages={cnuiMessages}
+        onSendMessage={vi.fn()}
+      />
+    )
+    const wrapper = screen.getByTestId('cnui-surface-wrapper')
+    expect(wrapper).toHaveAttribute('data-surface-type', 'habit-creation-card')
   })
 
   it('should call onCnuiConfirm when CN-UI form is submitted', async () => {
@@ -223,13 +269,13 @@ describe('ConversationView CN-UI 渲染', () => {
     )
   })
 
-  it('should not render CnuiRenderer for messages without cnuiSurface', () => {
+  it('should not render CnuiSurfaceWrapper for messages without cnuiSurface', () => {
     render(
       <ConversationView
         messages={messages}
         onSendMessage={vi.fn()}
       />
     )
-    expect(screen.queryByTestId('cnui-renderer')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cnui-surface-wrapper')).not.toBeInTheDocument()
   })
 })
