@@ -20,7 +20,7 @@ export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
-import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, findDomain } from "@/domains/registry";
+import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, findDomain, getFullManifest } from "@/domains/registry";
 import { FormRegistry } from "@/lib/form-registry";
 import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
@@ -989,9 +989,9 @@ export async function openCnuiSurface(
   domainId: string,
   action: string,
 ): Promise<OpenCnuiSurfaceResult> {
-  const domain = findDomain(domainId)
-  const manifest = domain?.manifest as Record<string, any> | undefined
-  const genActions = manifest?.generation_actions as Record<string, any> | undefined
+  // 使用 getFullManifest 获取完整 manifest（含 generation_actions）
+  const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
+  const genActions = fullManifest?.generation_actions as Record<string, any> | undefined
   const genAction = genActions?.[action]
   const surfaceType: string = genAction?.cnui_surface_type ?? `${domainId}-${action}`
 
@@ -1004,7 +1004,7 @@ export async function openCnuiSurface(
   }
 
   // 从 manifest intent_triggers 获取可读描述
-  const intentTriggers = (manifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
+  const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
   const trigger = intentTriggers.find((t) => t.action === action)
   const actionLabel = trigger?.description ?? action
 

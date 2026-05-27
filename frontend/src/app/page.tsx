@@ -430,23 +430,21 @@ export default function Home() {
       }
 
       if (hasPayload && payload) {
-        // 有附加内容 → AI 解析字段 → 导航到 HabitListPage 填入
+        // 有附加内容 → AI 解析字段 → 在对话流内打开 CN-UI 表面
         setIsLoading(true)
         try {
           const habitParse = await parseHabitIntentOnly(content)
           if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
-            setMainViewState({
-              type: 'view',
-              domainId: 'habits',
-              action: 'createHabit',
-              initialFields: habitParse.fields,
-            })
-            const navMsg: ChatMessage = {
+            const cnuiResult = await openCnuiSurface('habits', 'createHabit')
+            // 将 AI 解析的字段合并到 surface 的 dataSnapshot
+            const mergedSnapshot = { ...cnuiResult.surface.dataSnapshot, ...habitParse.fields }
+            const cnuiMsg: ChatMessage = {
               role: 'assistant',
-              content: HABIT_USER_FACING.INTENT_RECOGNIZED,
+              content: `已识别习惯信息，请确认：`,
               timestamp: new Date().toISOString(),
+              cnuiSurface: { ...cnuiResult.surface, dataSnapshot: mergedSnapshot },
             }
-            setConversationMessages(prev => [...prev, navMsg])
+            setConversationMessages(prev => [...prev, cnuiMsg])
             setIsLoading(false)
             return
           }

@@ -68,7 +68,7 @@ export function getMarkdownTemplate(_domainId: string, _action: string): string 
   return undefined
 }
 
-function getFullManifest(domainId: string): DomainManifest | undefined {
+export function getFullManifest(domainId: string): DomainManifest | undefined {
   const result = loadDomainManifest(domainId)
   return result.success ? result.manifest : undefined
 }
