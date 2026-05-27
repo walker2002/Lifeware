@@ -12,6 +12,7 @@ import type {
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
+import { validateHabitFields } from './validation'
 
 const HH_MM_REGEX = /^\d{2}:\d{2}$/
 
@@ -37,34 +38,8 @@ export function createHabitsHooks(manifest: DomainManifest) {
     const action = intent.action
 
     if (action === 'createHabit' || action === 'updateHabit') {
-      const title = fields['title']
-      if (action === 'createHabit' && (!title || (typeof title === 'string' && title.trim() === ''))) {
-        errors.push('title 必填')
-      }
-
-      const defaultTime = fields['defaultTime']
-      if (defaultTime !== undefined && !isValidHHMM(defaultTime)) {
-        errors.push('defaultTime 必须是有效的 HH:MM 格式')
-      }
-
-      const defaultDuration = fields['defaultDuration']
-      if (defaultDuration !== undefined && (typeof defaultDuration !== 'number' || defaultDuration <= 0)) {
-        errors.push('defaultDuration 必须大于 0')
-      }
-
-      const minDuration = fields['minDuration']
-      if (minDuration !== undefined && (typeof minDuration !== 'number' || minDuration <= 0)) {
-        errors.push('minDuration 必须大于 0')
-      }
-
-      if (typeof minDuration === 'number' && typeof defaultDuration === 'number' && minDuration > defaultDuration) {
-        errors.push('minDuration 不能大于 defaultDuration')
-      }
-
-      const frequencyType = fields['frequencyType']
-      if (frequencyType !== undefined && !validFrequencyTypes.has(frequencyType as string)) {
-        errors.push(`frequencyType 必须是 ${[...validFrequencyTypes].join('/')}`)
-      }
+      const result = validateHabitFields(fields, action as 'createHabit' | 'updateHabit')
+      errors.push(...result.errors)
     }
 
     if (action === 'logHabit') {
