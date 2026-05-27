@@ -5,6 +5,8 @@ import type { ChatMessage } from "@/usom/types/objects"
 import type { AISessionSummary } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
 import { CnuiRenderer } from "@/components/cnui/CnuiRenderer"
+import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
+import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
 
 interface IntentTrigger {
   label: string
@@ -32,8 +34,15 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
 export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, onCnuiConfirm }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
-  const [loadingSurfaceId, setLoadingSurfaceId] = useState<string | null>(null)
-  const [surfaceDataCache, setSurfaceDataCache] = useState<Record<string, Record<string, unknown>>>({})
+  const [lifecycleState, lifecycleActions] = useCnuiLifecycle(
+    useCallback(
+      async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
+        if (!onCnuiConfirm) return
+        await onCnuiConfirm(surfaceId, domainId, action, data)
+      },
+      [onCnuiConfirm]
+    )
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -263,27 +272,15 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                   {msg.content}
                 </div>
                 {msg.cnuiSurface && (
-                  <div className="mt-3 rounded-lg border border-hairline bg-surface-soft p-4">
-                    <CnuiRenderer
-                      surfaceType={msg.cnuiSurface.cnuiSurfaceType as any}
-                      dataModel={surfaceDataCache[msg.cnuiSurface.cnuiSurfaceId] ?? msg.cnuiSurface.dataSnapshot ?? {}}
-                      onDataChange={(data) => {
-                        setSurfaceDataCache(prev => ({ ...prev, [msg.cnuiSurface!.cnuiSurfaceId]: data }))
-                      }}
-                      onConfirm={async (data) => {
-                        if (!onCnuiConfirm) return
-                        setLoadingSurfaceId(msg.cnuiSurface!.cnuiSurfaceId)
-                        try {
-                          await onCnuiConfirm(msg.cnuiSurface!.cnuiSurfaceId, msg.cnuiSurface!.domainId, msg.cnuiSurface!.action, data)
-                        } finally {
-                          setLoadingSurfaceId(null)
-                        }
-                      }}
-                      onCancel={() => {}}
-                      isLoading={loadingSurfaceId === msg.cnuiSurface.cnuiSurfaceId}
-                      isDone={false}
-                    />
-                  </div>
+                  <CnuiSurfaceWrapper
+                    surfaceId={msg.cnuiSurface.cnuiSurfaceId}
+                    domainId={msg.cnuiSurface.domainId}
+                    action={msg.cnuiSurface.action}
+                    surfaceType={msg.cnuiSurface.cnuiSurfaceType}
+                    dataSnapshot={msg.cnuiSurface.dataSnapshot}
+                    lifecycleState={lifecycleState}
+                    lifecycleActions={lifecycleActions}
+                  />
                 )}
               </div>
             ))}
