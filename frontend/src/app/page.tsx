@@ -19,6 +19,7 @@ import { WeekView } from "@/domains/timebox/components/week-view";
 import { MonthView } from "@/domains/timebox/components/month-view";
 import { HabitListPage } from "@/domains/habits/pages/HabitListPage";
 import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage";
+import "@/domains/habits/register-form";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
