@@ -354,7 +354,12 @@ export default function Home() {
 
   const handleGrowthAction = useCallback((domainId: string, action: string) => {
     saveCurrentConversation();
-    setMainViewState({ type: 'action', domainId, action });
+    // createHabit 直接导航到 HabitListPage（type: 'view'）打开编辑面板
+    if (domainId === 'habits' && action === 'createHabit') {
+      setMainViewState({ type: 'view', domainId, action });
+    } else {
+      setMainViewState({ type: 'action', domainId, action });
+    }
   }, [saveCurrentConversation]);
 
   // T031: conversation 消息发送 → 可能触发 splitWith
