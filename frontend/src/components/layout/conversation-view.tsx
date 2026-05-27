@@ -5,7 +5,12 @@ import type { ChatMessage } from "@/usom/types/objects"
 import type { AISessionSummary } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
 
-const DEFAULT_QUICK_ACTIONS = ['创建任务', '规划日程', '设定目标', '添加习惯', '能量记录']
+interface IntentTrigger {
+  label: string
+  shortcut: string
+  domainId: string
+  action: string
+}
 
 interface ConversationViewProps {
   messages: ChatMessage[]
@@ -13,6 +18,7 @@ interface ConversationViewProps {
   isLoading?: boolean
   recentSessions?: AISessionSummary[]
   onSelectSession?: (sessionId: string) => void
+  intentTriggers?: IntentTrigger[]
 }
 
 const ROLE_LABELS: Record<ChatMessage['role'], string> = {
@@ -21,7 +27,7 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
   system: '系统',
 }
 
-export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession }: ConversationViewProps) {
+export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -142,26 +148,85 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
       {fileInput}
 
       {messages.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4">
+        <div className="flex flex-1 flex-col items-center pt-[15vh] px-4">
+          {/* 标题 */}
           <h2 className="text-lg font-semibold text-ink">有什么可以帮你的？</h2>
-          <div className="mt-6 flex max-w-xl flex-wrap justify-center gap-2">
-            {DEFAULT_QUICK_ACTIONS.map(action => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => onSendMessage(action)}
-                className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
 
+          {/* 输入框区域 — 附件内置在输入框内 */}
           <form onSubmit={handleSubmit} className="mt-8 w-full max-w-xl">
-            {attachmentTags}
-            {inputBar}
+            <div className="rounded-md border border-hairline bg-background p-2">
+              {/* 附件标签（输入框内部上方） */}
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {attachments.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-1 rounded-md bg-surface-soft px-2 py-1 text-xs text-body"
+                    >
+                      <span className="max-w-[200px] truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(index)}
+                        className="ml-1 text-body/50 hover:text-body"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* 输入行：附件按钮 + 输入框 + 发送按钮 */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-body/50 hover:text-body transition-colors p-1 shrink-0"
+                  title="添加附件"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </button>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  placeholder="输入消息..."
+                  className="flex-1 border-0 bg-transparent text-sm text-ink placeholder:text-body/40 focus:outline-none"
+                  disabled={isLoading}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || (!input.trim() && attachments.length === 0)}
+                  className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50 shrink-0"
+                >
+                  发送
+                </button>
+              </div>
+            </div>
           </form>
 
+          {/* 常用意图（在输入框下方） */}
+          {intentTriggers && intentTriggers.length > 0 && (
+            <div className="mt-4 flex max-w-xl flex-wrap justify-center gap-2">
+              {intentTriggers.map(trigger => (
+                <button
+                  key={`${trigger.domainId}:${trigger.action}`}
+                  type="button"
+                  onClick={() => {
+                    setInput(trigger.shortcut + " ")
+                    inputRef.current?.focus()
+                  }}
+                  className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                >
+                  {trigger.label} ({trigger.shortcut})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 最近对话 */}
           {recentSessions && recentSessions.length > 0 && (
             <div className="mt-6 w-full max-w-xl">
               <p className="mb-2 text-xs text-body/50">最近对话</p>

@@ -92,6 +92,7 @@ export default function Home() {
   const [sessions, setSessions] = useState<AISessionSummary[]>([]);
   const [conversationMessages, setConversationMessages] = useState<ChatMessage[]>([]);
   const [domainActions, setDomainActions] = useState<Array<{ domainId: string; domainName: string; actions: Array<{ action: string; shortcut?: string; description: string }> }>>([]);
+  const [intentTriggers, setIntentTriggers] = useState<Awaited<ReturnType<typeof fetchIntentTriggers>>>([])
 
   useEffect(() => {
     fetchDomainActions()
@@ -101,6 +102,11 @@ export default function Home() {
 
   useEffect(() => {
     checkLLMConfigured().then(setLlmConfigured)
+  }, []);
+  useEffect(() => {
+    fetchIntentTriggers()
+      .then(setIntentTriggers)
+      .catch(err => console.error('[fetchIntentTriggers] 加载失败:', err))
   }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
 
@@ -469,6 +475,7 @@ export default function Home() {
           isLoading={isLoading}
           recentSessions={sessions.slice(0, 3)}
           onSelectSession={handleSelectSession}
+          intentTriggers={intentTriggers}
         />
       )
       if (splitWith) {
