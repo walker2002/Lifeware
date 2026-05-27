@@ -329,12 +329,22 @@ export interface ReviewMetrics {
   focusScore?: number // 0-100
 }
 
+/** CN-UI 表面引用（嵌入 ChatMessage 用于对话内渲染） */
+export interface CnuiSurfaceRef {
+  cnuiSurfaceId: string
+  cnuiSurfaceType: string
+  domainId: string
+  action: string
+  dataSnapshot?: Record<string, unknown>
+}
+
 // ─── ChatMessage (embedded in AISession) ──────────────────────
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Timestamp
   intentRef?: string
+  cnuiSurface?: CnuiSurfaceRef
 }
 
 // ─── 3.12 AISession ──────────────────────────────────────────
