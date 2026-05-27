@@ -8,6 +8,7 @@ interface CnuiFormAdapterProps {
   dataModel: Record<string, unknown>
   onDataChange: (data: Record<string, unknown>) => void
   onConfirm: (data: Record<string, unknown>) => void
+  isLoading?: boolean
 }
 
 /** 将 CN-UI dataModel 映射为 Form 的 initial props */
@@ -39,7 +40,7 @@ function mapFormToData(
   return result
 }
 
-export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onConfirm }: CnuiFormAdapterProps) {
+export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onConfirm, isLoading }: CnuiFormAdapterProps) {
   const config = FormRegistry.get(domainId, action)
 
   if (!config) {
@@ -60,6 +61,7 @@ export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onC
         onConfirm(mapFormToData(fields, config.fieldMapping))
       }}
       onCancel={() => onDataChange(dataModel)}
+      isLoading={isLoading}
     />
   )
 }
