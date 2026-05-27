@@ -9,6 +9,7 @@ interface CnuiRendererProps {
   dataModel: Record<string, unknown>
   onDataChange: (data: Record<string, unknown>) => void
   onConfirm: (data: Record<string, unknown>) => void
+  isLoading?: boolean
 }
 
 const SURFACE_RENDERERS: Record<string, React.ComponentType<CnuiRendererProps>> = {
@@ -16,7 +17,7 @@ const SURFACE_RENDERERS: Record<string, React.ComponentType<CnuiRendererProps>> 
   'timebox-list': TimeboxList,
 }
 
-export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm }: CnuiRendererProps) {
+export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, isLoading }: CnuiRendererProps) {
   const Renderer = SURFACE_RENDERERS[surfaceType]
 
   if (!Renderer) {
@@ -27,5 +28,5 @@ export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm }
     )
   }
 
-  return <Renderer surfaceType={surfaceType} dataModel={dataModel} onDataChange={onDataChange} onConfirm={onConfirm} />
+  return <Renderer surfaceType={surfaceType} dataModel={dataModel} onDataChange={onDataChange} onConfirm={onConfirm} isLoading={isLoading} />
 }

@@ -7,9 +7,10 @@ interface HabitCreationCardProps {
   dataModel: Record<string, unknown>
   onDataChange: (data: Record<string, unknown>) => void
   onConfirm: (data: Record<string, unknown>) => void
+  isLoading?: boolean
 }
 
-export function HabitCreationCard({ dataModel, onDataChange, onConfirm }: HabitCreationCardProps) {
+export function HabitCreationCard({ dataModel, onDataChange, onConfirm, isLoading }: HabitCreationCardProps) {
   return (
     <div className="w-full max-w-md">
       <div className="mb-3 text-sm font-medium text-ink">习惯创建</div>
@@ -19,6 +20,7 @@ export function HabitCreationCard({ dataModel, onDataChange, onConfirm }: HabitC
         dataModel={dataModel}
         onDataChange={onDataChange}
         onConfirm={onConfirm}
+        isLoading={isLoading}
       />
     </div>
   )
