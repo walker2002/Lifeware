@@ -39,6 +39,7 @@ import {
   startOfMonth, endOfMonth,
   addDays, addWeeks, addMonths,
 } from "date-fns";
+import { resolveSlashCommand } from "@/lib/slash-command";
 import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/main-view-state";
 
 // view_route 页面组件映射（domainId → action → Component）
@@ -384,9 +385,46 @@ export default function Home() {
       return
     }
 
+    // slash 命令处理 — 无 payload 走 CN-UI Handler 管道
+    const slashResult = resolveSlashCommand(content)
+    if (slashResult.isSlashCommand) {
+      const { hasPayload, payload } = slashResult
+
+      if (hasPayload && payload) {
+        // 有附加内容 → AI 解析字段 → 导航到 HabitListPage 填入
+        setIsLoading(true)
+        try {
+          const habitParse = await parseHabitIntentOnly(content)
+          if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
+            setMainViewState({
+              type: 'view',
+              domainId: 'habits',
+              action: 'createHabit',
+              initialFields: habitParse.fields,
+            })
+            const navMsg: ChatMessage = {
+              role: 'assistant',
+              content: HABIT_USER_FACING.INTENT_RECOGNIZED,
+              timestamp: new Date().toISOString(),
+            }
+            setConversationMessages(prev => [...prev, navMsg])
+            setIsLoading(false)
+            return
+          }
+        } catch (err) {
+          console.error('[slashCommand] AI 解析失败:', err)
+        }
+        setIsLoading(false)
+        // AI 解析失败 → 继续走 submitIntent 通用管道
+      } else {
+        // 无附加内容 → 让 submitIntent 走 Handler → CN-UI 管道
+        // 不拦截，继续执行下面的 submitIntent
+      }
+    }
+
     setIsLoading(true)
     try {
-      // 习惯创建意图 → 仅解析不执行，导航到 HabitListPage 填入字段
+      // 习惯创建意图（自然语言，非 slash 命令）→ AI 解析 → 导航到 HabitListPage
       const habitParse = await parseHabitIntentOnly(content)
       if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
         setMainViewState({
