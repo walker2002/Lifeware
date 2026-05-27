@@ -23,7 +23,7 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { DynamicForm } from "@/components/editor/dynamic-form"
 import { ActionConfirm } from "@/components/editor/action-confirm"
