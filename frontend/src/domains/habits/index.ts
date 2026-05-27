@@ -5,6 +5,8 @@ import type { DomainPlugin } from '@/usom/types/process'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { createDomainPlugin } from '@/domains/plugin-factory'
 import { createHabitsHooks } from './hooks'
+import { HabitForm } from './components/habit-form'
+import { FormRegistry } from '@/lib/form-registry'
 
 const result = loadDomainManifest('habits')
 
@@ -25,3 +27,20 @@ export const habitsPlugin: DomainPlugin = result.success
 export { createHabitsHooks } from './hooks'
 export { habitTransitions, findTransition } from './transitions'
 export { PendingHabitsProvider, HabitTemplatesProvider } from './providers'
+
+// ─── CN-UI Form 适配器注册 ──────────────────────────────────────
+FormRegistry.register('habits', 'createHabit', {
+  component: HabitForm as any,
+  fieldMapping: {
+    name: 'title',
+    defaultTime: 'defaultTime',
+    defaultDuration: 'defaultDuration',
+    frequencyType: 'frequencyType',
+    trackable: 'trackable',
+  },
+  defaults: {
+    defaultDuration: 30,
+    trackable: true,
+    frequencyType: 'daily',
+  },
+})
