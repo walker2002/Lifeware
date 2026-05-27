@@ -1,17 +1,17 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.7.0 → 1.7.1
-  Rationale: PATCH — Clarified view_routes implementation detail:
-  build-time route generation from manifest.url field to maintain
-  Domain independence despite Next.js App Router constraints.
-  No new principles or governance changes.
+  Version change: 1.7.1 → 1.7.2
+  Rationale: PATCH — Added Form Component Reuse Constraint to CN-UI Protocol
+  Constraints: forms MUST reuse Domain components via adapters, not maintain 
+  independent field definitions. No new principles or governance changes.
 
   Modified sections:
     - Architecture Constraints > Domain Registration Process (Step 6
       clarified: view_routes now include url field; routes generated
       at build time via scripts/generate-routes.ts; app/ routes are
       auto-generated thin wrappers)
+    - CN-UI Protocol Constraints (Form Component Reuse Constraint added)
 
   Modified principles:
     - None (implementation detail only)
@@ -673,7 +673,7 @@ CN-UI (Conversation Native UI) is a declarative Payload protocol that
 allows Handlers to produce interactive UI components within the
 conversation flow.
 
-**Three constraints**:
+**Four constraints**:
 
 1. **Declarative data, not executable code**: CN-UI Payloads are JSON
    data describing component structure, props, and actions. They
@@ -692,6 +692,11 @@ conversation flow.
    modify) are captured as CNUIEvents, processed by SurfaceManager,
    and result in structured data entering Rule Engine → State Machine.
    CN-UI MUST NOT navigate users to separate pages.
+
+4. **Form Component Reuse Constraint**: 当 CN-UI 表面需要渲染与 Domain 页面编辑面板相同的表单时，
+   MUST 通过适配层（CnuiFormAdapter）复用 Domain 的 Form 组件，MUST NOT 维护独立的字段定义和验证逻辑。
+   Domain 的 Form 组件是表单实现的唯一来源。新 Domain 只需注册 FormAdapterConfig 即可在三种上下文
+   （页面编辑面板、GrowthMenu 入口、AI 助手 CN-UI）中复用同一表单实现。
 
 **Rationale**: CN-UI solves the experience fragmentation problem
 (form jumps, Markdown editing) while maintaining Nexus safety
@@ -1024,4 +1029,4 @@ document that specifies the build-time route generation mechanism
 detailing how `view_routes.url` declarations become Next.js App Router
 files.
 
-**Version**: 1.7.1 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-26
+**Version**: 1.7.2 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-27
