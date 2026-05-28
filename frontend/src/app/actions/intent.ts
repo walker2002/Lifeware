@@ -74,6 +74,16 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
   };
 }
 
+function getChineseActionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    activate: '激活',
+    suspend: '暂停',
+    reactivate: '恢复',
+    archive: '归档',
+  }
+  return labels[action] ?? action
+}
+
 async function fetchTimeboxSummariesByRange(
   start: Date,
   end: Date,
@@ -641,6 +651,38 @@ export async function checkHabitReferences(
   }
 }
 
+interface HabitItem {
+  id: string
+  title: string
+  defaultTime: string
+  streak: number
+  frequencyType?: string
+  status: string
+}
+
+/** 获取指定状态的习惯列表（用于生命周期操作面板） */
+export async function getHabitsByStatus(
+  status: string,
+): Promise<{ success: boolean; habits?: HabitItem[]; error?: string }> {
+  try {
+    const repo = await getHabitRepo()
+    const allHabits = await repo.findByUserId(MVP_USER_ID)
+    const filtered = allHabits
+      .filter(h => h.status === status)
+      .map(h => ({
+        id: h.id,
+        title: h.title,
+        defaultTime: h.defaultTime,
+        streak: h.streak,
+        frequencyType: h.frequency.type,
+        status: h.status,
+      }))
+    return { success: true, habits: filtered }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : '获取习惯列表失败' }
+  }
+}
+
 /** 更新习惯信息 */
 export async function updateHabit(
   habitId: string,
@@ -1009,6 +1051,33 @@ export async function openCnuiSurface(
   const trigger = intentTriggers.find((t) => t.action === action)
   const actionLabel = trigger?.description ?? action
 
+  // lifecycle actions: activateHabit, suspendHabit, archiveHabit, reactivateHabit
+  const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
+  if (lifecycleActions.includes(action) && domainId === 'habits') {
+    const statusMap: Record<string, string> = {
+      activateHabit: 'draft',
+      suspendHabit: 'active',
+      archiveHabit: 'suspended',
+      reactivateHabit: 'suspended',
+    }
+    const status = statusMap[action] ?? 'draft'
+    const result = await getHabitsByStatus(status)
+    const items = result.success ? (result.habits ?? []) : []
+
+    const smAction = action.replace('Habit', '') // activateHabit -> activate
+
+    return {
+      content: `请选择要${getChineseActionLabel(smAction)}的习惯`,
+      surface: {
+        cnuiSurfaceId: crypto.randomUUID(),
+        cnuiSurfaceType: 'habit-action-panel',
+        domainId,
+        action,
+        dataSnapshot: { action: smAction, items },
+      },
+    }
+  }
+
   return {
     content: `请填写${actionLabel}信息`,
     surface: {
@@ -1049,6 +1118,29 @@ export async function submitCnuiSurface(
 
   if (domainId === "habits" && action === "createHabit") {
     return submitHabitIntent(mappedFields as CreateHabitInput)
+  }
+
+  // lifecycle action 提交
+  const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
+  if (domainId === 'habits' && lifecycleActions.includes(action)) {
+    const selectedIds = fields['selectedIds'] as string[]
+    const submittedAction = fields['action'] as string ?? action.replace('Habit', '')
+    if (!selectedIds || selectedIds.length === 0) {
+      return { success: false, error: '未选择任何习惯' }
+    }
+
+    const smAction = submittedAction as 'activate' | 'suspend' | 'reactivate' | 'archive'
+    let lastError: string | undefined
+    for (const habitId of selectedIds) {
+      const result = await updateHabitStatus(habitId, smAction)
+      if (!result.success) {
+        lastError = result.error
+      }
+    }
+    if (lastError) {
+      return { success: false, error: lastError }
+    }
+    return { success: true }
   }
 
   return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
