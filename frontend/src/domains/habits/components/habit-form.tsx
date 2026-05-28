@@ -152,6 +152,16 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       onKeyDown={(e) => {
         if (disableEnterSubmit && e.key === 'Enter' && e.target instanceof HTMLInputElement) {
           e.preventDefault()
+          const form = formRef.current
+          if (!form) return
+          const focusable = Array.from(
+            form.querySelectorAll('input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)')
+          )
+          const idx = focusable.indexOf(e.target)
+          const next = focusable[idx + 1]
+          if (next instanceof HTMLElement) {
+            next.focus()
+          }
         }
       }}
       className="flex flex-col gap-4"

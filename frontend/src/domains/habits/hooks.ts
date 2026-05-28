@@ -12,16 +12,7 @@ import type {
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
-import { validateHabitFields } from './validation'
-
-const HH_MM_REGEX = /^\d{2}:\d{2}$/
-
-function isValidHHMM(value: unknown): boolean {
-  if (typeof value !== 'string') return false
-  if (!HH_MM_REGEX.test(value)) return false
-  const [h, m] = value.split(':').map(Number)
-  return h >= 0 && h < 24 && m >= 0 && m < 60
-}
+import { validateHabitFields, isValidHHMM } from './validation'
 
 export function createHabitsHooks(manifest: DomainManifest) {
   const subscribedEvents = new Set(manifest.subscribed_events)

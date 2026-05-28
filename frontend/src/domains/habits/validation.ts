@@ -1,9 +1,9 @@
 // 纯函数校验模块 — 客户端/服务端复用
 // 不依赖 React、不依赖数据库
 
-const HH_MM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+export const HH_MM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
 
-function isValidHHMM(value: unknown): boolean {
+export function isValidHHMM(value: unknown): boolean {
   if (typeof value !== 'string') return false
   return HH_MM_REGEX.test(value)
 }
@@ -32,15 +32,17 @@ export function validateHabitFields(
     errors.push('标题必填')
   }
 
-  // 时间格式校验（仅在校验传入时有效时校验格式）
-  if (!isValidHHMM(fields['defaultTime'])) {
-    errors.push('默认时间必须是有效的 HH:MM 格式')
-  }
-  if (!isValidHHMM(fields['earliestTime'])) {
-    errors.push('最早开始时间格式无效')
-  }
-  if (!isValidHHMM(fields['latestStartTime'])) {
-    errors.push('最迟开始时间格式无效')
+  // 时间格式校验（仅在字段有值时才校验格式，允许 update 时部分更新）
+  const timeFields = [
+    { key: 'defaultTime', label: '默认时间' },
+    { key: 'earliestTime', label: '最早开始时间' },
+    { key: 'latestStartTime', label: '最迟开始时间' },
+  ]
+  for (const { key, label } of timeFields) {
+    const val = fields[key]
+    if (val !== undefined && val !== null && !isValidHHMM(val)) {
+      errors.push(`${label}必须是有效的 HH:MM 格式`)
+    }
   }
 
   // 时间窗口约束
@@ -65,8 +67,10 @@ export function validateHabitFields(
   }
 
   const minDuration = fields['minDuration']
-  if (typeof minDuration === 'number' && typeof defaultDuration === 'number') {
+  if (typeof minDuration === 'number') {
     if (minDuration <= 0) errors.push('最短时长必须大于 0')
+  }
+  if (typeof minDuration === 'number' && typeof defaultDuration === 'number') {
     if (minDuration > defaultDuration) errors.push('最短时长不能大于默认时长')
   }
 

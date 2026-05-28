@@ -15,9 +15,11 @@ interface TimeboxListProps {
   dataModel: Record<string, unknown>
   onDataChange: (data: Record<string, unknown>) => void
   onConfirm: (data: Record<string, unknown>) => void
+  onCancel?: () => void
+  isDone?: boolean
 }
 
-export function TimeboxList({ dataModel, onDataChange, onConfirm }: TimeboxListProps) {
+export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDone }: TimeboxListProps) {
   const items = (dataModel.items as TimeboxItem[]) ?? []
 
   function removeItem(index: number) {

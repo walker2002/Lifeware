@@ -4,7 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import type { ChatMessage } from "@/usom/types/objects"
 import type { AISessionSummary } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
-import { CnuiRenderer } from "@/components/cnui/CnuiRenderer"
 import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
 

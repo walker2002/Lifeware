@@ -8,7 +8,7 @@ FormRegistry.register('habits', 'createHabit', {
   // 但 TypeScript 函数参数逆变导致类型不兼容。运行时安全。
   component: HabitForm as any,
   fieldMapping: {
-    name: 'title',
+    title: 'title',
     description: 'description',
     defaultTime: 'defaultTime',
     earliestTime: 'earliestTime',

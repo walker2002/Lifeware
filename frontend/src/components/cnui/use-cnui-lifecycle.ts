@@ -124,7 +124,7 @@ export function useCnuiLifecycle(
       await onSubmit(surfaceId, domainId, action, pendingData)
       setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'saved' }))
     } catch {
-      // 错误由调用方处理
+      setValidationErrors(prev => ({ ...prev, [surfaceId]: ['保存失败，请稍后重试'] }))
     } finally {
       setSubmittingId(null)
     }
