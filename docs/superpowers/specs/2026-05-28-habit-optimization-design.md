@@ -17,6 +17,7 @@ CN-UI 和页面端共享同一交互模式：
 - 顶部"全选"复选框 + "已选 N / 总数"计数
 - 底部单个执行按钮 "XXX所选 (N)"，N=0 时 disabled
 - 点击全选 → 选中/取消全部项目
+- **选中视觉反馈**：勾选后标题添加删除线（`text-decoration: line-through`），整行文字变灰（`color: #9ca3af`）；取消勾选恢复。CN-UI（HabitActionPanel、HabitCheckinPanel）和页面端 HabitCard 统一应用
 
 ---
 
