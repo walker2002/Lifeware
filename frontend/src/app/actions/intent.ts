@@ -1128,6 +1128,33 @@ export async function openCnuiSurface(
   const trigger = intentTriggers.find((t) => t.action === action)
   const actionLabel = trigger?.description ?? action
 
+  // logHabit: 展示待打卡习惯
+  if (action === 'logHabit' && domainId === 'habits') {
+    const repo = await getHabitRepo()
+    const allHabits = await repo.findByUserId(MVP_USER_ID)
+    const pending = allHabits
+      .filter(h => h.status === 'active' && h.trackable)
+      .map(h => ({
+        id: h.id,
+        title: h.title,
+        defaultTime: h.defaultTime,
+        defaultDuration: h.defaultDuration,
+        streak: h.streak,
+        todayLogged: false, // MVP: HabitLogRepository 查询需额外 server action
+      }))
+
+    return {
+      content: '请选择要打卡的习惯',
+      surface: {
+        cnuiSurfaceId: crypto.randomUUID(),
+        cnuiSurfaceType: 'habit-checkin-panel',
+        domainId,
+        action,
+        dataSnapshot: { items: pending },
+      },
+    }
+  }
+
   // lifecycle actions: activateHabit, suspendHabit, archiveHabit, reactivateHabit
   const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
   if (lifecycleActions.includes(action) && domainId === 'habits') {
@@ -1218,6 +1245,28 @@ export async function submitCnuiSurface(
       return { success: false, error: lastError }
     }
     return { success: true }
+  }
+
+  // logHabit 提交
+  if (domainId === 'habits' && action === 'logHabit') {
+    const selectedIds = fields['selectedIds'] as string[]
+    const detailFields = (fields['detailFields'] ?? {}) as Record<string, Record<string, unknown>>
+
+    if (!selectedIds || selectedIds.length === 0) {
+      return { success: false, error: '未选择任何习惯' }
+    }
+
+    const items = selectedIds.map(id => ({
+      habitId: id,
+      fields: detailFields[id] as {
+        actualDuration?: number
+        completionRating?: number
+        energyLevel?: number
+        note?: string
+      } | undefined,
+    }))
+
+    return batchLogHabits(items)
   }
 
   return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
