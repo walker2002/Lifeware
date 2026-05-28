@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { validateHabitFields } from '../validation'
 
 export interface HabitFormFields {
   title: string
@@ -83,6 +84,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
+  const [clientErrors, setClientErrors] = useState<string[]>([])
   const formRef = useRef<HTMLFormElement>(null)
 
   // 监听外部提交触发
@@ -123,7 +125,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // 自动补全（如果用户手动改过则用手动值）
+    // 客户端预检（纯函数，与 onValidate 复用同一逻辑）
     const auto = autoComplete(defaultTime, defaultDuration)
     const fields: HabitFormFields = {
       title,
@@ -140,10 +142,15 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       endDate: endDate || undefined,
     }
 
+    const validation = validateHabitFields(fields, 'createHabit')
+    if (!validation.valid) {
+      setClientErrors(validation.errors)
+      return
+    }
+    setClientErrors([])
+
     onSubmit(fields)
   }
-
-  const isValid = title.trim().length > 0 && /^\d{2}:\d{2}$/.test(defaultTime) && defaultDuration > 0
 
   return (
     <form
@@ -326,12 +333,21 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
         </div>
       </div>
 
+      {/* 校验错误 */}
+      {clientErrors.length > 0 && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+          {clientErrors.map((err, i) => (
+            <div key={i}>{err}</div>
+          ))}
+        </div>
+      )}
+
       {/* 操作按钮 */}
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           取消
         </Button>
-        <Button type="submit" disabled={!isValid || isLoading}>
+        <Button type="submit" disabled={isLoading}>
           {isLoading ? "提交中..." : initial ? "保存" : "创建"}
         </Button>
       </div>
