@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_05_28 (refactor)**：执行记录模型统一化 —— `habit_logs` 字段对齐 ExecutionRecord（`status` → `completion_status`，新增 `planned_duration`/`deviation_minutes`/`completion_rating`/`energy_level`，source 扩展 `'timebox_sync'`）；新增 `task_execution_logs` 表
 - 2026_05_25 (sync)：同步代码变更 — 移除 tasks/projects/project_templates/task_templates 时间字段；更新 ai_sessions 表（新增 domain_id/action/session_mode，扩展状态枚举为 6 值）；新增 memory_episodes 表；system_events.triggered_by 新增 context_engine/handler；reviews.type 新增 semi_annual
 - 2026_05_11 (enhancement)：objectives 新增 objective_number/priority 列、period_type 枚举新增 semi_annual
 - 2026_05_11：objectives 表新增 okr_type/discarded_at 列、key_results 表新增 discarded_at 列、状态枚举新增 discarded
@@ -127,6 +128,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── habit_templates        ← 习惯模板（一组习惯的打包方案）
 ├── template_habits        ← 模板-习惯关联表（多对多）
 ├── timeboxes              ← 时间盒
+├── task_execution_logs    ← 任务执行记录（新增 2026-05-28）
 └── reviews                ← 复盘
 
 关联表（Junction Tables）
@@ -605,22 +607,33 @@ CREATE INDEX idx_habits_key_result ON habits(key_result_id) where key_result_id 
 
 对应 USOM `HabitLog`。独立表，不嵌套在 `habits` 内。
 
+> **2026-05-28 变更**：
+> - `status` → `completion_status`，值域统一为 `('completed', 'partially_completed', 'not_completed')`
+> - 新增 `planned_duration`、`deviation_minutes`、`completion_rating`、`energy_level`
+> - `source` 扩展 `'timebox_sync'`，标识由时间盒确认触发的级联打卡
+
 ```sql
 CREATE TABLE habit_logs (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid not null references users(id) on delete cascade,
-  schema_version integer not null default 1,
+  schema_version integer not null default 2,  -- schema_version 升级（2026-05-28）
 
   -- 查询关键字段（独立列）
   habit_id       uuid not null references habits(id) on delete cascade,
   date           date not null,
-  status         text not null check (status in ('completed', 'skipped', 'partial')),
-  actual_duration integer,
+  completion_status text not null check (completion_status in ('completed', 'partially_completed', 'not_completed')),
+  actual_duration  integer,
+  planned_duration integer,        -- 新增（2026-05-28）
+  deviation_minutes integer,       -- 新增（2026-05-28）
+
+  -- 详细模式字段（可选）
+  completion_rating integer,       -- 新增：完成评分 1-5（2026-05-28）
+  energy_level     integer,        -- 新增：能量水平 1-10（2026-05-28）
 
   -- 审计字段
   note           text,
   logged_at      timestamptz not null default now(),
-  source         text not null check (source in ('manual', 'connector')) default 'manual'
+  source         text not null check (source in ('manual', 'connector', 'timebox_sync')) default 'manual'
 );
 
 -- 唯一约束：同一习惯同一天只能有一条打卡记录
@@ -727,6 +740,49 @@ ALTER TABLE timeboxes ADD CONSTRAINT check_timeboxes_end_after_start
 ```
 
 > **注意**：`taskIds` 和 `habitIds` 不在本表存储，通过 `timebox_tasks` 和 `timebox_habits` 关联表维护（见第五章）。USOM 中的数组字段在 Repository 层聚合后注入到 USOM 对象。
+
+---
+
+### 4.6a task_execution_logs（任务执行记录表，新增 2026-05-28）
+
+对应 USOM `Task.lastExecutionRecord` 的历史存储。Task 可能跨多个 Timebox 分段执行，需要独立表记录完整历史。
+
+> 设计决策：与 `habit_logs` 对齐字段结构，确保跨 Domain 执行记录的语义一致性。
+> 与 `timeboxes.execution_record`（JSONB）不同：`task_execution_logs` 是 1:N 关系，一个 Task 可在多个 Timebox 中执行。
+
+```sql
+CREATE TABLE task_execution_logs (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references users(id) on delete cascade,
+  schema_version integer not null default 1,
+
+  -- 关联字段（查询关键）
+  task_id        uuid not null references tasks(id) on delete cascade,
+  timebox_id     uuid references timeboxes(id) on delete set null,  -- 关联的 timebox（可为空）
+
+  -- 执行记录字段（与 ExecutionRecord 对齐）
+  completion_status text not null check (completion_status in ('completed', 'partially_completed', 'not_completed')),
+  actual_duration   integer,
+  planned_duration  integer,
+  deviation_minutes integer,
+
+  -- 详细模式字段（可选）
+  completion_rating integer,
+  actual_output     text,
+  deviation_reasons text,
+  energy_level      integer,
+
+  -- 审计字段
+  note           text,
+  logged_at      timestamptz not null default now(),
+  source         text not null check (source in ('manual', 'timebox_sync')) default 'manual'
+);
+
+-- 索引
+CREATE INDEX idx_task_exec_logs_user_task ON task_execution_logs(user_id, task_id);
+CREATE INDEX idx_task_exec_logs_timebox ON task_execution_logs(timebox_id);
+CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logged_at desc);
+```
 
 ---
 
@@ -1262,6 +1318,8 @@ interface DerivedSignalsRepository {
 | `Review.sections` | JSONB | 直接 JSON 序列化/反序列化 |
 | `Review.metrics` | JSONB | 同上 |
 | `Task.tags` / `Habit.tags` | JSONB | `string[]` 序列化 |
+| `Task.lastExecutionRecord` | `task_execution_logs` 表 | Repository 联查后注入 |
+| `HabitLog.status` | `completion_status` text | 值映射：completed/skipped/partial → completed/not_completed/partially_completed |
 
 ---
 
@@ -1279,6 +1337,7 @@ interface DerivedSignalsRepository {
 | `habit_templates` | 习惯模板表 |
 | `template_habits` | 模板-习惯关联表 |
 | `timeboxes` | 时间盒表 |
+|  | 任务执行记录表（新增 2026-05-28） |
 | `timebox_tasks` | Timebox-Task 关联表 |
 | `timebox_habits` | Timebox-Habit 关联表 |
 | `intentions` | 意图表 |

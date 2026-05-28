@@ -28,18 +28,26 @@
 位置：`frontend/src/usom/types/objects.ts`（位置不变，语义扩展）
 
 ```typescript
-// 简单模式 — 完成状态、时长、偏差
-export interface SimpleExecutionRecord {
-  mode: 'simple'
+// 执行记录来源类型
+export type ExecutionSourceType = 'timebox' | 'habit' | 'task'
+
+// 基础字段（共享）
+export interface ExecutionRecordBase {
   completionStatus: 'completed' | 'partially_completed' | 'not_completed'
   actualDuration: number          // 分钟
   plannedDuration: number          // 分钟
   deviationMinutes: number         // 实际 - 计划
+  sourceType: ExecutionSourceType  // 来源 Domain 标识
   loggedAt: string                 // ISO 时间戳
 }
 
+// 简单模式
+export interface SimpleExecutionRecord extends ExecutionRecordBase {
+  mode: 'simple'
+}
+
 // 详细模式 — 增加评分、产出、原因等
-export interface DetailedExecutionRecord extends Omit<SimpleExecutionRecord, 'mode'> {
+export interface DetailedExecutionRecord extends ExecutionRecordBase {
   mode: 'detailed'
   completionRating: number         // 1-5
   actualOutput: string             // 实际产出描述
@@ -166,27 +174,24 @@ CREATE TABLE task_execution_logs (
 用户执行 "确认时间盒执行"
   ↓
 State Machine: timebox status → 'logged', 写入 execution_record (JSONB)
-  ↓ 发射 SystemEvent { type: 'TimeboxLogged', payload: { timeboxId, habitIds, taskIds } }
+  ├─ 读取 Domain manifest `cascade_rules` 声明
+  ├─ 检查是否有 `on_event: TimeboxLogged` 的级联规则
+  ├─ Habits Domain manifest 声明：
+  │   cascade_rules:
+  │     - on_event: TimeboxLogged
+  │       action: log_habit
+  │       auto_execute: true
+  ├─ State Machine 自动执行级联：
+  │   ├─ 遍历 payload.habitIds，检查当天是否已有 habit_log → 已有则跳过
+  │   └─ 调用 HabitLogRepository.save(logEntry)
+  └─ 发射 SystemEvent { type: 'ExecutionLogged', payload: { sourceType: 'timebox', ... } }
   ↓
-Habits Domain.onEvent
-  ├─ 遍历 payload.habitIds，筛选属于自己的 habit
-  ├─ 检查每个 habit 当天是否已有 habit_log → 已有则跳过
-  └─ 返回 { suggestions: [
-       { suggestionType: 'log_entry', actionType: 'log_habit',
-         targetType: 'habit', targetId: <habitId>,
-         payload: { completionStatus: 'completed', actualDuration, plannedDuration,
-                    deviationMinutes, source: 'timebox_sync', ... },
-         label: '自动打卡', weight: 1.0 }
-     ]}
+Habits Domain.onEvent (ExecutionLogged)
+  ├─ 只返回 metrics 和 suggestions（不触发状态变更）
+  └─ 返回 { metrics: [streak+1], suggestions: [] }
   ↓
-State Machine 消费 suggestions:
-  ├─ suggestionType === 'log_entry' → 不查 lifecycle，直接写入
-  └─ 调用 HabitLogRepository.save(logEntry)
-  ↓ 发射 SystemEvent { type: 'HabitLogged', payload: { habitId, source: 'timebox_sync' } }
-  ↓
-Timebox Domain.onEvent
-  ├─ 收到 HabitLogged 事件
-  └─ source === 'timebox_sync' → 跳过（不生成 log_timebox suggestion）
+Memory Framework 接收 ExecutionLogged 事件
+  └─ 更新 DerivedSignals（streak、completionRate 等）
 ```
 
 ### 场景 B：习惯独立打卡 → 时间盒建议结束/确认
@@ -195,13 +200,12 @@ Timebox Domain.onEvent
 用户在习惯 Domain 执行打卡（manual）
   ↓
 State Machine → 写入 habit_logs (source: 'manual')
-  ↓ 发射 SystemEvent { type: 'HabitLogged', payload: { habitId, source: 'manual' } }
+  ↓ 发射 SystemEvent { type: 'ExecutionLogged', payload: { sourceType: 'habit', ... } }
   ↓
-Timebox Domain.onEvent
-  ├─ 收到 HabitLogged 事件
-  ├─ source === 'manual' → 检查今日是否有包含该 habit 的 timebox
-  ├─ 无 → 无需操作
-  ├─ 有且 status 为 'running'/'overtime'
+Timebox Domain.onEvent (ExecutionLogged)
+  ├─ sourceType === 'habit' → 检查今日是否有包含该 habit 的 timebox
+  ├─ 无 → 返回 { suggestions: [] }
+  ├─ 有且 timebox status 为 'running'/'overtime'
   │  └─ 检查同一 timebox 内所有 habit 是否都已完成
   │     └─ 是 → 返回 { suggestions: [
   │           { suggestionType: 'state_transition', actionType: 'end_timebox',
@@ -224,22 +228,45 @@ Timebox Domain.onEvent
 
 | 时刻 | 防护 |
 |------|------|
-| TimeboxLogged → Habit 生成 suggestion | State Machine 写 habit_logs 前检查去重（今天已有则不写） |
-| HabitLogged (source=timebox_sync) | Timebox Domain 检查 source，跳过不处理 |
-| TimeboxLogged 重复发射 | State Machine 验证 status 已是 `logged`（不可逆），拒绝重复执行 |
+| Timebox → ExecutionLogged (sourceType='timebox') | State Machine 读取 `cascade_rules`，检查当天是否已有 habit_log → 已有则跳过 |
+| Habit manual 打卡 → ExecutionLogged (sourceType='habit') | Timebox Domain.onEvent 检查 sourceType，不生成 log_timebox suggestion |
+| ExecutionLogged 重复发射 | State Machine 验证级联规则的去重条件（如 `(habitId, date)` 唯一约束） |
+| 级联规则的 auto_execute | manifest 中 `auto_execute: false` 时， suggestion 进入 Action Surface，用户确认后走完整链路 |
 
 ---
 
 ## State Machine 扩展
 
-`onEvent` 返回的 suggestions 需要区分两类动作，State Machine 据此选择不同的处理路径：
+### 1. 级联规则（Cascade Rules）
 
-| 类型 | 动作 | State Machine 行为 |
-|------|------|-------------------|
-| `state_transition` | `log_timebox`, `end_timebox` | 查 manifest.lifecycle，验证 from→to 合法性 → 执行状态转换 |
-| `log_entry` | `log_habit`, `log_task_execution` | 不查 lifecycle，直接调用 domain repository 写入 |
+级联行为不是"用户意图"，而是"业务规则"声明。类似于数据库的 `ON DELETE CASCADE`，级联规则声明在 Domain manifest 中：
 
-`ActionSurfaceSuggestion` 类型扩展：
+```yaml
+# domains/habits/manifest.yaml
+cascade_rules:
+  - on_event: 'ExecutionLogged'
+    condition: "payload.sourceType == 'timebox'"
+    action: 'log_habit'
+    auto_execute: true   # State Machine 直接执行，无需用户确认
+```
+
+State Machine 在执行原始 StateProposal 后：
+1. 读取所有 Domain manifest 的 `cascade_rules`
+2. 匹配当前事件类型和条件
+3. `auto_execute: true` → 直接执行级联操作
+4. `auto_execute: false` → 生成 suggestion 进入 Action Surface
+
+### 2. Suggestion 类型
+
+`onEvent` 返回的 suggestions 需要区分三类动作：
+
+| 类型 | 动作 | 处理路径 |
+|------|------|---------|
+| `state_transition` | `log_timebox`, `end_timebox` | State Machine 查 manifest.lifecycle 验证 → 执行状态转换 |
+| `log_entry` | `log_habit`, `log_task_execution` | State Machine 直接调用 domain repository 写入（不查 lifecycle） |
+| `action_surface` | `check_timebox_status` | 进入 Action Surface Engine，由用户决定是否执行 |
+
+### 3. ActionSurfaceSuggestion 类型扩展
 
 ```typescript
 export interface ActionSurfaceSuggestion {
@@ -247,28 +274,60 @@ export interface ActionSurfaceSuggestion {
   suggestionType: 'state_transition' | 'log_entry' | 'action_surface'  // 新增
   targetType: USOMObjectType
   targetId?: USOM_ID
-  payload: Record<string, unknown>
+  payload?: Record<string, unknown>
   label: string
   weight: number
 }
 ```
 
+### 4. onEvent 边界约束
+
+根据宪章 VI，`onEvent` 的职责边界：
+
+- **✅ 可以返回**：metrics（指标更新）、suggestions（行动建议）
+- **❌ 禁止执行**：状态变更、写入数据库、调用 AI
+- **Projection 更新**（如 streak +1）：由 State Machine 通过后续 StateProposal 处理
+- **DerivedSignal 更新**：由 Memory Framework 的 Deviation Aggregator 处理
+
 State Machine 处理逻辑：
 
 ```typescript
+// 阶段 1：执行原始 StateProposal
+await executeStateTransition(stateProposal)
+
+// 阶段 2：发射通用 ExecutionLogged 事件
+emitSystemEvent({
+  type: 'ExecutionLogged',
+  payload: { sourceType, targetId, executionRecord }
+})
+
+// 阶段 3：处理级联规则
+const cascadeRules = manifestRegistry.getCascadeRules(event.type)
+for (const rule of cascadeRules) {
+  if (rule.conditionMatches(event.payload)) {
+    if (rule.auto_execute) {
+      // 直接执行（视为原始 intent 的副作用）
+      await domainRegistry.getRepository(rule.targetDomain).insert(rule.payload)
+    } else {
+      // 生成 suggestion 等待用户确认
+      suggestions.push({
+        suggestionType: rule.actionType === 'state_transition' ? 'state_transition' : 'log_entry',
+        ...
+      })
+    }
+  }
+}
+
+// 阶段 4：处理 onEvent 返回的 suggestions
 for (const suggestion of suggestions) {
   if (suggestion.suggestionType === 'state_transition') {
     const lifecycle = manifestRegistry.getLifecycle(suggestion.targetType)
-    if (!isTransitionValid(lifecycle, currentState, targetState)) {
-      continue // 跳过非法转换
-    }
+    if (!isTransitionValid(lifecycle, currentState, targetState)) continue
     await executeStateTransition(suggestion)
-    emitSystemEvent(/* ... */)
   } else if (suggestion.suggestionType === 'log_entry') {
-    // 不查 lifecycle，日志无状态
     await domainRegistry.getRepository(suggestion.targetType).insert(suggestion.payload)
-    emitSystemEvent(/* ... */)
   }
+  emitSystemEvent({ type: 'ExecutionLogged', ... })
 }
 ```
 
@@ -279,14 +338,16 @@ for (const suggestion of suggestions) {
 ### 依赖
 
 1. Timebox Domain manifest 的 `lifecycle` 必须将 `logged` 标记为不可逆状态
-2. HabitLogRepository 需要实现 `findByHabitAndDate`（已有）和 `save` 方法
-3. TaskExecutionLogRepository 需要新增
+2. Habits Domain manifest 需要新增 `cascade_rules` 声明
+3. HabitLogRepository 需要实现 `findByHabitAndDate`（已有）和 `save` 方法
+4. TaskExecutionLogRepository 需要新增
 
 ### 约束（宪章兼容）
 
 - **Domain 独立性（VI）**：每个 domain 只通过 `onEvent` 钩子接收事件并返回 suggestion，不直接写入其他 domain 的数据
-- **Single-Writer Invariant（III）**：State Machine 是唯一执行 suggestion 的组件
+- **Single-Writer Invariant（III）**：State Machine 是唯一执行 suggestion 的组件；级联规则的 `auto_execute` 是 State Machine 读取 manifest 后执行的，不违反此约束
 - **Repository Isolation（V）**：所有数据写入通过 repository 接口，不直接调用 Drizzle
+- **Intent-Driven（I）**：级联行为视为原始 intent 的副作用，不需要重新经过 Intent Engine；`auto_execute: false` 的 suggestion 进入 Action Surface，用户确认后形成新的 intent
 
 ---
 
@@ -296,19 +357,22 @@ for (const suggestion of suggestions) {
 
 | 文件 | 变更内容 |
 |------|---------|
-| `frontend/src/usom/types/objects.ts` | 删除 `HabitLogStatus`，扩展 `HabitLog` 字段，添加 `Task.lastExecutionRecord` |
+| `frontend/src/usom/types/objects.ts` | 删除 `HabitLogStatus`，扩展 `HabitLog` 字段，添加 `Task.lastExecutionRecord`，`ExecutionRecord` 增加 `sourceType` |
 | `frontend/src/usom/types/primitives.ts` | 确认 `CompletionStatus` 已包含所需值 |
+| `frontend/src/usom/types/process.ts` | 扩展 `ActionSurfaceSuggestion` 类型，新增 `ExecutionLogged` 事件类型 |
 | `frontend/src/lib/db/schema.ts` | `habit_logs` 字段变更，`task_execution_logs` 新表 |
 | `frontend/src/lib/db/migrations/` | 新增 migration |
-| `frontend/src/lib/db/repositories/mappers.ts` | 更新 habit_log ↔ HabitLog 映射 |
+| `frontend/src/lib/db/repositories/mappers.ts` | 更新 habit_log ↔ HabitLog 映射，新增 task_execution_log 映射 |
 | `frontend/src/domains/habits/repository/habit-log.ts` | 更新 repository 接口 |
-| `frontend/src/domains/habits/hooks.ts` | `onEvent` 中处理 `TimeboxLogged` 事件 |
-| `frontend/src/domains/timebox/hooks.ts` | `onEvent` 中处理 `HabitLogged` 事件 |
-| `frontend/src/domains/tasks/hooks.ts` | `onEvent` 中处理 `TimeboxLogged` 事件 |
-| `frontend/src/usom/types/process.ts` | 扩展 `ActionSurfaceSuggestion` 类型 |
-| `frontend/src/nexus/core/state-machine/` | 扩展 suggestion 处理逻辑 |
+| `frontend/src/domains/habits/manifest.yaml` | 新增 `cascade_rules` 声明 |
+| `frontend/src/domains/habits/hooks.ts` | `onEvent` 中处理 `ExecutionLogged` 事件 |
+| `frontend/src/domains/timebox/manifest.yaml` | 新增 `cascade_rules` 声明 |
+| `frontend/src/domains/timebox/hooks.ts` | `onEvent` 中处理 `ExecutionLogged` 事件 |
+| `frontend/src/domains/tasks/manifest.yaml` | 新增 `cascade_rules` 声明 |
+| `frontend/src/domains/tasks/hooks.ts` | `onEvent` 中处理 `ExecutionLogged` 事件 |
 | `frontend/src/domains/tasks/repository/` | 新增 task_execution_log repository |
-| `docs/usom-design.md` | 更新 HabitLog 和 Task 的定义 |
+| `frontend/src/nexus/core/state-machine/` | 扩展级联规则处理逻辑 |
+| `docs/usom-design.md` | 更新 HabitLog、Task、ExecutionRecord、SystemEventType、ActionSurfaceSuggestion |
 | `docs/database-design.md` | 更新 habit_logs 和新增 task_execution_logs |
 | `manifest.md` | 记录变更 |
 
@@ -316,9 +380,11 @@ for (const suggestion of suggestions) {
 
 ## 验收标准
 
-1. [ ] Timebox 确认执行后，关联 habit 自动创建 `habit_logs` 记录（source='timebox_sync'）
-2. [ ] Habit manual 打卡后，关联 timebox 的 suggestion 正确生成
+1. [ ] Timebox 确认执行后，State Machine 读取 `cascade_rules` 自动创建 `habit_logs` 记录（source='timebox_sync'）
+2. [ ] Habit manual 打卡后，Timebox Domain.onEvent 返回的 suggestion 正确生成
 3. [ ] Task 在 timebox 中执行后，`task_execution_logs` 正确写入
 4. [ ] 双向同步不产生循环
-5. [ ] 所有现有测试通过
-6. [ ] 新增 repository 单元测试通过
+5. [ ] `ExecutionLogged` 事件正确发射，所有 domain 平等接收
+6. [ ] State Machine 级联规则读取自 manifest，不硬编码
+7. [ ] 所有现有测试通过
+8. [ ] 新增 repository 单元测试通过
