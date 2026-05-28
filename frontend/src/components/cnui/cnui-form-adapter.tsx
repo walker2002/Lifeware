@@ -11,6 +11,7 @@ interface CnuiFormAdapterProps {
   onCancel: () => void
   isLoading?: boolean
   isDone?: boolean
+  serverErrors?: string[]
 }
 
 /** 将 CN-UI dataModel 映射为 Form 的 initial props */
@@ -42,7 +43,7 @@ function mapFormToData(
   return result
 }
 
-export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: CnuiFormAdapterProps) {
+export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, serverErrors }: CnuiFormAdapterProps) {
   const config = FormRegistry.get(domainId, action)
 
   if (!config) {
@@ -57,14 +58,23 @@ export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onC
   const FormComponent = config.component
 
   return (
-    <FormComponent
-      initial={mappedData}
-      onSubmit={(fields: Record<string, unknown>) => {
-        onConfirm(mapFormToData(fields, config.fieldMapping))
-      }}
-      onCancel={onCancel}
-      isLoading={isLoading}
-      disableEnterSubmit={true}
-    />
+    <>
+      <FormComponent
+        initial={mappedData}
+        onSubmit={(fields: Record<string, unknown>) => {
+          onConfirm(mapFormToData(fields, config.fieldMapping))
+        }}
+        onCancel={onCancel}
+        isLoading={isLoading}
+        disableEnterSubmit={true}
+      />
+      {serverErrors && serverErrors.length > 0 && (
+        <div className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+          {serverErrors.map((err, i) => (
+            <div key={i}>{err}</div>
+          ))}
+        </div>
+      )}
+    </>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { CnuiFormAdapter } from '../cnui-form-adapter'
 
 interface HabitCreationCardProps {
@@ -13,6 +14,8 @@ interface HabitCreationCardProps {
 }
 
 export function HabitCreationCard({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: HabitCreationCardProps) {
+  const [serverErrors, setServerErrors] = useState<string[] | undefined>(undefined)
+
   return (
     <div className="w-full max-w-md">
       <div className="mb-3 text-sm font-medium text-ink">习惯创建</div>
@@ -25,6 +28,7 @@ export function HabitCreationCard({ dataModel, onDataChange, onConfirm, onCancel
         onCancel={onCancel}
         isLoading={isLoading}
         isDone={isDone}
+        serverErrors={serverErrors}
       />
     </div>
   )
