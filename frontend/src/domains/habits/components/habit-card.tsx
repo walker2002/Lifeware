@@ -40,6 +40,12 @@ interface HabitCardProps {
   todayLogged?: boolean
   /** 打卡回调 */
   onLog?: () => void
+  /** 批量选择模式 */
+  selectable?: boolean
+  /** 是否选中 */
+  selected?: boolean
+  /** 选中切换回调 */
+  onSelectToggle?: () => void
 }
 
 /** 时间窗口条: earliestTime ── defaultTime ── latestStartTime（最迟开始） */
@@ -105,6 +111,9 @@ export function HabitCard({
   onStatusChange,
   todayLogged,
   onLog,
+  selectable = false,
+  selected = false,
+  onSelectToggle,
 }: HabitCardProps) {
   const isSuspended = status === "suspended"
   const isArchived = status === "archived"
@@ -114,8 +123,25 @@ export function HabitCard({
   const showStats = streak > 0 || longestStreak > 0 || completionRate7d > 0
 
   return (
-    <Card className={cn("relative transition-opacity", isSuspended && "opacity-60", isArchived && "opacity-40")}>
-      <CardContent className="relative flex flex-col gap-3">
+    <Card className={cn(
+      "relative transition-opacity",
+      isSuspended && "opacity-60",
+      isArchived && "opacity-40",
+      selected && "border-blue-400 bg-blue-50/50",
+    )}>
+      <CardContent className={cn("relative flex flex-col gap-3", selectable && "pl-10")}>
+        {/* 批量选择复选框 */}
+        {selectable && (
+          <div className="absolute top-3 left-3 z-10">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onSelectToggle}
+              className="size-4 rounded accent-blue-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
         {/* 角标：可追踪=主色调，仅占时=柔和色 */}
         <div className="absolute top-0 right-0 z-10">
           <svg width="32" height="32" viewBox="0 0 32 32" className="block">
@@ -128,7 +154,9 @@ export function HabitCard({
         {/* 顶栏: 标题 + 标记 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-ink">{title}</span>
+            <span className={cn('font-medium text-ink', selected && 'text-gray-400 line-through')}>
+              {title}
+            </span>
             <Badge variant={trackable ? "default" : "secondary"}>
               {trackable ? "可追踪" : "仅占时"}
             </Badge>

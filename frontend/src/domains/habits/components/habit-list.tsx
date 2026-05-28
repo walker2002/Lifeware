@@ -60,6 +60,8 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
   const [panelMode, setPanelMode] = useState<PanelMode>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
 
   useEffect(() => {
     if (autoOpenCreate && panelMode === null) {
@@ -70,6 +72,21 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
   const editingHabit = typeof panelMode === "string" && panelMode !== "create"
     ? habits.find((h) => h.id === panelMode) ?? null
     : null
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function getSelectedInGroup(groupKey: string): Set<string> {
+    const groupHabits = habits.filter(h => h.status === groupKey)
+    const groupIds = new Set(groupHabits.map(h => h.id))
+    return new Set([...selectedIds].filter(id => groupIds.has(id)))
+  }
 
   const toggleGroup = (key: string) => {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -171,6 +188,86 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                   {group.label} ({group.habits.length})
                 </button>
 
+                {/* draft: 激活所选 */}
+                {!isCollapsed && group.key === "draft" && habits.filter(h => h.status === "draft").some(h => selectedIds.has(h.id)) && (
+                  <button
+                    type="button"
+                    disabled={isBatchProcessing}
+                    onClick={async () => {
+                      const ids = [...selectedIds].filter(id => habits.find(h => h.id === id)?.status === "draft")
+                      setIsBatchProcessing(true)
+                      for (const id of ids) {
+                        await onStatusChange(id, "activate")
+                      }
+                      setSelectedIds(new Set())
+                      setIsBatchProcessing(false)
+                      await onRefresh()
+                    }}
+                    className="ml-2 rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    激活所选 ({getSelectedInGroup("draft").size})
+                  </button>
+                )}
+                {/* active: 暂停所选 */}
+                {!isCollapsed && group.key === "active" && habits.filter(h => h.status === "active").some(h => selectedIds.has(h.id)) && (
+                  <button
+                    type="button"
+                    disabled={isBatchProcessing}
+                    onClick={async () => {
+                      const ids = [...selectedIds].filter(id => habits.find(h => h.id === id)?.status === "active")
+                      setIsBatchProcessing(true)
+                      for (const id of ids) {
+                        await onStatusChange(id, "suspend")
+                      }
+                      setSelectedIds(new Set())
+                      setIsBatchProcessing(false)
+                      await onRefresh()
+                    }}
+                    className="ml-2 rounded bg-amber-500 px-2 py-0.5 text-xs text-white hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    暂停所选 ({getSelectedInGroup("active").size})
+                  </button>
+                )}
+                {/* suspended: 恢复所选 + 归档所选 */}
+                {!isCollapsed && group.key === "suspended" && habits.filter(h => h.status === "suspended").some(h => selectedIds.has(h.id)) && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isBatchProcessing}
+                      onClick={async () => {
+                        const ids = [...selectedIds].filter(id => habits.find(h => h.id === id)?.status === "suspended")
+                        setIsBatchProcessing(true)
+                        for (const id of ids) {
+                          await onStatusChange(id, "reactivate")
+                        }
+                        setSelectedIds(new Set())
+                        setIsBatchProcessing(false)
+                        await onRefresh()
+                      }}
+                      className="ml-2 rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      恢复所选 ({getSelectedInGroup("suspended").size})
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBatchProcessing}
+                      onClick={async () => {
+                        const ids = [...selectedIds].filter(id => habits.find(h => h.id === id)?.status === "suspended")
+                        setIsBatchProcessing(true)
+                        for (const id of ids) {
+                          await onStatusChange(id, "archive")
+                        }
+                        setSelectedIds(new Set())
+                        setIsBatchProcessing(false)
+                        await onRefresh()
+                      }}
+                      className="ml-2 rounded bg-gray-500 px-2 py-0.5 text-xs text-white hover:bg-gray-600 disabled:opacity-50"
+                    >
+                      归档所选 ({getSelectedInGroup("suspended").size})
+                    </button>
+                  </>
+                )}
+
                 {!isCollapsed &&
                   (group.habits.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2 pl-6">暂无习惯</p>
@@ -201,6 +298,9 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                           frequencyType={habit.frequencyType}
                           onEdit={() => setPanelMode(habit.id)}
                           onStatusChange={(action) => onStatusChange(habit.id, action)}
+                          selectable
+                          selected={selectedIds.has(habit.id)}
+                          onSelectToggle={() => toggleSelectOne(habit.id)}
                         />
                       ))}
                     </div>
