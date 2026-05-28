@@ -19,6 +19,8 @@ export type CnuiDomainComponentType =
   | 'schedule-proposal'
   | 'review-summary'
   | 'objective-tracker'
+  | 'habit-action-panel'
+  | 'habit-checkin-panel'
 
 export type CnuiComponentType = CnuiBaseComponentType | CnuiDomainComponentType
 

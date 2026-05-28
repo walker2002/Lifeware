@@ -1,6 +1,8 @@
 'use client'
 
 import type { CnuiComponentType } from '@/nexus/ai-runtime/cnui/types'
+import { HabitActionPanel } from './surfaces/HabitActionPanel'
+import { HabitCheckinPanel } from './surfaces/HabitCheckinPanel'
 import { HabitCreationCard } from './surfaces/HabitCreationCard'
 import { TimeboxList } from './surfaces/TimeboxList'
 
@@ -15,6 +17,8 @@ interface CnuiRendererProps {
 }
 
 const SURFACE_RENDERERS: Record<string, React.ComponentType<CnuiRendererProps>> = {
+  'habit-action-panel': HabitActionPanel,
+  'habit-checkin-panel': HabitCheckinPanel,
   'habit-creation-card': HabitCreationCard,
   'timebox-list': TimeboxList,
 }

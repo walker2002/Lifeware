@@ -39,6 +39,7 @@ const BASE_COMPONENTS: CnuiComponentType[] = [
 const DOMAIN_COMPONENTS: CnuiComponentType[] = [
   'habit-creation-card', 'timebox-list', 'energy-indicator',
   'schedule-proposal', 'review-summary', 'objective-tracker',
+  'habit-action-panel', 'habit-checkin-panel',
 ]
 
 export function registerBaseComponents(catalog: ComponentCatalog): void {
