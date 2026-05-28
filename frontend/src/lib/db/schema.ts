@@ -276,16 +276,45 @@ export const habitLogs = pgTable('habit_logs', {
 
   habitId: uuid('habit_id').notNull().references(() => habits.id, { onDelete: 'cascade' }),
   date: date('date').notNull(),
-  status: text('status', { enum: ['completed', 'skipped', 'partial'] }).notNull(),
+  completionStatus: text('completion_status', { enum: ['completed', 'partially_completed', 'not_completed'] }).notNull(),
   actualDuration: integer('actual_duration'),
+  plannedDuration: integer('planned_duration'),
+  deviationMinutes: integer('deviation_minutes'),
+  completionRating: integer('completion_rating'),
+  energyLevel: integer('energy_level'),
 
   note: text('note'),
   loggedAt: timestamp('logged_at', { withTimezone: true }).notNull().defaultNow(),
-  source: text('source', { enum: ['manual', 'connector'] }).notNull().default('manual'),
+  source: text('source', { enum: ['manual', 'connector', 'timebox_sync'] }).notNull().default('manual'),
 }, (table) => [
   uniqueIndex('uniq_habit_logs_habit_date').on(table.habitId, table.date),
   index('idx_habit_logs_user_date').on(table.userId, table.date),
   index('idx_habit_logs_habit_id').on(table.habitId),
+])
+
+// ─── 4.5c task_execution_logs ─────────────────────────────────
+export const taskExecutionLogs = pgTable('task_execution_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+
+  taskId: uuid('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  timeboxId: uuid('timebox_id').references(() => timeboxes.id, { onDelete: 'set null' }),
+  completionStatus: text('completion_status', { enum: ['completed', 'partially_completed', 'not_completed'] }).notNull(),
+  actualDuration: integer('actual_duration'),
+  plannedDuration: integer('planned_duration'),
+  deviationMinutes: integer('deviation_minutes'),
+  completionRating: integer('completion_rating'),
+  actualOutput: text('actual_output'),
+  deviationReasons: text('deviation_reasons'),
+  energyLevel: integer('energy_level'),
+  note: text('note'),
+  loggedAt: timestamp('logged_at', { withTimezone: true }).notNull().defaultNow(),
+  source: text('source', { enum: ['manual', 'timebox_sync'] }).notNull().default('manual'),
+}, (table) => [
+  index('idx_task_exec_logs_user_task').on(table.userId, table.taskId),
+  index('idx_task_exec_logs_timebox').on(table.timeboxId),
+  index('idx_task_exec_logs_user_logged').on(table.userId, table.loggedAt),
 ])
 
 // ─── 4.5a habit_templates ──────────────────────────────────────

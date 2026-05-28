@@ -83,6 +83,13 @@ const QueryActionSchema = z.object({
   context_capabilities: z.array(ContextDeclarationSchema),
 })
 
+const CascadeRuleSchema = z.object({
+  on_event: z.string(),
+  condition: z.string().optional(),
+  action: z.string(),
+  auto_execute: z.boolean().default(false),
+})
+
 export const ManifestSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -110,6 +117,7 @@ export const ManifestSchema = z.object({
 
   generation_actions: z.record(z.string(), GenerationActionSchema).optional(),
   query_actions: z.record(z.string(), QueryActionSchema).optional(),
+  cascade_rules: z.array(CascadeRuleSchema).optional(),
 })
 
 export type DomainManifest = z.infer<typeof ManifestSchema>

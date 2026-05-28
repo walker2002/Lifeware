@@ -250,7 +250,7 @@ async function seed() {
 
   // 7. 习惯日志 (habit_logs) — 过去 7 天
   const habitIds = [IDS.habitMeditation, IDS.habitReading, IDS.habitExercise, IDS.habitJournal]
-  const habitStatuses: ('completed' | 'skipped' | 'partial')[] = ['completed', 'completed', 'completed', 'completed', 'skipped', 'completed', 'partial']
+  const habitStatuses: ('completed' | 'not_completed' | 'partially_completed')[] = ['completed', 'completed', 'completed', 'completed', 'not_completed', 'completed', 'partially_completed']
   for (let d = 6; d >= 0; d--) {
     for (let h = 0; h < habitIds.length; h++) {
       // 力量训练只在周一三五
@@ -264,7 +264,7 @@ async function seed() {
         userId: USER_ID, schemaVersion: 1,
         habitId: habitIds[h],
         date: formatDate(daysAgo(d)),
-        status: habitStatuses[6 - d],
+        completionStatus: habitStatuses[6 - d],
         actualDuration: habitStatuses[6 - d] === 'completed' ? [10, 30, 45, 15][h] : null,
         source: 'manual',
       }).onConflictDoNothing()

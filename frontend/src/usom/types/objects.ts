@@ -6,7 +6,7 @@ import type {
   Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
-  HabitLogStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
+  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
   ProjectStatus, AISessionStatus,
 } from './primitives'
 
@@ -136,7 +136,27 @@ export interface Task {
   daysOfWeek?: number[]
   startDate?: DateOnly
   endDate?: DateOnly
+  /** 最近一次执行记录（查询时从 task_execution_logs 聚合，非持久化字段） */
+  lastExecutionRecord?: ExecutionRecord
   notes?: Notes
+}
+
+// ─── 3.7d TaskExecutionLog ────────────────────────────────────
+export interface TaskExecutionLog {
+  id: USOM_ID
+  taskId: USOM_ID
+  timeboxId?: USOM_ID
+  completionStatus: CompletionStatus
+  actualDuration?: DurationMinutes
+  plannedDuration?: DurationMinutes
+  deviationMinutes?: number
+  completionRating?: number
+  actualOutput?: string
+  deviationReasons?: string
+  energyLevel?: number
+  note?: Notes
+  loggedAt: Timestamp
+  source: 'manual' | 'timebox_sync'
 }
 
 // ─── 3.7a Project ──────────────────────────────────────────────
@@ -248,24 +268,35 @@ export interface HabitLog {
   id: USOM_ID
   habitId: USOM_ID
   date: DateOnly
-  status: HabitLogStatus
+  completionStatus: CompletionStatus
   actualDuration?: DurationMinutes
+  plannedDuration?: DurationMinutes
+  deviationMinutes?: number
+  completionRating?: number
+  energyLevel?: number
   note?: Notes
   loggedAt: Timestamp
-  source: 'manual' | 'connector'
+  source: 'manual' | 'connector' | 'timebox_sync'
 }
 
-// ─── Execution Record Types ──────────────────────────────────────
-export interface SimpleExecutionRecord {
-  mode: 'simple'
-  completionStatus: 'completed' | 'partially_completed' | 'not_completed'
+// ─── Execution Source Type ─────────────────────────────────────
+export type ExecutionSourceType = 'timebox' | 'habit' | 'task'
+
+// ─── Execution Record Types ────────────────────────────────────
+export interface ExecutionRecordBase {
+  completionStatus: CompletionStatus
   actualDuration: number
   plannedDuration: number
   deviationMinutes: number
+  sourceType: ExecutionSourceType
   loggedAt: string
 }
 
-export interface DetailedExecutionRecord extends Omit<SimpleExecutionRecord, 'mode'> {
+export interface SimpleExecutionRecord extends ExecutionRecordBase {
+  mode: 'simple'
+}
+
+export interface DetailedExecutionRecord extends ExecutionRecordBase {
   mode: 'detailed'
   completionRating: number
   actualOutput: string

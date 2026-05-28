@@ -65,6 +65,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
         actualDuration,
         plannedDuration,
         deviationMinutes,
+        sourceType: 'timebox' as const,
         loggedAt: new Date().toISOString(),
       };
 

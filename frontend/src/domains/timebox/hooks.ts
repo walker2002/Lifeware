@@ -122,6 +122,29 @@ export function createTimeboxHooks(manifest: DomainManifest) {
           }],
         }
 
+      case 'ExecutionLogged': {
+        const sourceType = event.payload['sourceType'] as string
+        if (sourceType === 'timebox') {
+          return { metrics, suggestions: [] }
+        }
+        const targetType = event.payload['targetType'] as string
+        const targetId = event.payload['targetId'] as string
+        if (sourceType === 'habit' && targetType === 'timebox' && targetId) {
+          return {
+            metrics,
+            suggestions: [{
+              actionType: 'start_timebox',
+              suggestionType: 'state_transition',
+              targetType: 'timebox',
+              targetId,
+              label: '关联习惯已打卡，确认执行记录？',
+              weight: 70,
+            }],
+          }
+        }
+        return { metrics, suggestions: [] }
+      }
+
       default:
         return { metrics, suggestions: [] }
     }

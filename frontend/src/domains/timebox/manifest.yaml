@@ -203,6 +203,7 @@ subscribed_events:
   - TimeboxEnded
   - TimeboxCancelled
   - TimeboxLogged
+  - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
@@ -262,3 +263,11 @@ generation_actions:
       - id: energyProfile
         query: energy_profile
         params: []
+
+# ─── 区块 J: cascade_rules ──────────────────────────────────────
+cascade_rules:
+  - on_event: 'ExecutionLogged'
+    condition: "payload.sourceType == 'habit'"
+    action: 'suggest_log_timebox'
+    auto_execute: false
+

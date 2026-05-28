@@ -80,7 +80,6 @@ export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'in_progress' | 'on_
 
 export type ProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
 export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived'
-export type HabitLogStatus = 'completed' | 'skipped' | 'partial'
 export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'
 export type CompletionStatus = 'completed' | 'partially_completed' | 'not_completed'
 export type ReviewStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
@@ -104,7 +103,7 @@ export type ActionType =
 
 export type USOMObjectType =
   | 'objective' | 'key_result'
-  | 'task' | 'habit' | 'habit_log'
+  | 'task' | 'habit' | 'habit_log' | 'task_execution_log'
   | 'timebox' | 'review'
   | 'intention' | 'project'
 

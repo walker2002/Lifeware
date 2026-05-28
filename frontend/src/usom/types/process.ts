@@ -134,6 +134,10 @@ export interface MetricUpdate {
 
 export interface ActionSurfaceSuggestion {
   actionType: ActionType
+  suggestionType?: 'state_transition' | 'log_entry' | 'action_surface'
+  targetType?: USOMObjectType
+  targetId?: USOM_ID
+  payload?: Record<string, unknown>
   label: string
   weight: number
 }
@@ -167,6 +171,7 @@ export type SystemEventType =
   | 'ProjectCompleted' | 'ProjectArchived'
   | 'GenerativeContextAssembled' | 'GenerativeHandlerCompleted'
   | 'GenerativeUserConfirmed' | 'GenerativeProposalRejected' | 'GenerativeBatchExecuted'
+  | 'ExecutionLogged'
 
 export interface SystemEvent {
   id: USOM_ID

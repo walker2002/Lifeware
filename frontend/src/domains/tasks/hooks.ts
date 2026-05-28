@@ -113,6 +113,17 @@ export function createTasksHooks(manifest: DomainManifest) {
           suggestions: [{ actionType: 'review_okr', label: `项目已完成: ${name}`, weight: 80 }],
         }
 
+      case 'ExecutionLogged': {
+        const sourceType = event.payload['sourceType'] as string
+        if (sourceType === 'task') {
+          return { metrics: [], suggestions: [] }
+        }
+        return {
+          metrics: [{ metricKey: 'task_execution_needs_update', value: 1 }],
+          suggestions: [],
+        }
+      }
+
       default:
         return { metrics: [], suggestions: [] }
     }

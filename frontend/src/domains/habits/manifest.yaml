@@ -194,6 +194,7 @@ subscribed_events:
   - HabitLogged
   - HabitSkipped
   - HabitStreakMilestone
+  - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
@@ -247,3 +248,10 @@ query_actions:
       - id: habitStreaks
         query: habit_streaks
         params: [userId]
+
+# ─── 区块 J: cascade_rules ──────────────────────────────────────
+cascade_rules:
+  - on_event: 'ExecutionLogged'
+    condition: "payload.sourceType == 'timebox'"
+    action: 'log_habit'
+    auto_execute: true

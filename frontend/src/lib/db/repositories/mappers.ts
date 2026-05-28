@@ -8,7 +8,7 @@ import type {
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
   Project, ProjectTemplate, TaskTemplate,
-  AISession, ChatMessage,
+  AISession, ChatMessage, TaskExecutionLog,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -204,9 +204,16 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
 // --- HabitLog ----------------------------------------------------
 type HabitLogRow = {
   id: string; userId: string; schemaVersion: number;
-  habitId: string; date: string; status: string;
-  actualDuration: number | null; note: string | null;
-  loggedAt: Date; source: string;
+  habitId: string; date: string;
+  completionStatus: string;
+  actualDuration: number | null;
+  plannedDuration: number | null;
+  deviationMinutes: number | null;
+  completionRating: number | null;
+  energyLevel: number | null;
+  note: string | null;
+  loggedAt: Date;
+  source: string;
 }
 
 export function habitLogRowToUSOM(row: HabitLogRow): HabitLog {
@@ -214,8 +221,12 @@ export function habitLogRowToUSOM(row: HabitLogRow): HabitLog {
     id: row.id,
     habitId: row.habitId,
     date: row.date as DateOnly,
-    status: row.status as HabitLog['status'],
+    completionStatus: row.completionStatus as HabitLog['completionStatus'],
     actualDuration: row.actualDuration ?? undefined,
+    plannedDuration: row.plannedDuration ?? undefined,
+    deviationMinutes: row.deviationMinutes ?? undefined,
+    completionRating: row.completionRating ?? undefined,
+    energyLevel: row.energyLevel ?? undefined,
     note: row.note ?? undefined,
     loggedAt: row.loggedAt.toISOString() as Timestamp,
     source: row.source as HabitLog['source'],
@@ -228,8 +239,67 @@ export function habitLogUSOMToRow(log: HabitLog, userId: USOM_ID) {
     userId: userId,
     habitId: log.habitId,
     date: log.date,
-    status: log.status,
+    completionStatus: log.completionStatus,
     actualDuration: log.actualDuration ?? null,
+    plannedDuration: log.plannedDuration ?? null,
+    deviationMinutes: log.deviationMinutes ?? null,
+    completionRating: log.completionRating ?? null,
+    energyLevel: log.energyLevel ?? null,
+    note: log.note ?? null,
+    source: log.source,
+  }
+}
+
+// --- TaskExecutionLog --------------------------------------------
+type TaskExecutionLogRow = {
+  id: string; userId: string; schemaVersion: number;
+  taskId: string; timeboxId: string | null;
+  completionStatus: string;
+  actualDuration: number | null;
+  plannedDuration: number | null;
+  deviationMinutes: number | null;
+  completionRating: number | null;
+  actualOutput: string | null;
+  deviationReasons: string | null;
+  energyLevel: number | null;
+  note: string | null;
+  loggedAt: Date;
+  source: string;
+}
+
+export function taskExecutionLogRowToUSOM(row: TaskExecutionLogRow): TaskExecutionLog {
+  return {
+    id: row.id,
+    taskId: row.taskId,
+    timeboxId: row.timeboxId ?? undefined,
+    completionStatus: row.completionStatus as TaskExecutionLog['completionStatus'],
+    actualDuration: row.actualDuration ?? undefined,
+    plannedDuration: row.plannedDuration ?? undefined,
+    deviationMinutes: row.deviationMinutes ?? undefined,
+    completionRating: row.completionRating ?? undefined,
+    actualOutput: row.actualOutput ?? undefined,
+    deviationReasons: row.deviationReasons ?? undefined,
+    energyLevel: row.energyLevel ?? undefined,
+    note: row.note ?? undefined,
+    loggedAt: row.loggedAt.toISOString() as Timestamp,
+    source: row.source as TaskExecutionLog['source'],
+  }
+}
+
+export function taskExecutionLogUSOMToRow(log: TaskExecutionLog, userId: USOM_ID) {
+  return {
+    id: log.id,
+    userId: userId,
+    taskId: log.taskId,
+    timeboxId: log.timeboxId ?? null,
+    completionStatus: log.completionStatus,
+    actualDuration: log.actualDuration ?? null,
+    plannedDuration: log.plannedDuration ?? null,
+    deviationMinutes: log.deviationMinutes ?? null,
+    completionRating: log.completionRating ?? null,
+    actualOutput: log.actualOutput ?? null,
+    deviationReasons: log.deviationReasons ?? null,
+    energyLevel: log.energyLevel ?? null,
     note: log.note ?? null,
     source: log.source,
   }

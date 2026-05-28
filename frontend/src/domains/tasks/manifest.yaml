@@ -245,6 +245,7 @@ subscribed_events:
   - TaskActivated
   - TaskCompleted
   - TaskArchived
+  - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
@@ -259,3 +260,10 @@ view_routes:
     params:
       mode: create
   # view_list: 手动维护在 app/projects/page.tsx（服务器组件，含数据获取）
+
+# ─── 区块 J: cascade_rules ──────────────────────────────────────
+cascade_rules:
+  - on_event: 'ExecutionLogged'
+    condition: "payload.sourceType == 'timebox'"
+    action: 'log_task_execution'
+    auto_execute: true

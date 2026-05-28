@@ -8,7 +8,7 @@ import type {
   Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
   Project, ProjectTemplate, TaskTemplate,
-  AISession, AISessionSummary, UserSettings,
+  AISession, AISessionSummary, UserSettings, TaskExecutionLog,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
@@ -182,6 +182,13 @@ export interface IHabitLogRepository {
   findByUserAndDate(date: DateOnly, userId: USOM_ID): Promise<HabitLog[]>
   findByHabit(habitId: USOM_ID, userId: USOM_ID): Promise<HabitLog[]>
   save(log: HabitLog, userId: USOM_ID): Promise<void>
+}
+
+// ─── TaskExecutionLog ──────────────────────────────────────────
+export interface ITaskExecutionLogRepository {
+  findByTask(taskId: USOM_ID, userId: USOM_ID): Promise<TaskExecutionLog[]>
+  findByTimebox(timeboxId: USOM_ID, userId: USOM_ID): Promise<TaskExecutionLog[]>
+  save(log: TaskExecutionLog, userId: USOM_ID): Promise<void>
 }
 
 // ─── Timebox ───────────────────────────────────────────────────

@@ -175,7 +175,7 @@ export class HabitRepository implements IHabitRepository {
       .where(and(
         eq(s.habitLogs.habitId, habitId),
         eq(s.habitLogs.userId, userId),
-        eq(s.habitLogs.status, 'completed'),
+        eq(s.habitLogs.completionStatus, 'completed'),
       ))
       .orderBy(asc(s.habitLogs.date))
     return rows.map(r => r.date!)

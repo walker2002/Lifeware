@@ -190,6 +190,17 @@ export function createHabitsHooks(manifest: DomainManifest) {
           }],
         }
 
+      case 'ExecutionLogged': {
+        const sourceType = event.payload['sourceType'] as string
+        if (sourceType === 'habit') {
+          return { metrics: [], suggestions: [] }
+        }
+        return {
+          metrics: [{ metricKey: 'habit_metrics_needs_update', value: 1 }],
+          suggestions: [],
+        }
+      }
+
       default:
         return { metrics: [], suggestions: [] }
     }

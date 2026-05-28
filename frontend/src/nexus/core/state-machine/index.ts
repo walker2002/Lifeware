@@ -266,6 +266,30 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
       await eventRepo.append(event, userId)
       eventBus.publish(event)
 
+      // 6. 如果涉及执行记录，发射通用 ExecutionLogged 事件
+      if (transition.event_type === 'TimeboxLogged' || transition.event_type === 'HabitLogged') {
+        const executionRecord = proposal.payload['executionRecord'] as Record<string, unknown> | undefined
+        if (executionRecord) {
+          const sourceType = objectType === 'timebox' ? 'timebox' : objectType === 'habit_log' ? 'habit' : 'task'
+          const executionLoggedEvent: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'ExecutionLogged' as SystemEvent['type'],
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: {
+              sourceType,
+              targetType: objectType,
+              targetId: object.id,
+              executionRecord,
+              originalEventType: transition.event_type,
+            },
+            snapshotId: '' as USOM_ID,
+          }
+          await eventRepo.append(executionLoggedEvent, userId)
+          eventBus.publish(executionLoggedEvent)
+        }
+      }
+
       return { success: true, object, event }
     },
   }
