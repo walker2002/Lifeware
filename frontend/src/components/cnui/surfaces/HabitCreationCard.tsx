@@ -14,7 +14,7 @@ interface HabitCreationCardProps {
 }
 
 export function HabitCreationCard({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: HabitCreationCardProps) {
-  const [serverErrors, setServerErrors] = useState<string[] | undefined>(undefined)
+  const [serverErrors, setServerErrors] = useState<string[]>([])
 
   return (
     <div className="w-full max-w-md">
