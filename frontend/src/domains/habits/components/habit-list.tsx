@@ -40,6 +40,12 @@ interface HabitListProps {
   onStatusChange: (id: string, action: string) => void
   onUpdateHabit: (id: string, fields: HabitFormFields) => Promise<{ success: boolean; error?: string }>
   onRefresh: () => Promise<void>
+  /** 快速打卡 */
+  onLogHabit?: (habitId: string) => Promise<void>
+  /** 详情打卡 */
+  onDetailLogHabit?: (habitId: string, fields: import('./habit-checkin-detail').HabitLogFields) => Promise<void>
+  /** 今日已打卡的 habit id 集合 */
+  todayLoggedIds?: Set<string>
   autoOpenCreate?: boolean
   initialFields?: Partial<HabitFormFields>
 }
@@ -48,7 +54,7 @@ type PanelMode = null | "create" | string
 
 const EDIT_PANEL_WIDTH = "w-[480px]"
 
-export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh, autoOpenCreate, initialFields }: HabitListProps) {
+export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh, autoOpenCreate, initialFields, onLogHabit, onDetailLogHabit, todayLoggedIds }: HabitListProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     for (const g of STATUS_GROUPS) {
@@ -208,6 +214,30 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                     激活所选 ({getSelectedInGroup("draft").size})
                   </button>
                 )}
+                {/* active: 打卡所选 */}
+                {!isCollapsed && group.key === "active" && onLogHabit && habits.filter(h => h.status === "active").some(h => selectedIds.has(h.id)) && (
+                  <button
+                    type="button"
+                    disabled={isBatchProcessing}
+                    onClick={async () => {
+                      const ids = [...selectedIds].filter(id => habits.find(h => h.id === id)?.status === "active")
+                      setIsBatchProcessing(true)
+                      for (const id of ids) {
+                        try {
+                          await onLogHabit(id)
+                        } catch {
+                          // continue on individual failures
+                        }
+                      }
+                      setSelectedIds(new Set())
+                      setIsBatchProcessing(false)
+                      await onRefresh()
+                    }}
+                    className="ml-2 rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    打卡所选 ({getSelectedInGroup("active").size})
+                  </button>
+                )}
                 {/* active: 暂停所选 */}
                 {!isCollapsed && group.key === "active" && habits.filter(h => h.status === "active").some(h => selectedIds.has(h.id)) && (
                   <button
@@ -298,6 +328,8 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                           frequencyType={habit.frequencyType}
                           onEdit={() => setPanelMode(habit.id)}
                           onStatusChange={(action) => onStatusChange(habit.id, action)}
+                          onLog={onLogHabit ? (() => onLogHabit(habit.id)) : undefined}
+                          todayLogged={todayLoggedIds?.has(habit.id)}
                           selectable
                           selected={selectedIds.has(habit.id)}
                           onSelectToggle={() => toggleSelectOne(habit.id)}

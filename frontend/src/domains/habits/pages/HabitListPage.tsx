@@ -15,6 +15,7 @@ import { HabitList } from "../components/habit-list"
 import { HabitForm, type HabitFormFields } from "../components/habit-form"
 import type { Habit } from "@/usom/types/objects"
 import type { CreateHabitInput, UpdateHabitInput } from "@/usom/interfaces/irepository"
+import type { HabitLogFields } from "../components/habit-checkin-detail"
 import {
   getHabits,
   submitHabitIntent,
@@ -22,6 +23,7 @@ import {
   updateHabit,
   checkHabitReferences,
   deleteHabit,
+  logHabit,
 } from "@/app/actions/intent"
 
 // ─── 类型与辅助函数 ────────────────────────────────────────────────
@@ -100,6 +102,9 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
 
   // 提交错误
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // 今日已打卡集合
+  const [todayLoggedIds, setTodayLoggedIds] = useState<Set<string>>(new Set())
 
   // 删除确认
   const [deleteConfirm, setDeleteConfirm] = useState<Habit | null>(null)
@@ -199,6 +204,28 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
     [habits, loadHabits],
   )
 
+  // ─── 打卡处理 ──────────────────────────────────────────────────
+
+  const handleLogHabit = useCallback(async (habitId: string) => {
+    const result = await logHabit(habitId)
+    if (result.success) {
+      setTodayLoggedIds(prev => new Set(prev).add(habitId))
+      await loadHabits()
+    } else {
+      setSubmitError(result.error ?? "打卡失败")
+    }
+  }, [loadHabits])
+
+  const handleDetailLogHabit = useCallback(async (habitId: string, fields: HabitLogFields) => {
+    const result = await logHabit(habitId, fields)
+    if (result.success) {
+      setTodayLoggedIds(prev => new Set(prev).add(habitId))
+      await loadHabits()
+    } else {
+      setSubmitError(result.error ?? "打卡失败")
+    }
+  }, [loadHabits])
+
   // ─── 删除操作 ──────────────────────────────────────────────────
 
   const handleDelete = useCallback(
@@ -259,6 +286,9 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
         onStatusChange={handleStatusChange}
         onUpdateHabit={handleUpdateHabit}
         onRefresh={loadHabits}
+        onLogHabit={handleLogHabit}
+        onDetailLogHabit={handleDetailLogHabit}
+        todayLoggedIds={todayLoggedIds}
         autoOpenCreate={autoOpenCreate}
         initialFields={initialFields}
       />
