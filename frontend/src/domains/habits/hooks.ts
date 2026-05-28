@@ -40,6 +40,15 @@ export function createHabitsHooks(manifest: DomainManifest) {
       }
     }
 
+    // lifecycle actions: activate, suspend, archive, reactivate
+    const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
+    if (lifecycleActions.includes(action)) {
+      const habitId = fields['habitId']
+      if (!habitId || typeof habitId !== 'string') {
+        errors.push('habitId 必填')
+      }
+    }
+
     if (action === 'createTemplate') {
       const name = fields['name']
       if (!name || (typeof name === 'string' && name.trim() === '')) {
