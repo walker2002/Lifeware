@@ -651,6 +651,83 @@ export async function checkHabitReferences(
   }
 }
 
+/** 记录习惯打卡 */
+export async function logHabit(
+  habitId: string,
+  fields?: {
+    actualDuration?: number
+    completionRating?: number
+    energyLevel?: number
+    note?: string
+  },
+): Promise<HabitActionResult> {
+  try {
+    const habitRepo = await getHabitRepo()
+    const eventRepo = new SystemEventRepository()
+    const { HabitLogRepository } = await import('@/domains/habits/repository/habit-log')
+    const habitLogRepo = new HabitLogRepository()
+
+    const orchestrator = createOrchestrator({
+      timeboxRepo: new TimeboxRepository(),
+      eventRepo,
+      intentEngine: { parse: async () => { throw new Error('not used') } },
+      ruleEngine: {
+        evaluate: async () => ({
+          result: 'pass' as const,
+          warnings: [],
+          confirmations: [],
+        }),
+      },
+      habitRepo,
+      habitLogRepo,
+    })
+
+    const now = new Date().toISOString() as Timestamp
+    const intent: import('@/usom/types/objects').StructuredIntent = {
+      id: crypto.randomUUID(),
+      intentionId: crypto.randomUUID(),
+      targetDomain: 'habits',
+      action: 'logHabit',
+      fields: { habitId, ...fields },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      pathType: 'contract',
+      createdAt: now,
+    }
+
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID)
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    return { success: true, habit: result.habit }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : '打卡失败' }
+  }
+}
+
+/** 批量打卡 */
+export async function batchLogHabits(
+  items: Array<{
+    habitId: string
+    fields?: {
+      actualDuration?: number
+      completionRating?: number
+      energyLevel?: number
+      note?: string
+    }
+  }>,
+): Promise<{ success: boolean; error?: string }> {
+  let lastError: string | undefined
+  for (const item of items) {
+    const result = await logHabit(item.habitId, item.fields)
+    if (!result.success) {
+      lastError = result.error
+    }
+  }
+  return { success: !lastError, error: lastError }
+}
+
 interface HabitItem {
   id: string
   title: string

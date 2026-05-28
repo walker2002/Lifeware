@@ -25,6 +25,7 @@ import type {
   IKeyResultRepository,
   ITaskRepository,
   IProjectRepository,
+  IHabitLogRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { USOMSnapshot } from '@/usom/types/process'
@@ -88,6 +89,7 @@ export interface OrchestratorDeps {
   ruleEngine: RuleEngine
   actionSurfaceEngine?: ActionSurfaceEngine
   habitRepo?: IHabitRepository
+  habitLogRepo?: IHabitLogRepository
   templateRepo?: IHabitTemplateRepository
   objectiveRepo?: IObjectiveRepository
   keyResultRepo?: IKeyResultRepository
@@ -495,6 +497,65 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           eventBus.publish(event)
 
           return { success: true, habit: updated, warnings: ruleResult.warnings }
+        }
+
+        if (action === 'logHabit') {
+          if (!deps.habitLogRepo) {
+            return { success: false, error: 'HabitLogRepository 未配置' }
+          }
+
+          const habitId = intent.fields.habitId as USOM_ID
+          const existing = await deps.habitRepo.findById(habitId, userId)
+          if (!existing) {
+            return { success: false, error: '习惯不存在' }
+          }
+
+          const today = now.slice(0, 10) as import('@/usom/types/primitives').DateOnly
+          const existingLog = await deps.habitLogRepo.findByHabitAndDate(habitId, today, userId)
+          if (existingLog) {
+            return { success: false, error: '今日已打卡' }
+          }
+
+          const logId = crypto.randomUUID() as USOM_ID
+          const habitLog: import('@/usom/types/objects').HabitLog = {
+            id: logId,
+            habitId,
+            date: today,
+            completionStatus: 'completed',
+            actualDuration: intent.fields.actualDuration as number | undefined,
+            plannedDuration: existing.defaultDuration,
+            completionRating: intent.fields.completionRating as number | undefined,
+            energyLevel: intent.fields.energyLevel as number | undefined,
+            note: intent.fields.note as string | undefined,
+            loggedAt: now,
+            source: 'manual',
+          }
+
+          await deps.habitLogRepo.save(habitLog, userId)
+
+          // 重新计算 streak 指标
+          await orchestrator.recalculateHabitMetrics(habitId, userId)
+          const updatedHabit = await deps.habitRepo.findById(habitId, userId)
+
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: 'HabitLogged' as SystemEventType,
+            occurredAt: now,
+            triggeredBy: 'state_machine',
+            payload: {
+              habitId,
+              intentId: intent.id,
+              streak: updatedHabit?.streak ?? existing.streak,
+              title: existing.title,
+              trackable: existing.trackable,
+              logId,
+            },
+            snapshotId: '' as USOM_ID,
+          }
+          await deps.eventRepo.append(event, userId)
+          eventBus.publish(event)
+
+          return { success: true, habit: updatedHabit ?? undefined, warnings: ruleResult.warnings }
         }
 
         // 状态转换（activate/suspend/reactivate/archive）
