@@ -38,16 +38,11 @@ class CnuiSurfaceRegistry {
     return [...this.map.keys()]
   }
 
-  /** 确定 action 对应的 surfaceType：先从 generation_actions 查，再 fallback 到 intent_triggers */
-  findSurfaceType(domainId: string, action: string): string | undefined {
-    // 遍历所有注册的 surface，按 action 查找
-    // （调用方应优先通过 manifest 解析，此方法为 fallback）
-    for (const [type, reg] of this.map) {
-      if (reg.domainId === domainId) {
-        return type
-      }
-    }
-    return undefined
+  /** 确定 action 对应的 surfaceType（fallback：仅单 surface domain 可用） */
+  findSurfaceType(domainId: string): string | undefined {
+    const surfaces = this.getByDomain(domainId)
+    if (surfaces.length !== 1) return undefined
+    return surfaces[0].surfaceType
   }
 
   clear(): void {
