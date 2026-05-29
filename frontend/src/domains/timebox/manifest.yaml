@@ -271,3 +271,9 @@ cascade_rules:
     action: 'suggest_log_timebox'
     auto_execute: false
 
+# ─── 区块 K: cnui_surfaces ─────────────────────────────────────
+cnui_surfaces:
+  timebox-list:
+    description: 智能编排时间盒列表
+    handler: ./cnui/handlers
+

@@ -1,5 +1,6 @@
 // Component Catalog — 组件注册和查询
 import type { CnuiComponentType } from './types'
+import { cnuiRegistry } from './registry'
 
 export interface ComponentInfo {
   type: CnuiComponentType
@@ -36,12 +37,6 @@ const BASE_COMPONENTS: CnuiComponentType[] = [
   'toggle', 'button', 'text-display', 'list', 'card',
 ]
 
-const DOMAIN_COMPONENTS: CnuiComponentType[] = [
-  'habit-creation-card', 'timebox-list', 'energy-indicator',
-  'schedule-proposal', 'review-summary', 'objective-tracker',
-  'habit-action-panel', 'habit-checkin-panel',
-]
-
 export function registerBaseComponents(catalog: ComponentCatalog): void {
   for (const type of BASE_COMPONENTS) {
     catalog.register({ type, propsSchema: {}, isBase: true })
@@ -49,7 +44,7 @@ export function registerBaseComponents(catalog: ComponentCatalog): void {
 }
 
 export function registerDomainComponents(catalog: ComponentCatalog): void {
-  for (const type of DOMAIN_COMPONENTS) {
+  for (const type of cnuiRegistry.allTypes()) {
     catalog.register({ type, propsSchema: {}, isBase: false })
   }
 }

@@ -6,6 +6,16 @@ import { loadDomainManifest } from '@/domains/manifest-loader'
 import { createDomainPlugin } from '@/domains/plugin-factory'
 import { createTimeboxHooks } from './hooks'
 
+// ── CNUI Surface 注册 ────────────────────────────────────────
+import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
+import { timeboxCnuiHandler } from './cnui/handlers'
+import { TimeboxList } from './cnui/surfaces/TimeboxList'
+
+cnuiRegistry.register('timebox', 'timebox-list', {
+  component: TimeboxList,
+  handler: timeboxCnuiHandler,
+})
+
 const result = loadDomainManifest('timebox')
 
 if (!result.success) {

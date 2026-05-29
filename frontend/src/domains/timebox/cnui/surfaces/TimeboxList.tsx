@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CnuiButton } from '../components/Button'
+import { CnuiButton } from '@/components/cnui/components/Button'
 
 interface TimeboxItem {
   title: string
