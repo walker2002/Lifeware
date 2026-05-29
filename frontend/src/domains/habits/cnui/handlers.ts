@@ -28,50 +28,63 @@ function getChineseActionLabel(action: string): string {
   return labels[action] ?? action
 }
 
+async function getItemsByStatus(status: string): Promise<Record<string, unknown>[]> {
+  try {
+    const repo = new HabitRepository()
+    const habits = await repo.findByUserId(MVP_USER_ID)
+    return habits
+      .filter(h => h.status === status)
+      .map(h => ({
+        id: h.id,
+        title: h.title,
+        defaultTime: h.defaultTime,
+        streak: h.streak,
+        frequencyType: h.frequency.type,
+        status: h.status,
+      }))
+  } catch (e) {
+    console.error(`[habitCnuiHandler] 查询 habits (status=${status}) 失败:`, e)
+    return []
+  }
+}
+
+async function getTrackableHabits(): Promise<Record<string, unknown>[]> {
+  try {
+    const repo = new HabitRepository()
+    const habits = await repo.findByUserId(MVP_USER_ID)
+    return habits
+      .filter(h => h.status === 'active' && h.trackable)
+      .map(h => ({
+        id: h.id,
+        title: h.title,
+        defaultTime: h.defaultTime,
+        defaultDuration: h.defaultDuration,
+        streak: h.streak,
+        todayLogged: false,
+      }))
+  } catch (e) {
+    console.error('[habitCnuiHandler] 查询可打卡 habits 失败:', e)
+    return []
+  }
+}
+
 export const habitCnuiHandler: CnuiSurfaceHandler = {
   async open(action): Promise<CnuiSurfaceOpenResult> {
-    // createHabit: 返回空数据模型，由 CnuiFormAdapter 渲染
     if (action === 'createHabit') {
       return { content: '请填写习惯信息', dataSnapshot: { startDate: new Date().toISOString().slice(0, 10) } }
     }
 
-    const repo = new HabitRepository()
-
-    // logHabit: 展示待打卡习惯
     if (action === 'logHabit') {
-      const allHabits = await repo.findByUserId(MVP_USER_ID)
-      const pending = allHabits
-        .filter(h => h.status === 'active' && h.trackable)
-        .map(h => ({
-          id: h.id,
-          title: h.title,
-          defaultTime: h.defaultTime,
-          defaultDuration: h.defaultDuration,
-          streak: h.streak,
-          todayLogged: false,
-        }))
-
+      const pending = await getTrackableHabits()
       return {
         content: '请选择要打卡的习惯',
         dataSnapshot: { items: pending },
       }
     }
 
-    // lifecycle actions
     if (action in LIFECYCLE_STATUS_MAP) {
       const status = LIFECYCLE_STATUS_MAP[action]
-      const allHabits = await repo.findByUserId(MVP_USER_ID)
-      const items = allHabits
-        .filter(h => h.status === status)
-        .map(h => ({
-          id: h.id,
-          title: h.title,
-          defaultTime: h.defaultTime,
-          streak: h.streak,
-          frequencyType: h.frequency.type,
-          status: h.status,
-        }))
-
+      const items = await getItemsByStatus(status)
       const smAction = LIFECYCLE_SM_ACTION[action]
 
       return {
