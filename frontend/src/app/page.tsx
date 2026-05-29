@@ -24,7 +24,7 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { DynamicForm } from "@/components/editor/dynamic-form"
 import { ActionConfirm } from "@/components/editor/action-confirm"
@@ -354,15 +354,35 @@ export default function Home() {
     setActiveSessionId(newId)
   }, [conversationMessages, mainViewState])
 
-  const handleGrowthAction = useCallback((domainId: string, action: string) => {
+  const handleGrowthAction = useCallback(async (domainId: string, action: string) => {
     saveCurrentConversation();
     // createHabit 直接导航到 HabitListPage（type: 'view'）打开编辑面板
     if (domainId === 'habits' && action === 'createHabit') {
       setMainViewState({ type: 'view', domainId, action });
-    } else {
-      setMainViewState({ type: 'action', domainId, action });
+      return;
     }
-  }, [saveCurrentConversation]);
+
+    // response_type=cnui → 打开 CN-UI 表面
+    if (await isCnuiSurface(domainId, action)) {
+      try {
+        const result = await openCnuiSurface(domainId, action);
+        const msg: ChatMessage = {
+          role: 'assistant',
+          content: result.content,
+          timestamp: new Date().toISOString(),
+          cnuiSurface: result.surface,
+        };
+        setConversationMessages(prev => [...prev, msg]);
+      } catch (e) {
+        console.error('openCnuiSurface failed:', e);
+        const errMsg: ChatMessage = { role: 'assistant', content: '打开操作面板失败，请重试', timestamp: new Date().toISOString() };
+        setConversationMessages(prev => [...prev, errMsg]);
+      }
+      return;
+    }
+
+    setMainViewState({ type: 'action', domainId, action });
+  }, [saveCurrentConversation, openCnuiSurface]);
 
   /** 处理 CN-UI 表面提交 */
   const handleCnuiConfirm = useCallback(
@@ -370,21 +390,25 @@ export default function Home() {
       try {
         const result = await submitCnuiSurface(cnuiSurfaceId, domainId, action, data)
         if (result.success) {
+          const content = action === 'createHabit' && result.habit?.title
+            ? `习惯"${result.habit.title}"创建成功！`
+            : '操作成功！'
           const msg: ChatMessage = {
             role: 'assistant',
-            content: result.habit?.title ? `习惯"${result.habit.title}"创建成功！` : '习惯创建成功！',
+            content,
             timestamp: new Date().toISOString(),
           }
           setConversationMessages(prev => [...prev, msg])
         } else {
           const msg: ChatMessage = {
             role: 'system',
-            content: `创建失败: ${result.error}`,
+            content: `操作失败: ${result.error}`,
             timestamp: new Date().toISOString(),
           }
           setConversationMessages(prev => [...prev, msg])
         }
-      } catch {
+      } catch (e) {
+        console.error('submitCnuiSurface failed:', e)
         const msg: ChatMessage = {
           role: 'system',
           content: '网络错误，请重试',

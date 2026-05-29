@@ -28,7 +28,7 @@ import { timeboxPlugin } from "../../domains/timebox";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
 import { getTraceConfig } from "../../lib/config/trace-config";
 import { eq, desc } from "drizzle-orm";
-import { validateHabitFields } from "@/domains/habits/validation";
+import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry';
 
 // ─── 类型定义 ───────────────────────────────────────────────────
 
@@ -72,16 +72,6 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
     loggedAt: timebox.loggedAt,
     executionRecord: timebox.executionRecord,
   };
-}
-
-function getChineseActionLabel(action: string): string {
-  const labels: Record<string, string> = {
-    activate: '激活',
-    suspend: '暂停',
-    reactivate: '恢复',
-    archive: '归档',
-  }
-  return labels[action] ?? action
 }
 
 async function fetchTimeboxSummariesByRange(
@@ -728,38 +718,6 @@ export async function batchLogHabits(
   return { success: !lastError, error: lastError }
 }
 
-interface HabitItem {
-  id: string
-  title: string
-  defaultTime: string
-  streak: number
-  frequencyType?: string
-  status: string
-}
-
-/** 获取指定状态的习惯列表（用于生命周期操作面板） */
-export async function getHabitsByStatus(
-  status: string,
-): Promise<{ success: boolean; habits?: HabitItem[]; error?: string }> {
-  try {
-    const repo = await getHabitRepo()
-    const allHabits = await repo.findByUserId(MVP_USER_ID)
-    const filtered = allHabits
-      .filter(h => h.status === status)
-      .map(h => ({
-        id: h.id,
-        title: h.title,
-        defaultTime: h.defaultTime,
-        streak: h.streak,
-        frequencyType: h.frequency.type,
-        status: h.status,
-      }))
-    return { success: true, habits: filtered }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : '获取习惯列表失败' }
-  }
-}
-
 /** 更新习惯信息 */
 export async function updateHabit(
   habitId: string,
@@ -1109,88 +1067,71 @@ export async function openCnuiSurface(
   domainId: string,
   action: string,
 ): Promise<OpenCnuiSurfaceResult> {
-  // 使用 getFullManifest 获取完整 manifest（含 generation_actions）
+  // 从 manifest 获取 intent_trigger 元数据
   const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
-  const genActions = fullManifest?.generation_actions as Record<string, any> | undefined
-  const genAction = genActions?.[action]
-  const surfaceType: string = genAction?.cnui_surface_type ?? `${domainId}-${action}`
-
-  const config = FormRegistry.get(domainId, action)
-  const dataModel = config?.defaults ? JSON.parse(JSON.stringify(config.defaults)) : {}
-
-  // 动态注入日期默认值（不能在模块加载时固化）
-  if (domainId === 'habits' && action === 'createHabit' && !dataModel.startDate) {
-    dataModel.startDate = new Date().toISOString().slice(0, 10)
-  }
-
-  // 从 manifest intent_triggers 获取可读描述
   const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
   const trigger = intentTriggers.find((t) => t.action === action)
-  const actionLabel = trigger?.description ?? action
 
-  // logHabit: 展示待打卡习惯
-  if (action === 'logHabit' && domainId === 'habits') {
-    const repo = await getHabitRepo()
-    const allHabits = await repo.findByUserId(MVP_USER_ID)
-    const pending = allHabits
-      .filter(h => h.status === 'active' && h.trackable)
-      .map(h => ({
-        id: h.id,
-        title: h.title,
-        defaultTime: h.defaultTime,
-        defaultDuration: h.defaultDuration,
-        streak: h.streak,
-        todayLogged: false, // MVP: HabitLogRepository 查询需额外 server action
-      }))
+  // 确定 surfaceType：优先从 intent_triggers.cnui_surface，其次 generation_actions.cnui_surface_type
+  let surfaceType = trigger?.cnui_surface as string | undefined
+  if (!surfaceType) {
+    const genActions = fullManifest?.generation_actions as Record<string, any> | undefined
+    const genAction = genActions?.[action]
+    surfaceType = genAction?.cnui_surface_type as string | undefined
+  }
 
+  // 通过 registry 找到 handler
+  if (!surfaceType) {
     return {
-      content: '请选择要打卡的习惯',
+      content: `Unknown action: ${domainId}/${action}`,
       surface: {
         cnuiSurfaceId: crypto.randomUUID(),
-        cnuiSurfaceType: 'habit-checkin-panel',
+        cnuiSurfaceType: 'unknown',
         domainId,
         action,
-        dataSnapshot: { items: pending },
+        dataSnapshot: {},
       },
     }
   }
 
-  // lifecycle actions: activateHabit, suspendHabit, archiveHabit, reactivateHabit
-  const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
-  if (lifecycleActions.includes(action) && domainId === 'habits') {
-    const statusMap: Record<string, string> = {
-      activateHabit: 'draft',
-      suspendHabit: 'active',
-      archiveHabit: 'suspended',
-      reactivateHabit: 'suspended',
-    }
-    const status = statusMap[action] ?? 'draft'
-    const result = await getHabitsByStatus(status)
-    const items = result.success ? (result.habits ?? []) : []
-
-    const smAction = action.replace('Habit', '') // activateHabit -> activate
-
+  const reg = cnuiRegistry.get(surfaceType)
+  if (!reg) {
     return {
-      content: `请选择要${getChineseActionLabel(smAction)}的习惯`,
+      content: `未注册的 surface: ${surfaceType}`,
       surface: {
         cnuiSurfaceId: crypto.randomUUID(),
-        cnuiSurfaceType: 'habit-action-panel',
+        cnuiSurfaceType: surfaceType,
         domainId,
         action,
-        dataSnapshot: { action: smAction, items },
+        dataSnapshot: {},
       },
     }
   }
 
-  return {
-    content: `请填写${actionLabel}信息`,
-    surface: {
-      cnuiSurfaceId: crypto.randomUUID(),
-      cnuiSurfaceType: surfaceType,
-      domainId,
-      action,
-      dataSnapshot: dataModel,
-    },
+  try {
+    const result = await reg.handler.open(action)
+    return {
+      content: result.content,
+      surface: {
+        cnuiSurfaceId: crypto.randomUUID(),
+        cnuiSurfaceType: surfaceType,
+        domainId,
+        action,
+        dataSnapshot: result.dataSnapshot,
+      },
+    }
+  } catch (e) {
+    console.error(`[openCnuiSurface] handler.open failed for ${domainId}/${action}:`, e)
+    return {
+      content: '打开操作面板失败，请重试',
+      surface: {
+        cnuiSurfaceId: crypto.randomUUID(),
+        cnuiSurfaceType: surfaceType,
+        domainId,
+        action,
+        dataSnapshot: {},
+      },
+    }
   }
 }
 
@@ -1201,14 +1142,23 @@ export async function submitCnuiSurface(
   action: string,
   fields: Record<string, unknown>,
 ): Promise<HabitActionResult> {
-  // 服务端二次校验（防御性校验，客户端已校验过）
-  if (domainId === "habits" && action === "createHabit") {
-    const result = validateHabitFields(fields, "createHabit")
-    if (!result.valid) {
-      return { success: false, error: result.errors.join("；") }
-    }
+  // 通过 manifest 确定 surfaceType，查找 handler
+  const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
+  const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
+  const trigger = intentTriggers.find((t) => t.action === action)
+
+  let surfaceType = trigger?.cnui_surface as string | undefined
+  if (!surfaceType) {
+    const genActions = fullManifest?.generation_actions as Record<string, any> | undefined
+    const genAction = genActions?.[action]
+    surfaceType = genAction?.cnui_surface_type as string | undefined
   }
 
+  if (!surfaceType) {
+    return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
+  }
+
+  // FormRegistry 的字段映射（保留下层映射逻辑）
   const config = FormRegistry.get(domainId, action)
   let mappedFields = fields
   if (config) {
@@ -1220,54 +1170,24 @@ export async function submitCnuiSurface(
     }
   }
 
-  if (domainId === "habits" && action === "createHabit") {
-    return submitHabitIntent(mappedFields as CreateHabitInput)
+  const reg = cnuiRegistry.get(surfaceType)
+  if (!reg) {
+    return { success: false, error: `未注册的 surface: ${surfaceType}` }
   }
 
-  // lifecycle action 提交
-  const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
-  if (domainId === 'habits' && lifecycleActions.includes(action)) {
-    const selectedIds = fields['selectedIds'] as string[]
-    const submittedAction = fields['action'] as string ?? action.replace('Habit', '')
-    if (!selectedIds || selectedIds.length === 0) {
-      return { success: false, error: '未选择任何习惯' }
-    }
-
-    const smAction = submittedAction as 'activate' | 'suspend' | 'reactivate' | 'archive'
-    let lastError: string | undefined
-    for (const habitId of selectedIds) {
-      const result = await updateHabitStatus(habitId, smAction)
-      if (!result.success) {
-        lastError = result.error
-      }
-    }
-    if (lastError) {
-      return { success: false, error: lastError }
-    }
-    return { success: true }
+  // 委托给 domain handler 执行提交
+  const result = await reg.handler.submit(action, mappedFields)
+  return {
+    success: result.success,
+    error: result.error,
+    ...(result.data ?? {}),
   }
+}
 
-  // logHabit 提交
-  if (domainId === 'habits' && action === 'logHabit') {
-    const selectedIds = fields['selectedIds'] as string[]
-    const detailFields = (fields['detailFields'] ?? {}) as Record<string, Record<string, unknown>>
-
-    if (!selectedIds || selectedIds.length === 0) {
-      return { success: false, error: '未选择任何习惯' }
-    }
-
-    const items = selectedIds.map(id => ({
-      habitId: id,
-      fields: detailFields[id] as {
-        actualDuration?: number
-        completionRating?: number
-        energyLevel?: number
-        note?: string
-      } | undefined,
-    }))
-
-    return batchLogHabits(items)
-  }
-
-  return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
+/** 判断 action 的 response_type 是否为 cnui（读取 manifest，供客户端使用） */
+export async function isCnuiSurface(domainId: string, action: string): Promise<boolean> {
+  const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
+  const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
+  const trigger = intentTriggers.find((t) => t.action === action)
+  return trigger?.response_type === 'cnui'
 }
