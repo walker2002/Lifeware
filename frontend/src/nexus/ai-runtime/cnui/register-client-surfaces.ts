@@ -1,0 +1,20 @@
+// 客户端 CNUI Surface 组件注册
+// domains/*/index.ts 中的注册仅在服务端执行（被 registry.ts 触发），
+// 客户端需要独立的注册路径，否则 CnuiRegistry.get() 返回 undefined。
+
+import { cnuiRegistry } from './registry'
+
+// Habits surfaces
+import { HabitActionPanel } from '@/domains/habits/cnui/surfaces/HabitActionPanel'
+import { HabitCheckinPanel } from '@/domains/habits/cnui/surfaces/HabitCheckinPanel'
+import { HabitCreationCard } from '@/domains/habits/cnui/surfaces/HabitCreationCard'
+import { HabitListCard } from '@/domains/habits/cnui/surfaces/HabitListCard'
+
+// Timebox surfaces
+import { TimeboxList } from '@/domains/timebox/cnui/surfaces/TimeboxList'
+
+cnuiRegistry.register('habits', 'habit-action-panel', { component: HabitActionPanel })
+cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckinPanel })
+cnuiRegistry.register('habits', 'habit-creation-card', { component: HabitCreationCard })
+cnuiRegistry.register('habits', 'habit-list-card', { component: HabitListCard })
+cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })

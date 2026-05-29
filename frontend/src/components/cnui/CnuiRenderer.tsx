@@ -2,6 +2,7 @@
 
 import type { CnuiComponentType } from '@/nexus/ai-runtime/cnui/types'
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
+import '@/nexus/ai-runtime/cnui/register-client-surfaces'
 
 interface CnuiRendererProps {
   surfaceType: CnuiComponentType

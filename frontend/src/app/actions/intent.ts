@@ -29,6 +29,15 @@ import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
 import { getTraceConfig } from "../../lib/config/trace-config";
 import { eq, desc } from "drizzle-orm";
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry';
+import { surfaceHandlers as habitHandlers } from '@/domains/habits/cnui/handlers';
+import { surfaceHandlers as timeboxHandlers } from '@/domains/timebox/cnui/handlers';
+import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
+
+// 各 domain 自注册的 handler 合并（新增 domain 只需加一行 import + spread）
+const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
+  ...habitHandlers,
+  ...timeboxHandlers,
+}
 
 // ─── 类型定义 ───────────────────────────────────────────────────
 
@@ -1094,21 +1103,7 @@ export async function openCnuiSurface(
     }
   }
 
-  const reg = cnuiRegistry.get(surfaceType)
-  if (!reg) {
-    return {
-      content: `未注册的 surface: ${surfaceType}`,
-      surface: {
-        cnuiSurfaceId: crypto.randomUUID(),
-        cnuiSurfaceType: surfaceType,
-        domainId,
-        action,
-        dataSnapshot: {},
-      },
-    }
-  }
-
-  const handler = cnuiRegistry.getHandler(surfaceType)
+  const handler = CNUI_HANDLERS[surfaceType]
   if (!handler) {
     return {
       content: `Handler 未找到: ${surfaceType}`,
@@ -1184,12 +1179,7 @@ export async function submitCnuiSurface(
     }
   }
 
-  const reg = cnuiRegistry.get(surfaceType)
-  if (!reg) {
-    return { success: false, error: `未注册的 surface: ${surfaceType}` }
-  }
-
-  const handler = cnuiRegistry.getHandler(surfaceType)
+  const handler = CNUI_HANDLERS[surfaceType]
   if (!handler) {
     return { success: false, error: `Handler 未找到: ${surfaceType}` }
   }
@@ -1211,16 +1201,14 @@ export async function isCnuiSurface(domainId: string, action: string): Promise<b
   return trigger?.response_type === 'cnui'
 }
 
-/** 获取 action 的响应类型和视图路由（服务端查询） */
+/** 获取 action 的响应类型（服务端查询） */
 export async function getActionResponse(domainId: string, action: string): Promise<{
   responseType: string
-  viewRoute?: string
 }> {
   const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
   const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
   const trigger = intentTriggers.find((t) => t.action === action)
   return {
     responseType: trigger?.response_type ?? 'text',
-    viewRoute: trigger?.view_route,
   }
 }

@@ -54,6 +54,8 @@ intent_triggers:
   - action: createSmartSchedule
     shortcut: /smartSchedule
     description: AI 智能编排日程
+    response_type: cnui
+    cnui_surface: timebox-list
     examples:
       - 帮我智能安排今天的日程
       - 智能编排

@@ -40,6 +40,7 @@ import {
 } from "date-fns";
 import { resolveSlashCommand } from "@/lib/slash-command";
 import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/main-view-state";
+import type { SurfaceState } from "@/usom/types/objects";
 
 // view_route 页面组件映射（domainId → action → Component）
 // 在 AppShell 主内容区内渲染，保留左侧面板和顶部导航
@@ -333,11 +334,27 @@ export default function Home() {
     setActiveSessionId(newId)
   }, [conversationMessages, mainViewState])
 
+  /** 确保当前处于对话视图（如不处于则创建/切换） */
+  const ensureConversationView = useCallback(() => {
+    if (mainViewState.type === 'conversation') return
+    const sessionId = activeSessionId ?? crypto.randomUUID()
+    if (!activeSessionId) {
+      setSessions(prev => [{
+        id: sessionId, title: '新对话', status: 'active',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }, ...prev])
+      setActiveSessionId(sessionId)
+    }
+    setMainViewState({ type: 'conversation', sessionId })
+  }, [mainViewState, activeSessionId])
+
   const handleGrowthAction = useCallback(async (domainId: string, action: string) => {
     saveCurrentConversation();
 
-    // response_type=cnui → 打开 CN-UI 表面
+    // response_type=cnui → 切换到对话视图并打开 CN-UI 表面
     if (await isCnuiSurface(domainId, action)) {
+      ensureConversationView()
+
       try {
         const result = await openCnuiSurface(domainId, action);
         const msg: ChatMessage = {
@@ -356,24 +373,15 @@ export default function Home() {
     }
 
     // 非 CNUI action：通过 Server Action 检查响应类型
-    const { responseType, viewRoute } = await getActionResponse(domainId, action);
+    const { responseType } = await getActionResponse(domainId, action);
 
     if (responseType === 'page') {
-      // 页面导航
-      if (viewRoute) {
-        const msg: ChatMessage = {
-          role: 'assistant',
-          content: `正在跳转到 ${viewRoute}...`,
-          timestamp: new Date().toISOString(),
-        };
-        setConversationMessages(prev => [...prev, msg]);
-        // 页面导航可通过 manifest 的 view_route 处理，或在对话中提示用户
-        return;
-      }
+      setMainViewState({ type: 'action', domainId, action });
+      return;
     }
 
     if (responseType === 'text') {
-      // 纯文本响应
+      ensureConversationView()
       const msg: ChatMessage = {
         role: 'assistant',
         content: `操作 ${action} 已记录，请在对话中继续`,
@@ -383,14 +391,9 @@ export default function Home() {
       return;
     }
 
-    // 未定义 response_type 或其他情况：提示用户
-    const errorMsg: ChatMessage = {
-      role: 'system',
-      content: `操作 ${domainId}/${action} 尚未配置交互方式。请在 manifest 中声明 response_type（cnui/page/text）。`,
-      timestamp: new Date().toISOString(),
-    };
-    setConversationMessages(prev => [...prev, errorMsg]);
-  }, [saveCurrentConversation, openCnuiSurface]);
+    // 未定义 response_type 或其他情况
+    setMainViewState({ type: 'action', domainId, action });
+  }, [saveCurrentConversation, ensureConversationView]);
 
   /** 处理 CN-UI 表面提交 */
   const handleCnuiConfirm = useCallback(
@@ -427,6 +430,16 @@ export default function Home() {
     },
     [],
   )
+
+  /** CNUI 表面状态变更 → 持久化到消息中 */
+  const handleSurfaceStateChange = useCallback((surfaceId: string, state: SurfaceState) => {
+    setConversationMessages(prev => prev.map(msg => {
+      if (msg.cnuiSurface?.cnuiSurfaceId === surfaceId) {
+        return { ...msg, cnuiSurface: { ...msg.cnuiSurface, state } }
+      }
+      return msg
+    }))
+  }, [])
 
   // T031: conversation 消息发送 → 可能触发 splitWith
   const handleConversationSend = useCallback(async (content: string, attachments?: File[]) => {
@@ -566,7 +579,7 @@ export default function Home() {
       const habitParse = await parseHabitIntentOnly(content)
       if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
         setMainViewState({
-          type: 'view',
+          type: 'action',
           domainId: 'habits',
           action: 'createHabit',
           initialFields: habitParse.fields,
@@ -671,6 +684,7 @@ export default function Home() {
           onSelectSession={handleSelectSession}
           intentTriggers={intentTriggers}
           onCnuiConfirm={handleCnuiConfirm}
+          onSurfaceStateChange={handleSurfaceStateChange}
         />
       )
       if (splitWith) {
@@ -696,8 +710,19 @@ export default function Home() {
       return convView;
     }
 
-    if (mainViewState.type === 'view') {
+    if (mainViewState.type === 'action') {
       const { domainId, action, initialFields } = mainViewState
+      // 时间盒日程直接用 schedule 视图
+      if (domainId === 'timebox' && (action === 'viewSchedule' || action === 'view_schedule')) {
+        return (
+          <div className="flex w-full flex-col gap-4">
+            <DateNav mode={dateMode} currentDate={currentDate} onModeChange={handleDateModeChange} onNavigate={handleNavigate} />
+            {dateMode === "day" && <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />}
+            {dateMode === "week" && <WeekView timeboxes={timeboxes} currentDate={currentDate} />}
+            {dateMode === "month" && <MonthView timeboxes={timeboxes} currentDate={currentDate} />}
+          </div>
+        )
+      }
       const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
       if (ViewComponent) {
         const props = action === 'createHabit'
@@ -709,7 +734,7 @@ export default function Home() {
           </div>
         )
       }
-      return <div className="p-4"><p className="text-sm text-body">页面未找到</p></div>
+      return <div className="p-4"><p className="text-sm text-body">页面未找到: {domainId}/{action}</p></div>
     }
 
     if (mainViewState.type === 'settings') {

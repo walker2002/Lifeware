@@ -4,9 +4,11 @@ const IntentTriggerSchema = z.object({
   action: z.string(),
   shortcut: z.string().optional(),
   description: z.string(),
-  examples: z.array(z.string()),
-  keywords: z.array(z.string()),
+  examples: z.array(z.string()).optional(),
+  keywords: z.array(z.string()).optional(),
   view_route: z.string().optional(),
+  response_type: z.enum(['page', 'cnui', 'text']).optional(),
+  cnui_surface: z.string().optional(),
 })
 
 const LifecycleTransitionSchema = z.object({
@@ -90,6 +92,11 @@ const CascadeRuleSchema = z.object({
   auto_execute: z.boolean().default(false),
 })
 
+const CnuiSurfaceSchema = z.object({
+  description: z.string().optional(),
+  handler: z.string().optional(),
+})
+
 export const ManifestSchema = z.object({
   id: z.string(),
   version: z.string(),
@@ -118,6 +125,7 @@ export const ManifestSchema = z.object({
   generation_actions: z.record(z.string(), GenerationActionSchema).optional(),
   query_actions: z.record(z.string(), QueryActionSchema).optional(),
   cascade_rules: z.array(CascadeRuleSchema).optional(),
+  cnui_surfaces: z.record(z.string(), CnuiSurfaceSchema).optional(),
 })
 
 export type DomainManifest = z.infer<typeof ManifestSchema>

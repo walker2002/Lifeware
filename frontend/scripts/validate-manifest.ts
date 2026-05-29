@@ -268,6 +268,15 @@ function validateDomain(domainId: string): void {
       addError(domainId, 'GA-surface-not-found',
         `generation_actions["${actionKey}"] 的 cnui_surface_type "${ga.cnui_surface_type}" 在 cnui_surfaces 中不存在`)
     }
+
+    // generation_action 有 cnui surface 时，对应的 intent_trigger 必须声明 response_type
+    if (ga.cnui_surface_type || ga.response_mode === 'cnui') {
+      const trigger = intentTriggers.find(t => t.action === actionKey)
+      if (trigger && !trigger.response_type) {
+        addError(domainId, 'GA-missing-trigger-response-type',
+          `generation_actions["${actionKey}"] 有 cnui surface，但 intent_trigger 缺少 response_type: cnui`)
+      }
+    }
   }
 
   // ── query_actions 中的 cnui_surface 引用检查 ─────────────────

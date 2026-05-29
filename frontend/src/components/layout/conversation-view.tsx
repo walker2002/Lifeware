@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from "react"
-import type { ChatMessage } from "@/usom/types/objects"
-import type { AISessionSummary } from "@/usom/types/objects"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
 import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
@@ -22,6 +21,7 @@ interface ConversationViewProps {
   onSelectSession?: (sessionId: string) => void
   intentTriggers?: IntentTrigger[]
   onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
+  onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
 }
 
 const ROLE_LABELS: Record<ChatMessage['role'], string> = {
@@ -30,9 +30,21 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
   system: '系统',
 }
 
-export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, onCnuiConfirm }: ConversationViewProps) {
+export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
+
+  // 从消息中提取已有的 surface 状态（跨导航持久化）
+  const initialSurfaceStates = useMemo(() => {
+    const states: Record<string, SurfaceState> = {}
+    for (const msg of messages) {
+      if (msg.cnuiSurface?.state) {
+        states[msg.cnuiSurface.cnuiSurfaceId] = msg.cnuiSurface.state
+      }
+    }
+    return states
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — 状态已持久化在 messages.cnuiSurface.state 中，重新挂载时自动读取最新值
+
   const [lifecycleState, lifecycleActions] = useCnuiLifecycle(
     useCallback(
       async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
@@ -40,7 +52,9 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
         await onCnuiConfirm(surfaceId, domainId, action, data)
       },
       [onCnuiConfirm]
-    )
+    ),
+    initialSurfaceStates,
+    onSurfaceStateChange,
   )
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)

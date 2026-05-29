@@ -247,3 +247,11 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
     return { success: false, error: `Unknown CN-UI action: habits/${action}` }
   },
 }
+
+/** 所有 habits domain 的 CNUI surface handler 映射 */
+export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
+  'habit-action-panel': habitCnuiHandler,
+  'habit-checkin-panel': habitCnuiHandler,
+  'habit-creation-card': habitCnuiHandler,
+  'habit-list-card': habitCnuiHandler,
+}

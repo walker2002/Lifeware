@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import type { SurfaceState } from '@/usom/types/objects'
 
-export type SurfaceState = 'active' | 'saved' | 'cancelled'
+export type { SurfaceState }
 
 export interface CnuiLifecycleState {
   surfaceStates: Record<string, SurfaceState>
@@ -32,8 +33,10 @@ export interface CnuiLifecycleActions {
 
 export function useCnuiLifecycle(
   onSubmit: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<void>,
+  initialStates?: Record<string, SurfaceState>,
+  onStateChange?: (surfaceId: string, state: SurfaceState) => void,
 ): [CnuiLifecycleState, CnuiLifecycleActions] {
-  const [surfaceStates, setSurfaceStates] = useState<Record<string, SurfaceState>>({})
+  const [surfaceStates, setSurfaceStates] = useState<Record<string, SurfaceState>>(initialStates ?? {})
   const [surfaceData, setSurfaceData] = useState<Record<string, Record<string, unknown>>>({})
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
@@ -87,6 +90,7 @@ export function useCnuiLifecycle(
 
     if (type === 'cancel') {
       setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'cancelled' }))
+      onStateChange?.(surfaceId, 'cancelled')
       setConfirmDialog(prev => ({ ...prev, open: false }))
       return
     }
@@ -100,12 +104,13 @@ export function useCnuiLifecycle(
     try {
       await onSubmit(surfaceId, domainId, action, pendingData)
       setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'saved' }))
+      onStateChange?.(surfaceId, 'saved')
     } catch {
       setValidationErrors(prev => ({ ...prev, [surfaceId]: ['保存失败，请稍后重试'] }))
     } finally {
       setSubmittingId(null)
     }
-  }, [confirmDialog, onSubmit])
+  }, [confirmDialog, onSubmit, onStateChange])
 
   const dismissDialog = useCallback(() => {
     setConfirmDialog(prev => ({ ...prev, open: false }))

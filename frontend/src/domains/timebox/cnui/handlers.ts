@@ -129,3 +129,8 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     return { success: false, error: `Unknown CN-UI action: timebox/${action}` }
   },
 }
+
+/** 所有 timebox domain 的 CNUI surface handler 映射 */
+export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
+  'timebox-list': timeboxCnuiHandler,
+}

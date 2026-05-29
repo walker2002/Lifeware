@@ -360,6 +360,9 @@ export interface ReviewMetrics {
   focusScore?: number // 0-100
 }
 
+/** CN-UI 表面生命周期状态 */
+export type SurfaceState = 'active' | 'saved' | 'cancelled'
+
 /** CN-UI 表面引用（嵌入 ChatMessage 用于对话内渲染） */
 export interface CnuiSurfaceRef {
   cnuiSurfaceId: string
@@ -367,6 +370,7 @@ export interface CnuiSurfaceRef {
   domainId: string
   action: string
   dataSnapshot?: Record<string, unknown>
+  state?: SurfaceState
 }
 
 // ─── ChatMessage (embedded in AISession) ──────────────────────

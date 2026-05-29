@@ -11,6 +11,8 @@ intent_triggers:
   - action: createHabit
     shortcut: /createHabit
     description: 创建新习惯
+    response_type: cnui
+    cnui_surface: habit-creation-card
     examples:
       - 帮我创建一个每天跑步的习惯
       - 新增一个冥想习惯
