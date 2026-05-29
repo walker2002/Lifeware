@@ -30,12 +30,9 @@ export async function loadSessionMessages(sessionId: string): Promise<ChatMessag
 
 /** 创建新 session */
 export async function createSession(title?: string): Promise<{ id: string; title: string }> {
-  const now = new Date().toISOString()
-  const defaultTitle = `${parseInt(now.slice(5, 7))}月${parseInt(now.slice(8, 10))}日对话`
-
   const session = await sessionRepo.create({
     userId: MVP_USER_ID,
-    title: title || defaultTitle,
+    title: title || '新对话',
     status: 'active',
     messages: [],
     stateSnapshot: {},
@@ -89,8 +86,8 @@ export async function tryGenerateTitle(sessionId: string): Promise<string | null
   const session = await sessionRepo.findById(sessionId, MVP_USER_ID)
   if (!session) return null
 
-  // 已有自定义标题则跳过（不匹配默认模式 X月X日对话 或 新对话）
-  if (!/^\d+月\d+日对话$/.test(session.title) && session.title !== '新对话') return null
+  // 已有自定义标题则跳过
+  if (session.title !== '新对话') return null
 
   try {
     const aiRuntime = createAIRuntime()
