@@ -356,11 +356,6 @@ export default function Home() {
 
   const handleGrowthAction = useCallback(async (domainId: string, action: string) => {
     saveCurrentConversation();
-    // createHabit 直接导航到 HabitListPage（type: 'view'）打开编辑面板
-    if (domainId === 'habits' && action === 'createHabit') {
-      setMainViewState({ type: 'view', domainId, action });
-      return;
-    }
 
     // response_type=cnui → 打开 CN-UI 表面
     if (await isCnuiSurface(domainId, action)) {

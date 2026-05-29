@@ -23,6 +23,10 @@ cnuiRegistry.register('habits', 'habit-creation-card', {
   component: require('./cnui/surfaces/HabitCreationCard').HabitCreationCard,
   handler: habitCnuiHandler,
 })
+cnuiRegistry.register('habits', 'habit-list-card', {
+  component: require('./cnui/surfaces/HabitListCard').HabitListCard,
+  handler: habitCnuiHandler,
+})
 
 const result = loadDomainManifest('habits')
 
