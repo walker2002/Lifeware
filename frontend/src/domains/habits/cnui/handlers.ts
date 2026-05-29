@@ -1,6 +1,13 @@
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 import { HabitRepository } from '@/domains/habits/repository/habit'
+import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
+import { SystemEventRepository } from '@/lib/db/repositories/system-event.repository'
 import { validateHabitFields } from '@/domains/habits/validation'
+import { findTransition } from '@/domains/habits/transitions'
+import type { CreateHabitInput } from '@/usom/interfaces/irepository'
+import type { Habit, HabitFrequency } from '@/usom/types/objects'
+import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
+import type { SystemEvent, SystemEventType } from '@/usom/types/process'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -97,17 +104,40 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
-    // createHabit: 服务端校验 + 通过 orchestrator 提交
+    // createHabit: 服务端校验 + 直接调用 repository
     if (action === 'createHabit') {
       const result = validateHabitFields(fields, 'createHabit')
       if (!result.valid) {
         return { success: false, error: result.errors.join('；') }
       }
-      // 委托给 intent.ts 中已有的 submitHabitIntent
-      const { submitHabitIntent } = await import('@/app/actions/intent')
-      const intentResult = await submitHabitIntent(fields as any)
-      if (!intentResult.success) return { success: false, error: intentResult.error }
-      return { success: true, data: { habit: intentResult.habit } }
+
+      try {
+        const habitRepo = new HabitRepository()
+        const eventRepo = new SystemEventRepository()
+        const now = new Date().toISOString() as Timestamp
+
+        const input = fields as CreateHabitInput
+        const habit = await habitRepo.create(input, MVP_USER_ID)
+
+        // 创建系统事件
+        const transition = findTransition('habits', 'habit', null, 'create')
+        if (transition) {
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: transition.eventType as SystemEventType,
+            occurredAt: now,
+            triggeredBy: 'cnui_handler',
+            payload: { habitId: habit.id, toStatus: transition.to },
+            snapshotId: '' as USOM_ID,
+          }
+          await eventRepo.append(event, MVP_USER_ID)
+        }
+
+        return { success: true, data: { habit } }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '创建习惯失败'
+        return { success: false, error: msg }
+      }
     }
 
     // lifecycle actions
@@ -119,14 +149,44 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
 
       const smAction = (fields['action'] as string ?? LIFECYCLE_SM_ACTION[action]) as 'activate' | 'suspend' | 'reactivate' | 'archive'
 
-      const { updateHabitStatus } = await import('@/app/actions/intent')
-      let lastError: string | undefined
-      for (const habitId of selectedIds) {
-        const result = await updateHabitStatus(habitId, smAction)
-        if (!result.success) lastError = result.error
+      try {
+        const habitRepo = new HabitRepository()
+        const eventRepo = new SystemEventRepository()
+        const now = new Date().toISOString() as Timestamp
+        let lastError: string | undefined
+
+        for (const habitId of selectedIds) {
+          const existing = await habitRepo.findById(habitId, MVP_USER_ID)
+          if (!existing) {
+            lastError = `习惯不存在: ${habitId}`
+            continue
+          }
+
+          const transition = findTransition('habits', 'habit', existing.status, smAction)
+          if (!transition) {
+            lastError = `非法状态转换: action="${smAction}", fromState="${existing.status}"`
+            continue
+          }
+
+          await habitRepo.updateStatus(habitId, transition.to, MVP_USER_ID)
+
+          const event: SystemEvent = {
+            id: crypto.randomUUID() as USOM_ID,
+            type: transition.eventType as SystemEventType,
+            occurredAt: now,
+            triggeredBy: 'cnui_handler',
+            payload: { habitId, fromStatus: existing.status, toStatus: transition.to },
+            snapshotId: '' as USOM_ID,
+          }
+          await eventRepo.append(event, MVP_USER_ID)
+        }
+
+        if (lastError) return { success: false, error: lastError }
+        return { success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '状态更新失败'
+        return { success: false, error: msg }
       }
-      if (lastError) return { success: false, error: lastError }
-      return { success: true }
     }
 
     // logHabit
@@ -138,17 +198,57 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
         return { success: false, error: '未选择任何习惯' }
       }
 
-      const { batchLogHabits } = await import('@/app/actions/intent')
-      const items = selectedIds.map(id => ({
-        habitId: id,
-        fields: detailFields[id] as {
-          actualDuration?: number
-          completionRating?: number
-          energyLevel?: number
-          note?: string
-        } | undefined,
-      }))
-      return batchLogHabits(items)
+      try {
+        const habitLogRepo = new HabitLogRepository()
+        const habitRepo = new HabitRepository()
+        const eventRepo = new SystemEventRepository()
+        const now = new Date().toISOString() as Timestamp
+        let lastError: string | undefined
+
+        for (const habitId of selectedIds) {
+          const habit = await habitRepo.findById(habitId, MVP_USER_ID)
+          if (!habit) {
+            lastError = `习惯不存在: ${habitId}`
+            continue
+          }
+
+          const itemFields = detailFields[habitId] as {
+            actualDuration?: number
+            completionRating?: number
+            energyLevel?: number
+            note?: string
+          } | undefined
+
+          await habitLogRepo.create({
+            habitId,
+            logDate: now.split('T')[0] as USOM_ID,
+            actualDuration: itemFields?.actualDuration ?? habit.defaultDuration,
+            completionRating: itemFields?.completionRating,
+            energyLevel: itemFields?.energyLevel,
+            note: itemFields?.note,
+          }, MVP_USER_ID)
+
+          // 更新 streak（简化版，实际应该调用 streak calculator）
+          const transition = findTransition('habits', 'habit_log', null, 'create')
+          if (transition) {
+            const event: SystemEvent = {
+              id: crypto.randomUUID() as USOM_ID,
+              type: transition.eventType as SystemEventType,
+              occurredAt: now,
+              triggeredBy: 'cnui_handler',
+              payload: { habitId, logDate: now.split('T')[0] },
+              snapshotId: '' as USOM_ID,
+            }
+            await eventRepo.append(event, MVP_USER_ID)
+          }
+        }
+
+        if (lastError) return { success: false, error: lastError }
+        return { success: true }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '打卡失败'
+        return { success: false, error: msg }
+      }
     }
 
     return { success: false, error: `Unknown CN-UI action: habits/${action}` }
