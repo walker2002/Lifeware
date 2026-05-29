@@ -8,7 +8,7 @@ import type {
   Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
   Project, ProjectTemplate, TaskTemplate,
-  AISession, AISessionSummary, UserSettings, TaskExecutionLog,
+  AISession, AISessionSummary, ChatMessage, UserSettings, TaskExecutionLog,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
@@ -291,9 +291,20 @@ export interface IAISessionRepository {
   updateMessages(id: USOM_ID, messages: AISession['messages'], userId: USOM_ID): Promise<void>
   updateStateSnapshot(id: USOM_ID, snapshot: AISession['stateSnapshot'], userId: USOM_ID): Promise<void>
   updateTitle(id: USOM_ID, title: string, userId: USOM_ID): Promise<void>
+  updateTimestamp(id: USOM_ID, userId: USOM_ID): Promise<void>
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
   restore(id: USOM_ID, userId: USOM_ID): Promise<void>
-  delete(id: USOM_ID, userId: USOM_ID): Promise<void>
+  softDelete(id: USOM_ID, userId: USOM_ID): Promise<void>
+  hardDeleteExpired(retentionDays: number): Promise<number>
+}
+
+// ─── L1Message ──────────────────────────────────────────────────
+export interface IL1MessageRepository {
+  append(message: { sessionId: string; userId: string; role: string; content: string; intentRef?: string; cnuiSurface?: Record<string, unknown> | import('../types/objects').CnuiSurfaceRef }): Promise<void>
+  findBySessionId(sessionId: string, userId: string): Promise<ChatMessage[]>
+  softDeleteBySessionId(sessionId: string, userId: string): Promise<void>
+  restoreBySessionId(sessionId: string, userId: string): Promise<void>
+  hardDeleteExpired(retentionDays: number): Promise<number>
 }
 
 // ─── UserSettings ──────────────────────────────────────────────

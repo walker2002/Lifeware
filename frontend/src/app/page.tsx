@@ -26,6 +26,7 @@ import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-typ
 import type { AISessionSummary } from "@/usom/types/objects";
 import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
+import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from './actions/session'
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,27 @@ export default function Home() {
       .catch(err => console.error('[fetchIntentTriggers] 加载失败:', err))
   }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
+
+  // 页面加载：拉取 session 列表 + 自动恢复上次活跃对话
+  useEffect(() => {
+    fetchSessions()
+      .then(data => {
+        setSessions(data)
+        const lastActive = data.find(s => s.status === 'active')
+        if (lastActive) {
+          setActiveSessionId(lastActive.id)
+          setMainViewState({ type: 'conversation', sessionId: lastActive.id })
+          return loadSessionMessages(lastActive.id)
+        }
+        return [] as ChatMessage[]
+      })
+      .then(msgs => {
+        if (msgs.length > 0) setConversationMessages(msgs)
+      })
+      .catch(err => console.error('[fetchSessions] 加载失败:', err))
+      .finally(() => setSessionsLoaded(true))
+  }, [])
 
   const [traceEnabled] = useState(() => getTraceConfig().enabled);
   const [traceSessions, setTraceSessions] = useState<TraceSession[]>([]);
@@ -243,16 +265,8 @@ export default function Home() {
   }, []);
 
   const saveCurrentConversation = useCallback(() => {
-    if (mainViewState.type === 'conversation' && activeSessionId) {
-      setSessions(prev =>
-        prev.map(s =>
-          s.id === activeSessionId
-            ? { ...s, updatedAt: new Date().toISOString() }
-            : s
-        )
-      )
-    }
-  }, [mainViewState, activeSessionId]);
+    // 持久化已由 saveMessage 在每个消息发送时处理
+  }, []);
 
   const handleSettingsClick = useCallback(() => {
     saveCurrentConversation();
@@ -306,32 +320,85 @@ export default function Home() {
   const logTargetTimebox = logTarget ? timeboxes.find(t => t.id === logTarget) : null;
   const handleDateSelect = useCallback((date: Date) => { setCurrentDate(date); setDateMode('day'); }, []);
 
-  const handleSelectSession = useCallback((sessionId: string) => {
-    setMainViewState({ type: 'conversation', sessionId });
-    setActiveSessionId(sessionId);
-  }, []);
+  /** 添加消息到对话列表并持久化到 L1 */
+  const addChatMessage = useCallback((msg: ChatMessage) => {
+    setConversationMessages(prev => [...prev, msg])
+    if (activeSessionId) {
+      saveMessage(activeSessionId, {
+        role: msg.role,
+        content: msg.content,
+        cnuiSurface: msg.cnuiSurface,
+        intentRef: msg.intentRef,
+      }).catch(err => console.error('[saveMessage] 持久化失败:', err))
 
-  const handleNewSession = useCallback(() => {
-    // 如果当前有空会话（无实质消息），不创建新会话，直接显示空对话界面
+      // 标题生成：assistant 消息后异步触发
+      if (msg.role === 'assistant') {
+        tryGenerateTitle(activeSessionId).then(newTitle => {
+          if (newTitle) {
+            setSessions(prev => prev.map(s =>
+              s.id === activeSessionId ? { ...s, title: newTitle } : s
+            ))
+          }
+        }).catch(() => {})
+      }
+    }
+  }, [activeSessionId])
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      await deleteSession(sessionId)
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(undefined)
+        setConversationMessages([])
+        setMainViewState({ type: 'schedule', date: new Date(), viewMode: dateMode })
+      }
+    } catch (err) {
+      console.error('[deleteSession] 删除失败:', err)
+    }
+  }, [activeSessionId, dateMode])
+
+  const handleSelectSession = useCallback(async (sessionId: string) => {
+    saveCurrentConversation()
+    setMainViewState({ type: 'conversation', sessionId })
+    setActiveSessionId(sessionId)
+    try {
+      const msgs = await loadSessionMessages(sessionId)
+      setConversationMessages(msgs)
+    } catch (err) {
+      console.error('[loadSessionMessages] 加载失败:', err)
+    }
+  }, [saveCurrentConversation])
+
+  const handleNewSession = useCallback(async () => {
     const hasSubstantialMessages = conversationMessages.some(
       m => m.role === 'user' || (m.role === 'assistant' && m.content.trim().length > 0)
     )
     if (!hasSubstantialMessages && mainViewState.type === 'conversation') {
-      // 直接清空并停留在空对话界面
       setConversationMessages([])
       return
     }
 
-    // 清理当前对话消息，显示空对话界面
     setConversationMessages([])
 
-    const newId = crypto.randomUUID()
-    setSessions(prev => [{
-      id: newId, title: '新对话', status: 'active',
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    }, ...prev])
-    setMainViewState({ type: 'conversation', sessionId: newId })
-    setActiveSessionId(newId)
+    try {
+      const { id, title } = await createSession()
+      setSessions(prev => [{
+        id, title, status: 'active',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }, ...prev])
+      setActiveSessionId(id)
+      setMainViewState({ type: 'conversation', sessionId: id })
+    } catch (err) {
+      console.error('[createSession] 创建失败:', err)
+      const newId = crypto.randomUUID()
+      setSessions(prev => [{
+        id: newId, title: '新对话', status: 'active',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }, ...prev])
+      setActiveSessionId(newId)
+      setMainViewState({ type: 'conversation', sessionId: newId })
+    }
   }, [conversationMessages, mainViewState])
 
   /** 确保当前处于对话视图（如不处于则创建/切换） */
@@ -363,11 +430,11 @@ export default function Home() {
           timestamp: new Date().toISOString(),
           cnuiSurface: result.surface,
         };
-        setConversationMessages(prev => [...prev, msg]);
+        addChatMessage(msg);
       } catch (e) {
         console.error('openCnuiSurface failed:', e);
         const errMsg: ChatMessage = { role: 'assistant', content: '打开操作面板失败，请重试', timestamp: new Date().toISOString() };
-        setConversationMessages(prev => [...prev, errMsg]);
+        addChatMessage(errMsg);
       }
       return;
     }
@@ -387,7 +454,7 @@ export default function Home() {
         content: `操作 ${action} 已记录，请在对话中继续`,
         timestamp: new Date().toISOString(),
       };
-      setConversationMessages(prev => [...prev, msg]);
+      addChatMessage(msg);
       return;
     }
 
@@ -409,14 +476,14 @@ export default function Home() {
             content,
             timestamp: new Date().toISOString(),
           }
-          setConversationMessages(prev => [...prev, msg])
+          addChatMessage(msg)
         } else {
           const msg: ChatMessage = {
             role: 'system',
             content: `操作失败: ${result.error}`,
             timestamp: new Date().toISOString(),
           }
-          setConversationMessages(prev => [...prev, msg])
+          addChatMessage(msg)
         }
       } catch (e) {
         console.error('submitCnuiSurface failed:', e)
@@ -425,7 +492,7 @@ export default function Home() {
           content: '网络错误，请重试',
           timestamp: new Date().toISOString(),
         }
-        setConversationMessages(prev => [...prev, msg])
+        addChatMessage(msg)
       }
     },
     [],
@@ -448,7 +515,7 @@ export default function Home() {
       content: content || (attachments && attachments.length > 0 ? `上传了 ${attachments.length} 个文件` : ''),
       timestamp: new Date().toISOString(),
     }
-    setConversationMessages(prev => [...prev, userMsg])
+    addChatMessage(userMsg)
 
     // slash 命令处理 — 必须在 resolveShortcut 之前，否则 /createHabit 无 payload 会被错误路由
     const slashResult = resolveSlashCommand(content)
@@ -471,7 +538,7 @@ export default function Home() {
           content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
           timestamp: new Date().toISOString(),
         }
-        setConversationMessages(prev => [...prev, navMsg])
+        addChatMessage(navMsg)
         return
       }
 
@@ -490,7 +557,7 @@ export default function Home() {
               timestamp: new Date().toISOString(),
               cnuiSurface: { ...cnuiResult.surface, dataSnapshot: mergedSnapshot },
             }
-            setConversationMessages(prev => [...prev, cnuiMsg])
+            addChatMessage(cnuiMsg)
             setIsLoading(false)
             return
           }
@@ -508,10 +575,10 @@ export default function Home() {
             content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
             timestamp: new Date().toISOString(),
           }
-          setConversationMessages(prev => [...prev, aiMsg])
+          addChatMessage(aiMsg)
         } catch {
           const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-          setConversationMessages(prev => [...prev, errMsg])
+          addChatMessage(errMsg)
         } finally {
           setIsLoading(false)
         }
@@ -530,10 +597,10 @@ export default function Home() {
               timestamp: new Date().toISOString(),
               cnuiSurface: result.surface,
             }
-            setConversationMessages(prev => [...prev, cnuiMsg])
+            addChatMessage(cnuiMsg)
           } catch {
             const errMsg: ChatMessage = { role: 'assistant', content: '打开表单失败，请重试', timestamp: new Date().toISOString() }
-            setConversationMessages(prev => [...prev, errMsg])
+            addChatMessage(errMsg)
           }
           return
         }
@@ -549,10 +616,10 @@ export default function Home() {
             content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
             timestamp: new Date().toISOString(),
           }
-          setConversationMessages(prev => [...prev, aiMsg])
+          addChatMessage(aiMsg)
         } catch {
           const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-          setConversationMessages(prev => [...prev, errMsg])
+          addChatMessage(errMsg)
         } finally {
           setIsLoading(false)
         }
@@ -569,7 +636,7 @@ export default function Home() {
         content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
         timestamp: new Date().toISOString(),
       }
-      setConversationMessages(prev => [...prev, navMsg])
+      addChatMessage(navMsg)
       return
     }
 
@@ -589,7 +656,7 @@ export default function Home() {
           content: HABIT_USER_FACING.INTENT_RECOGNIZED,
           timestamp: new Date().toISOString(),
         }
-        setConversationMessages(prev => [...prev, navMsg])
+        addChatMessage(navMsg)
         setIsLoading(false)
         return
       }
@@ -618,7 +685,7 @@ export default function Home() {
           content: HABIT_USER_FACING.INTENT_UNRECOGNIZED(habitParse.error),
           timestamp: new Date().toISOString(),
         }
-        setConversationMessages(prev => [...prev, aiMsg])
+        addChatMessage(aiMsg)
         setIsLoading(false)
         return
       }
@@ -628,10 +695,10 @@ export default function Home() {
         content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
         timestamp: new Date().toISOString(),
       }
-      setConversationMessages(prev => [...prev, aiMsg])
+      addChatMessage(aiMsg)
     } catch {
       const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-      setConversationMessages(prev => [...prev, errMsg])
+      addChatMessage(errMsg)
     } finally {
       setIsLoading(false)
     }
@@ -658,6 +725,7 @@ export default function Home() {
           activeSessionId={activeSessionId}
           onSelectSession={handleSelectSession}
           onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
         />
       </>
     : <GrowthMenu domainActions={domainActions} onAction={handleGrowthAction} />;

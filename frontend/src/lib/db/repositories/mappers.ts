@@ -939,6 +939,7 @@ export function aiSessionRowToUSOM(row: any): AISession {
     createdAt: (row.createdAt ?? row.created_at).toISOString() as Timestamp,
     updatedAt: (row.updatedAt ?? row.updated_at).toISOString() as Timestamp,
     archivedAt: (row.archivedAt ?? row.archived_at)?.toISOString() as Timestamp ?? undefined,
+    deletedAt: (row.deletedAt ?? row.deleted_at)?.toISOString() as Timestamp ?? undefined,
   }
 }
 
@@ -956,5 +957,6 @@ export function aiSessionUSOMToRow(session: Omit<AISession, 'id' | 'createdAt' |
     stateSnapshot: session.stateSnapshot,
     referencedObjectIds: session.referencedObjectIds,
     archivedAt: session.archivedAt ? new Date(session.archivedAt) : null,
+    deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
   }
 }

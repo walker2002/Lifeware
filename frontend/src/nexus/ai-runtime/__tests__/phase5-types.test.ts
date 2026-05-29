@@ -155,7 +155,7 @@ describe('Memory Framework 接口 (T024)', () => {
     const memory = createMemoryFramework()
 
     expect(memory.l1).toBeDefined()
-    expect(typeof memory.l1.recordMessage).toBe('function')
+    expect(typeof memory.l1.appendMessage).toBe('function')
     expect(typeof memory.l1.getMessages).toBe('function')
   })
 })

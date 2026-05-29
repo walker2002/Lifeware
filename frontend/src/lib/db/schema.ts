@@ -587,9 +587,27 @@ export const aiSessions = pgTable('ai_sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('idx_ai_sessions_user_status').on(table.userId, table.status),
   index('idx_ai_sessions_updated').on(table.userId, table.updatedAt),
+])
+
+// ─── 8.1b l1_messages (Memory Framework L1) ─────────────────
+export const l1Messages = pgTable('l1_messages', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  sessionId:   uuid('session_id').notNull().references(() => aiSessions.id, { onDelete: 'cascade' }),
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role:        text('role', { enum: ['user', 'assistant', 'system'] }).notNull(),
+  content:     text('content').notNull(),
+  intentRef:   text('intent_ref'),
+  cnuiSurface: jsonb('cnui_surface').$type<Record<string, unknown>>(),
+  deletedAt:   timestamp('deleted_at', { withTimezone: true }),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_l1_messages_session').on(table.sessionId, table.createdAt),
+  index('idx_l1_messages_user').on(table.userId),
+  index('idx_l1_messages_cleanup').on(table.deletedAt, table.createdAt),
 ])
 
 // ─── 8.2 user_settings (one row per user) ─────────────────────

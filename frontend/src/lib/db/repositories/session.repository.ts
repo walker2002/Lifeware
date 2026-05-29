@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, lt } from 'drizzle-orm'
 import { db } from '../index'
 import * as s from '../schema'
 import type { IAISessionRepository } from '../../../usom/interfaces/irepository'
@@ -23,13 +23,16 @@ export class AISessionRepository implements IAISessionRepository {
     }).from(s.aiSessions)
       .where(eq(s.aiSessions.userId, userId))
       .orderBy(desc(s.aiSessions.updatedAt))
-    return rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      status: r.status as AISessionSummary['status'],
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-    }))
+
+    return rows
+      .filter(r => r.status !== 'deleted')
+      .map(r => ({
+        id: r.id,
+        title: r.title,
+        status: r.status as AISessionSummary['status'],
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      }))
   }
 
   async create(session: Omit<AISession, 'id' | 'createdAt' | 'updatedAt'>, userId: USOM_ID): Promise<AISession> {
@@ -64,6 +67,12 @@ export class AISessionRepository implements IAISessionRepository {
     }).where(and(eq(s.aiSessions.id, id), eq(s.aiSessions.userId, userId)))
   }
 
+  async updateTimestamp(id: USOM_ID, userId: USOM_ID): Promise<void> {
+    await db.update(s.aiSessions).set({
+      updatedAt: new Date(),
+    }).where(and(eq(s.aiSessions.id, id), eq(s.aiSessions.userId, userId)))
+  }
+
   async archive(id: USOM_ID, userId: USOM_ID): Promise<void> {
     await db.update(s.aiSessions).set({
       status: 'archived',
@@ -76,15 +85,26 @@ export class AISessionRepository implements IAISessionRepository {
     await db.update(s.aiSessions).set({
       status: 'active',
       archivedAt: null,
+      deletedAt: null,
       updatedAt: new Date(),
     }).where(and(eq(s.aiSessions.id, id), eq(s.aiSessions.userId, userId)))
   }
 
-  async delete(id: USOM_ID, userId: USOM_ID): Promise<void> {
-    const session = await this.findById(id, userId)
-    if (!session || session.status !== 'archived') {
-      throw new Error('只能删除已归档的会话')
-    }
-    await db.delete(s.aiSessions).where(and(eq(s.aiSessions.id, id), eq(s.aiSessions.userId, userId)))
+  async softDelete(id: USOM_ID, userId: USOM_ID): Promise<void> {
+    await db.update(s.aiSessions).set({
+      status: 'deleted',
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(s.aiSessions.id, id), eq(s.aiSessions.userId, userId)))
+  }
+
+  async hardDeleteExpired(retentionDays: number): Promise<number> {
+    const cutoff = new Date(Date.now() - retentionDays * 86400000)
+
+    const results = await db.delete(s.aiSessions).where(
+      and(eq(s.aiSessions.status, 'deleted'), lt(s.aiSessions.deletedAt!, cutoff))
+    ).returning({ id: s.aiSessions.id })
+
+    return results.length
   }
 }

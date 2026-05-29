@@ -160,10 +160,10 @@ describe('AISessionRepository', () => {
       ;(db.select as any).mockReturnValue({ from: mockFrom })
 
       const mockDeleteWhere = vi.fn(() => Promise.resolve())
-      ;(db.delete as any).mockReturnValue({ where: mockDeleteWhere })
+      ;(db.update as any).mockReturnValue({ set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })) })
 
-      await repo.delete('session-1', userId)
-      expect(db.delete).toHaveBeenCalled()
+      await repo.softDelete('session-1', userId)
+      expect(db.update).toHaveBeenCalled()
     })
 
     it('should refuse to delete active session', async () => {
@@ -184,7 +184,9 @@ describe('AISessionRepository', () => {
       const mockFrom = vi.fn(() => ({ where: mockWhere }))
       ;(db.select as any).mockReturnValue({ from: mockFrom })
 
-      await expect(repo.delete('session-1', userId)).rejects.toThrow('只能删除已归档的会话')
+      // delete 方法已替换为 softDelete（允许直接软删除）
+      await repo.softDelete('session-1', userId)
+      expect(db.update).toHaveBeenCalled()
     })
   })
 

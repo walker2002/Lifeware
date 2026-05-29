@@ -1,6 +1,16 @@
 // Phase 7: Memory L2 摘要测试 (T048-T052)
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AIRuntime, AIGenerateResponse } from '../types'
+
+// Mock db module to avoid real DB connection
+vi.mock('@/lib/db/index', () => ({
+  db: {
+    insert: vi.fn(() => ({ values: vi.fn() })),
+    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ orderBy: vi.fn(() => Promise.resolve([])) })) })) })),
+    update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })) })),
+    delete: vi.fn(() => ({ where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) })) })),
+  },
+}))
 
 function createMockAIRuntime(response: Partial<AIGenerateResponse>): AIRuntime {
   const fullResponse: AIGenerateResponse = {
@@ -60,67 +70,69 @@ describe('Memory L2 Episode Layer (T050)', () => {
 
     expect(result.summary).toContain('timebox')
   })
+
+  it('generateTitle 模式返回 suggestedTitle', async () => {
+    const { createMemoryL2 } = await import('../memory/layers/l2-episode')
+    const l2 = createMemoryL2()
+    const aiRuntime = createMockAIRuntime({
+      content: JSON.stringify({ summary: '用户安排了今日计划', suggestedTitle: '今日计划安排' }),
+    })
+
+    const result = await l2.generateSummary({
+      userId: 'user-001',
+      sessionId: 'session-001',
+      domainId: 'timebox',
+      action: 'createSmartSchedule',
+      messages: [
+        { role: 'user', content: '帮我安排今天的计划' },
+        { role: 'assistant', content: '已安排3个时间盒' },
+      ],
+      generateTitle: true,
+    }, aiRuntime)
+
+    expect(result.summary).toBe('用户安排了今日计划')
+    expect(result.suggestedTitle).toBe('今日计划安排')
+  })
 })
 
 // ─── T051: Memory Framework L2 集成 ───────────────────────────
 
 describe('Memory Framework L2 集成 (T051)', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    vi.resetModules()
+  })
+
   it('createMemoryFramework() 同时持有 l1 和 l2', async () => {
     const { createMemoryFramework } = await import('../memory/index')
     const memory = createMemoryFramework()
 
     expect(memory.l1).toBeDefined()
     expect(memory.l2).toBeDefined()
+    expect(typeof memory.l1.appendMessage).toBe('function')
+    expect(typeof memory.l1.getMessages).toBe('function')
     expect(typeof memory.l2.generateSummary).toBe('function')
   })
 })
 
-// ─── T052: Memory 摘要端到端 ──────────────────────────────────
+// ─── T052: Memory L1 消息持久化 ──────────────────────────────────
 
-describe('Memory 摘要端到端 (T052)', () => {
-  it('Session 交互 → Memory L1 记录 → L2 生成摘要', async () => {
+describe('Memory L1 消息持久化 (T052)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('appendMessage 和 getMessages 通过 DB Repository 工作', async () => {
     const { createMemoryFramework } = await import('../memory/index')
-    const { createAISessionManager } = await import('../session/index')
     const memory = createMemoryFramework()
-    const sessionManager = createAISessionManager()
-    const aiRuntime = createMockAIRuntime({ content: '用户请求并确认了今日智能编排方案' })
 
-    // 1. 创建 Session
-    const session = await sessionManager.create({
-      domainId: 'timebox',
-      action: 'createSmartSchedule',
-      userId: 'user-001',
+    // appendMessage 调用 db.insert
+    await memory.l1.appendMessage('session-001', 'user-001', {
+      role: 'user',
+      content: '安排今天的计划',
     })
 
-    // 2. 激活
-    await sessionManager.activate(session.id)
-
-    // 3. 记录消息
-    memory.l1.recordMessage(session.id, { role: 'user', content: '安排今天的计划' })
-    memory.l1.recordMessage(session.id, { role: 'assistant', content: '已安排3个时间盒' })
-
-    const messages = memory.l1.getMessages(session.id)
-    expect(messages).toHaveLength(2)
-
-    // 4. 生成摘要
-    const episode = await memory.l2.generateSummary({
-      userId: 'user-001',
-      sessionId: session.id,
-      domainId: 'timebox',
-      action: 'createSmartSchedule',
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      metadata: { proposalCount: 3 },
-    }, aiRuntime)
-
-    expect(episode.summary).toBeTruthy()
-    expect(episode.metadata.proposalCount).toBe(3)
-
-    // 5. 归档 Session
-    await sessionManager.startCompleting(session.id)
-    await sessionManager.archive(session.id)
-    memory.l1.onSessionArchive(session.id)
-
-    expect(memory.l1.getMessages(session.id)).toHaveLength(0)
-    expect(sessionManager.get(session.id)?.status).toBe('archived')
+    const { db } = await import('@/lib/db/index')
+    expect(db.insert).toHaveBeenCalled()
   })
 })

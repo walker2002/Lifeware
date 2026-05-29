@@ -375,6 +375,7 @@ export interface CnuiSurfaceRef {
 
 // ─── ChatMessage (embedded in AISession) ──────────────────────
 export interface ChatMessage {
+  id?: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Timestamp
@@ -394,6 +395,7 @@ export interface AISession {
   createdAt: Timestamp
   updatedAt: Timestamp
   archivedAt?: Timestamp
+  deletedAt?: Timestamp
 }
 
 export interface AISessionSummary {
