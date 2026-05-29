@@ -83,11 +83,14 @@ export async function tryGenerateTitle(sessionId: string): Promise<string | null
   const mf = createMemoryFramework()
   const messages = await mf.l1.getMessages(sessionId, MVP_USER_ID)
 
-  // 只在恰好 4 条消息时（2 轮对话）触发标题生成
-  if (messages.length !== 4) return null
+  // 至少 2 条消息时触发（1 轮对话即可）
+  if (messages.length < 2) return null
 
   const session = await sessionRepo.findById(sessionId, MVP_USER_ID)
   if (!session) return null
+
+  // 已有自定义标题则跳过（不匹配默认模式 X月X日对话 或 新对话）
+  if (!/^\d+月\d+日对话$/.test(session.title) && session.title !== '新对话') return null
 
   try {
     const aiRuntime = createAIRuntime()

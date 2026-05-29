@@ -652,21 +652,28 @@ export default function Home() {
 
     setIsLoading(true)
     try {
-      // 习惯创建意图（自然语言，非 slash 命令）→ AI 解析 → 导航到 HabitListPage
+      // 习惯创建意图（自然语言，非 slash 命令）→ AI 解析 → CNUI 对话模式
       const habitParse = await parseHabitIntentOnly(content)
       if (habitParse.success && habitParse.action === 'createHabit' && habitParse.fields) {
-        setMainViewState({
-          type: 'action',
-          domainId: 'habits',
-          action: 'createHabit',
-          initialFields: habitParse.fields,
-        })
-        const navMsg: ChatMessage = {
-          role: 'assistant',
-          content: HABIT_USER_FACING.INTENT_RECOGNIZED,
-          timestamp: new Date().toISOString(),
+        try {
+          const cnuiResult = await openCnuiSurface('habits', 'createHabit')
+          const mergedSnapshot = { ...cnuiResult.surface.dataSnapshot, ...habitParse.fields }
+          const cnuiMsg: ChatMessage = {
+            role: 'assistant',
+            content: '已识别习惯信息，请确认：',
+            timestamp: new Date().toISOString(),
+            cnuiSurface: { ...cnuiResult.surface, dataSnapshot: mergedSnapshot },
+          }
+          addChatMessage(cnuiMsg)
+        } catch (err) {
+          console.error('[habitIntent] CNUI 打开失败:', err)
+          const errMsg: ChatMessage = {
+            role: 'assistant',
+            content: HABIT_USER_FACING.INTENT_RECOGNIZED,
+            timestamp: new Date().toISOString(),
+          }
+          addChatMessage(errMsg)
         }
-        addChatMessage(navMsg)
         setIsLoading(false)
         return
       }
