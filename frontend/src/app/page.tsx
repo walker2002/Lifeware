@@ -24,10 +24,9 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, fetchActionData, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
-import { DynamicForm } from "@/components/editor/dynamic-form"
-import { ActionConfirm } from "@/components/editor/action-confirm"
+import { getFullManifest } from "@/domains/registry"
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
 import { Button } from "@/components/ui/button";
@@ -123,25 +122,6 @@ export default function Home() {
   } | null>(null);
 
   const [llmConfigured, setLlmConfigured] = useState(true)
-  const [actionViewData, setActionViewData] = useState<Awaited<ReturnType<typeof fetchActionData>> | null>(null);
-
-  // 加载 action 视图的表单字段数据（Server Action，避免客户端引用 node:fs）
-  // view_route + viewComponent 同时存在 → 主内容区内渲染页面组件，保留 AppShell 布局
-  // 仅 view_route（无 viewComponent）→ 回到日程默认视图（页面路由尚未实现）
-  useEffect(() => {
-    if (mainViewState.type === 'action') {
-      setActionViewData(null)
-      fetchActionData(mainViewState.domainId, mainViewState.action).then(data => {
-        if (data.viewRoute && data.viewComponent) {
-          setMainViewState({ type: 'view', domainId: mainViewState.domainId, action: mainViewState.action })
-        } else if (data.viewRoute) {
-          setMainViewState({ type: 'schedule', date: new Date(), viewMode: 'day' })
-        } else {
-          setActionViewData(data)
-        }
-      })
-    }
-  }, [mainViewState.type === 'action' ? `${mainViewState.domainId}/${mainViewState.action}` : null])
 
   const loadTimeboxes = useCallback(async (modeParam?: DateViewMode, dateParam?: Date) => {
     const m = modeParam ?? dateMode;
@@ -376,7 +356,45 @@ export default function Home() {
       return;
     }
 
-    setMainViewState({ type: 'action', domainId, action });
+    // 非 CNUI action：通过 manifest 检查响应类型
+    const fullManifest = getFullManifest(domainId);
+    const intentTriggers = (fullManifest as any)?.intent_triggers ?? [];
+    const trigger = intentTriggers.find((t: any) => t.action === action);
+    const responseType = trigger?.response_type;
+
+    if (responseType === 'page') {
+      // 页面导航
+      const viewRoute = trigger?.view_route;
+      if (viewRoute) {
+        const msg: ChatMessage = {
+          role: 'assistant',
+          content: `正在跳转到 ${viewRoute}...`,
+          timestamp: new Date().toISOString(),
+        };
+        setConversationMessages(prev => [...prev, msg]);
+        // 页面导航可通过 manifest 的 view_route 处理，或在对话中提示用户
+        return;
+      }
+    }
+
+    if (responseType === 'text') {
+      // 纯文本响应
+      const msg: ChatMessage = {
+        role: 'assistant',
+        content: trigger?.description || `操作 ${action} 已记录，请在对话中继续`,
+        timestamp: new Date().toISOString(),
+      };
+      setConversationMessages(prev => [...prev, msg]);
+      return;
+    }
+
+    // 未定义 response_type 或其他情况：提示用户
+    const errorMsg: ChatMessage = {
+      role: 'system',
+      content: `操作 ${domainId}/${action} 尚未配置交互方式。请在 manifest 中声明 response_type（cnui/page/text）。`,
+      timestamp: new Date().toISOString(),
+    };
+    setConversationMessages(prev => [...prev, errorMsg]);
   }, [saveCurrentConversation, openCnuiSurface]);
 
   /** 处理 CN-UI 表面提交 */
@@ -697,39 +715,6 @@ export default function Home() {
         )
       }
       return <div className="p-4"><p className="text-sm text-body">页面未找到</p></div>
-    }
-
-    if (mainViewState.type === 'action') {
-      const { domainId, action } = mainViewState
-      if (!actionViewData) {
-        return <div className="p-4"><p className="text-sm text-body">加载中...</p></div>
-      }
-      if (actionViewData.hasFields) {
-        return (
-          <DynamicForm
-            fields={actionViewData.fields}
-            domainId={domainId}
-            action={action}
-            onSubmit={async (values) => {
-              const result = await submitDynamicIntent(domainId, action, values)
-              if (result.success) handleHomeClick()
-            }}
-            onCancel={handleHomeClick}
-          />
-        )
-      }
-      return (
-        <ActionConfirm
-          domainId={domainId}
-          action={action}
-          description={actionViewData.description}
-          onConfirm={async () => {
-            const result = await submitDynamicIntent(domainId, action, {}, true)
-            if (result.success) handleHomeClick()
-          }}
-          onCancel={handleHomeClick}
-        />
-      )
     }
 
     if (mainViewState.type === 'settings') {
