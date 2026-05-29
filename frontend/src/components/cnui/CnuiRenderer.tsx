@@ -1,10 +1,7 @@
 'use client'
 
 import type { CnuiComponentType } from '@/nexus/ai-runtime/cnui/types'
-import { HabitActionPanel } from './surfaces/HabitActionPanel'
-import { HabitCheckinPanel } from './surfaces/HabitCheckinPanel'
-import { HabitCreationCard } from './surfaces/HabitCreationCard'
-import { TimeboxList } from './surfaces/TimeboxList'
+import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
 
 interface CnuiRendererProps {
   surfaceType: CnuiComponentType
@@ -16,17 +13,10 @@ interface CnuiRendererProps {
   isDone?: boolean
 }
 
-const SURFACE_RENDERERS: Record<string, React.ComponentType<CnuiRendererProps>> = {
-  'habit-action-panel': HabitActionPanel,
-  'habit-checkin-panel': HabitCheckinPanel,
-  'habit-creation-card': HabitCreationCard,
-  'timebox-list': TimeboxList,
-}
-
 export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: CnuiRendererProps) {
-  const Renderer = SURFACE_RENDERERS[surfaceType]
+  const reg = cnuiRegistry.get(surfaceType)
 
-  if (!Renderer) {
+  if (!reg) {
     return (
       <div className="rounded border border-dashed border-red-300 p-4 text-sm text-red-500">
         未知的卡片类型: {surfaceType}
@@ -34,5 +24,16 @@ export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, 
     )
   }
 
-  return <Renderer surfaceType={surfaceType} dataModel={dataModel} onDataChange={onDataChange} onConfirm={onConfirm} onCancel={onCancel} isLoading={isLoading} isDone={isDone} />
+  const Component = reg.component
+  return (
+    <Component
+      surfaceType={surfaceType}
+      dataModel={dataModel}
+      onDataChange={onDataChange}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      isLoading={isLoading}
+      isDone={isDone}
+    />
+  )
 }
