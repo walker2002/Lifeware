@@ -284,3 +284,7 @@ cnui_surfaces:
   habit-creation-card:
     description: 习惯创建表单卡片
     handler: ./cnui/handlers
+
+  habit-list-card:
+    description: 在对话中展示活跃习惯列表卡片
+    handler: ./cnui/handlers

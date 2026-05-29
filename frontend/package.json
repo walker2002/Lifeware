@@ -16,8 +16,9 @@
     "generate:routes": "npx tsx scripts/generate-routes.ts",
     "generate:routes:force": "npx tsx scripts/generate-routes.ts --force",
     "generate:routes:clean": "npx tsx scripts/generate-routes.ts --clean",
-    "predev": "npm run generate:routes",
-    "prebuild": "npm run generate:routes"
+    "validate:manifest": "npx tsx scripts/validate-manifest.ts",
+    "predev": "npm run generate:routes && npm run validate:manifest",
+    "prebuild": "npm run generate:routes && npm run validate:manifest"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.79",
