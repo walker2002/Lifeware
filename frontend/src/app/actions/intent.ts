@@ -992,7 +992,7 @@ export async function submitDynamicIntent(
   );
 }
 
-/** 查询 action 所需的表单字段和描述（供客户端 DynamicForm/ActionConfirm 使用） */
+/** 查询 action 所需的表单字段和描述（供 CNUI surface 使用） */
 export type ActionFieldType = 'text' | 'textarea' | 'number' | 'date' | 'time' | 'select' | 'multiselect' | 'toggle'
 
 export interface ActionFieldDescriptor {
