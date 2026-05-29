@@ -1,17 +1,15 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.7.1 → 1.7.2
-  Rationale: PATCH — Added Form Component Reuse Constraint to CN-UI Protocol
-  Constraints: forms MUST reuse Domain components via adapters, not maintain 
-  independent field definitions. No new principles or governance changes.
+  Version change: 1.7.2 → 1.8.0
+  Rationale: MINOR — Added CNUI Domain Surface Ownership Constraint (5th
+  CN-UI constraint), Domain Registration Step 15, and manifest
+  self-description fields (response_type, cnui_surfaces).
 
   Modified sections:
-    - Architecture Constraints > Domain Registration Process (Step 6
-      clarified: view_routes now include url field; routes generated
-      at build time via scripts/generate-routes.ts; app/ routes are
-      auto-generated thin wrappers)
-    - CN-UI Protocol Constraints (Form Component Reuse Constraint added)
+    - Architecture Constraints > Domain Registration Process (Step 15 added)
+    - CN-UI Protocol Constraints (Domain Surface Ownership added as 5th constraint)
+    - Domain Manifest Self-Description (response_type + cnui_surfaces fields added)
 
   Modified principles:
     - None (implementation detail only)
@@ -22,8 +20,9 @@
     - .specify/templates/tasks-template.md             ✅ no changes needed
 
   Follow-up documents requiring updates:
-    - docs/route-generation-spec.md                   ✅ created
-    - manifest.md                                     ✅ updated (added route-generation-spec)
+    - mydocs/core/LW_domain_注册指南_2026_05_14.md     ✅ updated (Step 13 + Block K)
+    - mydocs/core/LW_overall_总体设计_2026_05_02.md    ✅ updated (CNUI ownership paragraph)
+    - manifest.md                                     (to be updated)
 -->
 
 # Lifeware Constitution
@@ -446,6 +445,8 @@ components to operate generically without per-Domain hard-coding:
 | `intent_triggers` | Intent Engine (Phase A) | Bounded classification context for routing user input to Domain actions |
 | `lifecycle` | State Machine | Object lifecycle definitions and transition rules for validating state changes |
 | `view_routes` | Build-time route generator | Maps component paths to Next.js App Router URLs for auto-generating `app/` route files |
+| `response_type` | Intent Engine + Orchestrator | Declares how the system responds: `page` (navigate), `cnui` (in-conversation surface), `text` (plain) |
+| `cnui_surfaces` | CnuiSurfaceRegistry + CnuiRenderer | Maps surface types to handler files for Domain-owned CNUI components |
 
 For Domains with generative capabilities, manifests MAY declare a
 fourth structured field:
@@ -673,7 +674,7 @@ CN-UI (Conversation Native UI) is a declarative Payload protocol that
 allows Handlers to produce interactive UI components within the
 conversation flow.
 
-**Four constraints**:
+**Five constraints**:
 
 1. **Declarative data, not executable code**: CN-UI Payloads are JSON
    data describing component structure, props, and actions. They
@@ -697,6 +698,25 @@ conversation flow.
    MUST 通过适配层（CnuiFormAdapter）复用 Domain 的 Form 组件，MUST NOT 维护独立的字段定义和验证逻辑。
    Domain 的 Form 组件是表单实现的唯一来源。新 Domain 只需注册 FormAdapterConfig 即可在三种上下文
    （页面编辑面板、GrowthMenu 入口、AI 助手 CN-UI）中复用同一表单实现。
+
+5. **Domain Surface Ownership**：CN-UI surface 组件（panels、cards、lists）
+   若属于特定 Domain，MUST 置于该 Domain 的目录内
+   （`domains/{domain_id}/cnui/`）。公共 CN-UI 渲染器 MUST 通过
+   `CnuiSurfaceRegistry` 发现 surface 组件，MUST NOT 通过直接
+   import Domain 特定组件的方式引用。每个 Domain MUST 在初始化时
+   自行注册其 surfaces（component + handler）。公共层 MUST NOT 包含
+   硬编码的 Domain surface 类型引用或 Domain 特定的 open/submit 逻辑。
+
+   设计依据：若不遵守此约束，每新增一个 Domain 的 CNUI surface 就需要修改
+   多个公共层文件（types、catalog、renderer、action handlers），破坏 Domain
+   Plugin 的独立性承诺。
+
+   应用方式：Code review MUST 拒绝以下 PR：`CnuiRenderer` 直接 import
+   Domain 特定组件；`openCnuiSurface()` / `submitCnuiSurface()` 包含
+   Domain 特定的 if/else 分支。新 Domain 的 CNUI surface MUST 通过
+   Domain 自身的初始化代码注册。`manifest.yaml` MUST 为每个
+   `intent_trigger` 声明 `response_type`，为交互式组件声明
+   `cnui_surfaces`。
 
 **Rationale**: CN-UI solves the experience fragmentation problem
 (form jumps, Markdown editing) while maintaining Nexus safety
@@ -823,6 +843,11 @@ section codifies the architectural invariants enforced by that process.
     action, response_mode, cnui_surface, and context_capabilities
 14. (If query-capable, complex queries only) Implement `onQuery`
     handler method and register in `domains/<domain>/handlers/index.ts`
+15. (If CNUI-capable) Declare `cnui_surfaces` in manifest.yaml, implement
+    surface components in `domains/{domain}/cnui/surfaces/`, implement
+    handler in `domains/{domain}/cnui/handlers.ts` following the
+    `CnuiSurfaceHandler` interface, and register all surfaces in the Domain
+    entry file via `cnuiRegistry.register()`.
 
 **Build-time route generation (Step 6-8)**:
 
@@ -1029,4 +1054,4 @@ document that specifies the build-time route generation mechanism
 detailing how `view_routes.url` declarations become Next.js App Router
 files.
 
-**Version**: 1.7.2 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-27
+**Version**: 1.8.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-29
