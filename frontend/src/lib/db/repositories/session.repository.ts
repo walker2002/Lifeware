@@ -1,4 +1,4 @@
-import { eq, and, desc, lt } from 'drizzle-orm'
+import { eq, and, desc, lt, ne, sql } from 'drizzle-orm'
 import { db } from '../index'
 import * as s from '../schema'
 import type { IAISessionRepository } from '../../../usom/interfaces/irepository'
@@ -21,12 +21,10 @@ export class AISessionRepository implements IAISessionRepository {
       createdAt: s.aiSessions.createdAt,
       updatedAt: s.aiSessions.updatedAt,
     }).from(s.aiSessions)
-      .where(eq(s.aiSessions.userId, userId))
+      .where(and(eq(s.aiSessions.userId, userId), ne(s.aiSessions.status, 'deleted')))
       .orderBy(desc(s.aiSessions.updatedAt))
 
-    return rows
-      .filter(r => r.status !== 'deleted')
-      .map(r => ({
+    return rows.map(r => ({
         id: r.id,
         title: r.title,
         status: r.status as AISessionSummary['status'],
@@ -102,7 +100,7 @@ export class AISessionRepository implements IAISessionRepository {
     const cutoff = new Date(Date.now() - retentionDays * 86400000)
 
     const results = await db.delete(s.aiSessions).where(
-      and(eq(s.aiSessions.status, 'deleted'), lt(s.aiSessions.deletedAt!, cutoff))
+      and(eq(s.aiSessions.status, 'deleted'), sql`${s.aiSessions.deletedAt} < ${cutoff}`)
     ).returning({ id: s.aiSessions.id })
 
     return results.length

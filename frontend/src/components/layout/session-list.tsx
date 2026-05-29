@@ -8,7 +8,6 @@ interface SessionListProps {
   activeSessionId?: string
   onSelectSession: (sessionId: string) => void
   onNewSession: () => void
-  onArchiveSession?: (sessionId: string) => void
   onDeleteSession?: (sessionId: string) => void
 }
 

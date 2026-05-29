@@ -15,7 +15,7 @@ export class L1MessageRepository implements IL1MessageRepository {
       role: message.role as 'user' | 'assistant' | 'system',
       content: message.content,
       intentRef: message.intentRef ?? null,
-      cnuiSurface: message.cnuiSurface as Record<string, unknown> | null ?? null,
+      cnuiSurface: (message.cnuiSurface as Record<string, unknown> | null) ?? null,
     })
   }
 

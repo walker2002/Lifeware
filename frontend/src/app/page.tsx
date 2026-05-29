@@ -27,6 +27,7 @@ import type { AISessionSummary } from "@/usom/types/objects";
 import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from './actions/session'
+import { ConfirmDeleteDialog } from '@/components/layout/confirm-delete-dialog'
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,7 @@ export default function Home() {
   }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
 
   // 页面加载：拉取 session 列表 + 自动恢复上次活跃对话
   useEffect(() => {
@@ -344,19 +346,27 @@ export default function Home() {
     }
   }, [activeSessionId])
 
-  const handleDeleteSession = useCallback(async (sessionId: string) => {
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId)
+    setDeleteTarget({ id: sessionId, title: session?.title ?? '未命名对话' })
+  }, [sessions])
+
+  const confirmDeleteSession = useCallback(async () => {
+    if (!deleteTarget) return
     try {
-      await deleteSession(sessionId)
-      setSessions(prev => prev.filter(s => s.id !== sessionId))
-      if (activeSessionId === sessionId) {
+      await deleteSession(deleteTarget.id)
+      setSessions(prev => prev.filter(s => s.id !== deleteTarget.id))
+      if (activeSessionId === deleteTarget.id) {
         setActiveSessionId(undefined)
         setConversationMessages([])
         setMainViewState({ type: 'schedule', date: new Date(), viewMode: dateMode })
       }
     } catch (err) {
       console.error('[deleteSession] 删除失败:', err)
+    } finally {
+      setDeleteTarget(null)
     }
-  }, [activeSessionId, dateMode])
+  }, [deleteTarget, activeSessionId, dateMode])
 
   const handleSelectSession = useCallback(async (sessionId: string) => {
     saveCurrentConversation()
@@ -848,6 +858,13 @@ export default function Home() {
           onSubmit={handleLogSubmit}
         />
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteTarget !== null}
+        sessionTitle={deleteTarget?.title ?? ''}
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 }
