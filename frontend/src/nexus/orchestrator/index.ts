@@ -12,6 +12,7 @@ import type {
   ActionSurface,
   ContextSnapshot,
   GenerationResult,
+  GenerationRequest,
   QueryResult,
   QueryContext,
 } from '@/usom/types/process'

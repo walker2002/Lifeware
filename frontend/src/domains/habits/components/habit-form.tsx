@@ -142,7 +142,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       endDate: endDate || undefined,
     }
 
-    const validation = validateHabitFields(fields, 'createHabit')
+    const validation = validateHabitFields(fields as unknown as Record<string, unknown>, 'createHabit')
     if (!validation.valid) {
       setClientErrors(validation.errors)
       return

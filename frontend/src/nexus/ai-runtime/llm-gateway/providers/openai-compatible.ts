@@ -1,5 +1,5 @@
 import { createClient, resolveModel } from '@/lib/llm/config'
-import type { ChatMessage, TokenUsage } from '../types'
+import type { ChatMessage, TokenUsage } from '../../types'
 
 export interface LLMCallRequest {
   model: string
@@ -32,7 +32,7 @@ export async function callWithOpenAI(
     model,
     messages: openaiMessages,
     temperature: request.temperature ?? 0.7,
-    max_tokens: request.maxTokens,
+    max_tokens: request.maxTokens ?? 4096,
   })
 
   const choice = response.choices[0]

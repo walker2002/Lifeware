@@ -51,10 +51,18 @@ export function createAIRuntime(): AIRuntime {
         action: request.action,
       })
 
-      // Cache the response
-      cache.set(cacheKey, response, DEFAULT_CACHE_TTL)
+      // Create AIGenerateResponse for return
+      const aiResponse: AIGenerateResponse = {
+        content: response.content,
+        tokenUsage: response.tokenUsage,
+        model: response.model,
+        cached: false,
+      }
 
-      return { ...response, cached: false }
+      // Cache the response
+      cache.set(cacheKey, aiResponse, DEFAULT_CACHE_TTL)
+
+      return aiResponse
     },
 
     async *stream(request: AIGenerateRequest): AsyncGenerator<string> {

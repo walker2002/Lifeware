@@ -15,23 +15,25 @@ import { HabitListCard } from './cnui/surfaces/HabitListCard'
 
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
-import { habitCnuiHandler } from './cnui/handlers'
+
+// Handler 模块相对路径（运行时动态加载）
+const handlerModulePath = './domains/habits/cnui/handlers'
 
 cnuiRegistry.register('habits', 'habit-action-panel', {
   component: HabitActionPanel,
-  handler: habitCnuiHandler,
+  handlerModulePath,
 })
 cnuiRegistry.register('habits', 'habit-checkin-panel', {
   component: HabitCheckinPanel,
-  handler: habitCnuiHandler,
+  handlerModulePath,
 })
 cnuiRegistry.register('habits', 'habit-creation-card', {
   component: HabitCreationCard,
-  handler: habitCnuiHandler,
+  handlerModulePath,
 })
 cnuiRegistry.register('habits', 'habit-list-card', {
   component: HabitListCard,
-  handler: habitCnuiHandler,
+  handlerModulePath,
 })
 
 const result = loadDomainManifest('habits')

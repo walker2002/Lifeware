@@ -1,11 +1,14 @@
 import type React from 'react'
 import type { CnuiSurfaceHandler } from './types'
 
+type HandlerLoader = () => CnuiSurfaceHandler
+type HandlerModulePath = string
+
 interface SurfaceRegistration {
   domainId: string
   surfaceType: string
   component: React.ComponentType<any>
-  handler: CnuiSurfaceHandler
+  handlerModulePath?: HandlerModulePath
 }
 
 class CnuiSurfaceRegistry {
@@ -14,7 +17,7 @@ class CnuiSurfaceRegistry {
   register(
     domainId: string,
     surfaceType: string,
-    reg: { component: React.ComponentType<any>; handler: CnuiSurfaceHandler },
+    reg: { component: React.ComponentType<any>; handlerModulePath?: HandlerModulePath },
   ): void {
     if (this.map.has(surfaceType)) {
       const existing = this.map.get(surfaceType)!
@@ -28,6 +31,28 @@ class CnuiSurfaceRegistry {
 
   get(surfaceType: string): SurfaceRegistration | undefined {
     return this.map.get(surfaceType)
+  }
+
+  /**
+   * 获取 handler，通过动态导入模块路径避免客户端打包
+   */
+  getHandler(surfaceType: string): CnuiSurfaceHandler | undefined {
+    const reg = this.map.get(surfaceType)
+    if (!reg || !reg.handlerModulePath) return undefined
+
+    // 运行时动态加载 handler（仅在服务端执行）
+    if (typeof window !== 'undefined') {
+      console.warn(`[CnuiRegistry] Handler loading attempted on client side for "${surfaceType}"`)
+      return undefined
+    }
+
+    try {
+      const module = require(reg.handlerModulePath)
+      return module.habitCnuiHandler || module.timeboxCnuiHandler
+    } catch (e) {
+      console.error(`[CnuiRegistry] Failed to load handler for "${surfaceType}":`, e)
+      return undefined
+    }
   }
 
   getByDomain(domainId: string): SurfaceRegistration[] {

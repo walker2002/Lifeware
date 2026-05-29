@@ -1108,8 +1108,22 @@ export async function openCnuiSurface(
     }
   }
 
+  const handler = cnuiRegistry.getHandler(surfaceType)
+  if (!handler) {
+    return {
+      content: `Handler 未找到: ${surfaceType}`,
+      surface: {
+        cnuiSurfaceId: crypto.randomUUID(),
+        cnuiSurfaceType: surfaceType,
+        domainId,
+        action,
+        dataSnapshot: {},
+      },
+    }
+  }
+
   try {
-    const result = await reg.handler.open(action)
+    const result = await handler.open(action)
     return {
       content: result.content,
       surface: {
@@ -1175,8 +1189,13 @@ export async function submitCnuiSurface(
     return { success: false, error: `未注册的 surface: ${surfaceType}` }
   }
 
+  const handler = cnuiRegistry.getHandler(surfaceType)
+  if (!handler) {
+    return { success: false, error: `Handler 未找到: ${surfaceType}` }
+  }
+
   // 委托给 domain handler 执行提交
-  const result = await reg.handler.submit(action, mappedFields)
+  const result = await handler.submit(action, mappedFields)
   return {
     success: result.success,
     error: result.error,
@@ -1190,4 +1209,18 @@ export async function isCnuiSurface(domainId: string, action: string): Promise<b
   const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
   const trigger = intentTriggers.find((t) => t.action === action)
   return trigger?.response_type === 'cnui'
+}
+
+/** 获取 action 的响应类型和视图路由（服务端查询） */
+export async function getActionResponse(domainId: string, action: string): Promise<{
+  responseType: string
+  viewRoute?: string
+}> {
+  const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
+  const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
+  const trigger = intentTriggers.find((t) => t.action === action)
+  return {
+    responseType: trigger?.response_type ?? 'text',
+    viewRoute: trigger?.view_route,
+  }
 }

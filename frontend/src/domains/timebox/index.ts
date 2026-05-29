@@ -8,12 +8,14 @@ import { createTimeboxHooks } from './hooks'
 
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
-import { timeboxCnuiHandler } from './cnui/handlers'
 import { TimeboxList } from './cnui/surfaces/TimeboxList'
+
+// Handler 模块相对路径（运行时动态加载）
+const handlerModulePath = './domains/timebox/cnui/handlers'
 
 cnuiRegistry.register('timebox', 'timebox-list', {
   component: TimeboxList,
-  handler: timeboxCnuiHandler,
+  handlerModulePath,
 })
 
 const result = loadDomainManifest('timebox')

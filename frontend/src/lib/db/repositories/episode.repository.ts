@@ -27,7 +27,7 @@ export class EpisodeRepository {
       metadata: episode.metadata,
     }).returning()
 
-    return row as MemoryEpisodeRecord
+    return row as unknown as MemoryEpisodeRecord
   }
 
   async findBySessionId(sessionId: string): Promise<MemoryEpisodeRecord[]> {
@@ -37,7 +37,7 @@ export class EpisodeRepository {
       .where(eq(memoryEpisodes.sessionId, sessionId))
       .orderBy(desc(memoryEpisodes.createdAt))
 
-    return rows as MemoryEpisodeRecord[]
+    return rows as unknown as MemoryEpisodeRecord[]
   }
 
   async findByUserId(userId: string, limit = 50): Promise<MemoryEpisodeRecord[]> {
@@ -48,6 +48,6 @@ export class EpisodeRepository {
       .orderBy(desc(memoryEpisodes.createdAt))
       .limit(limit)
 
-    return rows as MemoryEpisodeRecord[]
+    return rows as unknown as MemoryEpisodeRecord[]
   }
 }

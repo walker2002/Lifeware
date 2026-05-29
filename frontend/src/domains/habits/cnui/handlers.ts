@@ -3,7 +3,7 @@ import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
 import { SystemEventRepository } from '@/lib/db/repositories/system-event.repository'
 import { validateHabitFields } from '@/domains/habits/validation'
-import { findTransition } from '@/domains/habits/transitions'
+import { habitTransitions, findTransition } from '@/domains/habits/transitions'
 import type { CreateHabitInput } from '@/usom/interfaces/irepository'
 import type { Habit, HabitFrequency } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
@@ -116,17 +116,17 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
         const eventRepo = new SystemEventRepository()
         const now = new Date().toISOString() as Timestamp
 
-        const input = fields as CreateHabitInput
+        const input = fields as unknown as CreateHabitInput
         const habit = await habitRepo.create(input, MVP_USER_ID)
 
         // 创建系统事件
-        const transition = findTransition('habits', 'habit', null, 'create')
+        const transition = findTransition(habitTransitions, null, 'create')
         if (transition) {
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
             type: transition.eventType as SystemEventType,
             occurredAt: now,
-            triggeredBy: 'cnui_handler',
+            triggeredBy: 'handler',
             payload: { habitId: habit.id, toStatus: transition.to },
             snapshotId: '' as USOM_ID,
           }
@@ -162,7 +162,7 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
             continue
           }
 
-          const transition = findTransition('habits', 'habit', existing.status, smAction)
+          const transition = findTransition(habitTransitions, existing.status as 'draft' | 'active' | 'suspended' | 'archived', smAction)
           if (!transition) {
             lastError = `非法状态转换: action="${smAction}", fromState="${existing.status}"`
             continue
@@ -174,7 +174,7 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
             id: crypto.randomUUID() as USOM_ID,
             type: transition.eventType as SystemEventType,
             occurredAt: now,
-            triggeredBy: 'cnui_handler',
+            triggeredBy: 'handler',
             payload: { habitId, fromStatus: existing.status, toStatus: transition.to },
             snapshotId: '' as USOM_ID,
           }
@@ -219,28 +219,21 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
             note?: string
           } | undefined
 
-          await habitLogRepo.create({
+          await habitLogRepo.save({
+            id: crypto.randomUUID() as USOM_ID,
             habitId,
-            logDate: now.split('T')[0] as USOM_ID,
+            date: now.split('T')[0] as USOM_ID,
+            completionStatus: 'completed',
             actualDuration: itemFields?.actualDuration ?? habit.defaultDuration,
+            plannedDuration: habit.defaultDuration,
             completionRating: itemFields?.completionRating,
             energyLevel: itemFields?.energyLevel,
             note: itemFields?.note,
+            loggedAt: now,
+            source: 'manual',
           }, MVP_USER_ID)
 
-          // 更新 streak（简化版，实际应该调用 streak calculator）
-          const transition = findTransition('habits', 'habit_log', null, 'create')
-          if (transition) {
-            const event: SystemEvent = {
-              id: crypto.randomUUID() as USOM_ID,
-              type: transition.eventType as SystemEventType,
-              occurredAt: now,
-              triggeredBy: 'cnui_handler',
-              payload: { habitId, logDate: now.split('T')[0] },
-              snapshotId: '' as USOM_ID,
-            }
-            await eventRepo.append(event, MVP_USER_ID)
-          }
+          // habit_log 创建完成，streak 更新由统计处理器处理
         }
 
         if (lastError) return { success: false, error: lastError }

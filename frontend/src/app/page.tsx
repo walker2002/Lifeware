@@ -24,9 +24,8 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
 import { checkLLMConfigured } from "./actions/llm-config"
-import { getFullManifest } from "@/domains/registry"
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
 import { Button } from "@/components/ui/button";
@@ -356,15 +355,11 @@ export default function Home() {
       return;
     }
 
-    // 非 CNUI action：通过 manifest 检查响应类型
-    const fullManifest = getFullManifest(domainId);
-    const intentTriggers = (fullManifest as any)?.intent_triggers ?? [];
-    const trigger = intentTriggers.find((t: any) => t.action === action);
-    const responseType = trigger?.response_type;
+    // 非 CNUI action：通过 Server Action 检查响应类型
+    const { responseType, viewRoute } = await getActionResponse(domainId, action);
 
     if (responseType === 'page') {
       // 页面导航
-      const viewRoute = trigger?.view_route;
       if (viewRoute) {
         const msg: ChatMessage = {
           role: 'assistant',
@@ -381,7 +376,7 @@ export default function Home() {
       // 纯文本响应
       const msg: ChatMessage = {
         role: 'assistant',
-        content: trigger?.description || `操作 ${action} 已记录，请在对话中继续`,
+        content: `操作 ${action} 已记录，请在对话中继续`,
         timestamp: new Date().toISOString(),
       };
       setConversationMessages(prev => [...prev, msg]);

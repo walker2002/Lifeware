@@ -19,8 +19,8 @@ const mockHabitRepo = {
 }
 
 const mockHabitLogRepo = {
-  findByDate: vi.fn().mockResolvedValue([]),
-  create: vi.fn().mockResolvedValue({}),
+  findByUserAndDate: vi.fn().mockResolvedValue([]),
+  save: vi.fn().mockResolvedValue(undefined),
 }
 
 const mockEventRepo = {

@@ -276,7 +276,7 @@ ${routingText}
     } catch {
       return {
         success: false,
-        error: `无法解析 JSON 响应，请重试或使用表单模式。原始内容：${content.slice(0, 100)}`,
+        error: `无法解析 JSON 响应，请重试或使用表单模式。原始内容：${(content as any)?.slice(0, 100) ?? ''}`,
       }
     }
 

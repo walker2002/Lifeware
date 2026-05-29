@@ -42,7 +42,7 @@ async function getPendingHabits(): Promise<Habit[]> {
     const today = await getTodayDate()
 
     const activeHabits = await habitRepo.findByUserId(MVP_USER_ID, { status: 'active', trackable: true })
-    const loggedIds = new Set((await logRepo.findByDate(today as USOM_ID, MVP_USER_ID)).map(l => l.habitId))
+    const loggedIds = new Set((await logRepo.findByUserAndDate(today as USOM_ID, MVP_USER_ID)).map(l => l.habitId))
 
     return activeHabits.filter(h => !loggedIds.has(h.id))
   } catch (e) {

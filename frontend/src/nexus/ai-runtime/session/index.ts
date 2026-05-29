@@ -16,7 +16,7 @@ export interface QueryResultEntry {
   timestamp: string
 }
 
-interface AISession {
+export interface AISession {
   id: string
   domainId: string
   action: string
