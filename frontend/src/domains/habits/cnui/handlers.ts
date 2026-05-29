@@ -105,7 +105,9 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
       }
       // 委托给 intent.ts 中已有的 submitHabitIntent
       const { submitHabitIntent } = await import('@/app/actions/intent')
-      return submitHabitIntent(fields as any)
+      const intentResult = await submitHabitIntent(fields as any)
+      if (!intentResult.success) return { success: false, error: intentResult.error }
+      return { success: true, data: { habit: intentResult.habit } }
     }
 
     // lifecycle actions
