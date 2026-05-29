@@ -12,15 +12,7 @@ export type CnuiBaseComponentType =
   | 'list'
   | 'card'
 
-export type CnuiDomainComponentType =
-  | 'habit-creation-card'
-  | 'timebox-list'
-  | 'energy-indicator'
-  | 'schedule-proposal'
-  | 'review-summary'
-  | 'objective-tracker'
-  | 'habit-action-panel'
-  | 'habit-checkin-panel'
+export type CnuiDomainComponentType = string
 
 export type CnuiComponentType = CnuiBaseComponentType | CnuiDomainComponentType
 
@@ -51,4 +43,22 @@ export interface CnuiSurfaceData {
   dataModel: Record<string, unknown>
   createdAt: string
   updatedAt: string
+}
+
+// ── CNUI Surface Handler 接口 ──────────────────────────────
+
+export interface CnuiSurfaceHandler {
+  open: (action: string) => Promise<CnuiSurfaceOpenResult>
+  submit: (action: string, fields: Record<string, unknown>) => Promise<CnuiSurfaceSubmitResult>
+}
+
+export interface CnuiSurfaceOpenResult {
+  content: string
+  dataSnapshot: Record<string, unknown>
+}
+
+export interface CnuiSurfaceSubmitResult {
+  success: boolean
+  error?: string
+  data?: Record<string, unknown>
 }
