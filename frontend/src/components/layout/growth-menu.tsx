@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { CheckSquare, Clock, Repeat, Target, Pin, PinOff, ChevronDown } from "lucide-react"
+import { CheckSquare, Clock, Repeat, Target, Pin, PinOff, ChevronDown, MessageSquare, LayoutGrid, FileText } from "lucide-react"
 
 interface DomainAction {
   action: string
   shortcut?: string
   description: string
+  response_type?: 'cnui' | 'page' | 'text'
 }
 
 interface DomainActionGroup {
@@ -25,6 +26,12 @@ const DOMAIN_META: Record<string, { icon: React.ComponentType<{ className?: stri
   timebox: { icon: Clock, label: '时间盒' },
   habits: { icon: Repeat, label: '习惯' },
   okrs: { icon: Target, label: 'OKR' },
+}
+
+const RESPONSE_TYPE_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  cnui: MessageSquare,
+  page: LayoutGrid,
+  text: FileText,
 }
 
 const UNPINNED_STORAGE_KEY = 'lw-unpinned-actions'
@@ -107,6 +114,10 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                     title={act.shortcut ?? undefined}
                     className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                   >
+                    {(() => {
+                      const RespIcon = RESPONSE_TYPE_ICON[(act as any).response_type ?? '']
+                      return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
+                    })()}
                     <span className="truncate">{act.description}</span>
                     <span
                       role="button"
@@ -137,6 +148,10 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                         title={act.shortcut ?? undefined}
                         className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                       >
+                        {(() => {
+                          const RespIcon = RESPONSE_TYPE_ICON[(act as any).response_type ?? '']
+                          return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
+                        })()}
                         <span className="truncate">{act.description}</span>
                         <span
                           role="button"
