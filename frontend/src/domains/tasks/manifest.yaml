@@ -47,6 +47,7 @@ intent_triggers:
     shortcut: /createProject
     description: 创建一个新项目
     response_type: page
+    view_route: /projects/new
     examples:
       - 创建一个新项目
       - 新建项目叫"产品重构"
@@ -55,6 +56,7 @@ intent_triggers:
     shortcut: /updateProject
     description: 更新项目信息
     response_type: page
+    view_route: /projects
     examples:
       - 修改项目名称
       - 更新项目状态
@@ -63,6 +65,7 @@ intent_triggers:
     shortcut: /archiveProject
     description: 归档一个项目
     response_type: page
+    view_route: /projects
     examples:
       - 归档这个项目
     keywords: [归档, archive]
@@ -277,11 +280,11 @@ view_routes:
 # ─── 区块 H: cnui_surfaces ───────────────────────────────────────
 cnui_surfaces:
   task-creation-card:
-    handler: domains/tasks/cnui/handlers
+    handler: ./cnui/handlers
   task-edit-card:
-    handler: domains/tasks/cnui/handlers
+    handler: ./cnui/handlers
   task-action-panel:
-    handler: domains/tasks/cnui/handlers
+    handler: ./cnui/handlers
 
 # ─── 区块 J: cascade_rules ──────────────────────────────────────
 cascade_rules:
