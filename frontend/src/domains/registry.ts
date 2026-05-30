@@ -131,6 +131,10 @@ async function loadHandlers(domainId: string): Promise<HandlerMap> {
       const mod = await import('./habits/handlers')
       return mod.habitHandlers ?? {}
     }
+    case 'tasks': {
+      const mod = await import('./tasks/cnui/handlers')
+      return { createTask: mod.taskCnuiHandler as unknown as DomainHandler }
+    }
     default:
       return {}
   }
