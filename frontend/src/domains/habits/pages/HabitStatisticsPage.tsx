@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format } from "date-fns"
+import { format, startOfWeek, endOfWeek, addWeeks } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { HabitStatsDayView } from "../components/statistics/HabitStatsDayView"
-import { getHabitStatsForDay, type HabitDayRow } from "@/app/actions/habit-stats"
+import { HabitStatsWeekView } from "../components/statistics/HabitStatsWeekView"
+import { getHabitStatsForDay, getHabitStatsForWeek, type HabitDayRow, type HabitWeekMatrix } from "@/app/actions/habit-stats"
 
 type ViewMode = "day" | "week" | "month"
 
@@ -12,12 +13,19 @@ export function HabitStatisticsPage() {
   const [tab, setTab] = useState<ViewMode>("day")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [dayData, setDayData] = useState<HabitDayRow[]>([])
+  const [weekData, setWeekData] = useState<HabitWeekMatrix[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (tab !== "day") return
     setLoading(true)
     getHabitStatsForDay(currentDate).then(d => { setDayData(d); setLoading(false) })
+  }, [tab, currentDate])
+
+  useEffect(() => {
+    if (tab !== "week") return
+    setLoading(true)
+    getHabitStatsForWeek(currentDate).then(d => { setWeekData(d); setLoading(false) })
   }, [tab, currentDate])
 
   return (
@@ -39,9 +47,16 @@ export function HabitStatisticsPage() {
           ))}
         </div>
 
-        {loading && tab === "day" && <p className="text-sm text-body/40">加载中...</p>}
+        {loading && <p className="text-sm text-body/40">加载中...</p>}
         {tab === "day" && !loading && <HabitStatsDayView data={dayData} />}
-        {tab === "week" && <p className="py-8 text-center text-sm text-body/40">周视图开发中...</p>}
+        {tab === "week" && !loading && (
+          <HabitStatsWeekView
+            data={weekData}
+            weekLabel={`${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'M/d')} — ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'M/d')}`}
+            onPrev={() => setCurrentDate(addWeeks(currentDate, -1))}
+            onNext={() => setCurrentDate(addWeeks(currentDate, 1))}
+          />
+        )}
         {tab === "month" && <p className="py-8 text-center text-sm text-body/40">月视图开发中...</p>}
       </div>
 
