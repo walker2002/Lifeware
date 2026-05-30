@@ -53,7 +53,7 @@ export function getViewRoute(domainId: string, action: string): { component: str
 export function getAllDomainActions(): Array<{
   domainId: string
   domainName: string
-  actions: Array<{ action: string; shortcut?: string; description: string }>
+  actions: Array<{ action: string; shortcut?: string; description: string; response_type?: string }>
 }> {
   return domainRegistry.map(plugin => ({
     domainId: plugin.manifest.domainId,

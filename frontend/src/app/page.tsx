@@ -100,7 +100,7 @@ export default function Home() {
 
   const [sessions, setSessions] = useState<AISessionSummary[]>([]);
   const [conversationMessages, setConversationMessages] = useState<ChatMessage[]>([]);
-  const [domainActions, setDomainActions] = useState<Array<{ domainId: string; domainName: string; actions: Array<{ action: string; shortcut?: string; description: string }> }>>([]);
+  const [domainActions, setDomainActions] = useState<Array<{ domainId: string; domainName: string; actions: Array<{ action: string; shortcut?: string; description: string; response_type?: string }> }>>([]);
   const [intentTriggers, setIntentTriggers] = useState<Awaited<ReturnType<typeof fetchIntentTriggers>>>([])
   const [frequentIntents, setFrequentIntents] = useState<Awaited<ReturnType<typeof fetchFrequentIntents>>>([])
 
