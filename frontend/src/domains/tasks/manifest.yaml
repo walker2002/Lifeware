@@ -11,6 +11,8 @@ intent_triggers:
   - action: createTask
     shortcut: /createTask
     description: 创建一个新任务
+    response_type: cnui
+    cnui_surface: task-creation-card
     examples:
       - 创建一个任务
       - 添加一个新任务叫"完成报告"
@@ -18,6 +20,8 @@ intent_triggers:
   - action: updateTask
     shortcut: /updateTask
     description: 更新任务信息
+    response_type: cnui
+    cnui_surface: task-edit-card
     examples:
       - 修改任务标题
       - 更新任务优先级
@@ -25,6 +29,8 @@ intent_triggers:
   - action: completeTask
     shortcut: /completeTask
     description: 完成一个任务
+    response_type: cnui
+    cnui_surface: task-action-panel
     examples:
       - 完成这个任务
       - 标记任务已完成
@@ -32,12 +38,15 @@ intent_triggers:
   - action: archiveTask
     shortcut: /archiveTask
     description: 归档一个任务
+    response_type: cnui
+    cnui_surface: task-action-panel
     examples:
       - 归档这个任务
     keywords: [归档, archive]
   - action: createProject
     shortcut: /createProject
     description: 创建一个新项目
+    response_type: page
     examples:
       - 创建一个新项目
       - 新建项目叫"产品重构"
@@ -45,6 +54,7 @@ intent_triggers:
   - action: updateProject
     shortcut: /updateProject
     description: 更新项目信息
+    response_type: page
     examples:
       - 修改项目名称
       - 更新项目状态
@@ -52,12 +62,14 @@ intent_triggers:
   - action: archiveProject
     shortcut: /archiveProject
     description: 归档一个项目
+    response_type: page
     examples:
       - 归档这个项目
     keywords: [归档, archive]
   - action: view_list
     shortcut: /projects
     description: 查看项目与任务列表
+    response_type: page
     examples:
       - 查看所有项目
       - 显示任务列表
@@ -66,6 +78,7 @@ intent_triggers:
   - action: view_detail
     shortcut: /projectDetail
     description: 查看项目或任务详情
+    response_type: page
     examples:
       - 查看项目详情
       - 打开任务详情
@@ -260,6 +273,15 @@ view_routes:
     params:
       mode: create
   # view_list: 手动维护在 app/projects/page.tsx（服务器组件，含数据获取）
+
+# ─── 区块 H: cnui_surfaces ───────────────────────────────────────
+cnui_surfaces:
+  task-creation-card:
+    handler: domains/tasks/cnui/handlers
+  task-edit-card:
+    handler: domains/tasks/cnui/handlers
+  task-action-panel:
+    handler: domains/tasks/cnui/handlers
 
 # ─── 区块 J: cascade_rules ──────────────────────────────────────
 cascade_rules:
