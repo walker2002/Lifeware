@@ -22,6 +22,7 @@ import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage";
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage";
 import { ProjectsView } from "@/domains/tasks/components/projects-view";
 import "@/domains/habits/register-form";
+import "@/domains/tasks/register-form";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
