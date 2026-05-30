@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { SessionList } from "@/components/layout/session-list";
@@ -112,6 +112,8 @@ export default function Home() {
       .catch(err => console.error('[fetchIntentTriggers] 加载失败:', err))
   }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
+  const activeSessionIdRef = useRef(activeSessionId)
+  activeSessionIdRef.current = activeSessionId
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
 
@@ -325,26 +327,30 @@ export default function Home() {
   /** 添加消息到对话列表并持久化到 L1 */
   const addChatMessage = useCallback((msg: ChatMessage) => {
     setConversationMessages(prev => [...prev, msg])
-    if (activeSessionId) {
-      saveMessage(activeSessionId, {
+    const sid = activeSessionIdRef.current
+    if (sid) {
+      const saveP = saveMessage(sid, {
         role: msg.role,
         content: msg.content,
         cnuiSurface: msg.cnuiSurface,
         intentRef: msg.intentRef,
-      }).catch(err => console.error('[saveMessage] 持久化失败:', err))
+      })
 
-      // 标题生成：assistant 消息后异步触发
       if (msg.role === 'assistant') {
-        tryGenerateTitle(activeSessionId).then(newTitle => {
-          if (newTitle) {
-            setSessions(prev => prev.map(s =>
-              s.id === activeSessionId ? { ...s, title: newTitle } : s
-            ))
-          }
-        }).catch(() => {})
+        saveP.then(() => tryGenerateTitle(sid))
+          .then(newTitle => {
+            if (newTitle) {
+              setSessions(prev => prev.map(s =>
+                s.id === sid ? { ...s, title: newTitle } : s
+              ))
+            }
+          })
+          .catch(err => console.error('[addChatMessage] 保存或标题生成失败:', err))
+      } else {
+        saveP.catch(err => console.error('[saveMessage] 持久化失败:', err))
       }
     }
-  }, [activeSessionId])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteSession = useCallback((sessionId: string) => {
     const session = sessions.find(s => s.id === sessionId)
