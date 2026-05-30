@@ -269,7 +269,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                       }}
                       className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                     >
-                      {item.label}{item.shortcut ? <span className="ml-1 text-body/40">[{item.shortcut}]</span> : null}
+                      {item.label}{item.shortcut ? <span className="ml-1 text-body/40">{item.shortcut}</span> : null}
                     </button>
                   ))}
                 </div>
