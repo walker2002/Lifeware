@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format, startOfWeek, endOfWeek, addWeeks } from "date-fns"
+import { format, startOfWeek, endOfWeek, addWeeks, addMonths } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { HabitStatsDayView } from "../components/statistics/HabitStatsDayView"
 import { HabitStatsWeekView } from "../components/statistics/HabitStatsWeekView"
-import { getHabitStatsForDay, getHabitStatsForWeek, type HabitDayRow, type HabitWeekMatrix } from "@/app/actions/habit-stats"
+import { HabitStatsMonthView } from "../components/statistics/HabitStatsMonthView"
+import { getHabitStatsForDay, getHabitStatsForWeek, getHabitStatsForMonth, type HabitDayRow, type HabitWeekMatrix, type MonthDaySummary } from "@/app/actions/habit-stats"
 
 type ViewMode = "day" | "week" | "month"
 
@@ -14,6 +15,7 @@ export function HabitStatisticsPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [dayData, setDayData] = useState<HabitDayRow[]>([])
   const [weekData, setWeekData] = useState<HabitWeekMatrix[]>([])
+  const [monthData, setMonthData] = useState<MonthDaySummary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,6 +28,14 @@ export function HabitStatisticsPage() {
     if (tab !== "week") return
     setLoading(true)
     getHabitStatsForWeek(currentDate).then(d => { setWeekData(d); setLoading(false) })
+  }, [tab, currentDate])
+
+  useEffect(() => {
+    if (tab !== "month") return
+    setLoading(true)
+    const y = currentDate.getFullYear()
+    const m = currentDate.getMonth() + 1
+    getHabitStatsForMonth(y, m).then(d => { setMonthData(d); setLoading(false) })
   }, [tab, currentDate])
 
   return (
@@ -57,7 +67,15 @@ export function HabitStatisticsPage() {
             onNext={() => setCurrentDate(addWeeks(currentDate, 1))}
           />
         )}
-        {tab === "month" && <p className="py-8 text-center text-sm text-body/40">月视图开发中...</p>}
+        {tab === "month" && !loading && (
+          <HabitStatsMonthView
+            data={monthData}
+            year={currentDate.getFullYear()}
+            month={currentDate.getMonth() + 1}
+            onPrev={() => setCurrentDate(addMonths(currentDate, -1))}
+            onNext={() => setCurrentDate(addMonths(currentDate, 1))}
+          />
+        )}
       </div>
 
       <div className="hidden md:block w-[280px] border-l border-hairline p-4">
