@@ -79,18 +79,20 @@ export async function getHabitStatsForWeek(weekStart: Date): Promise<HabitWeekMa
 
   const logsByHabit = await logRepo.findByDateRange(MVP_USER_ID, startDate, endDate)
   const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
 
   return habits.map(habit => {
     const logs = logsByHabit.get(habit.id) ?? []
     const weekDays = eachDayOfInterval({ start: wStart, end: wEnd }).map((d, i) => {
       const dateStr = format(d, 'yyyy-MM-dd')
+      if (dateStr > todayStr) return { date: dateStr, dayLabel: dayLabels[i], status: 'future' as const }
       const log = logs.find(l => l.date === dateStr)
       return { date: dateStr, dayLabel: dayLabels[i], status: log?.completionStatus ?? null }
     })
 
     const completed = weekDays.filter(d => d.status === 'completed').length
-    const total = weekDays.filter(d => d.status !== null).length
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0
+    const pastDays = weekDays.filter(d => d.status !== 'future' && d.status !== null).length
+    const completionRate = pastDays > 0 ? Math.round((completed / pastDays) * 100) : 0
 
     return { habitId: habit.id, title: habit.title, weekDays, completionRate }
   })
