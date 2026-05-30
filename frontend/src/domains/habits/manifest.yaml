@@ -98,6 +98,12 @@ intent_triggers:
       - 跑步坚持多久了
       - 冥想打卡情况
     keywords: [统计, streak, 坚持, 打卡情况]
+  - action: view_statistics
+    shortcut: /habitStatsView
+    description: 习惯统计
+    response_type: page
+    keywords: [统计, 打卡统计, 习惯数据]
+    view_route: /habits/statistics
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -221,6 +227,9 @@ view_routes:
   view_templates:
     component: domains/habits/pages/HabitTemplatePage
     url: /habits/templates
+  view_statistics:
+    component: domains/habits/pages/HabitStatisticsPage
+    url: /habits/statistics
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
