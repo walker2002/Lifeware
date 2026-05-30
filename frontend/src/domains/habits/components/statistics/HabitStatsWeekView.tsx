@@ -1,14 +1,11 @@
 "use client"
 
 import { useState, Fragment } from "react"
-import { Check, X, Minus, ChevronLeft, ChevronRight } from "lucide-react"
+import { Check, X, Minus } from "lucide-react"
 import type { HabitWeekMatrix } from "@/app/actions/habit-stats"
 
 interface HabitStatsWeekViewProps {
   data: HabitWeekMatrix[]
-  weekLabel: string
-  onPrev: () => void
-  onNext: () => void
 }
 
 function StatusCell({ status }: { status: string | null }) {
@@ -19,7 +16,7 @@ function StatusCell({ status }: { status: string | null }) {
   return <span className="inline-flex size-5 items-center justify-center rounded bg-gray-50 text-gray-300"><Minus className="size-3" /></span>
 }
 
-export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitStatsWeekViewProps) {
+export function HabitStatsWeekView({ data }: HabitStatsWeekViewProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   if (data.length === 0) {
@@ -28,17 +25,11 @@ export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitSta
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={onPrev} className="rounded p-1 hover:bg-surface-soft"><ChevronLeft className="size-4" /></button>
-          <span className="text-sm font-medium text-ink">{weekLabel}</span>
-          <button onClick={onNext} className="rounded p-1 hover:bg-surface-soft"><ChevronRight className="size-4" /></button>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-body/50">
-          <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-emerald-100" /> 完成</span>
-          <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-amber-100" /> 部分</span>
-          <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-red-50" /> 未完成</span>
-        </div>
+      {/* 图例 */}
+      <div className="flex items-center gap-3 text-xs text-body/50">
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-emerald-100" /> 完成</span>
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-amber-100" /> 部分</span>
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-red-50" /> 未完成</span>
       </div>
 
       <table className="w-full text-sm">
@@ -57,7 +48,6 @@ export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitSta
           {data.map(row => (
             <Fragment key={row.habitId}>
               <tr
-                key={row.habitId}
                 className="border-b border-hairline last:border-0 hover:bg-surface-soft/50 cursor-pointer"
                 onClick={() => setExpanded(expanded === row.habitId ? null : row.habitId)}
               >
@@ -72,7 +62,6 @@ export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitSta
                   <td colSpan={2 + row.weekDays.length} className="bg-surface-soft/30 px-4 py-3">
                     <div className="flex items-center gap-6 text-xs text-body/60">
                       <span>完成率：<strong className="text-ink">{row.completionRate}%</strong></span>
-                      <span className="text-primary">查看历史详情 →</span>
                     </div>
                   </td>
                 </tr>

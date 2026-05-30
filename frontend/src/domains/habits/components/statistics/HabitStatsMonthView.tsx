@@ -1,23 +1,18 @@
 "use client"
 
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { MonthDaySummary } from "@/app/actions/habit-stats"
 
 interface HabitStatsMonthViewProps {
   data: MonthDaySummary[]
-  year: number
-  month: number
-  onPrev: () => void
-  onNext: () => void
 }
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
-export function HabitStatsMonthView({ data, year, month, onPrev, onNext }: HabitStatsMonthViewProps) {
+export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
+  const firstDayOfWeek = new Date(data[0] ? parseInt(data[0].date.slice(0, 4)) : today.getFullYear(), data[0] ? parseInt(data[0].date.slice(5, 7)) - 1 : today.getMonth(), 1).getDay()
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
 
   const weeks: (MonthDaySummary | null)[][] = []
@@ -36,13 +31,7 @@ export function HabitStatsMonthView({ data, year, month, onPrev, onNext }: Habit
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <button onClick={onPrev} className="rounded p-1 hover:bg-surface-soft"><ChevronLeft className="size-4" /></button>
-        <span className="text-sm font-medium text-ink">{year}年{month}月</span>
-        <button onClick={onNext} className="rounded p-1 hover:bg-surface-soft"><ChevronRight className="size-4" /></button>
-      </div>
-
+    <div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-hairline">
