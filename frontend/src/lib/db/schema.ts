@@ -640,3 +640,27 @@ export const memoryEpisodes = pgTable('memory_episodes', {
   index('idx_memory_episodes_user_created').on(table.userId, table.createdAt),
   index('idx_memory_episodes_session').on(table.sessionId),
 ])
+
+// ─── 7.5 user_activities (用户行为埋点) ──────────────────────────
+export const userActivities = pgTable('user_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  activityType: text('activity_type', {
+    enum: ['intent_execute', 'menu_click', 'page_navigate', 'cnui_action']
+  }).notNull(),
+
+  source: text('source', {
+    enum: ['ai_assistant', 'growth_menu', 'shortcut', 'page_route', 'cnui_surface']
+  }).notNull(),
+
+  targetDomain: text('target_domain'),
+  targetAction: text('target_action'),
+
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_user_activities_user_time').on(table.userId, table.createdAt),
+  index('idx_user_activities_type').on(table.userId, table.activityType, table.createdAt),
+])

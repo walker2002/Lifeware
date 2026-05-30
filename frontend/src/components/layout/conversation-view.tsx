@@ -5,6 +5,7 @@ import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/o
 import { validateFile } from "@/lib/task-import/file-parser"
 import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
+import type { FrequentIntent } from "@/app/actions/activity"
 
 interface IntentTrigger {
   label: string
@@ -13,6 +14,8 @@ interface IntentTrigger {
   action: string
 }
 
+export type { FrequentIntent }
+
 interface ConversationViewProps {
   messages: ChatMessage[]
   onSendMessage: (content: string, attachments?: File[]) => void
@@ -20,6 +23,7 @@ interface ConversationViewProps {
   recentSessions?: AISessionSummary[]
   onSelectSession?: (sessionId: string) => void
   intentTriggers?: IntentTrigger[]
+  frequentIntents?: FrequentIntent[]
   onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
   onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
 }
@@ -30,9 +34,10 @@ const ROLE_LABELS: Record<ChatMessage['role'], string> = {
   system: '系统',
 }
 
-export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
+export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, frequentIntents, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
+  const [showAllIntents, setShowAllIntents] = useState(false)
 
   // 从消息中提取已有的 surface 状态（跨导航持久化）
   const initialSurfaceStates = useMemo(() => {
@@ -234,23 +239,52 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
           </form>
 
           {/* 常用意图（在输入框下方） */}
-          {intentTriggers && intentTriggers.length > 0 && (
-            <div className="mt-4 flex max-w-xl flex-wrap justify-center gap-2">
-              {intentTriggers.map(trigger => (
-                <button
-                  key={`${trigger.domainId}:${trigger.action}`}
-                  type="button"
-                  onClick={() => {
-                    setInput(trigger.shortcut + " ")
-                    inputRef.current?.focus()
-                  }}
-                  className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
-                >
-                  {trigger.label} ({trigger.shortcut})
-                </button>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const source = frequentIntents && frequentIntents.length > 0
+              ? frequentIntents.map(fi => ({
+                  key: `${fi.targetDomain}:${fi.targetAction}`,
+                  label: fi.label,
+                  shortcut: fi.shortcut,
+                }))
+              : (intentTriggers ?? []).map(t => ({
+                  key: `${t.domainId}:${t.action}`,
+                  label: t.label,
+                  shortcut: t.shortcut,
+                }))
+
+            if (source.length === 0) return null
+
+            const visible = showAllIntents ? source : source.slice(0, 5)
+
+            return (
+              <div className="mt-4 w-full max-w-xl">
+                <div className="flex max-w-xl flex-wrap justify-center gap-2">
+                  {visible.map(item => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        if (item.shortcut) setInput(item.shortcut + ' ')
+                        inputRef.current?.focus()
+                      }}
+                      className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                    >
+                      {item.label}{item.shortcut ? <span className="ml-1 text-body/40">[{item.shortcut}]</span> : null}
+                    </button>
+                  ))}
+                </div>
+                {source.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllIntents(prev => !prev)}
+                    className="mt-2 block mx-auto text-xs text-body/50 hover:text-body transition-colors"
+                  >
+                    {showAllIntents ? '收起' : `更多 (${source.length - 5})`}
+                  </button>
+                )}
+              </div>
+            )
+          })()}
 
           {/* 最近对话 */}
           {recentSessions && recentSessions.length > 0 && (

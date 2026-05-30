@@ -32,6 +32,7 @@ import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry';
 import { surfaceHandlers as habitHandlers } from '@/domains/habits/cnui/handlers';
 import { surfaceHandlers as timeboxHandlers } from '@/domains/timebox/cnui/handlers';
 import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
+import { recordActivity } from './activity-recorder';
 
 // 各 domain 自注册的 handler 合并（新增 domain 只需加一行 import + spread）
 const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
@@ -171,6 +172,15 @@ async function executePipeline(
     }
 
     if (logger) logger.endSession('success');
+
+    const si = parseResult.intent
+    void recordActivity({
+      activityType: 'intent_execute',
+      source: 'ai_assistant',
+      targetDomain: si.targetDomain,
+      targetAction: si.action,
+    })
+
     return {
       success: true,
       timeboxes,
@@ -942,35 +952,6 @@ export async function fetchDomainActions() {
     }
   }
   return actions;
-}
-
-export interface IntentTrigger {
-  label: string
-  shortcut: string
-  domainId: string
-  action: string
-}
-
-/** 从所有 Domain manifest 的 intent_triggers 动态读取有 shortcut 的意图 */
-export async function fetchIntentTriggers(): Promise<IntentTrigger[]> {
-  const { domainRegistry } = await import("@/domains/registry")
-  const triggers: IntentTrigger[] = []
-  for (const plugin of domainRegistry) {
-    const items = plugin.manifest.intentTriggers
-    if (!items) continue
-    for (const t of items) {
-      // 只返回有 shortcut 且不是 view_route 导航类的意图
-      if (t.shortcut && !t.view_route) {
-        triggers.push({
-          label: t.description || t.action,
-          shortcut: t.shortcut,
-          domainId: plugin.manifest.domainId,
-          action: t.action,
-        })
-      }
-    }
-  }
-  return triggers
 }
 
 // ─── 动态表单提交 Server Action ──────────────────────────────────

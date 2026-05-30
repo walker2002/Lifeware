@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_05_30 (enhancement)**：新增 `user_activities` 用户行为埋点表（统一分析入口，append-only，不走 Nexus 管道）；表结构总览新增"用户行为分析"分类
 - **2026_05_28 (refactor)**：执行记录模型统一化 —— `habit_logs` 字段对齐 ExecutionRecord（`status` → `completion_status`，新增 `planned_duration`/`deviation_minutes`/`completion_rating`/`energy_level`，source 扩展 `'timebox_sync'`）；新增 `task_execution_logs` 表
 - 2026_05_25 (sync)：同步代码变更 — 移除 tasks/projects/project_templates/task_templates 时间字段；更新 ai_sessions 表（新增 domain_id/action/session_mode，扩展状态枚举为 6 值）；新增 memory_episodes 表；system_events.triggered_by 新增 context_engine/handler；reviews.type 新增 semi_annual
 - 2026_05_11 (enhancement)：objectives 新增 objective_number/priority 列、period_type 枚举新增 semi_annual
@@ -145,6 +146,9 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── system_events          ← 事件存储（Memory Framework 原始数据源，append-only）
 ├── action_surfaces        ← 行动切面快照（审计用）
 ├── derived_signals        ← Memory Framework 计算缓存（每用户一行）
+
+用户行为分析
+└── user_activities        ← 用户行为埋点（统一分析入口，append-only）
 
 AI 与记忆
 ├── ai_sessions            ← AI 会话
@@ -1088,6 +1092,41 @@ CREATE INDEX idx_derived_signals_user ON derived_signals(user_id);
 
 ---
 
+### 7.5 user_activities（用户行为埋点表）
+
+纯分析基础设施，不走 Nexus 管道（Intent Engine / Rule Engine / State Machine）。记录用户在 AI 助手、GrowthMenu、页面导航、CNUI 操作中的行为数据，支持常用意图统计和软件使用分析。
+
+**设计决策**：与 `structured_intents`（Nexus 管道业务记录）分离，`user_activities` 是唯一的统计分析入口。
+
+```sql
+CREATE TABLE user_activities (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references users(id) on delete cascade,
+
+  -- 查询关键字段（独立列）
+  activity_type  text not null check (activity_type in ('intent_execute', 'menu_click', 'page_navigate', 'cnui_action')),
+  source         text not null check (source in ('ai_assistant', 'growth_menu', 'shortcut', 'page_route', 'cnui_surface')),
+  target_domain  text,
+  target_action  text,
+
+  -- JSONB 允许：附加上下文信息，不参与 WHERE 过滤
+  metadata       jsonb not null default '{}',
+
+  -- 审计字段
+  created_at     timestamptz not null default now()
+);
+
+-- 索引
+CREATE INDEX idx_user_activities_user_time ON user_activities(user_id, created_at);
+CREATE INDEX idx_user_activities_type ON user_activities(user_id, activity_type, created_at);
+```
+
+> **写入方式**：通过 `recordActivity()` Server Action 显式调用，fire-and-forget（不阻塞业务流程）。写入失败不影响业务逻辑。
+>
+> **聚合查询**：`fetchFrequentIntents()` 使用时间衰减窗口（半衰期 7 天，查询窗口 30 天），`GROUP BY (target_domain, target_action)` 加权排序。
+
+---
+
 ## 八、阶段二预留表
 
 ### 8.1 memories（记忆表）
@@ -1468,5 +1507,5 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_05_25*
+*文档版本：2026_05_30*
 *关联上游文档：LW_USOM_详细设计_2026_03_20.md*

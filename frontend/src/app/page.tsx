@@ -24,12 +24,16 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, fetchIntentTriggers, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
+import { fetchIntentTriggers } from "./actions/intent-triggers"
+import { recordActivity } from "./actions/activity-recorder"
+import { fetchFrequentIntents } from "./actions/activity"
 import { checkLLMConfigured } from "./actions/llm-config"
 import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from './actions/session'
 import { ConfirmDeleteDialog } from '@/components/layout/confirm-delete-dialog'
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
+import { usePageView } from '@/hooks/use-page-view'
 import { Button } from "@/components/ui/button";
 import { ExecutionLogDialog } from "@/components/execution-log-dialog";
 import type { ExecutionRecord, ChatMessage } from "@/usom/types/objects";
@@ -96,6 +100,12 @@ export default function Home() {
   const [conversationMessages, setConversationMessages] = useState<ChatMessage[]>([]);
   const [domainActions, setDomainActions] = useState<Array<{ domainId: string; domainName: string; actions: Array<{ action: string; shortcut?: string; description: string }> }>>([]);
   const [intentTriggers, setIntentTriggers] = useState<Awaited<ReturnType<typeof fetchIntentTriggers>>>([])
+  const [frequentIntents, setFrequentIntents] = useState<Awaited<ReturnType<typeof fetchFrequentIntents>>>([])
+
+  usePageView(
+    mainViewState.type === 'action' ? mainViewState.domainId : undefined,
+    mainViewState.type === 'action' ? mainViewState.action : undefined,
+  )
 
   useEffect(() => {
     fetchDomainActions()
@@ -110,6 +120,11 @@ export default function Home() {
     fetchIntentTriggers()
       .then(setIntentTriggers)
       .catch(err => console.error('[fetchIntentTriggers] 加载失败:', err))
+  }, []);
+  useEffect(() => {
+    fetchFrequentIntents(20)
+      .then(setFrequentIntents)
+      .catch(err => console.error('[fetchFrequentIntents] 加载失败:', err))
   }, []);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const activeSessionIdRef = useRef(activeSessionId)
@@ -434,6 +449,13 @@ export default function Home() {
   const handleGrowthAction = useCallback(async (domainId: string, action: string) => {
     saveCurrentConversation();
 
+    void recordActivity({
+      activityType: 'menu_click',
+      source: 'growth_menu',
+      targetDomain: domainId,
+      targetAction: action,
+    })
+
     // response_type=cnui → 切换到对话视图并打开 CN-UI 表面
     if (await isCnuiSurface(domainId, action)) {
       ensureConversationView()
@@ -493,6 +515,12 @@ export default function Home() {
             timestamp: new Date().toISOString(),
           }
           addChatMessage(msg)
+          void recordActivity({
+            activityType: 'cnui_action',
+            source: 'cnui_surface',
+            targetDomain: domainId,
+            targetAction: action,
+          })
         } else {
           const msg: ChatMessage = {
             role: 'system',
@@ -774,6 +802,7 @@ export default function Home() {
           recentSessions={sessions.slice(0, 3)}
           onSelectSession={handleSelectSession}
           intentTriggers={intentTriggers}
+          frequentIntents={frequentIntents}
           onCnuiConfirm={handleCnuiConfirm}
           onSurfaceStateChange={handleSurfaceStateChange}
         />

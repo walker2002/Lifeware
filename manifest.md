@@ -100,3 +100,5 @@ route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app
 | 统一执行记录模型设计 | 2026_05_28 | 无 | 创建。ExecutionRecord 跨 domain 共享（增加 sourceType），HabitLog 字段对齐 ExecutionRecord，新增 TaskExecutionLog，ActionSurfaceSuggestion 扩展 suggestionType，新增 ExecutionLogged 事件，Domain manifest 增加 cascade_rules，State Machine 发射 ExecutionLogged |
 | USOM 详细设计 | 2026_05_28 | 2026_05_22 | HabitLog 字段对齐 ExecutionRecord（删除 HabitLogStatus，新增 completionStatus/plannedDuration/deviationMinutes/completionRating/energyLevel，source 扩展 timebox_sync），Task 新增 lastExecutionRecord，ExecutionRecord 增加 sourceType/ExecutionRecordBase，新增 TaskExecutionLog 类型，SystemEventType 新增 ExecutionLogged，ActionSurfaceSuggestion 扩展 suggestionType/targetType/targetId/payload |
 | 数据库设计 | 2026_05_28 | 2026_05_16 | habit_logs 字段变更（status→completion_status，新增 planned_duration/deviation_minutes/completion_rating/energy_level，source 扩展 timebox_sync），新增 task_execution_logs 表 |
+| 数据库设计 | 2026_05_30 | 2026_05_28 | 新增 user_activities 用户行为埋点表（统一分析入口，4 种行为类型，时间衰减聚合查询）；新增"用户行为分析"表分类 |
+| 用户行为埋点设计 | 2026_05_30 | 无 | 创建。用户行为埋点框架设计（user_activities 表 + recordActivity Server Action + 时间衰减聚合 + AI 助手常用意图展示改造 + /analytics 独立分析页面） |
