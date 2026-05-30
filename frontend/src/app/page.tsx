@@ -788,7 +788,7 @@ export default function Home() {
           onDeleteSession={handleDeleteSession}
         />
       </>
-    : <GrowthMenu domainActions={domainActions} onAction={handleGrowthAction} />;
+    : <GrowthMenu domainActions={domainActions as any} onAction={handleGrowthAction} />;
 
   const renderMainContent = () => {
     if (mainViewState.type === 'schedule') {

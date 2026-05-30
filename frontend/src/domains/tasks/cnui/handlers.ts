@@ -88,8 +88,9 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         const eventRepo = new SystemEventRepository()
         const now = new Date().toISOString() as Timestamp
 
-        const task = await taskRepo.save({
-          id: crypto.randomUUID() as USOM_ID,
+        const taskId = crypto.randomUUID() as USOM_ID
+        await taskRepo.save({
+          id: taskId,
           title: title.trim(),
           description: (fields['description'] as string) || undefined,
           status: 'draft',
@@ -108,13 +109,13 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
             type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'handler',
-            payload: { taskId: task?.id ?? '', toStatus: transition.to },
+            payload: { taskId, toStatus: transition.to },
             snapshotId: '' as USOM_ID,
           }
           await eventRepo.append(event, MVP_USER_ID as USOM_ID)
         }
 
-        return { success: true, data: { task } }
+        return { success: true }
       } catch (err) {
         const msg = err instanceof Error ? err.message : '创建任务失败'
         return { success: false, error: msg }
