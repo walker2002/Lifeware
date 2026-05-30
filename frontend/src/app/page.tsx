@@ -20,6 +20,7 @@ import { MonthView } from "@/domains/timebox/components/month-view";
 import { HabitListPage } from "@/domains/habits/pages/HabitListPage";
 import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage";
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage";
+import { ProjectsView } from "@/domains/tasks/components/projects-view";
 import "@/domains/habits/register-form";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
@@ -57,6 +58,12 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
     view_templates: HabitTemplatePage,
     createHabit: HabitListPage,
     view_statistics: HabitStatisticsPage,
+  },
+  tasks: {
+    view_list: ProjectsView,
+    view_detail: ProjectsView,
+    createProject: ProjectsView,
+    createTask: ProjectsView,
   },
 };
 
