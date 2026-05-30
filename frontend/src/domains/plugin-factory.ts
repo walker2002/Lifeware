@@ -53,6 +53,7 @@ export function createDomainPlugin(
       shortcut: t.shortcut,
       description: t.description,
       view_route: t.view_route,
+      response_type: t.response_type,
     })) as IntentTriggerInfo[],
     viewRoutes: fullManifest.view_routes as Record<string, ViewRouteInfo> | undefined,
   }

@@ -119,6 +119,7 @@ export interface IntentTriggerInfo {
   shortcut?: string
   description: string
   view_route?: string
+  response_type?: 'cnui' | 'page' | 'text'
 }
 
 export interface ViewRouteInfo {
