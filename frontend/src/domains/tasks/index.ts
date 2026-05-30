@@ -6,6 +6,29 @@ import { loadDomainManifest } from '@/domains/manifest-loader'
 import { createDomainPlugin } from '@/domains/plugin-factory'
 import { createTasksHooks } from './hooks'
 
+// ── CNUI Surface 组件导入 ─────────────────────────────────────────
+import { TaskCreationCard } from './cnui/surfaces/TaskCreationCard'
+import { TaskEditCard } from './cnui/surfaces/TaskEditCard'
+import { TaskActionPanel } from './cnui/surfaces/TaskActionPanel'
+
+// ── CNUI Surface 注册 ────────────────────────────────────────
+import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
+
+const handlerModulePath = './domains/tasks/cnui/handlers'
+
+cnuiRegistry.register('tasks', 'task-creation-card', {
+  component: TaskCreationCard,
+  handlerModulePath,
+})
+cnuiRegistry.register('tasks', 'task-edit-card', {
+  component: TaskEditCard,
+  handlerModulePath,
+})
+cnuiRegistry.register('tasks', 'task-action-panel', {
+  component: TaskActionPanel,
+  handlerModulePath,
+})
+
 const result = loadDomainManifest('tasks')
 
 if (!result.success) {
