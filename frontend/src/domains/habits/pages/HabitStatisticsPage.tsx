@@ -66,6 +66,8 @@ export function HabitStatisticsPage() {
 
   return (
     <div className="flex w-full flex-col gap-4">
+      <h1 className="text-lg font-bold text-ink">习惯统计</h1>
+
       {/* DateNav — 与时间盒页面一致的导航 + Tab */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

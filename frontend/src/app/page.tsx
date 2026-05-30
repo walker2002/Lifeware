@@ -787,6 +787,7 @@ export default function Home() {
     if (mainViewState.type === 'schedule') {
       return (
         <div className="flex w-full flex-col gap-4">
+          <h1 className="text-lg font-bold text-ink">我的时间盒</h1>
           <DateNav mode={dateMode} currentDate={currentDate} onModeChange={handleDateModeChange} onNavigate={handleNavigate} />
           {dateMode === "day" && <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />}
           {dateMode === "week" && <WeekView timeboxes={timeboxes} currentDate={currentDate} />}
