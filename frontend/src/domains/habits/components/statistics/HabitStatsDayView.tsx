@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { Check, X, Minus } from "lucide-react"
 import type { HabitDayRow } from "@/app/actions/habit-stats"
 
@@ -17,7 +17,7 @@ function StatusIcon({ status }: { status: string | null }) {
 
 function StreakBadge({ streak, completionRate7d }: { streak: number; completionRate7d: number }) {
   if (streak > 0) return <span className="text-xs text-emerald-600">✅ 连续{streak}天</span>
-  if (completionRate7d < 0.5) return <span className="text-xs text-red-500">❌ 中断</span>
+  if (completionRate7d < 0.3) return <span className="text-xs text-red-500">❌ 中断</span>
   return <span className="text-xs text-gray-400">—</span>
 }
 
@@ -41,7 +41,7 @@ export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {
       </thead>
       <tbody>
         {data.map(row => (
-          <>
+          <Fragment key={row.habitId}>
             <tr
               key={row.habitId}
               className="border-b border-hairline last:border-0 hover:bg-surface-soft/50 cursor-pointer"
@@ -63,7 +63,7 @@ export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {
                 </td>
               </tr>
             )}
-          </>
+          </Fragment>
         ))}
       </tbody>
     </table>

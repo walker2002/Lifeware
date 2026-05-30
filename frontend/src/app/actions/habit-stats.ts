@@ -24,29 +24,35 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
   const logRepo = new HabitLogRepository()
 
   const habits = await habitRepo.findActive(MVP_USER_ID)
-  const startDate = format(subDays(date, 4), 'yyyy-MM-dd') as DateOnly
+  const recentStart = format(subDays(date, 4), 'yyyy-MM-dd') as DateOnly
   const endDate = format(date, 'yyyy-MM-dd') as DateOnly
+  // 查询 30 天范围用于 streak/7d 计算，避免被 5 天窗口截断
+  const streakStart = format(subDays(date, 29), 'yyyy-MM-dd') as DateOnly
 
-  const logsByHabit = await logRepo.findByDateRange(MVP_USER_ID, startDate, endDate)
+  const [recentLogs, streakLogs] = await Promise.all([
+    logRepo.findByDateRange(MVP_USER_ID, recentStart, endDate),
+    logRepo.findByDateRange(MVP_USER_ID, streakStart, endDate),
+  ])
+
+  const today = format(date, 'yyyy-MM-dd')
 
   return habits.map(habit => {
-    const logs = logsByHabit.get(habit.id) ?? []
+    const logs = recentLogs.get(habit.id) ?? []
     const recent5 = eachDayOfInterval({ start: subDays(date, 4), end: date }).map(d => {
       const dateStr = format(d, 'yyyy-MM-dd')
       const log = logs.find(l => l.date === dateStr)
       return { date: dateStr, status: log?.completionStatus ?? null }
     })
 
-    const completedDates = logs
+    const completedDates = (streakLogs.get(habit.id) ?? [])
       .filter(l => l.completionStatus === 'completed')
       .map(l => l.date)
-    const today = format(date, 'yyyy-MM-dd')
 
     return {
       habitId: habit.id,
       title: habit.title,
       streak: calculateStreak(completedDates, today),
-      completionRate7d: calculateCompletion7d(completedDates, today),
+      completionRate7d: calculateCompletion7d(completedDates, today) / 7,
       recent5Days: recent5,
     }
   })

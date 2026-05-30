@@ -112,10 +112,10 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                     type="button"
                     onClick={() => onAction(domain.domainId, act.action)}
                     title={act.shortcut ?? undefined}
-                    className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                    className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                   >
                     {(() => {
-                      const RespIcon = RESPONSE_TYPE_ICON[(act as any).response_type ?? '']
+                      const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']
                       return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                     })()}
                     <span className="truncate">{act.description}</span>
@@ -146,10 +146,10 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                         type="button"
                         onClick={() => onAction(domain.domainId, act.action)}
                         title={act.shortcut ?? undefined}
-                        className="group flex w-full items-center rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                        className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                       >
                         {(() => {
-                          const RespIcon = RESPONSE_TYPE_ICON[(act as any).response_type ?? '']
+                          const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']
                           return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                         })()}
                         <span className="truncate">{act.description}</span>

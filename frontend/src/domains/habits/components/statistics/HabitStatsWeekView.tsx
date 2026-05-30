@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { Check, X, Minus, ChevronLeft, ChevronRight } from "lucide-react"
 import type { HabitWeekMatrix } from "@/app/actions/habit-stats"
 
@@ -54,7 +54,7 @@ export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitSta
         </thead>
         <tbody>
           {data.map(row => (
-            <>
+            <Fragment key={row.habitId}>
               <tr
                 key={row.habitId}
                 className="border-b border-hairline last:border-0 hover:bg-surface-soft/50 cursor-pointer"
@@ -71,12 +71,12 @@ export function HabitStatsWeekView({ data, weekLabel, onPrev, onNext }: HabitSta
                   <td colSpan={2 + row.weekDays.length} className="bg-surface-soft/30 px-4 py-3">
                     <div className="flex items-center gap-6 text-xs text-body/60">
                       <span>完成率：<strong className="text-ink">{row.completionRate}%</strong></span>
-                      <span className="text-primary cursor-pointer">查看历史详情 →</span>
+                      <span className="text-primary">查看历史详情 →</span>
                     </div>
                   </td>
                 </tr>
               )}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>
