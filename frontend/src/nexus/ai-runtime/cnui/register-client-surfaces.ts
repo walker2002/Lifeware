@@ -18,3 +18,12 @@ cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckin
 cnuiRegistry.register('habits', 'habit-creation-card', { component: HabitCreationCard })
 cnuiRegistry.register('habits', 'habit-list-card', { component: HabitListCard })
 cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })
+
+// Tasks surfaces
+import { TaskCreationCard } from '@/domains/tasks/cnui/surfaces/TaskCreationCard'
+import { TaskEditCard } from '@/domains/tasks/cnui/surfaces/TaskEditCard'
+import { TaskActionPanel } from '@/domains/tasks/cnui/surfaces/TaskActionPanel'
+
+cnuiRegistry.register('tasks', 'task-creation-card', { component: TaskCreationCard })
+cnuiRegistry.register('tasks', 'task-edit-card', { component: TaskEditCard })
+cnuiRegistry.register('tasks', 'task-action-panel', { component: TaskActionPanel })

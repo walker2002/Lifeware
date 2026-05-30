@@ -31,6 +31,7 @@ import { eq, desc } from "drizzle-orm";
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry';
 import { surfaceHandlers as habitHandlers } from '@/domains/habits/cnui/handlers';
 import { surfaceHandlers as timeboxHandlers } from '@/domains/timebox/cnui/handlers';
+import { surfaceHandlers as taskHandlers } from '@/domains/tasks/cnui/handlers';
 import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
 import { recordActivity } from './activity-recorder';
 
@@ -38,6 +39,7 @@ import { recordActivity } from './activity-recorder';
 const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
   ...habitHandlers,
   ...timeboxHandlers,
+  ...taskHandlers,
 }
 
 // ─── 类型定义 ───────────────────────────────────────────────────
