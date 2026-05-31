@@ -58,7 +58,11 @@ async function getItemsByStatus(status: string): Promise<Record<string, unknown>
 async function getTrackableHabits(): Promise<Record<string, unknown>[]> {
   try {
     const repo = new HabitRepository()
+    const logRepo = new HabitLogRepository()
     const habits = await repo.findByUserId(MVP_USER_ID)
+    const today = new Date().toISOString().slice(0, 10)
+    const todayLogs = await logRepo.findByUserAndDate(today as any, MVP_USER_ID)
+    const loggedIds = new Set(todayLogs.map(l => l.habitId))
     return habits
       .filter(h => h.status === 'active' && h.trackable)
       .map(h => ({
@@ -67,7 +71,7 @@ async function getTrackableHabits(): Promise<Record<string, unknown>[]> {
         defaultTime: h.defaultTime,
         defaultDuration: h.defaultDuration,
         streak: h.streak,
-        todayLogged: false,
+        todayLogged: loggedIds.has(h.id),
       }))
   } catch (e) {
     console.error('[habitCnuiHandler] 查询可打卡 habits 失败:', e)
