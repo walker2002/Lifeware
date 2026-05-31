@@ -31,6 +31,17 @@
   --success: #5db872;
   --warning: #d4a017;
   --error: #c64545;
+  --info: #5b8fb9;
+  --success-soft: #e8f5ec;
+  --warning-soft: #fdf6e3;
+  --error-soft: #fde8e8;
+  --info-soft: #e8f0f8;
+
+  /* --- 交互叠加色（UI-DESIGN-SPEC §1.5）--- */
+  --hover-overlay: rgba(20,20,19,0.04);
+  --pressed-overlay: rgba(20,20,19,0.08);
+  --focus-ring: rgba(204,120,92,0.3);
+  --scrim: rgba(20,20,19,0.5);
 
   /* --- shadcn/ui 兼容层 — 将品牌令牌映射到 shadcn 期望的变量 --- */
   --background: var(--canvas);
@@ -135,6 +146,16 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
+  --color-info: var(--info);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-error-soft: var(--error-soft);
+  --color-info-soft: var(--info-soft);
+
+  --color-hover-overlay: var(--hover-overlay);
+  --color-pressed-overlay: var(--pressed-overlay);
+  --color-focus-ring: var(--focus-ring);
+  --color-scrim: var(--scrim);
 
   /* --- 字体族 --- */
   --font-display: "Cormorant Garamond", serif;
