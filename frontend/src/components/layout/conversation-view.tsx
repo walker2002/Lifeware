@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
+import { toast } from "sonner"
 import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
 import type { FrequentIntent } from "@/app/actions/activity"
@@ -84,7 +85,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
       if (validation.valid) {
         validFiles.push(file)
       } else {
-        alert(validation.error)
+        toast.error(validation.error)
       }
     }
 

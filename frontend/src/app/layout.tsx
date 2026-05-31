@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 /* DESIGN.md 字体栈：Cormorant Garamond（标题）、Inter（正文）、JetBrains Mono（代码） */
@@ -38,6 +39,7 @@ export default function RootLayout({
         className={`${displayFont.variable} ${bodyFont.variable} ${codeFont.variable} antialiased`}
       >
         <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+        <Toaster position="bottom-center" richColors />
       </body>
     </html>
   );
