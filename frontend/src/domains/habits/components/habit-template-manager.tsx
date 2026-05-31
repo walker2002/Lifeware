@@ -182,7 +182,13 @@ export function HabitTemplateManager({ onDirtyChange, onSubmitError, onCancelReq
     : null
 
   if (isLoading) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">加载中...</div>
+    return (
+      <div className="py-12 space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-10 rounded bg-hairline animate-pulse" />
+        ))}
+      </div>
+    )
   }
 
   const tplForView = templates.map(t => ({

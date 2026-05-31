@@ -83,7 +83,11 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
   return (
     <div className="flex flex-col gap-2">
       {domainActions.length === 0 && (
-        <p className="px-3 py-6 text-center text-sm text-body/40">加载中...</p>
+        <div className="px-3 py-6 space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-8 rounded bg-hairline animate-pulse" />
+          ))}
+        </div>
       )}
       {domainActions.map(domain => {
         const meta = DOMAIN_META[domain.domainId]

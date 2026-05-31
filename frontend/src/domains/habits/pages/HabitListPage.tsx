@@ -255,8 +255,16 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-muted-foreground">加载中...</p>
+      <div className="flex flex-col gap-3 p-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg bg-surface-card p-4">
+            <div className="size-5 rounded-full bg-hairline animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-2/3 rounded bg-hairline animate-pulse" />
+              <div className="h-3 w-1/3 rounded bg-hairline animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
@@ -308,14 +316,15 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={() => deleteConfirm && handleDelete(deleteConfirm.id)}
-            >
-              确认
-            </AlertDialogAction>
             <AlertDialogCancel onClick={() => setDeleteConfirm(null)}>
               取消
             </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirm && handleDelete(deleteConfirm.id)}
+              className="bg-error text-on-primary hover:bg-error/90"
+            >
+              确认
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -35,7 +35,11 @@ export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onSaveCurr
         </DialogHeader>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground text-center py-8">加载中...</p>
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-10 rounded bg-hairline animate-pulse" />
+            ))}
+          </div>
         ) : templates.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-8">
             <p className="text-sm text-muted-foreground">暂无保存的模板</p>

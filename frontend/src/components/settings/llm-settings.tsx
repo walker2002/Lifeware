@@ -63,7 +63,13 @@ export function LLMSettings() {
   }, [prefs])
 
   if (loading) {
-    return <p className="text-sm text-body">加载中...</p>
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="h-10 rounded bg-hairline animate-pulse" />
+        ))}
+      </div>
+    )
   }
 
   if (providers.length === 0) {

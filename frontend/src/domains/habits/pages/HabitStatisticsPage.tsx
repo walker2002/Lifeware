@@ -110,7 +110,13 @@ export function HabitStatisticsPage() {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-body/40">加载中...</p>}
+      {loading && (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-4 rounded bg-hairline animate-pulse" />
+          ))}
+        </div>
+      )}
 
       {/* 日视图：左右分栏 + 右侧 MiniCalendar */}
       {tab === "day" && !loading && (
