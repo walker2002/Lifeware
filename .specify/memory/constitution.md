@@ -1,18 +1,18 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.7.2 → 1.8.0
-  Rationale: MINOR — Added CNUI Domain Surface Ownership Constraint (5th
-  CN-UI constraint), Domain Registration Step 15, and manifest
-  self-description fields (response_type, cnui_surfaces).
+  Version change: 1.8.0 → 1.9.0
+  Rationale: MINOR — 新增 UI 设计规范 (docs/UI-DESIGN-SPEC.md) 为宪章治理
+  领域。扩展了 Document Authority Chain、Tier 2 文档清单和 Compliance
+  Review，将 UI 合规纳入 PR 审查要求。
 
   Modified sections:
-    - Architecture Constraints > Domain Registration Process (Step 15 added)
-    - CN-UI Protocol Constraints (Domain Surface Ownership added as 5th constraint)
-    - Domain Manifest Self-Description (response_type + cnui_surfaces fields added)
+    - Governance > Document Ownership Model (Tier 2 文档清单补充 UI-DESIGN-SPEC.md)
+    - Governance > Compliance Review (新增 UI 合规审查条目)
+    - Governance > Document Authority Chain (新增 UI-DESIGN-SPEC.md 节点)
 
   Modified principles:
-    - None (implementation detail only)
+    - None (治理扩展，不影响现有原则)
 
   Templates requiring updates:
     - .specify/templates/plan-template.md            ✅ no changes needed
@@ -20,9 +20,8 @@
     - .specify/templates/tasks-template.md             ✅ no changes needed
 
   Follow-up documents requiring updates:
-    - mydocs/core/LW_domain_注册指南_2026_05_14.md     ✅ updated (Step 13 + Block K)
-    - mydocs/core/LW_overall_总体设计_2026_05_02.md    ✅ updated (CNUI ownership paragraph)
     - manifest.md                                     (to be updated)
+    - CLAUDE.md                                       (可选：补充 UI 设计规范引用)
 -->
 
 # Lifeware Constitution
@@ -991,9 +990,12 @@ explicit instruction referencing a specific discussion outcome.
 
 **Tier 2 documents** (`docs/`): Implementation-level design that MUST
 stay in sync with code (`usom-design.md`, `database-design.md`,
-`route-generation-spec.md`). The user describes intent ("add a
-HabitLog object"); Claude updates the document, schema code, and
-cross-references in one atomic change.
+`route-generation-spec.md`, `UI-DESIGN-SPEC.md`). The user describes
+intent ("add a HabitLog object"); Claude updates the document, schema
+code, and cross-references in one atomic change. `UI-DESIGN-SPEC.md`
+is the authoritative source for all visual and interaction standards;
+UI code MUST comply with its color tokens, typography scale, spacing
+system, and component conventions.
 
 **Tier 3 documents**: `manifest.md` (version tracking), `CLAUDE.md`
 (developer guidance), this constitution, and `specs/` (speckit
@@ -1024,6 +1026,10 @@ workflow events or document changes.
   within the current iteration.
 - Complexity introduced without necessity MUST be justified in the
   Complexity Tracking section of the implementation plan.
+- All PRs containing UI changes MUST verify compliance with
+  `docs/UI-DESIGN-SPEC.md` checklist items C-01 through C-07 (color
+  tokens, component conventions, spacing/typography, interaction
+  patterns, responsive design, dark mode, accessibility).
 
 ### Document Authority Chain
 
@@ -1042,7 +1048,9 @@ docs/usom-design.md             (object model definitions — Tier 2)
     ↓
 docs/database-design.md         (physical schema — Tier 2)
     ↓
-Drizzle Schema Code             (implementation)
+docs/UI-DESIGN-SPEC.md          (visual & interaction standards — Tier 2)
+    ↓
+Drizzle Schema Code / CSS       (implementation)
 ```
 
 The Domain Registration Guide (`mydocs/core/LW_domain_注册指南_*`)
@@ -1054,4 +1062,16 @@ document that specifies the build-time route generation mechanism
 detailing how `view_routes.url` declarations become Next.js App Router
 files.
 
-**Version**: 1.8.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-29
+The UI Design Spec (`docs/UI-DESIGN-SPEC.md`) is a Tier 2 document
+and the authoritative source for all visual and interaction standards.
+It defines the design token system (colors, typography, spacing,
+borders, shadows), component conventions (buttons, inputs, cards,
+chat bubbles), layout system (AppShell, responsive breakpoints), and
+an AI Agent checklist (C-01 through C-07) for PR compliance
+verification. All UI code MUST use the design tokens defined in this
+spec rather than hardcoded values. The upstream source for brand
+tokens is DESIGN.md; the downstream implementation is `globals.css`.
+MVP scope is Web only; mobile layout specifications are pre-designed
+for future iteration.
+
+**Version**: 1.9.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-31

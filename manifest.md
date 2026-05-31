@@ -38,6 +38,7 @@ docs/
 usom-design.md           # USOM 对象定义文档（由 LW_USOM_详细设计 演化）
 database-design.md       # 数据库表结构与设计规范（由 LW_database_数据库设计 演化）
 route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app/ 路由文件）
+UI-DESIGN-SPEC.md        # 界面设计规范（色彩/排版/间距/组件/布局/交互/响应式/暗色模式/检查清单）
 ```
 
 ### 第三层：Claude 自动维护
@@ -102,3 +103,5 @@ route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app
 | 数据库设计 | 2026_05_28 | 2026_05_16 | habit_logs 字段变更（status→completion_status，新增 planned_duration/deviation_minutes/completion_rating/energy_level，source 扩展 timebox_sync），新增 task_execution_logs 表 |
 | 数据库设计 | 2026_05_30 | 2026_05_28 | 新增 user_activities 用户行为埋点表（统一分析入口，4 种行为类型，时间衰减聚合查询）；新增"用户行为分析"表分类 |
 | 用户行为埋点设计 | 2026_05_30 | 无 | 创建。用户行为埋点框架设计（user_activities 表 + recordActivity Server Action + 时间衰减聚合 + AI 助手常用意图展示改造 + /analytics 独立分析页面） |
+| 界面设计规范 | 2026_05_31 | 无 | 创建。完整 UI 设计规范：色彩令牌体系、排版/间距/圆角/阴影层级、基础组件规范（按钮/输入框/卡片/气泡/徽标/空状态/加载）、布局系统（AppShell 三栏）、导航系统、交互规范（动画/反馈/键盘）、响应式断点、图标/暗色模式规范、AI Agent 检查清单 C-01~C-07 |
+| 项目宪章 | 2026_05_31 | 2026_05_29 | v1.8.0→v1.9.0：MINOR — 新增 UI 设计规范治理；Document Authority Chain 补充 UI-DESIGN-SPEC.md；Tier 2 文档清单补充；Compliance Review 新增 UI 合规审查条目（C-01~C-07） |

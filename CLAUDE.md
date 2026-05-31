@@ -120,9 +120,12 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 
 ## 界面设计要求
 
-- 视觉风格参照 DESIGN.md
+- **权威规范**：`docs/UI-DESIGN-SPEC.md` — 所有 UI 相关开发必须遵守
+- 视觉风格参照 DESIGN.md（品牌设计令牌来源）
 - 组件库使用 shadcn/ui
 - Web 端布局为 Notion 风格三栏（顶部导航 + 左侧 AI 面板 + 右侧主内容区）
+- 颜色必须使用 CSS 变量令牌（`bg-canvas`、`text-ink` 等），禁止 Tailwind 默认颜色类
+- PR 审查必须通过 UI-DESIGN-SPEC §14 检查清单（C-01~C-07）
 
 ---
 
@@ -162,6 +165,7 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 |---|---|
 | `docs/usom-design.md` | USOM object definitions |
 | `docs/database-design.md` | Database schema design |
+| `docs/UI-DESIGN-SPEC.md` | Visual & interaction design specification |
 
 **Document Update Rule**: 以上文档若有修改, **MUST** 更新 `manifest.md` 版本历史记录。
 
