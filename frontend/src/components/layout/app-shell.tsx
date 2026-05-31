@@ -36,7 +36,7 @@ export function AppShell({
   });
 
   return (
-    <div className="grid h-screen grid-rows-[64px_1fr] bg-canvas">
+    <div className="grid h-screen grid-rows-[56px_1fr] bg-canvas">
       <TopNav onMenuClick={toggle} onSettingsClick={onSettingsClick} isPanelOpen={isOpen} />
 
       <div className="flex min-h-0 flex-col overflow-hidden">
