@@ -63,7 +63,7 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
 export interface HabitWeekMatrix {
   habitId: string
   title: string
-  weekDays: Array<{ date: string; dayLabel: string; status: HabitLog['completionStatus'] | null }>
+  weekDays: Array<{ date: string; dayLabel: string; status: HabitLog['completionStatus'] | 'future' | null }>
   completionRate: number
 }
 

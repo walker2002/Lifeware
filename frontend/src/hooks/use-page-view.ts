@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { recordActivity } from '@/app/actions/activity-recorder'
 
 export function usePageView(domainId?: string, action?: string) {
-  const lastKey = useRef<string>()
+  const lastKey = useRef<string | undefined>(undefined)
   useEffect(() => {
     if (!domainId || !action) return
     const key = `${domainId}:${action}`

@@ -7,6 +7,7 @@ import { SessionList } from "@/components/layout/session-list";
 import { GrowthMenu } from "@/components/layout/growth-menu";
 import { ConversationView } from "@/components/layout/conversation-view";
 import { SplitView } from "@/components/layout/main-content";
+import { HomeBanner } from "@/components/layout/home-banner";
 import { IntentInput } from "@/components/intent-input";
 import { IntentForm } from "@/components/intent-form";
 import type { TemplateFormFields } from "@/components/intent-form";
@@ -795,7 +796,9 @@ export default function Home() {
     if (mainViewState.type === 'schedule') {
       return (
         <div className="flex w-full flex-col gap-4">
-          <h1 className="text-lg font-bold text-ink">我的时间盒</h1>
+          <HomeBanner
+            onAction={handleGrowthAction}
+          />
           <DateNav mode={dateMode} currentDate={currentDate} onModeChange={handleDateModeChange} onNavigate={handleNavigate} />
           {dateMode === "day" && <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />}
           {dateMode === "week" && <WeekView timeboxes={timeboxes} currentDate={currentDate} />}
