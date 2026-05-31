@@ -94,7 +94,7 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading }: T
                 key={task.id}
                 className={cn(
                   'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
-                  isSelected && 'border-blue-400 bg-blue-50/50',
+                  isSelected && 'border-primary/40 bg-primary/10',
                 )}
               >
                 <input
@@ -104,10 +104,10 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading }: T
                   className="size-4 rounded accent-blue-500"
                 />
                 <div className="flex-1">
-                  <div className={cn('text-sm font-medium', isSelected && 'text-gray-400 line-through')}>
+                  <div className={cn('text-sm font-medium', isSelected && 'text-muted-foreground line-through')}>
                     {task.title}
                   </div>
-                  <div className={cn('text-xs text-muted-foreground', isSelected && 'text-gray-400')}>
+                  <div className={cn('text-xs text-muted-foreground', isSelected && 'text-muted-foreground')}>
                     {PRIORITY_LABELS[task.priority] ?? task.priority}
                     {task.estimatedDuration ? ` · ${task.estimatedDuration}分钟` : ''}
                   </div>

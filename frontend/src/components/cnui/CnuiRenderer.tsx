@@ -19,7 +19,7 @@ export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, 
 
   if (!reg) {
     return (
-      <div className="rounded border border-dashed border-red-300 p-4 text-sm text-red-500">
+      <div className="rounded border border-dashed border-error p-4 text-sm text-error">
         未知的卡片类型: {surfaceType}
       </div>
     )

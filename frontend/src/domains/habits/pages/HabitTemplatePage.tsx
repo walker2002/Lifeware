@@ -71,8 +71,8 @@ export function HabitTemplatePage() {
         <div
           className={`flex items-center justify-between rounded-lg border px-4 py-2 text-sm ${
             pageState === "dirty"
-              ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-              : "bg-blue-50 border-blue-300 text-blue-800"
+              ? "bg-warning-soft border-warning text-warning"
+              : "bg-surface-soft border-primary text-primary"
           }`}
         >
           <span>
@@ -85,12 +85,12 @@ export function HabitTemplatePage() {
 
       {/* 提交错误 */}
       {submitError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
+        <div className="flex items-center justify-between rounded-lg border border-error bg-error-soft px-4 py-2 text-sm text-error">
           <span>{submitError}</span>
           <button
             type="button"
             onClick={() => setSubmitError(null)}
-            className="rounded-md bg-red-200 px-3 py-1 text-xs font-medium hover:bg-red-300 transition-colors"
+            className="rounded-md bg-error-soft px-3 py-1 text-xs font-medium hover:bg-error-soft/80 transition-colors"
           >
             关闭
           </button>

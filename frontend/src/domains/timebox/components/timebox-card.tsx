@@ -112,12 +112,12 @@ export function TimeboxCard({ timebox, compact = false, onAction }: TimeboxCardP
             {timebox.title}
           </span>
           {timebox.status === "running" && (
-            <span className="text-xs font-mono text-green-600 whitespace-nowrap">
+            <span className="text-xs font-mono text-success whitespace-nowrap">
               {formatElapsed(elapsed)}
             </span>
           )}
           {timebox.status === "overtime" && (
-            <span className="text-xs font-mono text-red-600 whitespace-nowrap">
+            <span className="text-xs font-mono text-error whitespace-nowrap">
               +{formatElapsed(overtimeMs)}
             </span>
           )}
@@ -170,9 +170,9 @@ export function TimeboxCard({ timebox, compact = false, onAction }: TimeboxCardP
   return (
     <div className={`flex flex-col gap-2 rounded-lg p-4 border-l-4 ${borderColor} ${
       timebox.status === "cancelled"
-        ? "bg-gray-50 opacity-60"
+        ? "bg-surface-card opacity-60"
         : timebox.status === "overtime"
-          ? "bg-red-50 border border-red-200 border-l-4"
+          ? "bg-error-soft border border-error border-l-4"
           : "bg-surface-card"
     }`}>
       {/* 第一行：完成图标 + 时间 + 标题 + 状态 */}
@@ -216,7 +216,7 @@ export function TimeboxCard({ timebox, compact = false, onAction }: TimeboxCardP
       {(timebox.status === "running" || timebox.status === "overtime") && startedAt && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between text-xs">
-            <span className={timebox.status === "overtime" ? "font-mono text-red-600" : "font-mono text-green-600"}>
+            <span className={timebox.status === "overtime" ? "font-mono text-error" : "font-mono text-success"}>
               {timebox.status === "overtime" ? `超时 +${formatElapsed(overtimeMs)}` : formatElapsed(elapsed)}
             </span>
             <span className="text-body">
@@ -226,7 +226,7 @@ export function TimeboxCard({ timebox, compact = false, onAction }: TimeboxCardP
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
-                timebox.status === "overtime" ? "bg-red-500" : "bg-green-500"
+                timebox.status === "overtime" ? "bg-error" : "bg-success"
               }`}
               style={{ width: `${Math.min(progressPercent, 100)}%` }}
             />

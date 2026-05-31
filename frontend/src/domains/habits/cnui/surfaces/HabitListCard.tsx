@@ -59,9 +59,9 @@ export function HabitListCard({ dataModel }: HabitListCardProps) {
             <div
               className={cn(
                 'rounded-full px-2 py-0.5 text-xs font-medium',
-                habit.status === 'active' && 'bg-green-100 text-green-700',
-                habit.status === 'suspended' && 'bg-yellow-100 text-yellow-700',
-                habit.status === 'draft' && 'bg-gray-100 text-gray-600',
+                habit.status === 'active' && 'bg-success-soft text-success',
+                habit.status === 'suspended' && 'bg-warning-soft text-warning',
+                habit.status === 'draft' && 'bg-surface-card text-muted-foreground',
               )}
             >
               {habit.status === 'active' ? '进行中' : habit.status === 'suspended' ? '已暂停' : '草稿'}

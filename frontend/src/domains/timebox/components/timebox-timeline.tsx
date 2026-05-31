@@ -15,11 +15,11 @@ const HOURS = TIMELINE_END - TIMELINE_START
 
 // 状态颜色映射
 const STATUS_COLORS: Record<TimeboxStatus, string> = {
-  planned: "bg-hairline-soft border-hairline",
+  planned: "bg-surface-soft border-hairline",
   running: "bg-primary/20 border-primary",
-  overtime: "bg-orange-500/20 border-orange-500",
-  ended: "bg-hairline-soft border-hairline",
-  cancelled: "bg-gray-300/20 border-gray-300",
+  overtime: "bg-warning/20 border-warning",
+  ended: "bg-surface-soft border-hairline",
+  cancelled: "bg-muted/20 border-muted",
   logged: "bg-success/20 border-success",
 }
 

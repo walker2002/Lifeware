@@ -209,7 +209,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                       setIsBatchProcessing(false)
                       await onRefresh()
                     }}
-                    className="ml-2 rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 disabled:opacity-50"
+                    className="ml-2 rounded bg-success px-2 py-0.5 text-xs text-on-primary hover:bg-success/90 disabled:opacity-50"
                   >
                     激活所选 ({getSelectedInGroup("draft").size})
                   </button>
@@ -233,7 +233,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                       setIsBatchProcessing(false)
                       await onRefresh()
                     }}
-                    className="ml-2 rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700 disabled:opacity-50"
+                    className="ml-2 rounded bg-success px-2 py-0.5 text-xs text-on-primary hover:bg-success/90 disabled:opacity-50"
                   >
                     打卡所选 ({getSelectedInGroup("active").size})
                   </button>
@@ -253,7 +253,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                       setIsBatchProcessing(false)
                       await onRefresh()
                     }}
-                    className="ml-2 rounded bg-amber-500 px-2 py-0.5 text-xs text-white hover:bg-amber-600 disabled:opacity-50"
+                    className="ml-2 rounded bg-warning px-2 py-0.5 text-xs text-on-primary hover:bg-warning/90 disabled:opacity-50"
                   >
                     暂停所选 ({getSelectedInGroup("active").size})
                   </button>
@@ -274,7 +274,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                         setIsBatchProcessing(false)
                         await onRefresh()
                       }}
-                      className="ml-2 rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+                      className="ml-2 rounded bg-primary px-2 py-0.5 text-xs text-on-primary hover:bg-primary/90 disabled:opacity-50"
                     >
                       恢复所选 ({getSelectedInGroup("suspended").size})
                     </button>
@@ -291,7 +291,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                         setIsBatchProcessing(false)
                         await onRefresh()
                       }}
-                      className="ml-2 rounded bg-gray-500 px-2 py-0.5 text-xs text-white hover:bg-gray-600 disabled:opacity-50"
+                      className="ml-2 rounded bg-muted px-2 py-0.5 text-xs text-on-primary hover:bg-muted/80 disabled:opacity-50"
                     >
                       归档所选 ({getSelectedInGroup("suspended").size})
                     </button>
@@ -360,7 +360,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
           </div>
 
           {submitError && (
-            <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <div className="mb-4 rounded-lg border border-error bg-error-soft px-3 py-2 text-xs text-error">
               {submitError}
               <button
                 type="button"

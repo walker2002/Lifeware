@@ -9,11 +9,11 @@ interface HabitStatsWeekViewProps {
 }
 
 function StatusCell({ status }: { status: string | null }) {
-  if (status === "future") return <span className="inline-flex size-5 items-center justify-center rounded bg-gray-50 text-gray-200"><Minus className="size-3" /></span>
-  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-emerald-100 text-emerald-600"><Check className="size-3" strokeWidth={3} /></span>
-  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-amber-100 text-amber-600"><Minus className="size-3" strokeWidth={3} /></span>
-  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-red-50 text-red-400"><X className="size-3" strokeWidth={3} /></span>
-  return <span className="inline-flex size-5 items-center justify-center rounded bg-gray-50 text-gray-300"><Minus className="size-3" /></span>
+  if (status === "future") return <span className="inline-flex size-5 items-center justify-center rounded bg-surface-card text-muted-foreground/30"><Minus className="size-3" /></span>
+  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-success-soft text-success"><Check className="size-3" strokeWidth={3} /></span>
+  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-warning-soft text-warning"><Minus className="size-3" strokeWidth={3} /></span>
+  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-error-soft text-error"><X className="size-3" strokeWidth={3} /></span>
+  return <span className="inline-flex size-5 items-center justify-center rounded bg-surface-card text-muted-foreground/40"><Minus className="size-3" /></span>
 }
 
 export function HabitStatsWeekView({ data }: HabitStatsWeekViewProps) {
@@ -27,9 +27,9 @@ export function HabitStatsWeekView({ data }: HabitStatsWeekViewProps) {
     <div className="space-y-3">
       {/* 图例 */}
       <div className="flex items-center gap-3 text-xs text-body/50">
-        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-emerald-100" /> 完成</span>
-        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-amber-100" /> 部分</span>
-        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-red-50" /> 未完成</span>
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-success-soft" /> 完成</span>
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-warning-soft" /> 部分</span>
+        <span className="flex items-center gap-1"><span className="size-2.5 rounded bg-error-soft" /> 未完成</span>
       </div>
 
       <table className="w-full text-sm">

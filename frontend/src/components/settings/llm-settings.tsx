@@ -172,7 +172,7 @@ export function LLMSettings() {
           {saving ? "保存中..." : "保存"}
         </Button>
         {message && (
-          <span className={`text-xs ${message.includes('失败') ? 'text-destructive' : 'text-green-600'}`}>
+          <span className={`text-xs ${message.includes('失败') ? 'text-destructive' : 'text-success'}`}>
             {message}
           </span>
         )}

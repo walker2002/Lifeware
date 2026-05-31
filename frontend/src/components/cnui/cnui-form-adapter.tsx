@@ -48,7 +48,7 @@ export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onC
 
   if (!config) {
     return (
-      <div className="rounded border border-dashed border-red-300 p-4 text-sm text-red-500">
+      <div className="rounded border border-dashed border-error p-4 text-sm text-error">
         表单未注册: {domainId}/{action}
       </div>
     )
@@ -68,7 +68,7 @@ export function CnuiFormAdapter({ domainId, action, dataModel, onDataChange, onC
         isLoading={isLoading}
       />
       {serverErrors && serverErrors.length > 0 && (
-        <div className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+        <div className="mt-3 rounded-lg border border-error bg-error-soft px-3 py-2 text-xs text-error">
           {serverErrors.map((err, i) => (
             <div key={i}>{err}</div>
           ))}

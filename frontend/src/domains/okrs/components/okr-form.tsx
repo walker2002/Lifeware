@@ -164,7 +164,7 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
         <Label>重要程度</Label>
         <div className="flex gap-3">
           <button type="button" onClick={() => setPriority("P0")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P0" ? "bg-red-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P0" ? "bg-error text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
             P0 必须完成
           </button>
           <button type="button" onClick={() => setPriority("P1")}
@@ -172,7 +172,7 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
             P1 应该完成
           </button>
           <button type="button" onClick={() => setPriority("P2")}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P2" ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P2" ? "bg-muted text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
             P2 有余力则做
           </button>
         </div>

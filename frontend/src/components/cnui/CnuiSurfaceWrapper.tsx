@@ -62,7 +62,7 @@ export function CnuiSurfaceWrapper({
     <>
       <div className="mt-3 rounded-lg border border-hairline bg-surface-soft p-4">
         {errors && errors.length > 0 && (
-          <div className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <div className="mb-3 rounded-md border border-error bg-error-soft px-3 py-2 text-sm text-error">
             {errors.map((err, i) => (
               <div key={i}>{err}</div>
             ))}

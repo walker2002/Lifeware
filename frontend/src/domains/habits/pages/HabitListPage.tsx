@@ -267,11 +267,11 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
     <div className="flex flex-col gap-4">
       {/* 错误横幅 */}
       {submitError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
+        <div className="flex items-center justify-between rounded-lg border border-error bg-error-soft px-4 py-2 text-sm text-error">
           <span>{submitError}</span>
           <button
             type="button"
-            className="rounded-md bg-red-200 px-3 py-1 text-xs font-medium hover:bg-red-300 transition-colors"
+            className="rounded-md bg-error-soft px-3 py-1 text-xs font-medium hover:bg-error-soft/80 transition-colors"
             onClick={() => setSubmitError(null)}
           >
             关闭

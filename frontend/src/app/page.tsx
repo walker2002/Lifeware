@@ -773,8 +773,8 @@ export default function Home() {
   const leftPanelContent = panelTab === 'assistant'
     ? <>
         {!llmConfigured && (
-          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm text-amber-800">请先配置大语言模型</p>
+          <div className="mb-3 rounded-md border border-warning bg-warning-soft p-3">
+            <p className="text-sm text-warning">请先配置大语言模型</p>
             <button type="button" onClick={() => setMainViewState({ type: 'settings', section: 'llm' })}
               className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground">
               前往设置
@@ -892,8 +892,8 @@ export default function Home() {
       />
 
       {transitionConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-w-sm rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-scrim">
+          <div className="mx-4 max-w-sm rounded-lg bg-canvas p-6 shadow-lg">
             <p className="mb-4 text-sm font-medium text-ink">{transitionConfirm.message}</p>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="outline" onClick={() => setTransitionConfirm(null)} disabled={isLoading}>取消</Button>

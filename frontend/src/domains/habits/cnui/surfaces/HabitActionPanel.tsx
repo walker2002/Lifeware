@@ -95,7 +95,7 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: 
                 key={habit.id}
                 className={cn(
                   'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
-                  isSelected && 'border-blue-400 bg-blue-50/50',
+                  isSelected && 'border-primary/40 bg-primary/10',
                 )}
               >
                 <input
@@ -108,7 +108,7 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: 
                   <div
                     className={cn(
                       'text-sm font-medium',
-                      isSelected && 'text-gray-400 line-through',
+                      isSelected && 'text-muted-foreground line-through',
                     )}
                   >
                     {habit.title}
@@ -116,7 +116,7 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: 
                   <div
                     className={cn(
                       'text-xs text-muted-foreground',
-                      isSelected && 'text-gray-400',
+                      isSelected && 'text-muted-foreground',
                     )}
                   >
                     {habit.frequencyType === 'daily' ? '每天' : habit.frequencyType === 'weekly' ? '每周' : '自定义'}

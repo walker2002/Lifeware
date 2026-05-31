@@ -9,16 +9,16 @@ interface HabitStatsDayViewProps {
 }
 
 function StatusIcon({ status }: { status: string | null }) {
-  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-emerald-100 text-emerald-600"><Check className="size-3" strokeWidth={3} /></span>
-  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-amber-100 text-amber-600"><Minus className="size-3" strokeWidth={3} /></span>
-  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-red-50 text-red-400"><X className="size-3" strokeWidth={3} /></span>
-  return <span className="inline-flex size-5 items-center justify-center rounded bg-gray-50 text-gray-300"><Minus className="size-3" /></span>
+  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-success-soft text-success"><Check className="size-3" strokeWidth={3} /></span>
+  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-warning-soft text-warning"><Minus className="size-3" strokeWidth={3} /></span>
+  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-error-soft text-error"><X className="size-3" strokeWidth={3} /></span>
+  return <span className="inline-flex size-5 items-center justify-center rounded bg-surface-card text-muted-foreground/40"><Minus className="size-3" /></span>
 }
 
 function StreakBadge({ streak, completionRate7d }: { streak: number; completionRate7d: number }) {
-  if (streak > 0) return <span className="text-xs text-emerald-600">✅ 连续{streak}天</span>
-  if (completionRate7d < 0.3) return <span className="text-xs text-red-500">❌ 中断</span>
-  return <span className="text-xs text-gray-400">—</span>
+  if (streak > 0) return <span className="text-xs text-success">✅ 连续{streak}天</span>
+  if (completionRate7d < 0.3) return <span className="text-xs text-error">❌ 中断</span>
+  return <span className="text-xs text-muted-foreground">—</span>
 }
 
 export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {

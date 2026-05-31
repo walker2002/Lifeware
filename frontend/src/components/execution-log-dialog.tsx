@@ -15,9 +15,9 @@ import { getCardBorderColor } from "@/lib/color-coding";
 type CompletionStatus = "completed" | "partially_completed" | "not_completed";
 
 const COMPLETION_OPTIONS: { value: CompletionStatus; label: string; color: string }[] = [
-  { value: "completed", label: "已完成", color: "bg-green-100 text-green-800 border-green-300" },
-  { value: "partially_completed", label: "部分完成", color: "bg-amber-100 text-amber-800 border-amber-300" },
-  { value: "not_completed", label: "未完成", color: "bg-red-100 text-red-800 border-red-300" },
+  { value: "completed", label: "已完成", color: "bg-success-soft text-success border-success" },
+  { value: "partially_completed", label: "部分完成", color: "bg-warning-soft text-warning border-warning" },
+  { value: "not_completed", label: "未完成", color: "bg-error-soft text-error border-error" },
 ];
 
 const RATING_LABELS = ["", "很差", "较差", "一般", "良好", "很好"];
@@ -114,7 +114,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
             <div className="flex items-center gap-2">
               <span className="text-body">完成状态：</span>
               <span className={COMPLETION_OPTIONS.find(o => o.value === record.completionStatus)?.color
-                ?? "bg-gray-100 text-gray-800"}>
+                ?? "bg-surface-card text-muted-foreground"}>
                 {COMPLETION_OPTIONS.find(o => o.value === record.completionStatus)?.label ?? record.completionStatus}
               </span>
             </div>
@@ -123,7 +123,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
               <span>实际时长：{formatMins(record.actualDuration)}</span>
             </div>
             <div className="text-body">
-              偏差：<span className={record.deviationMinutes > 0 ? "text-red-600" : record.deviationMinutes < 0 ? "text-green-600" : "text-ink"}>
+              偏差：<span className={record.deviationMinutes > 0 ? "text-error" : record.deviationMinutes < 0 ? "text-success" : "text-ink"}>
                 {record.deviationMinutes > 0 ? "+" : ""}{formatMins(Math.abs(record.deviationMinutes))}
               </span>
             </div>
@@ -157,7 +157,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
           <div className="flex justify-between text-sm text-body">
             <span>计划：{formatMins(plannedDuration)}</span>
             <span>实际：{formatMins(actualDuration)}</span>
-            <span className={deviationMinutes > 0 ? "text-red-600" : deviationMinutes < 0 ? "text-green-600" : "text-ink"}>
+            <span className={deviationMinutes > 0 ? "text-error" : deviationMinutes < 0 ? "text-success" : "text-ink"}>
               偏差：{deviationMinutes > 0 ? "+" : ""}{formatMins(Math.abs(deviationMinutes))}
             </span>
           </div>
@@ -170,7 +170,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
                 type="button"
                 onClick={() => setCompletion(opt.value)}
                 className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  completion === opt.value ? opt.color : "border-gray-200 bg-white text-body"
+                  completion === opt.value ? opt.color : "border-hairline bg-canvas text-body"
                 }`}
               >
                 {opt.label}
@@ -188,7 +188,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
           </button>
 
           {detailed && (
-            <div className="flex flex-col gap-3 rounded-md border border-gray-200 p-3">
+            <div className="flex flex-col gap-3 rounded-md border border-hairline p-3">
               {/* 评分 */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-body">评分：</span>
@@ -198,7 +198,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
                     type="button"
                     onClick={() => setRating(v)}
                     className={`rounded px-2 py-0.5 text-sm ${
-                      rating === v ? "bg-ink text-white" : "bg-gray-100 text-body"
+                      rating === v ? "bg-ink text-on-primary" : "bg-surface-card text-body"
                     }`}
                   >
                     {v}
@@ -211,7 +211,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
               <div>
                 <label className="text-sm text-body">实际产出</label>
                 <textarea
-                  className="mt-1 w-full rounded-md border border-gray-200 p-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-hairline p-2 text-sm"
                   rows={2}
                   value={actualOutput}
                   onChange={(e) => setActualOutput(e.target.value)}
@@ -224,7 +224,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
                 <div>
                   <label className="text-sm text-body">偏差原因</label>
                   <textarea
-                    className="mt-1 w-full rounded-md border border-gray-200 p-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-hairline p-2 text-sm"
                     rows={2}
                     value={deviationReasons}
                     onChange={(e) => setDeviationReasons(e.target.value)}
@@ -242,7 +242,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
                     type="button"
                     onClick={() => setEnergyLevel(v)}
                     className={`rounded px-2 py-0.5 text-sm ${
-                      energyLevel === v ? "bg-ink text-white" : "bg-gray-100 text-body"
+                      energyLevel === v ? "bg-ink text-on-primary" : "bg-surface-card text-body"
                     }`}
                   >
                     {v}
@@ -254,7 +254,7 @@ export function ExecutionLogDialog({ timebox, open, onClose, onSubmit }: Executi
               <div>
                 <label className="text-sm text-body">备注</label>
                 <textarea
-                  className="mt-1 w-full rounded-md border border-gray-200 p-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-hairline p-2 text-sm"
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}

@@ -25,7 +25,7 @@ export function ConfirmDeleteDialog({ open, sessionTitle, onConfirm, onCancel }:
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>取消</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700">
+          <AlertDialogAction onClick={onConfirm} className="bg-error hover:bg-error/90">
             删除
           </AlertDialogAction>
         </AlertDialogFooter>

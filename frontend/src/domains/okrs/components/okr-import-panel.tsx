@@ -62,10 +62,10 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
   }
 
   const bannerStyle = report.confidence === 'high'
-    ? 'bg-green-50 text-green-800 border-green-200'
+    ? 'bg-success-soft text-success border-success'
     : report.confidence === 'medium'
-      ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
-      : 'bg-red-50 text-red-800 border-red-200'
+      ? 'bg-warning-soft text-warning border-warning'
+      : 'bg-error-soft text-error border-error'
 
   return (
     <div className="flex flex-col h-full">

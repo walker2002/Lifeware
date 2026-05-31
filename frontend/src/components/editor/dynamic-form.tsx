@@ -149,11 +149,11 @@ export function DynamicForm({ fields, domainId, action, onSubmit, onCancel }: Dy
           <div key={f.name} className="space-y-1.5">
             <Label>
               {f.label}
-              {f.required && <span className="text-red-500 ml-0.5">*</span>}
+              {f.required && <span className="text-error ml-0.5">*</span>}
             </Label>
             {renderField(f)}
             {errors[f.name] && (
-              <p className="text-xs text-red-500">{errors[f.name]}</p>
+              <p className="text-xs text-error">{errors[f.name]}</p>
             )}
           </div>
         ))}

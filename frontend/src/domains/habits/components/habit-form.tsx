@@ -335,7 +335,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
 
       {/* 校验错误 */}
       {clientErrors.length > 0 && (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+        <div className="rounded-lg border border-error bg-error-soft px-3 py-2 text-xs text-error">
           {clientErrors.map((err, i) => (
             <div key={i}>{err}</div>
           ))}

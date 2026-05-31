@@ -129,7 +129,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
                 setEditDuration(String(task.estimatedDuration ?? 60))
                 onDataChange({ taskId: task.id, ...task })
               }}
-              className="flex items-center gap-3 rounded-md border p-3 text-left transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+              className="flex items-center gap-3 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/10"
             >
               <div className="flex-1">
                 <div className="text-sm font-medium">{task.title}</div>

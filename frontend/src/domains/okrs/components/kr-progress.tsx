@@ -31,12 +31,12 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate }: KRProgr
   }
 
   const statusColors: Record<string, string> = {
-    draft: "bg-gray-400",
+    draft: "bg-muted",
     active: "bg-primary",
-    paused: "bg-yellow-500",
-    completed: "bg-green-500",
-    discarded: "bg-gray-300",
-    archived: "bg-gray-400",
+    paused: "bg-warning",
+    completed: "bg-success",
+    discarded: "bg-muted",
+    archived: "bg-muted",
   }
 
   return (

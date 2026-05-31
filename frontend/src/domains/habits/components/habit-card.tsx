@@ -127,7 +127,7 @@ export function HabitCard({
       "relative transition-opacity",
       isSuspended && "opacity-60",
       isArchived && "opacity-40",
-      selected && "border-blue-400 bg-blue-50/50",
+      selected && "border-primary/40 bg-primary/10",
     )}>
       <CardContent className={cn("relative flex flex-col gap-3", selectable && "pl-10")}>
         {/* 批量选择复选框 */}
@@ -154,7 +154,7 @@ export function HabitCard({
         {/* 顶栏: 标题 + 标记 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={cn('font-medium text-ink', selected && 'text-gray-400 line-through')}>
+            <span className={cn('font-medium text-ink', selected && 'text-muted-foreground line-through')}>
               {title}
             </span>
             <Badge variant={trackable ? "default" : "secondary"}>

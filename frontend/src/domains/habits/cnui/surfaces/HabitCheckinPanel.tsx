@@ -102,7 +102,7 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }:
                 key={habit.id}
                 className={cn(
                   'flex items-center gap-3 rounded-md border p-3 transition-colors',
-                  isSelected && 'border-blue-400 bg-blue-50/50',
+                  isSelected && 'border-primary/40 bg-primary/10',
                 )}
               >
                 <input
@@ -112,10 +112,10 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }:
                   className="size-4 rounded accent-blue-500"
                 />
                 <div className="flex-1">
-                  <div className={cn('text-sm font-medium', isSelected && 'text-gray-400 line-through')}>
+                  <div className={cn('text-sm font-medium', isSelected && 'text-muted-foreground line-through')}>
                     {habit.title}
                   </div>
-                  <div className={cn('text-xs text-muted-foreground', isSelected && 'text-gray-400')}>
+                  <div className={cn('text-xs text-muted-foreground', isSelected && 'text-muted-foreground')}>
                     {habit.streak > 0 && `${habit.streak} 天连续 · `}{habit.defaultTime}
                   </div>
                 </div>
@@ -123,14 +123,14 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }:
                   <button
                     type="button"
                     onClick={() => handleQuickLog(habit.id)}
-                    className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700"
+                    className="rounded bg-success px-2 py-1 text-xs text-on-primary hover:bg-success/90"
                   >
                     完成
                   </button>
                   <button
                     type="button"
                     onClick={() => setDetailHabit(habit)}
-                    className="rounded bg-gray-400 px-2 py-1 text-xs text-white hover:bg-gray-500"
+                    className="rounded bg-muted px-2 py-1 text-xs text-on-primary hover:bg-muted/80"
                   >
                     详情
                   </button>
@@ -175,7 +175,7 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }:
           <div className="mb-2 text-xs font-medium text-muted-foreground">已完成</div>
           {completed.map(habit => (
             <div key={habit.id} className="flex items-center gap-2 py-1 text-sm opacity-60">
-              <span className="text-green-500">✓</span>
+              <span className="text-success">✓</span>
               <span>{habit.title}</span>
               <span className="text-xs text-muted-foreground">{habit.streak} 天连续</span>
             </div>

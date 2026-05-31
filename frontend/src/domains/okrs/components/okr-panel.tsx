@@ -181,9 +181,9 @@ export function OKRPanel({
           </div>
         )}
         {activeKRs.length > 0 && activeKRs.every(kr => kr.status === "completed") && obj.status === "active" && (
-          <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">
+          <div className="rounded-md bg-success-soft p-3 text-sm text-success">
             所有 KR 已完成，建议将 Objective 标记为
-            <Button variant="link" className="h-auto p-0 text-green-800 underline" onClick={() => handleStatusAction("complete")}>完成</Button>
+            <Button variant="link" className="h-auto p-0 text-success underline" onClick={() => handleStatusAction("complete")}>完成</Button>
           </div>
         )}
         <div className="flex flex-wrap gap-2">

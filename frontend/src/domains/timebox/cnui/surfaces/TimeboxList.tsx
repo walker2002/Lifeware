@@ -50,7 +50,7 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
             </div>
             <button
               onClick={() => removeItem(i)}
-              className="text-xs text-red-400 hover:text-red-600"
+              className="text-xs text-error/70 hover:text-error"
             >
               移除
             </button>

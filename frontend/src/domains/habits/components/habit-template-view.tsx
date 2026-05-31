@@ -91,13 +91,13 @@ export function HabitTemplateView({ templates }: HabitTemplateViewProps) {
                   className={cn(
                     "absolute left-1 right-1 rounded-md px-2 py-0.5 text-xs font-medium overflow-hidden",
                     "bg-primary/20 text-primary border border-primary/30",
-                    hasOverride && "bg-amber-100 text-amber-800 border-amber-300",
+                    hasOverride && "bg-warning-soft text-warning border-warning",
                   )}
                   style={{ top: `${top}%`, height: `${Math.max(height, 1)}%` }}
                 >
                   <span className="truncate">{habit.title}</span>
                   {hasOverride && (
-                    <span className="ml-1 text-[10px] text-amber-600">
+                    <span className="ml-1 text-[10px] text-warning">
                       覆盖: {habit.timeOverride}
                     </span>
                   )}
