@@ -1,7 +1,7 @@
 // ---
 // Auto-generated from domains/habits/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-05-31T23:33:42.008Z
+// Generated at: 2026-05-31T23:39:01.121Z
 // ---
 
 import { HabitListPage } from "@/domains/habits/pages/HabitListPage"

@@ -3,6 +3,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Loader2, Send } from "lucide-react";
 
 interface IntentInputProps {
   /** 提交回调，接收用户原始输入和可选的确认标志 */
@@ -53,30 +54,14 @@ export function IntentInput({ onSubmit, isLoading, error }: IntentInputProps) {
         <Button type="submit" disabled={isLoading || !inputValue.trim()}>
           {isLoading ? (
             <span className="flex items-center gap-1">
-              <svg
-                className="size-4 animate-spin"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
+              <Loader2 className="size-4 animate-spin" />
               处理中
             </span>
           ) : (
-            "发送"
+            <span className="flex items-center gap-1">
+              <Send className="size-4" />
+              发送
+            </span>
           )}
         </Button>
       </div>

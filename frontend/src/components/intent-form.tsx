@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 /** 表单提交的字段值 */
 export interface TemplateFormFields {
@@ -157,26 +158,7 @@ export function IntentForm({ onSubmit, isLoading, error }: IntentFormProps) {
       <Button type="submit" disabled={isLoading} className="mt-1">
         {isLoading ? (
           <span className="flex items-center gap-1">
-            <svg
-              className="size-4 animate-spin"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
+            <Loader2 className="size-4 animate-spin" />
             处理中
           </span>
         ) : (

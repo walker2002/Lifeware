@@ -143,14 +143,13 @@ export function HabitCard({
           </div>
         )}
         {/* 角标：可追踪=主色调，仅占时=柔和色 */}
-        <div className="absolute top-0 right-0 z-10">
-          <svg width="32" height="32" viewBox="0 0 32 32" className="block">
-            <polygon
-              points="0,0 32,0 32,32"
-              className={cn(trackable ? "fill-primary/70" : "fill-muted")}
-            />
-          </svg>
-        </div>
+        <div
+          className={cn(
+            "absolute top-0 right-0 z-10 w-8 h-8",
+            trackable ? "bg-primary/70" : "bg-muted"
+          )}
+          style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
+        />
         {/* 顶栏: 标题 + 标记 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

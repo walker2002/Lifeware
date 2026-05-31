@@ -10,9 +10,9 @@ interface HabitStatsWeekViewProps {
 
 function StatusCell({ status }: { status: string | null }) {
   if (status === "future") return <span className="inline-flex size-5 items-center justify-center rounded bg-surface-card text-muted-foreground/30"><Minus className="size-3" /></span>
-  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-success-soft text-success"><Check className="size-3" strokeWidth={3} /></span>
-  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-warning-soft text-warning"><Minus className="size-3" strokeWidth={3} /></span>
-  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-error-soft text-error"><X className="size-3" strokeWidth={3} /></span>
+  if (status === "completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-success-soft text-success"><Check className="size-3" /></span>
+  if (status === "partially_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-warning-soft text-warning"><Minus className="size-3" /></span>
+  if (status === "not_completed") return <span className="inline-flex size-5 items-center justify-center rounded bg-error-soft text-error"><X className="size-3" /></span>
   return <span className="inline-flex size-5 items-center justify-center rounded bg-surface-card text-muted-foreground/40"><Minus className="size-3" /></span>
 }
 
