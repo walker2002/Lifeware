@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AppProvider, useApp } from "@/contexts/app-context";
 import { useTimebox } from "@/hooks/use-timebox";
+import { useConversation } from "@/hooks/use-conversation";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { SessionList } from "@/components/layout/session-list";
@@ -26,13 +27,13 @@ import { ProjectsView } from "@/domains/tasks/components/projects-view";
 import "@/domains/habits/register-form";
 import "@/domains/tasks/register-form";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import type { AISessionSummary } from "@/usom/types/objects";
+
 import { submitIntent, submitTemplateIntent, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
 import { fetchIntentTriggers } from "./actions/intent-triggers"
 import { recordActivity } from "./actions/activity-recorder"
 import { fetchFrequentIntents } from "./actions/activity"
 import { checkLLMConfigured } from "./actions/llm-config"
-import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from './actions/session'
+
 import { ConfirmDeleteDialog } from '@/components/layout/confirm-delete-dialog'
 import { getTraceConfig } from "@/lib/config/trace-config";
 import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult } from "./actions/intent";
@@ -43,7 +44,7 @@ import { Banner } from "@/components/feedback/banner";
 import type { ChatMessage } from "@/usom/types/objects";
 import { resolveSlashCommand } from "@/lib/slash-command";
 import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/main-view-state";
-import type { SurfaceState } from "@/usom/types/objects";
+
 
 // view_route 页面组件映射（domainId → action → Component）
 // 在 AppShell 主内容区内渲染，保留左侧面板和顶部导航
@@ -76,9 +77,8 @@ function HomeContent() {
 
   const [panelTab, setPanelTab] = useState<PanelTab>("assistant");
   const [splitWith, setSplitWith] = useState<SplitWith | undefined>();
+  const conv = useConversation();
 
-  const [sessions, setSessions] = useState<AISessionSummary[]>([]);
-  const [conversationMessages, setConversationMessages] = useState<ChatMessage[]>([]);
   const [domainActions, setDomainActions] = useState<Array<{ domainId: string; domainName: string; actions: Array<{ action: string; shortcut?: string; description: string; response_type?: string }> }>>([]);
   const [intentTriggers, setIntentTriggers] = useState<Awaited<ReturnType<typeof fetchIntentTriggers>>>([])
   const [frequentIntents, setFrequentIntents] = useState<Awaited<ReturnType<typeof fetchFrequentIntents>>>([])
@@ -107,31 +107,8 @@ function HomeContent() {
       .then(setFrequentIntents)
       .catch(err => console.error('[fetchFrequentIntents] 加载失败:', err))
   }, []);
-  const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
-  const activeSessionIdRef = useRef(activeSessionId)
-  activeSessionIdRef.current = activeSessionId
-  const [sessionsLoaded, setSessionsLoaded] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
-
-  // 页面加载：拉取 session 列表 + 自动恢复上次活跃对话
-  useEffect(() => {
-    fetchSessions()
-      .then(data => {
-        setSessions(data)
-        const lastActive = data.find(s => s.status === 'active')
-        if (lastActive) {
-          setActiveSessionId(lastActive.id)
-          setMainViewState({ type: 'conversation', sessionId: lastActive.id })
-          return loadSessionMessages(lastActive.id)
-        }
-        return [] as ChatMessage[]
-      })
-      .then(msgs => {
-        if (msgs.length > 0) setConversationMessages(msgs)
-      })
-      .catch(err => console.error('[fetchSessions] 加载失败:', err))
-      .finally(() => setSessionsLoaded(true))
-  }, [])
+  // 加载 session 列表
+  useEffect(() => { conv.loadSessions() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [traceEnabled] = useState(() => getTraceConfig().enabled);
   const [traceSessions, setTraceSessions] = useState<TraceSession[]>([]);
@@ -240,129 +217,18 @@ function HomeContent() {
     setError(undefined);
   }, []);
 
-  const saveCurrentConversation = useCallback(() => {
-    // 持久化已由 saveMessage 在每个消息发送时处理
-  }, []);
-
   const handleSettingsClick = useCallback(() => {
-    saveCurrentConversation();
+    conv.saveCurrentConversation();
     setMainViewState({ type: 'settings' });
-  }, [saveCurrentConversation]);
+  }, [conv.saveCurrentConversation]);
 
   const handleHomeClick = useCallback(() => {
-    saveCurrentConversation();
+    conv.saveCurrentConversation();
     setMainViewState({ type: 'schedule', date: new Date(), viewMode: tb.dateMode });
-  }, [tb.dateMode, saveCurrentConversation]);
-
-  /** 添加消息到对话列表并持久化到 L1 */
-  const addChatMessage = useCallback((msg: ChatMessage) => {
-    setConversationMessages(prev => [...prev, msg])
-    const sid = activeSessionIdRef.current
-    if (sid) {
-      const saveP = saveMessage(sid, {
-        role: msg.role,
-        content: msg.content,
-        cnuiSurface: msg.cnuiSurface,
-        intentRef: msg.intentRef,
-      })
-
-      if (msg.role === 'assistant') {
-        saveP.then(() => tryGenerateTitle(sid))
-          .then(newTitle => {
-            if (newTitle) {
-              setSessions(prev => prev.map(s =>
-                s.id === sid ? { ...s, title: newTitle } : s
-              ))
-            }
-          })
-          .catch(err => console.error('[addChatMessage] 保存或标题生成失败:', err))
-      } else {
-        saveP.catch(err => console.error('[saveMessage] 持久化失败:', err))
-      }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId)
-    setDeleteTarget({ id: sessionId, title: session?.title ?? '未命名对话' })
-  }, [sessions])
-
-  const confirmDeleteSession = useCallback(async () => {
-    if (!deleteTarget) return
-    try {
-      await deleteSession(deleteTarget.id)
-      setSessions(prev => prev.filter(s => s.id !== deleteTarget.id))
-      if (activeSessionId === deleteTarget.id) {
-        setActiveSessionId(undefined)
-        setConversationMessages([])
-        setMainViewState({ type: 'schedule', date: new Date(), viewMode: tb.dateMode })
-      }
-    } catch (err) {
-      console.error('[deleteSession] 删除失败:', err)
-    } finally {
-      setDeleteTarget(null)
-    }
-  }, [deleteTarget, activeSessionId, tb.dateMode])
-
-  const handleSelectSession = useCallback(async (sessionId: string) => {
-    saveCurrentConversation()
-    setMainViewState({ type: 'conversation', sessionId })
-    setActiveSessionId(sessionId)
-    try {
-      const msgs = await loadSessionMessages(sessionId)
-      setConversationMessages(msgs)
-    } catch (err) {
-      console.error('[loadSessionMessages] 加载失败:', err)
-    }
-  }, [saveCurrentConversation])
-
-  const handleNewSession = useCallback(async () => {
-    const hasSubstantialMessages = conversationMessages.some(
-      m => m.role === 'user' || (m.role === 'assistant' && m.content.trim().length > 0)
-    )
-    if (!hasSubstantialMessages && mainViewState.type === 'conversation') {
-      setConversationMessages([])
-      return
-    }
-
-    setConversationMessages([])
-
-    try {
-      const { id, title } = await createSession()
-      setSessions(prev => [{
-        id, title, status: 'active',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }, ...prev])
-      setActiveSessionId(id)
-      setMainViewState({ type: 'conversation', sessionId: id })
-    } catch (err) {
-      console.error('[createSession] 创建失败:', err)
-      const newId = crypto.randomUUID()
-      setSessions(prev => [{
-        id: newId, title: '新对话', status: 'active',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }, ...prev])
-      setActiveSessionId(newId)
-      setMainViewState({ type: 'conversation', sessionId: newId })
-    }
-  }, [conversationMessages, mainViewState])
-
-  /** 确保当前处于对话视图（如不处于则创建/切换） */
-  const ensureConversationView = useCallback(() => {
-    if (mainViewState.type === 'conversation') return
-    const sessionId = activeSessionId ?? crypto.randomUUID()
-    if (!activeSessionId) {
-      setSessions(prev => [{
-        id: sessionId, title: '新对话', status: 'active',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }, ...prev])
-      setActiveSessionId(sessionId)
-    }
-    setMainViewState({ type: 'conversation', sessionId })
-  }, [mainViewState, activeSessionId])
+  }, [tb.dateMode, conv.saveCurrentConversation]);
 
   const handleGrowthAction = useCallback(async (domainId: string, action: string) => {
-    saveCurrentConversation();
+    conv.saveCurrentConversation();
 
     void recordActivity({
       activityType: 'menu_click',
@@ -373,7 +239,7 @@ function HomeContent() {
 
     // response_type=cnui → 切换到对话视图并打开 CN-UI 表面
     if (await isCnuiSurface(domainId, action)) {
-      ensureConversationView()
+      conv.ensureConversationView()
 
       try {
         const result = await openCnuiSurface(domainId, action);
@@ -383,11 +249,11 @@ function HomeContent() {
           timestamp: new Date().toISOString(),
           cnuiSurface: result.surface,
         };
-        addChatMessage(msg);
+        conv.addChatMessage(msg);
       } catch (e) {
         console.error('openCnuiSurface failed:', e);
         const errMsg: ChatMessage = { role: 'assistant', content: '打开操作面板失败，请重试', timestamp: new Date().toISOString() };
-        addChatMessage(errMsg);
+        conv.addChatMessage(errMsg);
       }
       return;
     }
@@ -401,19 +267,19 @@ function HomeContent() {
     }
 
     if (responseType === 'text') {
-      ensureConversationView()
+      conv.ensureConversationView()
       const msg: ChatMessage = {
         role: 'assistant',
         content: `操作 ${action} 已记录，请在对话中继续`,
         timestamp: new Date().toISOString(),
       };
-      addChatMessage(msg);
+      conv.addChatMessage(msg);
       return;
     }
 
     // 未定义 response_type 或其他情况
     setMainViewState({ type: 'action', domainId, action });
-  }, [saveCurrentConversation, ensureConversationView]);
+  }, [conv.saveCurrentConversation, conv.ensureConversationView]);
 
   /** 处理 CN-UI 表面提交 */
   const handleCnuiConfirm = useCallback(
@@ -429,7 +295,7 @@ function HomeContent() {
             content,
             timestamp: new Date().toISOString(),
           }
-          addChatMessage(msg)
+          conv.addChatMessage(msg)
           void recordActivity({
             activityType: 'cnui_action',
             source: 'cnui_surface',
@@ -442,7 +308,7 @@ function HomeContent() {
             content: `操作失败: ${result.error}`,
             timestamp: new Date().toISOString(),
           }
-          addChatMessage(msg)
+          conv.addChatMessage(msg)
         }
       } catch (e) {
         console.error('submitCnuiSurface failed:', e)
@@ -451,21 +317,11 @@ function HomeContent() {
           content: '网络错误，请重试',
           timestamp: new Date().toISOString(),
         }
-        addChatMessage(msg)
+        conv.addChatMessage(msg)
       }
     },
     [],
   )
-
-  /** CNUI 表面状态变更 → 持久化到消息中 */
-  const handleSurfaceStateChange = useCallback((surfaceId: string, state: SurfaceState) => {
-    setConversationMessages(prev => prev.map(msg => {
-      if (msg.cnuiSurface?.cnuiSurfaceId === surfaceId) {
-        return { ...msg, cnuiSurface: { ...msg.cnuiSurface, state } }
-      }
-      return msg
-    }))
-  }, [])
 
   // T031: conversation 消息发送 → 可能触发 splitWith
   const handleConversationSend = useCallback(async (content: string, attachments?: File[]) => {
@@ -474,7 +330,7 @@ function HomeContent() {
       content: content || (attachments && attachments.length > 0 ? `上传了 ${attachments.length} 个文件` : ''),
       timestamp: new Date().toISOString(),
     }
-    addChatMessage(userMsg)
+    conv.addChatMessage(userMsg)
 
     // slash 命令处理 — 必须在 resolveShortcut 之前，否则 /createHabit 无 payload 会被错误路由
     const slashResult = resolveSlashCommand(content)
@@ -497,7 +353,7 @@ function HomeContent() {
           content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
           timestamp: new Date().toISOString(),
         }
-        addChatMessage(navMsg)
+        conv.addChatMessage(navMsg)
         return
       }
 
@@ -516,7 +372,7 @@ function HomeContent() {
               timestamp: new Date().toISOString(),
               cnuiSurface: { ...cnuiResult.surface, dataSnapshot: mergedSnapshot },
             }
-            addChatMessage(cnuiMsg)
+            conv.addChatMessage(cnuiMsg)
             setIsLoading(false)
             return
           }
@@ -534,10 +390,10 @@ function HomeContent() {
             content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
             timestamp: new Date().toISOString(),
           }
-          addChatMessage(aiMsg)
+          conv.addChatMessage(aiMsg)
         } catch {
           const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-          addChatMessage(errMsg)
+          conv.addChatMessage(errMsg)
         } finally {
           setIsLoading(false)
         }
@@ -556,10 +412,10 @@ function HomeContent() {
               timestamp: new Date().toISOString(),
               cnuiSurface: result.surface,
             }
-            addChatMessage(cnuiMsg)
+            conv.addChatMessage(cnuiMsg)
           } catch {
             const errMsg: ChatMessage = { role: 'assistant', content: '打开表单失败，请重试', timestamp: new Date().toISOString() }
-            addChatMessage(errMsg)
+            conv.addChatMessage(errMsg)
           }
           return
         }
@@ -575,10 +431,10 @@ function HomeContent() {
             content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
             timestamp: new Date().toISOString(),
           }
-          addChatMessage(aiMsg)
+          conv.addChatMessage(aiMsg)
         } catch {
           const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-          addChatMessage(errMsg)
+          conv.addChatMessage(errMsg)
         } finally {
           setIsLoading(false)
         }
@@ -595,7 +451,7 @@ function HomeContent() {
         content: `已导航到 ${shortcut.domainId}/${shortcut.action}`,
         timestamp: new Date().toISOString(),
       }
-      addChatMessage(navMsg)
+      conv.addChatMessage(navMsg)
       return
     }
 
@@ -613,7 +469,7 @@ function HomeContent() {
             timestamp: new Date().toISOString(),
             cnuiSurface: { ...cnuiResult.surface, dataSnapshot: mergedSnapshot },
           }
-          addChatMessage(cnuiMsg)
+          conv.addChatMessage(cnuiMsg)
         } catch (err) {
           console.error('[habitIntent] CNUI 打开失败:', err)
           const errMsg: ChatMessage = {
@@ -621,7 +477,7 @@ function HomeContent() {
             content: HABIT_USER_FACING.INTENT_RECOGNIZED,
             timestamp: new Date().toISOString(),
           }
-          addChatMessage(errMsg)
+          conv.addChatMessage(errMsg)
         }
         setIsLoading(false)
         return
@@ -651,7 +507,7 @@ function HomeContent() {
           content: HABIT_USER_FACING.INTENT_UNRECOGNIZED(habitParse.error),
           timestamp: new Date().toISOString(),
         }
-        addChatMessage(aiMsg)
+        conv.addChatMessage(aiMsg)
         setIsLoading(false)
         return
       }
@@ -661,10 +517,10 @@ function HomeContent() {
         content: result.success ? '已处理你的请求。' : (result.error ?? '处理失败'),
         timestamp: new Date().toISOString(),
       }
-      addChatMessage(aiMsg)
+      conv.addChatMessage(aiMsg)
     } catch {
       const errMsg: ChatMessage = { role: 'assistant', content: '网络错误，请重试', timestamp: new Date().toISOString() }
-      addChatMessage(errMsg)
+      conv.addChatMessage(errMsg)
     } finally {
       setIsLoading(false)
     }
@@ -686,11 +542,11 @@ function HomeContent() {
           />
         )}
         <SessionList
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewSession={handleNewSession}
-          onDeleteSession={handleDeleteSession}
+          sessions={conv.sessions}
+          activeSessionId={conv.activeSessionId}
+          onSelectSession={conv.handleSelectSession}
+          onNewSession={conv.handleNewSession}
+          onDeleteSession={conv.handleDeleteSession}
         />
       </>
     : <GrowthMenu domainActions={domainActions as any} onAction={handleGrowthAction} />;
@@ -713,15 +569,15 @@ function HomeContent() {
     if (mainViewState.type === 'conversation') {
       const convView = (
         <ConversationView
-          messages={conversationMessages}
+          messages={conv.conversationMessages}
           onSendMessage={handleConversationSend}
           isLoading={isLoading}
-          recentSessions={sessions.slice(0, 3)}
-          onSelectSession={handleSelectSession}
+          recentSessions={conv.sessions.slice(0, 3)}
+          onSelectSession={conv.handleSelectSession}
           intentTriggers={intentTriggers}
           frequentIntents={frequentIntents}
           onCnuiConfirm={handleCnuiConfirm}
-          onSurfaceStateChange={handleSurfaceStateChange}
+          onSurfaceStateChange={conv.handleSurfaceStateChange}
         />
       )
       if (splitWith) {
@@ -784,7 +640,7 @@ function HomeContent() {
   const handleFocusIntentInput = useCallback(() => {
     if (mainViewState.type !== 'conversation') {
       // Switch to conversation view
-      const activeSessionId = sessions[0]?.id
+      const activeSessionId = conv.sessions[0]?.id
       if (activeSessionId) {
         setMainViewState({ type: 'conversation', sessionId: activeSessionId })
       }
@@ -793,7 +649,7 @@ function HomeContent() {
     setTimeout(() => {
       document.querySelector<HTMLInputElement>('input[placeholder="输入消息..."]')?.focus()
     }, 100)
-  }, [mainViewState.type, sessions])
+  }, [mainViewState.type, conv.sessions])
 
   return (
     <>
@@ -835,10 +691,10 @@ function HomeContent() {
       )}
 
       <ConfirmDeleteDialog
-        open={deleteTarget !== null}
-        sessionTitle={deleteTarget?.title ?? ''}
-        onConfirm={confirmDeleteSession}
-        onCancel={() => setDeleteTarget(null)}
+        open={conv.deleteTarget !== null}
+        sessionTitle={conv.deleteTarget?.title ?? ''}
+        onConfirm={conv.confirmDeleteSession}
+        onCancel={() => conv.setDeleteTarget(null)}
       />
     </>
   );
