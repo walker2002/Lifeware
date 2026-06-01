@@ -71,7 +71,12 @@ function HomeContent() {
     <>
       <AppShell activeTab={panelTab} onTabChange={setPanelTab} onHomeClick={handleHomeClick} onSettingsClick={handleSettingsClick}
         tilesBanner={tb.actionSurface && tb.actionSurface.tiles.length > 0 ? <TilesBanner candidates={tb.actionSurface.tiles} /> : undefined}
-        leftPanelContent={leftPanelContent} mainContent={mainContent} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput} />
+        leftPanelContent={leftPanelContent} mainContent={mainContent} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
+        currentViewType={mainViewState.type}
+        onBottomNavNavigate={(view) => setMainViewState(view)}
+        onFabAction={intent.handleGrowthAction}
+        growthContent={<GrowthMenu domainActions={intent.domainActions as any} onAction={intent.handleGrowthAction} />}
+      />
       {tb.transitionConfirm && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-scrim">
           <div className="mx-4 max-w-sm rounded-lg bg-canvas p-6 shadow-lg">
