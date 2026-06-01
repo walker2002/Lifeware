@@ -6,6 +6,7 @@ import { validateFile } from "@/lib/task-import/file-parser"
 import { toast } from "sonner"
 import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
+import { ChatBubble } from "@/components/chat-bubble"
 import type { FrequentIntent } from "@/app/actions/activity"
 import { Paperclip, Send, MessageSquare } from "lucide-react"
 
@@ -28,12 +29,6 @@ interface ConversationViewProps {
   frequentIntents?: FrequentIntent[]
   onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
   onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
-}
-
-const ROLE_LABELS: Record<ChatMessage['role'], string> = {
-  user: '你',
-  assistant: 'AI',
-  system: '系统',
 }
 
 export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, frequentIntents, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
@@ -181,7 +176,13 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
       {messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center pt-[15vh] px-4">
           {/* 标题 */}
-          <h2 className="text-lg font-semibold text-ink">有什么可以帮你的？</h2>
+          <div className="flex flex-col items-center gap-3 mb-8">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-surface-soft">
+              <MessageSquare className="size-7 text-primary" />
+            </div>
+            <h2 className="font-display text-2xl font-medium text-ink">有什么可以帮你的？</h2>
+            <p className="text-sm text-body">通过自然语言描述你的意图，AI 会帮你规划执行</p>
+          </div>
 
           {/* 输入框区域 — 附件内置在输入框内 */}
           <form onSubmit={handleSubmit} className="mt-8 w-full max-w-xl">
@@ -307,27 +308,24 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
         <>
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {messages.map((msg, i) => (
-              <div key={i} className="mb-3">
-                <span className="text-xs font-medium text-body/50">{ROLE_LABELS[msg.role]}</span>
-                <div className={`mt-0.5 text-sm ${
-                  msg.role === 'user' ? 'text-ink' :
-                  msg.role === 'system' ? 'text-body/60 italic' :
-                  'text-body'
-                }`}>
-                  {msg.content}
-                </div>
-                {msg.cnuiSurface && (
-                  <CnuiSurfaceWrapper
-                    surfaceId={msg.cnuiSurface.cnuiSurfaceId}
-                    domainId={msg.cnuiSurface.domainId}
-                    action={msg.cnuiSurface.action}
-                    surfaceType={msg.cnuiSurface.cnuiSurfaceType}
-                    dataSnapshot={msg.cnuiSurface.dataSnapshot}
-                    lifecycleState={lifecycleState}
-                    lifecycleActions={lifecycleActions}
-                  />
+              <ChatBubble key={i} role={msg.role} timestamp={msg.timestamp}>
+                {msg.cnuiSurface ? (
+                  <div>
+                    <div>{msg.content}</div>
+                    <CnuiSurfaceWrapper
+                      surfaceId={msg.cnuiSurface.cnuiSurfaceId}
+                      domainId={msg.cnuiSurface.domainId}
+                      action={msg.cnuiSurface.action}
+                      surfaceType={msg.cnuiSurface.cnuiSurfaceType}
+                      dataSnapshot={msg.cnuiSurface.dataSnapshot}
+                      lifecycleState={lifecycleState}
+                      lifecycleActions={lifecycleActions}
+                    />
+                  </div>
+                ) : (
+                  msg.content
                 )}
-              </div>
+              </ChatBubble>
             ))}
             <div ref={bottomRef} />
           </div>
