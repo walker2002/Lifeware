@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { AppProvider, useApp } from "@/contexts/app-context";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { SessionList } from "@/components/layout/session-list";
@@ -93,18 +94,20 @@ function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'
 }
 
 export default function Home() {
+  return (
+    <AppProvider>
+      <HomeContent />
+    </AppProvider>
+  )
+}
+
+function HomeContent() {
+  const { mainViewState, setMainViewState, isLoading, setIsLoading, error, setError } = useApp()
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
   const [actionSurface, setActionSurface] = useState<ActionSurface | undefined>();
   const [dateMode, setDateMode] = useState<DateViewMode>("day");
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  const [mainViewState, setMainViewState] = useState<MainViewState>({
-    type: 'schedule',
-    date: new Date(),
-    viewMode: 'day',
-  });
   const [panelTab, setPanelTab] = useState<PanelTab>("assistant");
   const [splitWith, setSplitWith] = useState<SplitWith | undefined>();
 
