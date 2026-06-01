@@ -878,6 +878,20 @@ export default function Home() {
     return null;
   };
 
+  const handleFocusIntentInput = useCallback(() => {
+    if (mainViewState.type !== 'conversation') {
+      // Switch to conversation view
+      const activeSessionId = sessions[0]?.id
+      if (activeSessionId) {
+        setMainViewState({ type: 'conversation', sessionId: activeSessionId })
+      }
+    }
+    // Focus input after a short delay to allow view switch
+    setTimeout(() => {
+      document.querySelector<HTMLInputElement>('input[placeholder="输入消息..."]')?.focus()
+    }, 100)
+  }, [mainViewState.type, sessions])
+
   return (
     <>
       <AppShell
@@ -893,6 +907,7 @@ export default function Home() {
         leftPanelContent={leftPanelContent}
         mainContent={renderMainContent()}
         viewKey={mainViewState.type}
+        onFocusIntentInput={handleFocusIntentInput}
       />
 
       {transitionConfirm && (
