@@ -198,3 +198,28 @@ body {
   color: var(--foreground);
   font-family: "Inter", sans-serif;
 }
+
+/* ========================================================================
+   过渡动画
+   ======================================================================== */
+
+@keyframes viewIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-view-in {
+  animation: viewIn 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-view-in {
+    animation: none;
+  }
+}

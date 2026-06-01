@@ -22,11 +22,13 @@ interface AppShellProps {
   tilesBanner?: ReactNode;
   /** TopNav 设置按钮回调 */
   onSettingsClick?: () => void;
+  /** 传入 view key 变化时触发过渡动画 */
+  viewKey?: string;
 }
 
 export function AppShell({
   activeTab, onTabChange, onHomeClick,
-  leftPanelContent, mainContent, tilesBanner, onSettingsClick,
+  leftPanelContent, mainContent, tilesBanner, onSettingsClick, viewKey,
 }: AppShellProps) {
   const { isOpen, toggle } = usePanelState();
   const { leftWidth, handleMouseDown, containerRef } = useResizablePanel({
@@ -59,12 +61,12 @@ export function AppShell({
           )}
 
           <div className="min-h-0 flex-1 flex flex-col">
-            <MainContent>{mainContent}</MainContent>
+            <MainContent viewKey={viewKey}>{mainContent}</MainContent>
           </div>
         </div>
 
         <div className="min-h-0 flex-1 flex flex-col md:hidden">
-          <MainContent>{mainContent}</MainContent>
+          <MainContent viewKey={viewKey}>{mainContent}</MainContent>
         </div>
       </div>
     </div>

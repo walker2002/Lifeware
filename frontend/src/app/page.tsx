@@ -892,6 +892,7 @@ export default function Home() {
         }
         leftPanelContent={leftPanelContent}
         mainContent={renderMainContent()}
+        viewKey={mainViewState.type}
       />
 
       {transitionConfirm && (

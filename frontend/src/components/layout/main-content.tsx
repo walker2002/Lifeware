@@ -1,15 +1,27 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { type ReactNode, useState, useEffect } from "react"
 
 interface MainContentProps {
   children: ReactNode
+  /** 传入 view key 变化时触发过渡动画 */
+  viewKey?: string
 }
 
-export function MainContent({ children }: MainContentProps) {
+export function MainContent({ children, viewKey }: MainContentProps) {
+  const [animating, setAnimating] = useState(false)
+
+  useEffect(() => {
+    if (viewKey !== undefined) {
+      setAnimating(true)
+      const timer = setTimeout(() => setAnimating(false), 200)
+      return () => clearTimeout(timer)
+    }
+  }, [viewKey])
+
   return (
     <main
-      className="min-w-0 min-h-0 flex-1 overflow-y-auto bg-canvas p-6"
+      className={`min-w-0 min-h-0 flex-1 overflow-y-auto bg-canvas p-6 ${animating ? "animate-view-in" : ""}`}
       role="main"
     >
       <div className="w-full h-full">{children}</div>
