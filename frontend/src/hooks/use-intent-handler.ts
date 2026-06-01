@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import { useApp } from "@/contexts/app-context"
+import { useAppView, useAppLoading } from "@/contexts/app-context"
 import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { ActionSurface } from "@/usom/types/process"
 import type { ChatMessage } from "@/usom/types/objects"
@@ -40,7 +40,8 @@ interface IntentHandlerDeps {
 }
 
 export function useIntentHandler(deps: IntentHandlerDeps) {
-  const { setMainViewState, setIsLoading, setError } = useApp()
+  const { setMainViewState } = useAppView()
+  const { setIsLoading, setError } = useAppLoading()
 
   const [splitWith, setSplitWith] = useState<SplitWith | undefined>()
   const [domainActions, setDomainActions] = useState<

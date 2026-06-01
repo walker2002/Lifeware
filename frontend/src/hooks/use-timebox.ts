@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useApp } from "@/contexts/app-context";
+import { useAppLoading } from "@/contexts/app-context";
 import { useAutoTrigger } from "@/hooks/use-auto-trigger";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ActionSurface } from "@/usom/types/process";
@@ -38,7 +38,7 @@ function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'
 }
 
 export function useTimebox() {
-  const { setIsLoading, setError } = useApp();
+  const { setIsLoading, setError } = useAppLoading();
 
   const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
   const [dateMode, setDateMode] = useState<DateViewMode>("day");

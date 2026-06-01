@@ -3,16 +3,27 @@
 import { createContext, useContext, useState, type Dispatch, type SetStateAction } from "react"
 import type { MainViewState } from "@/components/layout/main-view-state"
 
-interface AppContextValue {
+// --- View Context: mainViewState（导航状态） ---
+
+interface AppViewContextValue {
   mainViewState: MainViewState
   setMainViewState: Dispatch<SetStateAction<MainViewState>>
+}
+
+const AppViewContext = createContext<AppViewContextValue | null>(null)
+
+// --- Loading Context: isLoading / error（全局加载状态） ---
+
+interface AppLoadingContextValue {
   isLoading: boolean
   setIsLoading: Dispatch<SetStateAction<boolean>>
   error: string | undefined
   setError: Dispatch<SetStateAction<string | undefined>>
 }
 
-const AppContext = createContext<AppContextValue | null>(null)
+const AppLoadingContext = createContext<AppLoadingContextValue | null>(null)
+
+// --- Provider ---
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mainViewState, setMainViewState] = useState<MainViewState>({
@@ -24,14 +35,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | undefined>()
 
   return (
-    <AppContext.Provider value={{ mainViewState, setMainViewState, isLoading, setIsLoading, error, setError }}>
-      {children}
-    </AppContext.Provider>
+    <AppViewContext.Provider value={{ mainViewState, setMainViewState }}>
+      <AppLoadingContext.Provider value={{ isLoading, setIsLoading, error, setError }}>
+        {children}
+      </AppLoadingContext.Provider>
+    </AppViewContext.Provider>
   )
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error("useApp must be used within AppProvider")
+// --- Hooks ---
+
+/** 读取导航状态（mainViewState / setMainViewState） */
+export function useAppView() {
+  const ctx = useContext(AppViewContext)
+  if (!ctx) throw new Error("useAppView must be used within AppProvider")
   return ctx
+}
+
+/** 读取/写入加载状态（isLoading / error 及其 setters） */
+export function useAppLoading() {
+  const ctx = useContext(AppLoadingContext)
+  if (!ctx) throw new Error("useAppLoading must be used within AppProvider")
+  return ctx
+}
+
+/** 同时读取两个 context（仅在 page.tsx 组装层使用） */
+export function useApp() {
+  return { ...useAppView(), ...useAppLoading() }
 }

@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import { useApp } from "@/contexts/app-context"
+import { useAppView } from "@/contexts/app-context"
 import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
 import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from '@/app/actions/session'
 
 export function useConversation() {
-  const { mainViewState, setMainViewState } = useApp()
+  const { mainViewState, setMainViewState } = useAppView()
 
   const [sessions, setSessions] = useState<AISessionSummary[]>([])
   const [conversationMessages, setConversationMessages] = useState<ChatMessage[]>([])
