@@ -40,6 +40,7 @@ import type { IntentSubmissionResult, ExecutionIntentResult, BatchIntentResult }
 import { usePageView } from '@/hooks/use-page-view'
 import { Button } from "@/components/ui/button";
 import { ExecutionLogDialog } from "@/components/execution-log-dialog";
+import { Banner } from "@/components/feedback/banner";
 import type { ExecutionRecord, ChatMessage } from "@/usom/types/objects";
 import { useAutoTrigger } from "@/hooks/use-auto-trigger";
 import {
@@ -774,13 +775,12 @@ export default function Home() {
   const leftPanelContent = panelTab === 'assistant'
     ? <>
         {!llmConfigured && (
-          <div className="mb-3 rounded-md border border-warning bg-warning-soft p-3">
-            <p className="text-sm text-warning">请先配置大语言模型</p>
-            <button type="button" onClick={() => setMainViewState({ type: 'settings', section: 'llm' })}
-              className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground">
-              前往设置
-            </button>
-          </div>
+          <Banner
+            variant="warning"
+            title="请先配置大语言模型"
+            description="配置后即可使用 AI 助手功能"
+            onClose={() => {}}
+          />
         )}
         <SessionList
           sessions={sessions}
