@@ -95,7 +95,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
   }, [])
 
   // Internal helpers
-  function handleResult(result: IntentSubmissionResult) {
+  const handleResult = useCallback((result: IntentSubmissionResult) => {
     deps.setTimeboxes(result.timeboxes)
     deps.setActionSurface(result.actionSurface)
     if (result.traceSession) {
@@ -111,7 +111,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
     } else {
       setError(undefined)
     }
-  }
+  }, [deps.setTimeboxes, deps.setActionSurface, setError])
 
   const isExecutionIntent = (input: string): boolean =>
     /^(开始|结束|取消|记录|复盘|启动|完成|停止)/.test(input.trim())

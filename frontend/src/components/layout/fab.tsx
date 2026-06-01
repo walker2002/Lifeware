@@ -31,7 +31,7 @@ export function Fab({ quickActions = DEFAULT_ACTIONS, growthContent, onAction }:
     <>
       {/* 快捷菜单（FAB 展开时显示） */}
       {expanded && (
-        <div className="fixed inset-0 z-30 bg-scrim sm:hidden" onClick={() => setExpanded(false)}>
+        <div className="fixed inset-0 z-overlay bg-scrim sm:hidden" onClick={() => setExpanded(false)}>
           <div className="absolute bottom-24 right-4 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
             {quickActions.map(act => (
               <button
@@ -73,7 +73,7 @@ export function Fab({ quickActions = DEFAULT_ACTIONS, growthContent, onAction }:
       <button
         type="button"
         onClick={() => setExpanded(prev => !prev)}
-        className="fixed bottom-20 right-4 flex size-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg active:bg-primary-active sm:hidden z-30"
+        className="fixed bottom-20 right-4 flex size-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg active:bg-primary-active sm:hidden z-overlay"
         aria-label={expanded ? "关闭快捷菜单" : "打开快捷菜单"}
       >
         {expanded ? <X className="size-6" /> : <Plus className="size-6" />}

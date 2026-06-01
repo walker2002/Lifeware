@@ -91,7 +91,15 @@ function HomeContent() {
         tilesBanner={tb.actionSurface && tb.actionSurface.tiles.length > 0 ? <TilesBanner candidates={tb.actionSurface.tiles} /> : undefined}
         leftPanelContent={leftPanelContent} mainContent={mainContent} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
         currentViewType={mainViewState.type}
-        onBottomNavNavigate={(view) => setMainViewState(view)}
+        onBottomNavNavigate={(view) => {
+          // BottomNav conversation tab 需要有效的 sessionId
+          if (view.type === 'conversation') {
+            const sid = conv.activeSessionId ?? conv.sessions[0]?.id ?? ''
+            setMainViewState(sid ? { ...view, sessionId: sid } : { type: 'schedule', date: new Date(), viewMode: 'day' })
+          } else {
+            setMainViewState(view)
+          }
+        }}
         onFabAction={intent.handleGrowthAction}
         growthContent={<GrowthMenu domainActions={intent.domainActions as any} onAction={intent.handleGrowthAction} />}
       />

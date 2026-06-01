@@ -62,7 +62,7 @@ export function useConversation() {
         saveP.catch(err => console.error('[saveMessage] 持久化失败:', err))
       }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — activeSessionIdRef 通过 ref 读取无需列入 deps；setSessions/setConversationMessages 为 useState setter 稳定引用
 
   const saveCurrentConversation = useCallback(() => {
     // 持久化已由 saveMessage 在每个消息发送时处理

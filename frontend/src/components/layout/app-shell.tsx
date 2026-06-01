@@ -98,9 +98,9 @@ export function AppShell({
 
         {/* 平板端（640-1023px）：overlay 模式 */}
         {isOpen && (
-          <div className="hidden sm:flex lg:hidden fixed inset-0 z-30">
+          <div className="hidden sm:flex lg:hidden fixed inset-0 z-overlay">
             <div className="absolute inset-0 bg-scrim" onClick={toggle} />
-            <div className="relative z-40 w-[300px] shrink-0 shadow-xl">
+            <div className="relative z-modal w-[300px] shrink-0 shadow-xl">
               <LeftPanel activeTab={activeTab} onTabChange={onTabChange} onHomeClick={onHomeClick}>
                 {leftPanelContent}
               </LeftPanel>
