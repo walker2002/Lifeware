@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AppProvider, useApp } from "@/contexts/app-context";
+import { useTimebox } from "@/hooks/use-timebox";
 import { AppShell } from "@/components/layout/app-shell";
 import { TilesBanner } from "@/components/layout/tiles-banner";
 import { SessionList } from "@/components/layout/session-list";
@@ -14,7 +15,6 @@ import { IntentForm } from "@/components/intent-form";
 import type { TemplateFormFields } from "@/components/intent-form";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { DateNav } from "@/domains/timebox/components/date-nav";
-import type { DateViewMode } from "@/domains/timebox/components/types";
 import { HABIT_USER_FACING } from "@/lib/constants/habit-messages";
 import { DayView } from "@/domains/timebox/components/day-view";
 import { WeekView } from "@/domains/timebox/components/week-view";
@@ -25,11 +25,9 @@ import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
 import { ProjectsView } from "@/domains/tasks/components/projects-view";
 import "@/domains/habits/register-form";
 import "@/domains/tasks/register-form";
-import type { TimeboxSummary } from "@/usom/types/summaries";
-import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import type { AISessionSummary } from "@/usom/types/objects";
-import { submitIntent, submitTemplateIntent, getTimeboxesByRange, transitionTimebox, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
+import { submitIntent, submitTemplateIntent, submitExecutionIntent, submitBatchIntent, resolveShortcut, fetchDomainActions, submitDynamicIntent, parseHabitIntentOnly, openCnuiSurface, submitCnuiSurface, isCnuiSurface, getActionResponse } from "./actions/intent"
 import { fetchIntentTriggers } from "./actions/intent-triggers"
 import { recordActivity } from "./actions/activity-recorder"
 import { fetchFrequentIntents } from "./actions/activity"
@@ -42,14 +40,7 @@ import { usePageView } from '@/hooks/use-page-view'
 import { Button } from "@/components/ui/button";
 import { ExecutionLogDialog } from "@/components/execution-log-dialog";
 import { Banner } from "@/components/feedback/banner";
-import type { ExecutionRecord, ChatMessage } from "@/usom/types/objects";
-import { useAutoTrigger } from "@/hooks/use-auto-trigger";
-import {
-  startOfDay, endOfDay,
-  startOfWeek, endOfWeek,
-  startOfMonth, endOfMonth,
-  addDays, addWeeks, addMonths,
-} from "date-fns";
+import type { ChatMessage } from "@/usom/types/objects";
 import { resolveSlashCommand } from "@/lib/slash-command";
 import type { MainViewState, PanelTab, SplitWith } from "@/components/layout/main-view-state";
 import type { SurfaceState } from "@/usom/types/objects";
@@ -71,28 +62,6 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
   },
 };
 
-const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
-
-function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
-  switch (mode) {
-    case 'day':
-      return { start: startOfDay(date), end: endOfDay(date) };
-    case 'week':
-      return { start: startOfWeek(date, { weekStartsOn: 1 }), end: endOfWeek(date, { weekStartsOn: 1 }) };
-    case 'month':
-      return { start: startOfMonth(date), end: endOfMonth(date) };
-  }
-}
-
-function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'): Date {
-  const delta = direction === 'next' ? 1 : -1;
-  switch (mode) {
-    case 'day': return addDays(date, delta);
-    case 'week': return addWeeks(date, delta);
-    case 'month': return addMonths(date, delta);
-  }
-}
-
 export default function Home() {
   return (
     <AppProvider>
@@ -103,10 +72,7 @@ export default function Home() {
 
 function HomeContent() {
   const { mainViewState, setMainViewState, isLoading, setIsLoading, error, setError } = useApp()
-  const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>(INITIAL_TIMEBOXES);
-  const [actionSurface, setActionSurface] = useState<ActionSurface | undefined>();
-  const [dateMode, setDateMode] = useState<DateViewMode>("day");
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const tb = useTimebox();
 
   const [panelTab, setPanelTab] = useState<PanelTab>("assistant");
   const [splitWith, setSplitWith] = useState<SplitWith | undefined>();
@@ -169,39 +135,15 @@ function HomeContent() {
 
   const [traceEnabled] = useState(() => getTraceConfig().enabled);
   const [traceSessions, setTraceSessions] = useState<TraceSession[]>([]);
-  const [logTarget, setLogTarget] = useState<string | null>(null);
-  const [transitionConfirm, setTransitionConfirm] = useState<{
-    timeboxId: string; action: string; message: string;
-  } | null>(null);
   const [confirmation, setConfirmation] = useState<{
     message: string; rawInput?: string; formFields?: TemplateFormFields;
   } | null>(null);
 
   const [llmConfigured, setLlmConfigured] = useState(true)
 
-  const loadTimeboxes = useCallback(async (modeParam?: DateViewMode, dateParam?: Date) => {
-    const m = modeParam ?? dateMode;
-    const d = dateParam ?? currentDate;
-    const { start, end } = getDateRange(m, d);
-    try {
-      const data = await getTimeboxesByRange(start, end);
-      setTimeboxes(data);
-    } catch {}
-  }, [dateMode, currentDate]);
-
-  useEffect(() => { loadTimeboxes(); }, [dateMode, currentDate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useAutoTrigger({
-    timeboxes,
-    onTransition: async (id, action) => {
-      const result = await transitionTimebox(id, action as any);
-      if (result.success) await loadTimeboxes();
-    },
-  });
-
   function handleResult(result: IntentSubmissionResult) {
-    setTimeboxes(result.timeboxes);
-    setActionSurface(result.actionSurface);
+    tb.setTimeboxes(result.timeboxes);
+    tb.setActionSurface(result.actionSurface);
     if (result.traceSession) {
       setTraceSessions((prev) => [...prev, result.traceSession!]);
     }
@@ -241,13 +183,13 @@ function HomeContent() {
     try {
       if (isExecutionIntent(rawInput)) {
         const result = await submitExecutionIntent(rawInput);
-        setTimeboxes(result.timeboxes);
+        tb.setTimeboxes(result.timeboxes);
         if (!result.success) setError(result.error ?? "执行失败");
         return;
       }
       if (isBatchIntent(rawInput)) {
         const batchResult = await submitBatchIntent(rawInput);
-        await loadTimeboxes();
+        await tb.loadTimeboxes();
         const batchErrors = batchResult.results.filter(r => r.error).map(r => `第${r.index + 1}个任务"${r.title}"：${r.error}`);
         setError(batchErrors.length > 0 ? batchErrors.join("；") : undefined);
         return;
@@ -260,7 +202,7 @@ function HomeContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [traceEnabled, loadTimeboxes]);
+  }, [traceEnabled, tb.loadTimeboxes]);
 
   const handleFormSubmit = useCallback(async (fields: TemplateFormFields, confirmed?: boolean) => {
     setError(undefined);
@@ -309,50 +251,8 @@ function HomeContent() {
 
   const handleHomeClick = useCallback(() => {
     saveCurrentConversation();
-    setMainViewState({ type: 'schedule', date: new Date(), viewMode: dateMode });
-  }, [dateMode, saveCurrentConversation]);
-
-  const handleDateModeChange = useCallback((newMode: DateViewMode) => { setDateMode(newMode); }, []);
-  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
-    setCurrentDate((prev) => navigateDate(dateMode, prev, direction));
-  }, [dateMode]);
-
-  const handleTimeboxAction = useCallback(async (timeboxId: string, action: string) => {
-    if (action === "log" || action === "viewLog") { setLogTarget(timeboxId); return; }
-    if (action === "cancel") { setTransitionConfirm({ timeboxId, action, message: "确认取消这个时间盒？" }); return; }
-    setIsLoading(true);
-    try {
-      const result = await transitionTimebox(timeboxId, action as any);
-      if (result.success) await loadTimeboxes();
-      else if (result.needsConfirmation) setTransitionConfirm({ timeboxId, action, message: result.confirmationMessage ?? "确认继续？" });
-      else setError(result.error ?? "操作失败");
-    } catch (err) { setError(err instanceof Error ? err.message : "操作失败"); }
-    finally { setIsLoading(false); }
-  }, [loadTimeboxes]);
-
-  const handleTransitionConfirm = useCallback(async () => {
-    if (!transitionConfirm) return;
-    setIsLoading(true);
-    try {
-      const result = await transitionTimebox(transitionConfirm.timeboxId, transitionConfirm.action as any);
-      if (result.success) await loadTimeboxes();
-      else setError(result.error ?? "操作失败");
-    } catch (err) { setError(err instanceof Error ? err.message : "操作失败"); }
-    finally { setIsLoading(false); setTransitionConfirm(null); }
-  }, [transitionConfirm, loadTimeboxes]);
-
-  const handleLogSubmit = useCallback(async (timeboxId: string, executionRecord: ExecutionRecord) => {
-    setIsLoading(true);
-    try {
-      const result = await transitionTimebox(timeboxId, 'log', executionRecord);
-      if (result.success) await loadTimeboxes();
-      else setError(result.error ?? "记录失败");
-    } catch (err) { setError(err instanceof Error ? err.message : "记录失败"); }
-    finally { setIsLoading(false); setLogTarget(null); }
-  }, [loadTimeboxes]);
-
-  const logTargetTimebox = logTarget ? timeboxes.find(t => t.id === logTarget) : null;
-  const handleDateSelect = useCallback((date: Date) => { setCurrentDate(date); setDateMode('day'); }, []);
+    setMainViewState({ type: 'schedule', date: new Date(), viewMode: tb.dateMode });
+  }, [tb.dateMode, saveCurrentConversation]);
 
   /** 添加消息到对话列表并持久化到 L1 */
   const addChatMessage = useCallback((msg: ChatMessage) => {
@@ -395,14 +295,14 @@ function HomeContent() {
       if (activeSessionId === deleteTarget.id) {
         setActiveSessionId(undefined)
         setConversationMessages([])
-        setMainViewState({ type: 'schedule', date: new Date(), viewMode: dateMode })
+        setMainViewState({ type: 'schedule', date: new Date(), viewMode: tb.dateMode })
       }
     } catch (err) {
       console.error('[deleteSession] 删除失败:', err)
     } finally {
       setDeleteTarget(null)
     }
-  }, [deleteTarget, activeSessionId, dateMode])
+  }, [deleteTarget, activeSessionId, tb.dateMode])
 
   const handleSelectSession = useCallback(async (sessionId: string) => {
     saveCurrentConversation()
@@ -627,7 +527,7 @@ function HomeContent() {
         setIsLoading(true)
         try {
           const result = await submitIntent(content, false, traceEnabled)
-          setTimeboxes(result.timeboxes)
+          tb.setTimeboxes(result.timeboxes)
 
           const aiMsg: ChatMessage = {
             role: 'assistant',
@@ -668,7 +568,7 @@ function HomeContent() {
         setIsLoading(true)
         try {
           const result = await submitIntent(content, false, traceEnabled)
-          setTimeboxes(result.timeboxes)
+          tb.setTimeboxes(result.timeboxes)
 
           const aiMsg: ChatMessage = {
             role: 'assistant',
@@ -728,7 +628,7 @@ function HomeContent() {
       }
 
       const result = await submitIntent(content, false, traceEnabled)
-      setTimeboxes(result.timeboxes)
+      tb.setTimeboxes(result.timeboxes)
 
       // 如果 AI 解析出 StructuredIntent，触发分裂视图
       if (result.success && result.actionSurface) {
@@ -802,10 +702,10 @@ function HomeContent() {
           <HomeBanner
             onAction={handleGrowthAction}
           />
-          <DateNav mode={dateMode} currentDate={currentDate} onModeChange={handleDateModeChange} onNavigate={handleNavigate} />
-          {dateMode === "day" && <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />}
-          {dateMode === "week" && <WeekView timeboxes={timeboxes} currentDate={currentDate} />}
-          {dateMode === "month" && <MonthView timeboxes={timeboxes} currentDate={currentDate} />}
+          <DateNav mode={tb.dateMode} currentDate={tb.currentDate} onModeChange={tb.handleDateModeChange} onNavigate={tb.handleNavigate} />
+          {tb.dateMode === "day" && <DayView timeboxes={tb.timeboxes} currentDate={tb.currentDate} onDateSelect={tb.handleDateSelect} onAction={tb.handleTimeboxAction} />}
+          {tb.dateMode === "week" && <WeekView timeboxes={tb.timeboxes} currentDate={tb.currentDate} />}
+          {tb.dateMode === "month" && <MonthView timeboxes={tb.timeboxes} currentDate={tb.currentDate} />}
         </div>
       );
     }
@@ -853,10 +753,10 @@ function HomeContent() {
       if (domainId === 'timebox' && (action === 'viewSchedule' || action === 'view_schedule')) {
         return (
           <div className="flex w-full flex-col gap-4">
-            <DateNav mode={dateMode} currentDate={currentDate} onModeChange={handleDateModeChange} onNavigate={handleNavigate} />
-            {dateMode === "day" && <DayView timeboxes={timeboxes} currentDate={currentDate} onDateSelect={handleDateSelect} onAction={handleTimeboxAction} />}
-            {dateMode === "week" && <WeekView timeboxes={timeboxes} currentDate={currentDate} />}
-            {dateMode === "month" && <MonthView timeboxes={timeboxes} currentDate={currentDate} />}
+            <DateNav mode={tb.dateMode} currentDate={tb.currentDate} onModeChange={tb.handleDateModeChange} onNavigate={tb.handleNavigate} />
+            {tb.dateMode === "day" && <DayView timeboxes={tb.timeboxes} currentDate={tb.currentDate} onDateSelect={tb.handleDateSelect} onAction={tb.handleTimeboxAction} />}
+            {tb.dateMode === "week" && <WeekView timeboxes={tb.timeboxes} currentDate={tb.currentDate} />}
+            {tb.dateMode === "month" && <MonthView timeboxes={tb.timeboxes} currentDate={tb.currentDate} />}
           </div>
         )
       }
@@ -903,8 +803,8 @@ function HomeContent() {
         onHomeClick={handleHomeClick}
         onSettingsClick={handleSettingsClick}
         tilesBanner={
-          actionSurface && actionSurface.tiles.length > 0
-            ? <TilesBanner candidates={actionSurface.tiles} />
+          tb.actionSurface && tb.actionSurface.tiles.length > 0
+            ? <TilesBanner candidates={tb.actionSurface.tiles} />
             : undefined
         }
         leftPanelContent={leftPanelContent}
@@ -913,24 +813,24 @@ function HomeContent() {
         onFocusIntentInput={handleFocusIntentInput}
       />
 
-      {transitionConfirm && (
+      {tb.transitionConfirm && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-scrim">
           <div className="mx-4 max-w-sm rounded-lg bg-canvas p-6 shadow-lg">
-            <p className="mb-4 text-sm font-medium text-ink">{transitionConfirm.message}</p>
+            <p className="mb-4 text-sm font-medium text-ink">{tb.transitionConfirm.message}</p>
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setTransitionConfirm(null)} disabled={isLoading}>取消</Button>
-              <Button size="sm" onClick={handleTransitionConfirm} disabled={isLoading}>{isLoading ? "处理中..." : "确认"}</Button>
+              <Button size="sm" variant="outline" onClick={() => tb.setTransitionConfirm(null)} disabled={isLoading}>取消</Button>
+              <Button size="sm" onClick={tb.handleTransitionConfirm} disabled={isLoading}>{isLoading ? "处理中..." : "确认"}</Button>
             </div>
           </div>
         </div>
       )}
 
-      {logTargetTimebox && (
+      {tb.logTargetTimebox && (
         <ExecutionLogDialog
-          timebox={logTargetTimebox}
-          open={!!logTarget}
-          onClose={() => setLogTarget(null)}
-          onSubmit={handleLogSubmit}
+          timebox={tb.logTargetTimebox}
+          open={!!tb.logTarget}
+          onClose={() => tb.setLogTarget(null)}
+          onSubmit={tb.handleLogSubmit}
         />
       )}
 
