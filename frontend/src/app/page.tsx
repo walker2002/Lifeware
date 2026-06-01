@@ -115,6 +115,17 @@ function HomeContent() {
         </div>
       )}
       {tb.logTargetTimebox && <ExecutionLogDialog timebox={tb.logTargetTimebox} open={!!tb.logTarget} onClose={() => tb.setLogTarget(null)} onSubmit={tb.handleLogSubmit} />}
+      {intent.confirmation && (
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-scrim">
+          <div className="mx-4 max-w-sm rounded-lg bg-canvas p-6 shadow-lg">
+            <p className="mb-4 text-sm font-medium text-ink">{intent.confirmation.message}</p>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={intent.handleCancelConfirmation} disabled={isLoading}>取消</Button>
+              <Button size="sm" onClick={intent.handleConfirm} disabled={isLoading}>{isLoading ? "处理中..." : "确认"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
       <ConfirmDeleteDialog open={conv.deleteTarget !== null} sessionTitle={conv.deleteTarget?.title ?? ''} onConfirm={conv.confirmDeleteSession} onCancel={() => conv.setDeleteTarget(null)} />
       <CommandMenu open={searchOpen} onOpenChange={setSearchOpen} items={searchableItems} />
     </>
