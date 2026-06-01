@@ -115,7 +115,6 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                     key={act.action}
                     type="button"
                     onClick={() => onAction(domain.domainId, act.action)}
-                    title={act.shortcut ?? undefined}
                     className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                   >
                     {(() => {
@@ -123,11 +122,16 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                       return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                     })()}
                     <span className="truncate">{act.description}</span>
+                    {act.shortcut && (
+                      <span className="ml-auto shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground">
+                        {act.shortcut}
+                      </span>
+                    )}
                     <span
                       role="button"
                       tabIndex={0}
                       onClick={e => { e.stopPropagation(); togglePin(domain.domainId, act.action) }}
-                      className="ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"
+                      className={act.shortcut ? "shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity" : "ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"}
                     >
                       <Pin className="size-3" />
                     </span>
@@ -149,7 +153,6 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                         key={act.action}
                         type="button"
                         onClick={() => onAction(domain.domainId, act.action)}
-                        title={act.shortcut ?? undefined}
                         className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
                       >
                         {(() => {
@@ -157,11 +160,16 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                           return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                         })()}
                         <span className="truncate">{act.description}</span>
+                        {act.shortcut && (
+                          <span className="ml-auto shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground">
+                            {act.shortcut}
+                          </span>
+                        )}
                         <span
                           role="button"
                           tabIndex={0}
                           onClick={e => { e.stopPropagation(); togglePin(domain.domainId, act.action) }}
-                          className="ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"
+                          className={act.shortcut ? "shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity" : "ml-auto shrink-0 p-0.5 opacity-0 group-hover:opacity-100 text-body/30 hover:text-primary transition-opacity"}
                         >
                           <PinOff className="size-3" />
                         </span>
