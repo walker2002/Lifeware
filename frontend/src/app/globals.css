@@ -223,3 +223,70 @@ body {
     animation: none;
   }
 }
+
+/* ========================================================================
+   暗色模式（UI-DESIGN-SPEC §1.6, §12）
+   通过 <html class="dark"> 切换，所有令牌在 .dark 中重定义
+   ======================================================================== */
+
+.dark {
+  /* --- 品牌色（Canvas/Ink 反转，Primary 提亮）--- */
+  --canvas: #181715;
+  --ink: #faf9f5;
+  --primary: #d4886a;
+  --primary-active: #cc785c;
+  --primary-disabled: #3a3530;
+  --body: #c8c5bc;
+  --body-strong: #e8e5de;
+  --muted: #8e8b82;
+  --muted-soft: #6c6a64;
+  --hairline: #33302b;
+  --hairline-soft: #2a2723;
+  --surface-soft: #1f1e1b;
+  --surface-card: #252320;
+  --surface-cream-strong: #2e2b27;
+  --on-primary: #181715;
+
+  /* --- 语义色（UI-DESIGN-SPEC §1.4 暗色值）--- */
+  --success: #6bcf82;
+  --warning: #e8b84a;
+  --error: #e05555;
+  --info: #7ba8cc;
+  --success-soft: #1a2e1e;
+  --warning-soft: #2e2818;
+  --error-soft: #2e1818;
+  --info-soft: #182838;
+
+  /* --- 交互叠加色（暗色模式下 light-on-dark）--- */
+  --hover-overlay: rgba(250,249,245,0.06);
+  --pressed-overlay: rgba(250,249,245,0.10);
+  --focus-ring: rgba(212,136,106,0.5);
+  --scrim: rgba(0,0,0,0.7);
+
+  /* --- shadcn/ui 兼容层（暗色值）--- */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface-card);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--ink);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--surface-card);
+  --secondary-foreground: var(--ink);
+  --accent: var(--surface-card);
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --destructive-foreground: var(--on-primary);
+  --muted-foreground: var(--muted);
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--primary);
+  --sidebar-background: var(--surface-soft);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--surface-card);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--primary);
+}

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bell, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 interface TopNavProps {
   onMenuClick?: () => void;
@@ -49,6 +50,7 @@ export function TopNav({ onMenuClick, onSettingsClick, isPanelOpen }: TopNavProp
         <Button variant="ghost" size="icon-sm" aria-label="通知">
           <Bell className="size-[18px] text-body" />
         </Button>
+        <ThemeToggle />
         <Button variant="ghost" size="icon-sm" aria-label="设置" onClick={onSettingsClick}>
           <Settings className="size-[18px] text-body" />
         </Button>
