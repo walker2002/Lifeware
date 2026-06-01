@@ -115,7 +115,7 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                     key={act.action}
                     type="button"
                     onClick={() => onAction(domain.domainId, act.action)}
-                    className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                    className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-hover-overlay hover:text-ink transition-colors"
                   >
                     {(() => {
                       const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']
@@ -153,7 +153,7 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                         key={act.action}
                         type="button"
                         onClick={() => onAction(domain.domainId, act.action)}
-                        className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                        className="group flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm text-body hover:bg-hover-overlay hover:text-ink transition-colors"
                       >
                         {(() => {
                           const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']

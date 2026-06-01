@@ -39,7 +39,7 @@ export function TopNav({ onMenuClick, onSettingsClick, isPanelOpen }: TopNavProp
         />
         <Link
           href="/"
-          className="font-display text-xl font-medium text-ink hover:opacity-80 transition-opacity"
+          className="font-display text-xl font-medium text-ink hover:bg-hover-overlay transition-colors"
           aria-label="Lifeware 首页"
         >
           Lifeware

@@ -156,7 +156,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
         value={input}
         onChange={e => setInput(e.target.value)}
         placeholder="输入消息..."
-        className="flex-1 rounded-md border border-hairline bg-background px-3 py-2 text-sm text-ink placeholder:text-body/40 focus:outline-none focus:ring-1 focus:ring-primary"
+        className="flex-1 rounded-md border border-hairline bg-background px-3 py-2 text-sm text-ink placeholder:text-body/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         disabled={isLoading}
       />
       <button
@@ -266,7 +266,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                         if (item.shortcut) setInput(item.shortcut + ' ')
                         inputRef.current?.focus()
                       }}
-                      className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                      className="rounded-full border border-hairline px-3 py-1.5 text-sm text-body hover:bg-hover-overlay hover:text-ink transition-colors"
                     >
                       {item.label}{item.shortcut ? <span className="ml-1 text-body/40">{item.shortcut}</span> : null}
                     </button>
@@ -295,7 +295,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
                     key={session.id}
                     type="button"
                     onClick={() => onSelectSession?.(session.id)}
-                    className="rounded-md px-3 py-2 text-left text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+                    className="rounded-md px-3 py-2 text-left text-sm text-body hover:bg-hover-overlay hover:text-ink transition-colors"
                   >
                     {session.title}
                   </button>

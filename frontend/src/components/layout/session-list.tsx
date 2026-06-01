@@ -68,7 +68,7 @@ export function SessionList({ sessions, activeSessionId, onSelectSession, onNewS
       <button
         type="button"
         onClick={onNewSession}
-        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-hairline px-3 py-2 text-sm text-body hover:bg-surface-soft hover:text-ink transition-colors"
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-hairline px-3 py-2 text-sm text-body hover:bg-hover-overlay hover:text-ink transition-colors"
       >
         + 新对话
       </button>
@@ -89,7 +89,7 @@ export function SessionList({ sessions, activeSessionId, onSelectSession, onNewS
                 className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors ${
                   session.id === activeSessionId
                     ? 'bg-surface-soft text-ink'
-                    : 'text-body hover:bg-surface-soft/50'
+                    : 'text-body hover:bg-hover-overlay'
                 }`}
               >
                 <span className="truncate w-full text-sm">{session.title}</span>
@@ -127,7 +127,7 @@ export function SessionList({ sessions, activeSessionId, onSelectSession, onNewS
               <button
                 type="button"
                 onClick={() => onSelectSession(session.id)}
-                className="flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left text-body/50 hover:bg-surface-soft/50 transition-colors"
+                className="flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left text-body/50 hover:bg-hover-overlay transition-colors"
               >
                 <span className="truncate w-full text-sm">{session.title}</span>
                 <span className="text-xs text-body/30">{formatTime(session.updatedAt)}</span>

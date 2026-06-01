@@ -39,7 +39,7 @@ export function SettingsPage({ onTemplateManage, initialSection }: SettingsPageP
             type="button"
             onClick={() => setSection(item.key)}
             className={`block w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
-              section === item.key ? 'bg-surface-soft text-ink' : 'text-body hover:bg-surface-soft/50'
+              section === item.key ? 'bg-surface-soft text-ink' : 'text-body hover:bg-hover-overlay'
             }`}
           >
             {item.label}

@@ -25,7 +25,7 @@ export function FileUploader({ onFileContent, accept = '.md,.txt,.csv' }: FileUp
     <button
       type="button"
       onClick={() => inputRef.current?.click()}
-      className="rounded-md p-2 text-body hover:bg-surface-soft transition-colors"
+      className="rounded-md p-2 text-body hover:bg-hover-overlay transition-colors"
       aria-label="上传文件"
     >
       <Paperclip className="size-4" />

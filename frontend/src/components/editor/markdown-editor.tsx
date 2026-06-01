@@ -22,7 +22,7 @@ export function MarkdownEditor({ initialContent = '', onSubmit, onCancel, isLoad
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
-          className="h-full w-full resize-none rounded-md border border-hairline bg-background p-3 font-mono text-sm text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+          className="h-full w-full resize-none rounded-md border border-hairline bg-background p-3 font-mono text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           placeholder="在此编辑 Markdown 内容..."
         />
       </div>
