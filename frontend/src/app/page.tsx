@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { AppProvider, useApp } from "@/contexts/app-context"
 import { useTimebox } from "@/hooks/use-timebox"
 import { useConversation } from "@/hooks/use-conversation"
@@ -18,6 +18,8 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog"
 import { ExecutionLogDialog } from "@/components/execution-log-dialog"
 import { Banner } from "@/components/feedback/banner"
 import { Button } from "@/components/ui/button"
+import { CommandMenu } from "@/components/search/command-menu"
+import { CheckSquare, Clock, MessageSquare, Repeat, Target } from "lucide-react"
 import { usePageView } from "@/hooks/use-page-view"
 import "@/domains/habits/register-form"
 import "@/domains/tasks/register-form"
@@ -36,8 +38,24 @@ function HomeContent() {
     addChatMessage: conv.addChatMessage, ensureConversationView: conv.ensureConversationView, saveCurrentConversation: conv.saveCurrentConversation,
   })
   const [panelTab, setPanelTab] = useState<PanelTab>("assistant")
+  const [searchOpen, setSearchOpen] = useState(false)
   usePageView(mainViewState.type === 'action' ? mainViewState.domainId : undefined, mainViewState.type === 'action' ? mainViewState.action : undefined)
   useEffect(() => { conv.loadSessions() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const DOMAIN_ICONS: Record<string, React.ComponentType<{ className?: string }>> = { tasks: CheckSquare, timebox: Clock, habits: Repeat, okrs: Target }
+  const searchableItems = useMemo(() => [
+    ...intent.domainActions.flatMap(d =>
+      d.actions.map(a => ({
+        id: `${d.domainId}:${a.action}`, label: a.description, group: d.domainName,
+        icon: DOMAIN_ICONS[d.domainId] ?? CheckSquare,
+        onSelect: () => { intent.handleGrowthAction(d.domainId, a.action); setSearchOpen(false) },
+      }))
+    ),
+    ...conv.sessions.slice(0, 5).map(s => ({
+      id: `session:${s.id}`, label: s.title, group: '最近对话', icon: MessageSquare,
+      onSelect: () => { conv.handleSelectSession(s.id); setSearchOpen(false) },
+    })),
+  ], [intent.domainActions, conv.sessions])
 
   const handleHomeClick = useCallback(() => {
     conv.saveCurrentConversation(); setMainViewState({ type: 'schedule', date: new Date(), viewMode: tb.dateMode })
@@ -90,6 +108,7 @@ function HomeContent() {
       )}
       {tb.logTargetTimebox && <ExecutionLogDialog timebox={tb.logTargetTimebox} open={!!tb.logTarget} onClose={() => tb.setLogTarget(null)} onSubmit={tb.handleLogSubmit} />}
       <ConfirmDeleteDialog open={conv.deleteTarget !== null} sessionTitle={conv.deleteTarget?.title ?? ''} onConfirm={conv.confirmDeleteSession} onCancel={() => conv.setDeleteTarget(null)} />
+      <CommandMenu open={searchOpen} onOpenChange={setSearchOpen} items={searchableItems} />
     </>
   )
 }
