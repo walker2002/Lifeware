@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Home } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelTab } from "./main-view-state"
 
 interface LeftPanelProps {
@@ -37,22 +38,15 @@ export function LeftPanel({ activeTab, onTabChange, onHomeClick, children }: Lef
         <span className="text-sm font-medium text-ink">Home</span>
       </div>
 
-      <div className="flex gap-1 px-3 py-2 border-b border-hairline">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onTabChange(tab.key)}
-            className={`flex-1 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors ${
-              activeTab === tab.key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-body hover:text-foreground"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as PanelTab)}>
+        <TabsList className="mx-3 mt-2 mb-1">
+          {TABS.map(tab => (
+            <TabsTrigger key={tab.key} value={tab.key}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       <div className="flex-1 overflow-y-auto p-3">
         {children}
