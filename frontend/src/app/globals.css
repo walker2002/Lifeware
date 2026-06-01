@@ -43,6 +43,15 @@
   --focus-ring: rgba(204,120,92,0.3);
   --scrim: rgba(20,20,19,0.5);
 
+  /* --- z-index 层级（UI-DESIGN-SPEC §7.3）--- */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
   /* --- shadcn/ui 兼容层 — 将品牌令牌映射到 shadcn 期望的变量 --- */
   --background: var(--canvas);
   --foreground: var(--ink);
@@ -156,6 +165,15 @@
   --color-pressed-overlay: var(--pressed-overlay);
   --color-focus-ring: var(--focus-ring);
   --color-scrim: var(--scrim);
+
+  /* --- z-index --- */
+  --z-index-base: var(--z-base);
+  --z-index-sticky: var(--z-sticky);
+  --z-index-dropdown: var(--z-dropdown);
+  --z-index-overlay: var(--z-overlay);
+  --z-index-modal: var(--z-modal);
+  --z-index-toast: var(--z-toast);
+  --z-index-tooltip: var(--z-tooltip);
 
   /* --- 字体族 --- */
   --font-display: "Cormorant Garamond", serif;
