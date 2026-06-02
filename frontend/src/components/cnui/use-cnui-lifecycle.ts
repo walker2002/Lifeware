@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { SurfaceState } from '@/usom/types/objects'
 
 export type { SurfaceState }
@@ -77,6 +77,24 @@ export function useCnuiLifecycle(
   onStateChange?: (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => void,
 ): [CnuiLifecycleState, CnuiLifecycleActions] {
   const [surfaceStates, setSurfaceStates] = useState<Record<string, SurfaceState>>(initialStates ?? {})
+
+  // 当 initialStates 异步到达时（如从后端恢复），将终端状态合并到 surfaceStates
+  useEffect(() => {
+    if (!initialStates) return
+    setSurfaceStates(prev => {
+      const next = { ...prev }
+      let changed = false
+      for (const [id, state] of Object.entries(initialStates)) {
+        // 只恢复终端状态（saved/cancelled），不覆盖用户正在编辑的 active 状态
+        if ((state === 'saved' || state === 'cancelled') && prev[id] !== state) {
+          next[id] = state
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [initialStates])
+
   const [surfaceData, setSurfaceData] = useState<Record<string, Record<string, unknown>>>({})
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
