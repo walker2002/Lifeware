@@ -15,6 +15,7 @@ import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
 import { ChatBubble } from "@/components/chat-bubble"
 import type { FrequentIntent } from "@/app/actions/activity"
+import { getSessionSurfaceOutcomes } from "@/app/actions/session"
 import { Paperclip, Send, MessageSquare } from "lucide-react"
 
 /**
@@ -39,6 +40,8 @@ export type { FrequentIntent }
 interface ConversationViewProps {
   /** 消息列表 */
   messages: ChatMessage[]
+  /** 当前会话 ID（用于恢复 surface 状态） */
+  sessionId?: string
   /** 发送消息回调 */
   onSendMessage: (content: string, attachments?: File[]) => void
   /** 是否正在加载 */
@@ -57,7 +60,7 @@ interface ConversationViewProps {
   onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
 }
 
-export function ConversationView({ messages, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, frequentIntents, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
+export function ConversationView({ messages, sessionId, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, frequentIntents, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
   const [showAllIntents, setShowAllIntents] = useState(false)
@@ -73,6 +76,29 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
     return states
   }, []) // eslint-disable-line react-hooks/exhaustive-deps — 状态已持久化在 messages.cnuiSurface.state 中，重新挂载时自动读取最新值
 
+  // 从后端 session 恢复 surface 状态
+  const [restoredSurfaceStates, setRestoredSurfaceStates] = useState<Record<string, SurfaceState>>({})
+
+  useEffect(() => {
+    if (!sessionId) return
+
+    getSessionSurfaceOutcomes(sessionId)
+      .then(outcomes => {
+        const states: Record<string, SurfaceState> = {}
+        for (const [surfaceId, outcome] of Object.entries(outcomes)) {
+          states[surfaceId] = outcome.state
+        }
+        setRestoredSurfaceStates(states)
+      })
+      .catch(err => console.error('[ConversationView] 恢复 surface 状态失败:', err))
+  }, [sessionId])
+
+  // 合并消息中的状态和从后端恢复的状态（后端状态优先级更高）
+  const mergedInitialStates = useMemo(() => ({
+    ...initialSurfaceStates,
+    ...restoredSurfaceStates,
+  }), [initialSurfaceStates, restoredSurfaceStates])
+
   const [lifecycleState, lifecycleActions] = useCnuiLifecycle(
     useCallback(
       async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
@@ -81,7 +107,7 @@ export function ConversationView({ messages, onSendMessage, isLoading, recentSes
       },
       [onCnuiConfirm]
     ),
-    initialSurfaceStates,
+    mergedInitialStates,
     onSurfaceStateChange,
   )
   const bottomRef = useRef<HTMLDivElement>(null)
