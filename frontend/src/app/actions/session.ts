@@ -159,3 +159,38 @@ export async function tryGenerateTitle(sessionId: string): Promise<string | null
 
   return null
 }
+
+/**
+ * 保存 CN-UI surface 的最终状态到 session stateSnapshot
+ *
+ * @param sessionId - 会话 ID
+ * @param surfaceId - surface ID
+ * @param state - 最终状态（saved / cancelled）
+ * @param dataModel - surface 数据快照（可选）
+ */
+export async function saveSurfaceOutcome(
+  sessionId: string,
+  surfaceId: string,
+  state: 'saved' | 'cancelled',
+  dataModel?: Record<string, unknown>,
+): Promise<void> {
+  const session = await sessionRepo.findById(sessionId, MVP_USER_ID)
+  if (!session) return
+
+  const currentSnapshot = session.stateSnapshot ?? {}
+  const surfaceStates = (currentSnapshot.cnuiSurfaceStates as Record<string, unknown> | undefined) ?? {}
+
+  const updatedSnapshot = {
+    ...currentSnapshot,
+    cnuiSurfaceStates: {
+      ...surfaceStates,
+      [surfaceId]: {
+        state,
+        dataModel: dataModel ?? {},
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  }
+
+  await sessionRepo.updateStateSnapshot(sessionId, updatedSnapshot, MVP_USER_ID)
+}
