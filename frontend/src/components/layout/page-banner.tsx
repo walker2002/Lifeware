@@ -52,7 +52,7 @@ export function PageBanner({ domainId, title }: PageBannerProps) {
   return (
     <div className="w-full">
       {/* Banner 图片 */}
-      <div className="relative h-[80px] w-full overflow-hidden">
+      <div className="relative h-[180px] w-full overflow-hidden">
         {bannerSrc ? (
           <Image
             src={bannerSrc}
