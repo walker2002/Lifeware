@@ -8,6 +8,12 @@ import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { TimeboxStatus } from "@/usom/types/primitives"
 import type { ExecutionRecord } from "@/usom/types/objects"
 import { getCardBorderColor } from "@/lib/color-coding"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
 interface MonthViewProps {
@@ -102,6 +108,26 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
         views={["month"]}
         defaultView="month"
         toolbar={false}
+        components={{
+          showMore: ({ count, remainingEvents }) => (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="rbc-button-link rbc-show-more">
+                    +{count} more
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[240px]">
+                  <div className="flex flex-col gap-1">
+                    {remainingEvents.map((evt: CalendarEvent, i: number) => (
+                      <span key={i} className="text-xs truncate">{evt.title}</span>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ),
+        }}
       />
     </div>
   )
