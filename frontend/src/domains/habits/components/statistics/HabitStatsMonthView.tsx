@@ -49,9 +49,9 @@ export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
                 return (
                   <td key={day.date} className={`py-1.5 text-center ${isToday ? 'bg-primary/5 rounded' : ''}`}>
                     <div className={`text-xs ${isToday ? 'font-bold text-primary' : 'text-ink'}`}>{day.day}</div>
-                    {day.completedCount > 0 && (
+                    {day.habitNames.length > 0 && (
                       <span className="mt-0.5 inline-block rounded px-1 text-[10px] bg-emerald-50 text-emerald-600">
-                        {day.completedCount}项
+                        {day.habitNames.length}项
                       </span>
                     )}
                   </td>

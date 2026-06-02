@@ -150,26 +150,51 @@ export async function getHabitStatsForWeek(weekStart: Date): Promise<HabitWeekMa
 
 // ─── 月视图数据 ─────────────────────────────────────────────────
 
+/**
+ * 月视图单日汇总
+ */
 export interface MonthDaySummary {
+  /** 日期（yyyy-MM-dd） */
   date: string
+  /** 日期（1-31） */
   day: number
-  completedCount: number
+  /** 当日已打卡习惯名称列表 */
+  habitNames: string[]
 }
 
+/**
+ * 获取指定月份的习惯统计数据
+ *
+ * @param year - 年份
+ * @param month - 月份（1-12）
+ * @returns 月视图单日汇总列表
+ */
 export async function getHabitStatsForMonth(year: number, month: number): Promise<MonthDaySummary[]> {
+  const habitRepo = new HabitRepository()
   const logRepo = new HabitLogRepository()
 
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
   const startDate = `${monthStr}-01` as DateOnly
   const endDate = `${monthStr}-${new Date(year, month, 0).getDate()}` as DateOnly
 
-  const logsByHabit = await logRepo.findByDateRange(MVP_USER_ID, startDate, endDate)
+  const [logsByHabit, habits] = await Promise.all([
+    logRepo.findByDateRange(MVP_USER_ID, startDate, endDate),
+    habitRepo.findByUserId(MVP_USER_ID),
+  ])
 
-  const allLogs = Array.from(logsByHabit.values()).flat()
-  const countByDate = new Map<string, number>()
-  for (const log of allLogs) {
-    if (log.completionStatus === 'completed') {
-      countByDate.set(log.date, (countByDate.get(log.date) ?? 0) + 1)
+  // 建立 habitId → title 映射
+  const habitTitleMap = new Map(habits.map(h => [h.id, h.title]))
+
+  // 按日期聚合 completed 状态的 habit 名称
+  const namesByDate = new Map<string, string[]>()
+  for (const [habitId, logs] of logsByHabit.entries()) {
+    const title = habitTitleMap.get(habitId) ?? '未知习惯'
+    for (const log of logs) {
+      if (log.completionStatus === 'completed') {
+        const existing = namesByDate.get(log.date) ?? []
+        existing.push(title)
+        namesByDate.set(log.date, existing)
+      }
     }
   }
 
@@ -177,6 +202,6 @@ export async function getHabitStatsForMonth(year: number, month: number): Promis
   return Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1
     const dateStr = `${monthStr}-${String(day).padStart(2, '0')}`
-    return { date: dateStr, day, completedCount: countByDate.get(dateStr) ?? 0 }
+    return { date: dateStr, day, habitNames: namesByDate.get(dateStr) ?? [] }
   })
 }
