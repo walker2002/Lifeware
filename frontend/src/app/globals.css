@@ -226,6 +226,30 @@ body {
 }
 
 /* ========================================================================
+   react-big-calendar 习惯月视图覆盖（确保 dummy row 测量正确）
+   ======================================================================== */
+
+.habit-month-calendar { font-family: "Inter", sans-serif; }
+.habit-month-calendar .rbc-header { border-bottom-color: #e6dfd8; }
+.habit-month-calendar .rbc-month-view { border-color: #e6dfd8; }
+.habit-month-calendar .rbc-month-row + .rbc-month-row,
+.habit-month-calendar .rbc-header + .rbc-header { border-color: #ebe6df; }
+.habit-month-calendar .rbc-today { background: #f5f0e8; }
+.habit-month-calendar .rbc-off-range-bg { background: #faf9f5; }
+.habit-month-calendar .rbc-row-segment { padding: 0 1px 1px; }
+.habit-month-calendar .rbc-row-content-scroll-container { overflow: hidden; }
+
+.timebox-month-calendar { font-family: "Inter", sans-serif; }
+.timebox-month-calendar .rbc-header { border-bottom-color: #e6dfd8; }
+.timebox-month-calendar .rbc-month-view { border-color: #e6dfd8; }
+.timebox-month-calendar .rbc-month-row + .rbc-month-row,
+.timebox-month-calendar .rbc-header + .rbc-header { border-color: #ebe6df; }
+.timebox-month-calendar .rbc-today { background: #f5f0e8; }
+.timebox-month-calendar .rbc-off-range-bg { background: #faf9f5; }
+.timebox-month-calendar .rbc-row-segment { padding: 0 1px 1px; }
+.timebox-month-calendar .rbc-row-content-scroll-container { overflow: hidden; }
+
+/* ========================================================================
    暗色模式（UI-DESIGN-SPEC §1.6, §12）
    通过 <html class="dark"> 切换，所有令牌在 .dark 中重定义
    ======================================================================== */

@@ -9,10 +9,15 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { HabitCard } from "./habit-card"
 import { HabitForm, type HabitFormFields } from "./habit-form"
-import { ChevronDown, ChevronRight, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 /**
  * 习惯列表项
@@ -61,8 +66,6 @@ interface HabitListProps {
 }
 
 type PanelMode = null | "create" | string
-
-const EDIT_PANEL_WIDTH = "w-[480px]"
 
 export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onRefresh, autoOpenCreate, initialFields, onLogHabit, onDetailLogHabit, todayLoggedIds }: HabitListProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -168,14 +171,8 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
   )
 
   return (
-    <div className="flex gap-0 overflow-y-auto max-h-[calc(100vh-200px)]">
-      {/* 左侧：卡片列表 */}
-      <div
-        className={cn(
-          "transition-all duration-300 ease-in-out",
-          panelMode ? "flex-1 min-w-0 pr-4" : "w-full",
-        )}
-      >
+    <>
+      <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-muted-foreground">{habits.length} 个习惯</span>
@@ -312,14 +309,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                   (group.habits.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2 pl-6">暂无习惯</p>
                   ) : (
-                    <div
-                      className={cn(
-                        "grid gap-3 pl-6 transition-all",
-                        panelMode
-                          ? "grid-cols-1 sm:grid-cols-2"
-                          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-                      )}
-                    >
+                    <div className="grid gap-3 pl-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {group.habits.map((habit) => (
                         <HabitCard
                           key={habit.id}
@@ -353,21 +343,14 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         </div>
       </div>
 
-      {/* 右侧：编辑/创建面板 */}
-      {panelMode && (
-        <div className={`${EDIT_PANEL_WIDTH} shrink-0 border-l px-4 overflow-y-auto`}>
-          <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
-            <h3 className="text-sm font-medium">
+      {/* 编辑/创建抽屉 */}
+      <Sheet open={panelMode !== null} onOpenChange={(open) => { if (!open) handlePanelClose() }}>
+        <SheetContent side="right" className="sm:max-w-[560px] px-6 py-6">
+          <SheetHeader>
+            <SheetTitle>
               {panelMode === "create" ? "新建习惯" : "编辑习惯"}
-            </h3>
-            <button
-              type="button"
-              onClick={handlePanelClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
+            </SheetTitle>
+          </SheetHeader>
 
           {submitError && (
             <div className="mb-4 rounded-lg border border-error bg-error-soft px-3 py-2 text-xs text-error">
@@ -389,8 +372,8 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
             onCancel={handlePanelClose}
             isLoading={isSubmitting}
           />
-        </div>
-      )}
-    </div>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }
