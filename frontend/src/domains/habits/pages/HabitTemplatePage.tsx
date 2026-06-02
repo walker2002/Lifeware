@@ -11,6 +11,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
+import { PageBanner } from "@/components/layout/page-banner"
 import { HabitTemplateManager } from "../components/habit-template-manager"
 
 type PageState = "idle" | "dirty" | "submitting"
@@ -66,6 +67,8 @@ export function HabitTemplatePage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <PageBanner domainId="habits" title="习惯模板配置" />
+
       {/* 脏状态指示器 */}
       {pageState !== "idle" && (
         <div

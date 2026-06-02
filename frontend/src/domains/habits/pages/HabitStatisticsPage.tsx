@@ -8,6 +8,7 @@ import { MiniCalendar } from "@/domains/timebox/components/mini-calendar"
 import { HabitStatsDayView } from "../components/statistics/HabitStatsDayView"
 import { HabitStatsWeekView } from "../components/statistics/HabitStatsWeekView"
 import { HabitStatsMonthView } from "../components/statistics/HabitStatsMonthView"
+import { PageBanner } from "@/components/layout/page-banner"
 import { getHabitStatsForDay, getHabitStatsForWeek, getHabitStatsForMonth, type HabitDayRow, type HabitWeekMatrix, type MonthDaySummary } from "@/app/actions/habit-stats"
 
 type ViewMode = "day" | "week" | "month"
@@ -66,7 +67,7 @@ export function HabitStatisticsPage() {
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <h1 className="text-lg font-bold text-ink">习惯统计</h1>
+      <PageBanner domainId="habits" title="习惯统计" />
 
       {/* DateNav — 与时间盒页面一致的导航 + Tab */}
       <div className="flex items-center justify-between">
