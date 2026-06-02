@@ -59,7 +59,7 @@ export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-body/60">
                     <span>当前连续：<strong className="text-ink">{row.streak}</strong> 天</span>
                     <span>7日完成率：<strong className="text-ink">{Math.round(row.completionRate7d * 100)}%</strong></span>
-                    <span>开始时间：<strong className="text-ink">{row.startDate}</strong></span>
+                    <span>开始时间：<strong className="text-ink">{row.startDate || '未设置'}</strong></span>
                     <span>打卡总次数：<strong className="text-ink">{row.totalLogs}</strong></span>
                     <span>最长连续：<strong className="text-ink">{row.longestStreak}</strong> 天</span>
                   </div>

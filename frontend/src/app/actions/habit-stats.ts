@@ -77,6 +77,8 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
       .map(l => l.date)
 
     // 新增：并行查询额外字段
+    // NOTE: MVP 阶段使用 Promise.all 并行化单条查询，避免串行 N+1。
+    // TODO: 当习惯数量增多时，应改为 Repository 层批量查询（如 countByHabit、batchLongestStreak）。
     const [allLogs, longestStreak] = await Promise.all([
       logRepo.findByHabit(habit.id, MVP_USER_ID),
       habitRepo.calculateLongestStreak(habit.id, MVP_USER_ID),

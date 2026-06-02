@@ -103,6 +103,9 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
             backgroundColor: STATUS_BG[event.status] ?? STATUS_BG.planned,
             color: event.status === "running" ? "#ffffff" : "#141413",
             borderLeft: `4px solid ${BORDER_COLOR_MAP[getCardBorderColor(event.executionRecord)] ?? "transparent"}`,
+            fontSize: '11px',
+            lineHeight: '14px',
+            minHeight: '16px',
           },
         })}
         views={["month"]}
