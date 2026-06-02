@@ -8,7 +8,8 @@
 
 'use client'
 
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 /**
  * Domain 与 Banner 图片的映射表
@@ -39,10 +40,13 @@ export interface PageBannerProps {
  * @param title - 页面标题
  */
 export function PageBanner({ domainId, title }: PageBannerProps) {
-  const bannerSrc = useMemo(() => {
+  const [bannerSrc, setBannerSrc] = useState<string | null>(null)
+
+  useEffect(() => {
     const images = DOMAIN_BANNER_MAP[domainId]
-    if (!images || images.length === 0) return null
-    return images[Math.floor(Math.random() * images.length)]
+    if (images?.length) {
+      setBannerSrc(images[Math.floor(Math.random() * images.length)])
+    }
   }, [domainId])
 
   return (
@@ -50,10 +54,12 @@ export function PageBanner({ domainId, title }: PageBannerProps) {
       {/* Banner 图片 */}
       <div className="relative h-[80px] w-full overflow-hidden">
         {bannerSrc ? (
-          <img
+          <Image
             src={bannerSrc}
             alt={`${title} banner`}
-            className="h-full w-full object-cover"
+            fill
+            className="object-cover"
+            priority
           />
         ) : (
           <div className="h-full w-full bg-surface-soft" />
