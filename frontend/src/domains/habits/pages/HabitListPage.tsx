@@ -25,6 +25,7 @@ import {
   deleteHabit,
   logHabit,
 } from "@/app/actions/intent"
+import { PageBanner } from "@/components/layout/page-banner"
 
 // ─── 类型与辅助函数 ────────────────────────────────────────────────
 
@@ -273,6 +274,8 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
 
   return (
     <div className="flex flex-col gap-4">
+      <PageBanner domainId="habits" title="习惯管理" />
+
       {/* 错误横幅 */}
       {submitError && (
         <div className="flex items-center justify-between rounded-lg border border-error bg-error-soft px-4 py-2 text-sm text-error">
