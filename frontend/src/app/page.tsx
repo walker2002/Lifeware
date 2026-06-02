@@ -100,16 +100,14 @@ function HomeContent() {
     : mainViewState.type === 'settings' ? <SettingsPage initialSection={mainViewState.section} />
     : null
 
-  const mainContentWithBanner = (
-    <div className="flex h-full flex-col">
-      {mainViewState.type === 'schedule' && (
+  const mainContentWithBanner = mainViewState.type === 'schedule'
+    ? (
+      <>
         <PageBanner domainId="home" title="我的时间盒" />
-      )}
-      <div className="flex-1 overflow-auto">
         {mainContent}
-      </div>
-    </div>
-  )
+      </>
+    )
+    : mainContent
 
   return (
     <>
