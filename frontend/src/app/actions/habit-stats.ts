@@ -27,6 +27,12 @@ export interface HabitDayRow {
   habitId: string
   /** 习惯标题 */
   title: string
+  /** 习惯开始时间（ISO 日期 yyyy-MM-dd） */
+  startDate: string
+  /** 历史打卡总次数 */
+  totalLogs: number
+  /** 历史最长连续打卡天数 */
+  longestStreak: number
   /** 当前连续打卡天数 */
   streak: number
   /** 7天完成率 */
@@ -58,7 +64,7 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
 
   const today = format(date, 'yyyy-MM-dd')
 
-  return habits.map(habit => {
+  return Promise.all(habits.map(async habit => {
     const logs = recentLogs.get(habit.id) ?? []
     const recent5 = eachDayOfInterval({ start: subDays(date, 4), end: date }).map(d => {
       const dateStr = format(d, 'yyyy-MM-dd')
@@ -70,14 +76,23 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
       .filter(l => l.completionStatus === 'completed')
       .map(l => l.date)
 
+    // 新增：并行查询额外字段
+    const [allLogs, longestStreak] = await Promise.all([
+      logRepo.findByHabit(habit.id, MVP_USER_ID),
+      habitRepo.calculateLongestStreak(habit.id, MVP_USER_ID),
+    ])
+
     return {
       habitId: habit.id,
       title: habit.title,
+      startDate: habit.startDate ?? '',
+      totalLogs: allLogs.length,
+      longestStreak,
       streak: calculateStreak(completedDates, today),
       completionRate7d: calculateCompletion7d(completedDates, today) / 7,
       recent5Days: recent5,
     }
-  })
+  }))
 }
 
 // ─── 周视图数据 ─────────────────────────────────────────────────
