@@ -194,3 +194,37 @@ export async function saveSurfaceOutcome(
 
   await sessionRepo.updateStateSnapshot(sessionId, updatedSnapshot, MVP_USER_ID)
 }
+
+/**
+ * 获取 session 中所有 CN-UI surface 的最终状态
+ *
+ * @param sessionId - 会话 ID
+ * @returns surface 状态映射表
+ */
+export async function getSessionSurfaceOutcomes(
+  sessionId: string,
+): Promise<Record<string, { state: 'saved' | 'cancelled'; dataModel: Record<string, unknown> }>> {
+  const session = await sessionRepo.findById(sessionId, MVP_USER_ID)
+  if (!session) return {}
+
+  const surfaceStates = session.stateSnapshot?.cnuiSurfaceStates as Record<string, unknown> | undefined
+  if (!surfaceStates) return {}
+
+  const result: Record<string, { state: 'saved' | 'cancelled'; dataModel: Record<string, unknown> }> = {}
+
+  for (const [surfaceId, outcome] of Object.entries(surfaceStates)) {
+    if (
+      outcome &&
+      typeof outcome === 'object' &&
+      'state' in outcome &&
+      (outcome.state === 'saved' || outcome.state === 'cancelled')
+    ) {
+      result[surfaceId] = {
+        state: outcome.state as 'saved' | 'cancelled',
+        dataModel: (outcome as Record<string, unknown>).dataModel as Record<string, unknown> ?? {},
+      }
+    }
+  }
+
+  return result
+}
