@@ -10,7 +10,7 @@
 import { useState, useCallback, useRef } from "react"
 import { useAppView } from "@/contexts/app-context"
 import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
-import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from '@/app/actions/session'
+import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle, saveSurfaceOutcome } from '@/app/actions/session'
 
 /**
  * 会话管理 Hook
@@ -157,14 +157,25 @@ export function useConversation() {
     setMainViewState({ type: 'conversation', sessionId })
   }, [mainViewState, activeSessionId, setMainViewState])
 
-  /** CNUI 表面状态变更 → 持久化到消息中 */
-  const handleSurfaceStateChange = useCallback((surfaceId: string, state: SurfaceState) => {
+  /** CNUI 表面状态变更 → 持久化到消息中 + 后端 session */
+  const handleSurfaceStateChange = useCallback(async (surfaceId: string, state: SurfaceState) => {
+    // 1. 更新本地 messages
     setConversationMessages(prev => prev.map(msg => {
       if (msg.cnuiSurface?.cnuiSurfaceId === surfaceId) {
         return { ...msg, cnuiSurface: { ...msg.cnuiSurface, state } }
       }
       return msg
     }))
+
+    // 2. 持久化到后端 session stateSnapshot（仅终端状态）
+    const sid = activeSessionIdRef.current
+    if (sid && (state === 'saved' || state === 'cancelled')) {
+      try {
+        await saveSurfaceOutcome(sid, surfaceId, state)
+      } catch (err) {
+        console.error('[handleSurfaceStateChange] 持久化 surface 状态失败:', err)
+      }
+    }
   }, [])
 
   return {
