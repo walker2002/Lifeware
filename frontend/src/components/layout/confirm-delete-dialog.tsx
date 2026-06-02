@@ -1,3 +1,10 @@
+/**
+ * @file confirm-delete-dialog
+ * @brief 确认删除对话框组件
+ * 
+ * 提供删除会话的二次确认功能
+ */
+
 'use client'
 
 import {
@@ -6,10 +13,17 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+/**
+ * ConfirmDeleteDialog 组件属性
+ */
 interface ConfirmDeleteDialogProps {
+  /** 是否打开 */
   open: boolean
+  /** 会话标题 */
   sessionTitle: string
+  /** 确认回调 */
   onConfirm: () => void
+  /** 取消回调 */
   onCancel: () => void
 }
 

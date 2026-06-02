@@ -1,11 +1,24 @@
+/**
+ * @file init-db
+ * @brief 数据库初始化检查脚本
+ * 
+ * @usage npx tsx scripts/init-db.ts
+ * 
+ * 检查数据库是否已初始化（通过检测 users 表是否存在）
+ * 并给出相应的操作建议
+ */
+
 import { db } from '../src/lib/db'
 import { sql } from 'drizzle-orm'
 
+/**
+ * 主函数：检查数据库初始化状态
+ */
 async function main() {
   console.log('Initializing database...')
 
   try {
-    // Check if the users table exists to verify migration has been applied
+    // 检查 users 表是否存在以验证迁移是否已应用
     const result = await db.execute(sql`
       SELECT EXISTS (
         SELECT FROM information_schema.tables

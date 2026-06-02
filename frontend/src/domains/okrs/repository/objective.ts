@@ -1,3 +1,10 @@
+/**
+ * @file objective
+ * @brief Objective 仓储实现
+ * 
+ * 实现 IObjectiveRepository 接口，提供 Objective 数据的数据库操作
+ */
+
 import { eq, and, between, inArray, ne, like, sql } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -7,6 +14,9 @@ import type { USOM_ID, ObjectiveStatus, DateOnly } from '../../../usom/types/pri
 import { objectiveRowToUSOM, objectiveUSOMToRow } from '../../../lib/db/repositories/mappers'
 import { keyResultRowToUSOM } from '../../../lib/db/repositories/mappers'
 
+/**
+ * Objective 仓储
+ */
 export class ObjectiveRepository implements IObjectiveRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Objective | null> {
     const rows = await db.select().from(s.objectives)

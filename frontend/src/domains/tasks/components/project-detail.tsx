@@ -1,3 +1,10 @@
+/**
+ * @file project-detail
+ * @brief 项目详情组件
+ * 
+ * 展示项目详情及其任务列表
+ */
+
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -6,14 +13,25 @@ import { TaskList, buildTree } from "./task-list"
 import type { Project, Task } from "@/usom/types/objects"
 import type { TaskStatus, ProjectStatus } from "@/usom/types/primitives"
 
+/**
+ * 项目详情属性
+ */
 interface ProjectDetailProps {
+  /** 项目对象 */
   project: Project
+  /** 任务列表 */
   tasks: Task[]
+  /** 添加任务回调 */
   onAddTask: (parentId?: string) => void
+  /** 编辑任务回调 */
   onEditTask: (taskId: string) => void
+  /** 编辑项目回调 */
   onEditProject: () => void
+  /** 保存为模板回调 */
   onSaveAsTemplate: () => void
+  /** 任务状态变更回调 */
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void
+  /** 项目状态变更回调 */
   onProjectStatusChange: (newStatus: ProjectStatus) => void
 }
 

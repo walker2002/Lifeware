@@ -1,3 +1,10 @@
+/**
+ * @file popover
+ * @brief 气泡弹出框组件
+ * 
+ * 基于 shadcn/ui 的气泡弹出框组件
+ */
+
 "use client"
 
 import * as React from "react"

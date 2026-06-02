@@ -1,3 +1,10 @@
+/**
+ * @file project
+ * @brief 项目仓储实现
+ * 
+ * 实现 IProjectRepository 接口，提供项目数据的数据库操作
+ */
+
 import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -7,6 +14,9 @@ import type { USOM_ID, ProjectStatus } from '../../../usom/types/primitives'
 import { projectRowToUSOM, projectUSOMToRow, projectTemplateRowToUSOM } from '../../../lib/db/repositories/mappers'
 import { v4 } from 'uuid'
 
+/**
+ * 项目仓储
+ */
 export class ProjectRepository implements IProjectRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Project | null> {
     const rows = await db.select().from(s.projects)

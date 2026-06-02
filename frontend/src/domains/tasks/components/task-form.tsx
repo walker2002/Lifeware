@@ -1,3 +1,10 @@
+/**
+ * @file task-form
+ * @brief 任务表单组件
+ * 
+ * 提供任务创建和编辑的表单界面
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -9,6 +16,9 @@ import { SplitWarning } from "./split-warning"
 import type { Task } from "@/usom/types/objects"
 import { Priority, EnergyLevel } from "@/usom/types/primitives"
 
+/**
+ * 任务表单数据
+ */
 export interface TaskFormData {
   title: string
   description?: string

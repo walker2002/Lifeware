@@ -1,23 +1,48 @@
+/**
+ * @file growth-menu
+ * @brief 成长菜单组件
+ * 
+ * 展示各域的操作菜单，支持折叠和置顶功能
+ */
+
 "use client"
 
 import { useState, useCallback } from "react"
 import { CheckSquare, Clock, Repeat, Target, Pin, PinOff, ChevronDown, MessageSquare, LayoutGrid, FileText } from "lucide-react"
 
+/**
+ * 域操作项
+ */
 interface DomainAction {
+  /** 动作名称 */
   action: string
+  /** 快捷键 */
   shortcut?: string
+  /** 描述 */
   description: string
+  /** 响应类型 */
   response_type?: 'cnui' | 'page' | 'text'
 }
 
+/**
+ * 域操作分组
+ */
 interface DomainActionGroup {
+  /** 域 ID */
   domainId: string
+  /** 域名称 */
   domainName: string
+  /** 操作列表 */
   actions: DomainAction[]
 }
 
+/**
+ * GrowthMenu 组件属性
+ */
 interface GrowthMenuProps {
+  /** 域操作分组列表 */
   domainActions: DomainActionGroup[]
+  /** 操作回调 */
   onAction: (domainId: string, action: string) => void
 }
 

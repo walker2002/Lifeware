@@ -1,15 +1,25 @@
+/**
+ * @file file-parser
+ * @brief OKR 导入文件解析器
+ * 
+ * 支持解析多种文件格式（Markdown、文本、Excel、Word）
+ */
+
 "use client"
 
 import * as XLSX from 'xlsx'
 import mammoth from 'mammoth'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+/** 最大文件大小（5MB） */
+const MAX_FILE_SIZE = 5 * 1024 * 1024
 
+/** 支持的文件扩展名 */
 const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.xlsx', '.docx']
 
 /**
  * 校验文件：格式和大小
- * 返回错误信息，校验通过返回 null
+ * @param file - 文件对象
+ * @returns 错误信息，校验通过返回 null
  */
 export function validateFile(file: File): string | null {
   const ext = getFileExtension(file.name)
@@ -27,6 +37,8 @@ export function validateFile(file: File): string | null {
 
 /**
  * 解析上传文件为纯文本
+ * @param file - 文件对象
+ * @returns 文件文本内容
  */
 export async function parseFileToText(file: File): Promise<string> {
   const ext = getFileExtension(file.name)
@@ -44,15 +56,30 @@ export async function parseFileToText(file: File): Promise<string> {
   }
 }
 
+/**
+ * 获取文件扩展名
+ * @param filename - 文件名
+ * @returns 小写扩展名（包含点）
+ */
 function getFileExtension(filename: string): string {
   const idx = filename.lastIndexOf('.')
   return idx === -1 ? '' : filename.slice(idx).toLowerCase()
 }
 
+/**
+ * 解析纯文本文件
+ * @param file - 文件对象
+ * @returns 文本内容
+ */
 async function parseTextFile(file: File): Promise<string> {
   return file.text()
 }
 
+/**
+ * 解析 Excel 文件
+ * @param file - 文件对象
+ * @returns 解析后的文本
+ */
 async function parseExcelFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array' })
@@ -71,6 +98,11 @@ async function parseExcelFile(file: File): Promise<string> {
   return parts.join('\n')
 }
 
+/**
+ * 解析 Word 文件
+ * @param file - 文件对象
+ * @returns 提取的纯文本
+ */
 async function parseWordFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   const result = await mammoth.extractRawText({ arrayBuffer: buffer })

@@ -1,3 +1,14 @@
+/**
+ * @file encrypt
+ * @brief 客户端加密工具
+ * 
+ * 使用设备指纹派生密钥进行 AES-GCM 加密
+ */
+
+/**
+ * 获取设备指纹
+ * @returns SHA-256 哈希值（十六进制字符串）
+ */
 async function getFingerprint(): Promise<string> {
   const components = [
     navigator.userAgent,
@@ -12,6 +23,10 @@ async function getFingerprint(): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+/**
+ * 从设备指纹派生加密密钥
+ * @returns AES-GCM 密钥
+ */
 async function deriveKey(): Promise<CryptoKey> {
   const fingerprint = await getFingerprint()
   const encoder = new TextEncoder()
@@ -31,6 +46,11 @@ async function deriveKey(): Promise<CryptoKey> {
   )
 }
 
+/**
+ * 加密文本
+ * @param plainText - 明文
+ * @returns Base64 编码的密文（包含 IV）
+ */
 export async function encrypt(plainText: string): Promise<string> {
   const key = await deriveKey()
   const encoder = new TextEncoder()
@@ -46,6 +66,11 @@ export async function encrypt(plainText: string): Promise<string> {
   return btoa(String.fromCharCode(...combined))
 }
 
+/**
+ * 解密文本
+ * @param cipherText - Base64 编码的密文（包含 IV）
+ * @returns 明文
+ */
 export async function decrypt(cipherText: string): Promise<string> {
   const key = await deriveKey()
   const combined = Uint8Array.from(atob(cipherText), c => c.charCodeAt(0))

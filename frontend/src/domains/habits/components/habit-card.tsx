@@ -1,3 +1,10 @@
+/**
+ * @file habit-card
+ * @brief 习惯卡片组件
+ * 
+ * 展示单个习惯的摘要信息和操作按钮
+ */
+
 "use client"
 
 import { Badge } from "@/components/ui/badge"
@@ -5,6 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
+/**
+ * 习惯卡片属性
+ */
 interface HabitCardProps {
   /** 习惯标题 */
   title: string

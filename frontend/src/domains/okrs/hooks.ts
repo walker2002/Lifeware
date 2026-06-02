@@ -1,5 +1,10 @@
-// OKR Domain Hooks — 工厂函数模式
-// 遵循 Constitution Principle VI: 无副作用、无数据库调用
+/**
+ * @file hooks
+ * @brief OKR 域钩子函数工厂
+ * 
+ * 工厂函数模式，遵循 Constitution Principle VI: 无副作用、无数据库调用
+ * 提供意图验证、事件响应和动作表面请求处理能力
+ */
 
 import type {
   USOMSnapshot,
@@ -13,12 +18,23 @@ import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 
+/**
+ * 创建 OKR 域钩子函数
+ * @param manifest - 域 manifest
+ * @returns 钩子函数对象
+ */
 export function createOkrsHooks(manifest: DomainManifest) {
   const subscribedEvents = new Set(manifest.subscribed_events)
   const validOkrTypes = new Set(
     manifest.field_metadata.okrType?.options ?? ['visionary', 'committed']
   )
 
+  /**
+   * 验证意图
+   * @param intent - 结构化意图
+   * @param _snapshot - USOM 快照
+   * @returns 验证结果
+   */
   function onValidate(
     intent: StructuredIntent,
     _snapshot: USOMSnapshot,
@@ -86,6 +102,12 @@ export function createOkrsHooks(manifest: DomainManifest) {
     return { valid: errors.length === 0, errors }
   }
 
+  /**
+   * 处理系统事件
+   * @param event - 系统事件
+   * @param _snapshot - USOM 快照
+   * @returns 指标更新和动作表面建议
+   */
   function onEvent(
     event: SystemEvent,
     _snapshot: USOMSnapshot,
@@ -169,6 +191,12 @@ export function createOkrsHooks(manifest: DomainManifest) {
     }
   }
 
+  /**
+   * 处理动作表面请求
+   * @param snapshot - USOM 快照
+   * @param _signals - 派生信号
+   * @returns 动作候选列表、分类和权重
+   */
   function onActionSurfaceRequest(
     snapshot: USOMSnapshot,
     _signals: Readonly<DerivedSignals>,

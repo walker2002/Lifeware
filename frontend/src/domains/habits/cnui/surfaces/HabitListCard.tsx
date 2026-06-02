@@ -1,23 +1,49 @@
+/**
+ * @file HabitListCard
+ * @brief 习惯列表卡片 Surface
+ * 
+ * CNUI Surface 组件，展示活跃习惯列表
+ */
+
 'use client'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * 习惯项
+ */
 interface HabitItem {
+  /** ID */
   id: string
+  /** 标题 */
   title: string
+  /** 默认时间 */
   defaultTime: string
+  /** 默认时长 */
   defaultDuration: number
+  /** 连续天数 */
   streak: number
+  /** 频率类型 */
   frequencyType?: string
+  /** 状态 */
   status: string
 }
 
+/**
+ * 习惯列表卡片属性
+ */
 interface HabitListCardProps {
+  /** Surface 类型 */
   surfaceType: string
+  /** 数据模型 */
   dataModel: Record<string, unknown>
+  /** 数据变更回调 */
   onDataChange: (data: Record<string, unknown>) => void
+  /** 确认回调 */
   onConfirm: (data: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 是否加载中 */
   isLoading?: boolean
 }
 

@@ -1,3 +1,10 @@
+/**
+ * @file habit-form
+ * @brief 习惯表单组件
+ * 
+ * 提供习惯创建和编辑的表单界面
+ */
+
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
@@ -7,6 +14,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { validateHabitFields } from '../validation'
 
+/**
+ * 习惯表单字段
+ */
 export interface HabitFormFields {
   title: string
   description?: string

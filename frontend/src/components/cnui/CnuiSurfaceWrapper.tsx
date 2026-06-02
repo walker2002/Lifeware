@@ -1,16 +1,33 @@
+/**
+ * @file CnuiSurfaceWrapper
+ * @brief CN-UI 动作面包装器组件
+ * 
+ * 包装 CN-UI 渲染器，处理生命周期状态、数据快照和完成状态展示
+ */
+
 'use client'
 
 import { CnuiRenderer } from './CnuiRenderer'
 import { CnuiConfirmDialog } from './cnui-confirm-dialog'
 import type { CnuiLifecycleState, CnuiLifecycleActions } from './use-cnui-lifecycle'
 
+/**
+ * CnuiSurfaceWrapper 组件属性
+ */
 interface CnuiSurfaceWrapperProps {
+  /** 动作面 ID */
   surfaceId: string
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
+  /** 动作面类型 */
   surfaceType: string
+  /** 数据快照 */
   dataSnapshot: Record<string, unknown> | undefined
+  /** 生命周期状态 */
   lifecycleState: CnuiLifecycleState
+  /** 生命周期操作 */
   lifecycleActions: CnuiLifecycleActions
 }
 

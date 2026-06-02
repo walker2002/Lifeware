@@ -1,3 +1,10 @@
+/**
+ * @file detail-panel
+ * @brief 任务/项目详情面板
+ * 
+ * 展示任务和项目的详细信息，支持编辑和状态变更
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -10,15 +17,27 @@ import { TaskForm, type TaskFormData } from "./task-form"
 import type { Project, Task } from "@/usom/types/objects"
 import type { TaskStatus, ProjectStatus } from "@/usom/types/primitives"
 
+/**
+ * 详情面板属性
+ */
 interface DetailPanelProps {
+  /** 选中的项目 */
   selectedProject: Project | null
+  /** 选中的任务 */
   selectedTask: Task | null
+  /** 所有任务列表 */
   allTasks: Task[]
+  /** 创建任务回调 */
   onCreateTask: (data: TaskFormData & { projectId?: string; parentId?: string }) => Promise<void>
+  /** 创建项目回调 */
   onCreateProject: (data: ProjectFormData) => Promise<void>
+  /** 更新项目回调 */
   onUpdateProject: (projectId: string, data: ProjectFormData) => Promise<void>
+  /** 更新任务状态回调 */
   onUpdateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>
+  /** 更新项目状态回调 */
   onUpdateProjectStatus: (projectId: string, status: ProjectStatus) => Promise<void>
+  /** 保存为模板回调 */
   onSaveAsTemplate: (projectId: string) => Promise<void>
 }
 

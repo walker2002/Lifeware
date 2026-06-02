@@ -1,12 +1,28 @@
+/**
+ * @file chat-bubble
+ * @brief 聊天消息气泡组件
+ * 
+ * 渲染不同角色的聊天消息，支持用户、AI 和系统消息三种类型
+ */
+
 "use client"
 
 import type { ReactNode } from "react"
 
+/**
+ * 聊天消息角色类型
+ */
 type ChatBubbleRole = "user" | "assistant" | "system"
 
+/**
+ * ChatBubble 组件属性
+ */
 interface ChatBubbleProps {
+  /** 消息角色 */
   role: ChatBubbleRole
+  /** 消息内容 */
   children: ReactNode
+  /** 时间戳 */
   timestamp?: string
 }
 

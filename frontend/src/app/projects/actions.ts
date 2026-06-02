@@ -1,3 +1,10 @@
+/**
+ * @file actions
+ * @brief 项目管理 Server Action 模块
+ * 
+ * 提供项目和任务的创建、查询、更新、删除等功能
+ */
+
 "use server"
 
 import { revalidatePath } from "next/cache"
@@ -14,9 +21,19 @@ import { SystemEventRepository } from "@/lib/db/repositories/system-event.reposi
 import { TimeboxRepository } from "@/domains/timebox/repository"
 import type { USOM_ID, Timestamp } from "@/usom/types/primitives"
 
+/** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+/** 当前用户 ID */
 const userId = MVP_USER_ID
 
+/**
+ * 构建意图对象
+ * 
+ * @param action - 动作名称
+ * @param fields - 动作字段
+ * @returns 意图对象
+ */
 function makeIntent(action: string, fields: Record<string, unknown>) {
   const now = new Date().toISOString() as Timestamp
   return {
@@ -31,6 +48,10 @@ function makeIntent(action: string, fields: Record<string, unknown>) {
   }
 }
 
+/**
+ * 创建任务编排器实例
+ * @returns 任务编排器
+ */
 async function createTasksOrchestrator() {
   const taskRepo = new TaskRepository()
   const projectRepo = new ProjectRepository()

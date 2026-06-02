@@ -1,15 +1,21 @@
-// 追踪日志类型定义
-// 记录 Nexus 管道各组件的输入/输出和状态机转换详情
+/**
+ * @file trace-types
+ * @brief 追踪日志类型定义
+ * 
+ * 记录 Nexus 管道各组件的输入/输出和状态机转换详情
+ */
 
 import type { Timestamp } from '@/usom/types/primitives'
 import type { TimeboxStatus } from '@/usom/types/primitives'
 
 // ─── 追踪步骤阶段 ─────────────────────────────────────────────
 
+/** 追踪阶段：开始或结束 */
 export type TracePhase = 'start' | 'end'
 
 // ─── 组件名称 ─────────────────────────────────────────────────
 
+/** 追踪组件名 */
 export type TraceComponent =
   | 'IntentEngine'
   | 'RuleEngine'
@@ -21,6 +27,7 @@ export type TraceComponent =
 
 // ─── 追踪步骤 ─────────────────────────────────────────────────
 
+/** 追踪步骤 */
 export interface TraceStep {
   /** 步骤序号 */
   id: number

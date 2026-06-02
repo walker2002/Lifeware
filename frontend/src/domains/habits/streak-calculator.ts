@@ -1,5 +1,10 @@
-// 纯函数：习惯 streak 指标计算
-// 输入为日期数组（来自 habit_logs），输出为 streak / longestStreak / completionCount7d
+/**
+ * @file streak-calculator
+ * @brief 习惯连续打卡计算器
+ * 
+ * 纯函数：习惯 streak 指标计算
+ * 输入为日期数组（来自 habit_logs），输出为 streak / longestStreak / completionCount7d
+ */
 
 /** 将 DateOnly 字符串 (YYYY-MM-DD) 转为可比较的整数 YYYYMMDD */
 function dateToDay(d: string): number {
@@ -15,6 +20,7 @@ function dayDiff(a: string, b: string): number {
 
 /**
  * 从已排序的打卡日期列表中计算当前连续天数
+ * 
  * @param completedDates 按 ASC 排序的已完成日期 (YYYY-MM-DD)
  * @param today 今天的日期 (YYYY-MM-DD)
  * @returns 当前连续天数（今天有打卡则 >= 1，今天没打卡但昨天有则为 0）

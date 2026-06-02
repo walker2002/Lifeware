@@ -1,3 +1,10 @@
+/**
+ * @file alert-dialog
+ * @brief 警告对话框组件
+ * 
+ * 基于 shadcn/ui 的警告对话框组件
+ */
+
 "use client"
 
 import * as React from "react"

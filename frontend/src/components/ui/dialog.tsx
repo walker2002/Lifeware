@@ -1,3 +1,10 @@
+/**
+ * @file dialog
+ * @brief 对话框组件
+ * 
+ * 基于 shadcn/ui 的对话框组件
+ */
+
 "use client"
 
 import * as React from "react"

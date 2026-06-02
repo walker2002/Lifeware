@@ -1,10 +1,23 @@
+/**
+ * @file TimePicker
+ * @brief CN-UI 时间选择组件
+ * 
+ * 提供时间输入功能
+ */
+
 'use client'
 
 import { Input } from '@/components/ui/input'
 
+/**
+ * TimePicker 组件属性
+ */
 interface TimePickerProps {
+  /** 当前值（HH:mm 格式） */
   value: string
+  /** 值变更回调 */
   onChange: (value: string) => void
+  /** 标签文本 */
   label?: string
 }
 

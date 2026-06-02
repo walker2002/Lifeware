@@ -1,3 +1,10 @@
+/**
+ * @file layout
+ * @brief 应用根布局组件
+ * 
+ * 定义应用的全局布局结构，包括字体配置、主题提供者、工具提示和通知组件
+ */
+
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
@@ -5,7 +12,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-/* DESIGN.md 字体栈：Cormorant Garamond（标题）、Inter（正文）、JetBrains Mono（代码） */
+// ─── 字体配置 ───────────────────────────────────────────────────
+
+/**
+ * DESIGN.md 字体栈：
+ * - Cormorant Garamond（标题字体）
+ * - Inter（正文字体）
+ * - JetBrains Mono（代码字体）
+ */
 const displayFont = Cormorant_Garamond({
   variable: "--font-display",
   subsets: ["latin"],
@@ -24,11 +38,21 @@ const codeFont = JetBrains_Mono({
   weight: ["400"],
 });
 
+// ─── 元数据配置 ───────────────────────────────────────────────────
+
+/**
+ * 应用元数据
+ */
 export const metadata: Metadata = {
   title: "Lifeware",
   description: "意图驱动的个人成长系统",
 };
 
+/**
+ * 根布局组件
+ * 
+ * @param children - 子组件内容
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

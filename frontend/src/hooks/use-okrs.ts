@@ -1,3 +1,10 @@
+/**
+ * @file use-okrs
+ * @brief OKR 管理 Hook
+ * 
+ * 提供 OKR 的增删改查等操作
+ */
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -17,6 +24,9 @@ import {
   deleteDraftKeyResult,
 } from "@/app/actions/okr"
 
+/**
+ * OKR Hook 返回结果
+ */
 interface UseOKRsResult {
   objectives: Objective[]
   isLoading: boolean

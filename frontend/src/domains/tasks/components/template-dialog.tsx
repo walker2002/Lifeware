@@ -1,3 +1,10 @@
+/**
+ * @file template-dialog
+ * @brief 模板选择对话框
+ * 
+ * 提供从模板创建项目的功能
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -5,12 +12,21 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ProjectTemplate } from "@/usom/types/objects"
 
+/**
+ * 模板对话框属性
+ */
 interface TemplateDialogProps {
+  /** 是否打开 */
   open: boolean
+  /** 打开状态变更回调 */
   onOpenChange: (open: boolean) => void
+  /** 应用模板回调 */
   onApplyTemplate: (templateId: string) => Promise<void>
+  /** 保存当前为模板回调 */
   onSaveCurrentAsTemplate?: () => Promise<void>
+  /** 模板列表 */
   templates: ProjectTemplate[]
+  /** 是否加载中 */
   loading?: boolean
 }
 

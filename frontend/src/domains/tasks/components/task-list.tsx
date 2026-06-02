@@ -1,3 +1,10 @@
+/**
+ * @file task-list
+ * @brief 任务列表组件
+ * 
+ * 展示任务树形结构，支持折叠、状态变更等操作
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -6,10 +13,17 @@ import { StatusBadge } from "./status-badge"
 import type { Task } from "@/usom/types/objects"
 import type { TaskStatus } from "@/usom/types/primitives"
 
+/**
+ * 带子任务的任务
+ */
 export interface TaskWithChildren extends Task {
+  /** 子任务列表 */
   children: TaskWithChildren[]
 }
 
+/**
+ * 任务列表属性
+ */
 interface TaskListProps {
   tasks: TaskWithChildren[]
   onTaskClick: (taskId: string) => void

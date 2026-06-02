@@ -1,3 +1,10 @@
+/**
+ * @file calendar
+ * @brief 日历组件
+ * 
+ * 基于 shadcn/ui 的日历组件
+ */
+
 "use client"
 
 import * as React from "react"

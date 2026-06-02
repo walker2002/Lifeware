@@ -1,10 +1,33 @@
+/**
+ * @file validator
+ * @brief Manifest 语义校验器
+ * 
+ * 验证 manifest 的语义正确性，包括状态机一致性检查
+ */
+
 import type { DomainManifest } from './schema'
 
+/**
+ * 语义错误
+ */
 interface SemanticError {
+  /** 字段路径 */
   fieldPath: string[]
+  /** 错误消息 */
   message: string
 }
 
+/**
+ * 校验 manifest 语义正确性
+ * 
+ * 验证内容：
+ * - initial_state 必须在 states 中
+ * - terminal_states 必须是 states 的子集
+ * - transitions 中的 from/to 必须在 states 中
+ * 
+ * @param manifest - 领域 manifest
+ * @returns 语义错误列表
+ */
 export function validateSemantics(manifest: DomainManifest): SemanticError[] {
   const errors: SemanticError[] = []
 

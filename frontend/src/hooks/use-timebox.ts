@@ -1,3 +1,10 @@
+/**
+ * @file use-timebox
+ * @brief 时间盒管理 Hook
+ * 
+ * 提供时间盒的加载、导航、状态转换等功能
+ */
+
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -15,8 +22,16 @@ import {
   addDays, addWeeks, addMonths,
 } from "date-fns";
 
+/** 初始时间盒列表 */
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 
+/**
+ * 获取日期范围
+ * 
+ * @param mode - 日期视图模式
+ * @param date - 基准日期
+ * @returns 日期范围
+ */
 function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
   switch (mode) {
     case 'day':

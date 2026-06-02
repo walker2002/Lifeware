@@ -1,19 +1,44 @@
+/**
+ * @file task-extractor
+ * @brief 任务提取工具
+ * 
+ * 从 Markdown 模板提取任务结构，支持规则解析和 LLM 辅助
+ */
+
+/**
+ * 导入预览结构
+ */
 export interface ImportPreview {
+  /** 项目信息 */
   project?: {
+    /** 项目名称 */
     name: string
+    /** 优先级 */
     priority?: string
+    /** 默认最早时间 */
     defaultEarliestTime?: string
+    /** 默认最晚时间 */
     defaultLatestStartTime?: string
+    /** 描述 */
     description?: string
   }
+  /** 任务列表 */
   tasks: Array<{
+    /** 临时 ID */
     tempId: string
+    /** 任务标题 */
     title: string
+    /** 层级深度 */
     depth: number
+    /** 父任务临时 ID */
     parentTempId?: string
+    /** 预估时长 */
     estimatedDuration?: number
+    /** 优先级 */
     priority?: string
+    /** 所需能量 */
     energyRequired?: string
+    /** 频率类型 */
     frequencyType?: string
   }>
 }
@@ -21,6 +46,8 @@ export interface ImportPreview {
 /**
  * 从 Markdown 模板文本提取结构化导入预览。
  * MVP 阶段使用纯规则解析；生产环境可接入 LLM。
+ * @param markdown - Markdown 字符串
+ * @returns 导入预览结构
  */
 export async function extractTasks(markdown: string): Promise<ImportPreview> {
   const lines = markdown.split('\n')
@@ -98,6 +125,8 @@ export async function extractTasks(markdown: string): Promise<ImportPreview> {
 /**
  * Markdown 规则解析无法满足时调用 LLM 提取。
  * 需要 OPENAI_API_KEY 环境变量。
+ * @param markdown - Markdown 字符串
+ * @returns 导入预览结构
  */
 export async function extractTasksWithLLM(markdown: string): Promise<ImportPreview> {
   const OpenAI = (await import('openai')).default

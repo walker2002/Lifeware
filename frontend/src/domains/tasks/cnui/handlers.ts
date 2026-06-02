@@ -1,3 +1,10 @@
+/**
+ * @file handlers
+ * @brief Tasks CNUI Surface 处理器
+ * 
+ * 实现 CN-UI 协议的 Surface Handler，处理任务相关的打开、提交事件
+ */
+
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 import { TaskRepository } from '@/domains/tasks/repository/task'
 import { SystemEventRepository } from '@/lib/db/repositories/system-event.repository'
@@ -7,16 +14,24 @@ import type { SystemEvent, SystemEventType } from '@/usom/types/process'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
+/** 生命周期状态映射 */
 const LIFECYCLE_STATUS_MAP: Record<string, string> = {
   completeTask: 'active',
   archiveTask: 'completed',
 }
 
+/** 生命周期状态机动作映射 */
 const LIFECYCLE_SM_ACTION: Record<string, string> = {
   completeTask: 'complete',
   archiveTask: 'archive',
 }
 
+/**
+ * 根据状态获取任务列表
+ * 
+ * @param status - 任务状态
+ * @returns 任务列表
+ */
 async function getTasksByStatus(status: string): Promise<Record<string, unknown>[]> {
   try {
     const repo = new TaskRepository()

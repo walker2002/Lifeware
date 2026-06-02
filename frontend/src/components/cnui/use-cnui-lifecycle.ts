@@ -1,3 +1,10 @@
+/**
+ * @file use-cnui-lifecycle
+ * @brief CN-UI 生命周期管理 Hook
+ * 
+ * 管理 CN-UI 动作面的状态、数据、验证和提交流程
+ */
+
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -5,32 +12,65 @@ import type { SurfaceState } from '@/usom/types/objects'
 
 export type { SurfaceState }
 
+/**
+ * CN-UI 生命周期状态
+ */
 export interface CnuiLifecycleState {
+  /** 各动作面的状态 */
   surfaceStates: Record<string, SurfaceState>
+  /** 各动作面的数据 */
   surfaceData: Record<string, Record<string, unknown>>
+  /** 当前正在提交的动作面 ID */
   submittingId: string | null
+  /** 各动作面的验证错误 */
   validationErrors: Record<string, string[]>
+  /** 确认对话框状态 */
   confirmDialog: {
+    /** 是否打开 */
     open: boolean
+    /** 对话框类型 */
     type: 'save' | 'cancel' | 'save-with-warnings'
+    /** 动作面 ID */
     surfaceId: string
+    /** 标题 */
     title: string
+    /** 消息内容 */
     message: string
+    /** 待提交的数据 */
     pendingData?: Record<string, unknown>
+    /** 域 ID */
     domainId?: string
+    /** 动作名称 */
     action?: string
   }
 }
 
+/**
+ * CN-UI 生命周期操作
+ */
 export interface CnuiLifecycleActions {
+  /** 请求保存 */
   requestSave: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
+  /** 请求取消 */
   requestCancel: (surfaceId: string) => void
+  /** 确认对话框操作 */
   confirmDialogAction: () => void
+  /** 关闭对话框 */
   dismissDialog: () => void
+  /** 更新数据 */
   updateData: (surfaceId: string, data: Record<string, unknown>) => void
+  /** 清除验证错误 */
   clearValidationErrors: (surfaceId: string) => void
 }
 
+/**
+ * CN-UI 生命周期管理 Hook
+ * 
+ * @param onSubmit - 提交回调
+ * @param initialStates - 初始状态
+ * @param onStateChange - 状态变更回调
+ * @returns [状态, 操作] 元组
+ */
 export function useCnuiLifecycle(
   onSubmit: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<void>,
   initialStates?: Record<string, SurfaceState>,

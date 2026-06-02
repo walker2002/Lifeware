@@ -1,3 +1,10 @@
+/**
+ * @file page
+ * @brief 应用主页组件
+ * 
+ * 应用的主入口页面，包含完整的应用布局和核心交互逻辑
+ */
+
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from "react"
@@ -25,10 +32,17 @@ import "@/domains/habits/register-form"
 import "@/domains/tasks/register-form"
 import type { PanelTab } from "@/components/layout/main-view-state"
 
+/**
+ * 应用主页组件入口
+ * @returns 应用主页
+ */
 export default function Home() {
   return <AppProvider><HomeContent /></AppProvider>
 }
 
+/**
+ * 主页内容组件
+ */
 function HomeContent() {
   const { mainViewState, setMainViewState, isLoading } = useApp()
   const tb = useTimebox()

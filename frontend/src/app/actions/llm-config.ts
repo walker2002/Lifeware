@@ -1,3 +1,10 @@
+/**
+ * @file llm-config
+ * @brief LLM 配置管理 Server Action 模块
+ * 
+ * 提供 LLM 配置的读取、保存和验证功能
+ */
+
 'use server'
 
 import {
@@ -10,14 +17,24 @@ import {
 } from '@/lib/llm/config'
 import { UserSettingsRepository } from '@/lib/db/repositories/user-settings.repository'
 
+/** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
+/**
+ * LLM 设置数据接口
+ */
 export interface LLMSettingsData {
+  /** 用户偏好设置 */
   prefs: UserLLMPreferences
+  /** 提供商摘要列表 */
   providers: ProviderSummary[]
 }
 
-/** 加载用户 LLM 偏好 + 提供商摘要（供设置页面使用） */
+/**
+ * 加载用户 LLM 偏好 + 提供商摘要（供设置页面使用）
+ * 
+ * @returns LLM 设置数据
+ */
 export async function getLLMSettings(): Promise<LLMSettingsData> {
   const repo = new UserSettingsRepository()
   const settings = await repo.findByUserId(MVP_USER_ID)
@@ -29,7 +46,11 @@ export async function getLLMSettings(): Promise<LLMSettingsData> {
   return { prefs, providers: getProviderSummaries() }
 }
 
-/** 保存用户 LLM 偏好到 DB 并更新内存缓存 */
+/**
+ * 保存用户 LLM 偏好到 DB 并更新内存缓存
+ * 
+ * @param prefs - 用户 LLM 偏好设置
+ */
 export async function saveLLMSettings(prefs: UserLLMPreferences): Promise<void> {
   const repo = new UserSettingsRepository()
   await repo.upsert({
@@ -41,7 +62,11 @@ export async function saveLLMSettings(prefs: UserLLMPreferences): Promise<void> 
   setCachedUserPrefs(prefs)
 }
 
-/** 检查默认供应商是否已配置 API Key 和默认模型 */
+/**
+ * 检查默认供应商是否已配置 API Key 和默认模型
+ * 
+ * @returns 是否已配置
+ */
 export async function checkLLMConfigured(): Promise<boolean> {
   const providerId = getActiveProviderId()
   const config = getMergedConfig(providerId)
@@ -51,5 +76,7 @@ export async function checkLLMConfigured(): Promise<boolean> {
   return hasApiKey && hasModel
 }
 
-// 向后兼容别名
+/**
+ * 向后兼容别名：获取 LLM 提供商列表
+ */
 export { getProviderSummaries as getLLMProviders }

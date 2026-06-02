@@ -1,3 +1,10 @@
+/**
+ * @file llm-settings
+ * @brief LLM 设置组件
+ * 
+ * 提供 LLM 提供商和模型偏好设置
+ */
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"

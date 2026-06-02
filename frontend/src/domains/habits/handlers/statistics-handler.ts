@@ -1,9 +1,15 @@
+/**
+ * @file statistics-handler
+ * @brief 习惯统计分析 Handler
+ * 
+ * 实现 DomainHandler 接口的 onQuery hook，使用 AI Runtime 生成分析文本
+ */
+
 import type { DomainHandler, QueryContext, QueryResult, GenerationRequest, GenerationResult } from '@/usom/types/process'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 
 /**
- * 习惯统计分析 Handler。
- * 实现 onQuery hook，使用 AI Runtime 生成分析文本。
+ * 习惯统计分析 Handler
  */
 export class HabitStatisticsHandler implements DomainHandler {
   async handle(_request: GenerationRequest): Promise<GenerationResult> {

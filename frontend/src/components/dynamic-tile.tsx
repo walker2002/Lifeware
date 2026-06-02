@@ -1,11 +1,18 @@
-"use client"
+/**
+ * @file dynamic-tile
+ * @brief 动作面候选项的动态卡片组件
+ * 
+ * 每个 ActionCandidate 渲染为可点击的卡片
+ * 样式：canvas 背景、圆角、hairline 边框
+ */
 
-// DynamicTile — 动作面候选项的动态卡片组件
-// 每个 ActionCandidate 渲染为可点击的卡片
-// 样式：canvas 背景、圆角、hairline 边框
+"use client"
 
 import type { ActionCandidate } from "@/usom/types/process"
 
+/**
+ * DynamicTile 组件属性
+ */
 interface DynamicTileProps {
   /** 候选动作列表 */
   candidates: ActionCandidate[]

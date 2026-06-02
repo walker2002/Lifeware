@@ -1,7 +1,15 @@
+/**
+ * @file context-providers
+ * @brief Habits 领域上下文提供者注册
+ * 
+ * 注册 habits Domain 的查询用 Context Providers，在 Domain 初始化时调用
+ */
+
 import { registerContextCapability } from '@/nexus/context-engine/registry'
 import { z } from 'zod'
 import type { IHabitRepository } from '@/usom/interfaces/irepository'
 
+/** 习惯摘要 Schema */
 const HabitSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -12,12 +20,14 @@ const HabitSummarySchema = z.object({
   todayLogged: z.boolean(),
 })
 
+/** 习惯打卡记录 Schema */
 const HabitLogSchema = z.object({
   habitId: z.string(),
   date: z.string(),
   completed: z.boolean(),
 })
 
+/** 习惯连续打卡 Schema */
 const HabitStreakSchema = z.object({
   habitId: z.string(),
   title: z.string(),
@@ -26,7 +36,11 @@ const HabitStreakSchema = z.object({
   completionRate7d: z.number(),
 })
 
-/** 注册 habits Domain 的查询用 Context Providers。在 Domain 初始化时调用。 */
+/**
+ * 注册习惯领域上下文提供者
+ * 
+ * @param habitRepo - 习惯仓储实例
+ */
 export function registerHabitProviders(habitRepo: IHabitRepository) {
   registerContextCapability({
     id: 'activeHabits',

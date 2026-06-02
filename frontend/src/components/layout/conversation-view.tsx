@@ -1,3 +1,10 @@
+/**
+ * @file conversation-view
+ * @brief 对话视图组件
+ * 
+ * 展示聊天消息列表，支持意图触发和 CN-UI 动作面
+ */
+
 "use client"
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react"
@@ -10,24 +17,43 @@ import { ChatBubble } from "@/components/chat-bubble"
 import type { FrequentIntent } from "@/app/actions/activity"
 import { Paperclip, Send, MessageSquare } from "lucide-react"
 
+/**
+ * 意图触发项
+ */
 interface IntentTrigger {
+  /** 显示标签 */
   label: string
+  /** 快捷键 */
   shortcut: string
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
 }
 
 export type { FrequentIntent }
 
+/**
+ * ConversationView 组件属性
+ */
 interface ConversationViewProps {
+  /** 消息列表 */
   messages: ChatMessage[]
+  /** 发送消息回调 */
   onSendMessage: (content: string, attachments?: File[]) => void
+  /** 是否正在加载 */
   isLoading?: boolean
+  /** 最近会话列表 */
   recentSessions?: AISessionSummary[]
+  /** 选中会话回调 */
   onSelectSession?: (sessionId: string) => void
+  /** 意图触发列表 */
   intentTriggers?: IntentTrigger[]
+  /** 频繁意图列表 */
   frequentIntents?: FrequentIntent[]
+  /** CN-UI 确认回调 */
   onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
+  /** 动作面状态变更回调 */
   onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
 }
 

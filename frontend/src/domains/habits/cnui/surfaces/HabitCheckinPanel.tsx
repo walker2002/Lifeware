@@ -1,24 +1,49 @@
+/**
+ * @file HabitCheckinPanel
+ * @brief 习惯打卡面板 Surface
+ * 
+ * CNUI Surface 组件，支持习惯的快速打卡和详情打卡
+ */
+
 'use client'
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { HabitCheckinDetail, type HabitLogFields } from '@/domains/habits/components/habit-checkin-detail'
 
+/**
+ * 打卡习惯项
+ */
 interface CheckinHabitItem {
+  /** ID */
   id: string
+  /** 标题 */
   title: string
+  /** 默认时间 */
   defaultTime: string
+  /** 默认时长 */
   defaultDuration: number
+  /** 连续天数 */
   streak: number
+  /** 今日是否已打卡 */
   todayLogged: boolean
 }
 
+/**
+ * 习惯打卡面板属性
+ */
 interface HabitCheckinPanelProps {
+  /** Surface 类型 */
   surfaceType: string
+  /** 数据模型 */
   dataModel: Record<string, unknown>
+  /** 数据变更回调 */
   onDataChange: (data: Record<string, unknown>) => void
+  /** 确认回调 */
   onConfirm: (data: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 是否加载中 */
   isLoading?: boolean
 }
 

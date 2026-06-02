@@ -1,3 +1,10 @@
+/**
+ * @file key-result
+ * @brief KeyResult 仓储实现
+ * 
+ * 实现 IKeyResultRepository 接口，提供 KeyResult 数据的数据库操作
+ */
+
 import { eq, and } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -6,6 +13,9 @@ import type { KeyResult } from '../../../usom/types/objects'
 import type { USOM_ID, KeyResultStatus } from '../../../usom/types/primitives'
 import { keyResultRowToUSOM, keyResultUSOMToRow } from '../../../lib/db/repositories/mappers'
 
+/**
+ * KeyResult 仓储
+ */
 export class KeyResultRepository implements IKeyResultRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<KeyResult | null> {
     const rows = await db.select().from(s.keyResults)

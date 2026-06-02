@@ -1,25 +1,40 @@
-// Event Bus — 类型安全的观察者模式
-// State Machine 发布 SystemEvent，Event Bus 同步分发给订阅者
+/**
+ * @file index
+ * @brief Event Bus — 类型安全的观察者模式
+ * 
+ * State Machine 发布 SystemEvent，Event Bus 同步分发给订阅者
+ */
 
 import type { SystemEvent, SystemEventType } from '@/usom/types/process'
 
 // ─── 类型定义 ─────────────────────────────────────────────────
+
+/** 事件处理器类型 */
 type EventHandler = (event: SystemEvent) => void
 
+/** 事件总线接口 */
 interface EventBus {
   /**
    * 订阅特定事件类型
+   * @param eventType - 事件类型
+   * @param handler - 事件处理器
    * @returns unsubscribe 函数
    */
   subscribe(eventType: SystemEventType, handler: EventHandler): () => void
 
   /**
    * 发布事件，同步通知所有订阅者
+   * @param event - 系统事件
    */
   publish(event: SystemEvent): void
 }
 
 // ─── 工厂函数 ─────────────────────────────────────────────────
+
+/**
+ * 创建事件总线实例
+ * @returns EventBus 实例
+ */
 function createEventBus(): EventBus {
   // 按事件类型分组的 handler 列表
   const handlers = new Map<SystemEventType, Set<EventHandler>>()

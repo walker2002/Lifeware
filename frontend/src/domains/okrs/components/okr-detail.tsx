@@ -1,3 +1,10 @@
+/**
+ * @file okr-detail
+ * @brief OKR 详情组件
+ * 
+ * 展示 OKR 详情，支持编辑、状态变更和 KR 管理
+ */
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -15,18 +22,31 @@ import { KRProgress } from "./kr-progress"
 import { OKRForm } from "./okr-form"
 import type { OKRFormFields } from "./okr-form"
 
+/**
+ * OKR 详情组件属性
+ */
 interface OKRDetailProps {
+  /** Objective ID */
   objectiveId: string
+  /** 加载详情回调 */
   onLoad: (id: string) => Promise<ObjectiveWithKR | null>
+  /** 更新回调 */
   onUpdate: (id: string, fields: Record<string, unknown>) => Promise<Objective | null>
+  /** 激活回调 */
   onActivate: (id: string) => Promise<boolean>
+  /** 状态变更回调 */
   onChangeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<boolean>
+  /** 添加 KR 回调 */
   onAddKR: (objectiveId: string, input: { title: string; description?: string; targetValue: number; unit: string }) => Promise<KeyResult | null>
+  /** 更新 KR 进度回调 */
   onUpdateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
+  /** 删除 KR 回调 */
   onDeleteKR: (id: string) => Promise<boolean>
+  /** 返回回调 */
   onBack: () => void
 }
 
+/** 状态标签映射 */
 const STATUS_LABELS: Record<string, string> = {
   draft: "草稿",
   active: "进行中",

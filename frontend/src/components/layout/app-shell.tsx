@@ -1,3 +1,17 @@
+/**
+ * @file app-shell
+ * @brief 应用主布局组件
+ * 
+ * 负责构建应用的整体布局结构，包括：
+ * - 顶部导航栏 (TopNav)
+ * - 左侧面板 (LeftPanel) - 可调整宽度
+ * - 主内容区 (MainContent)
+ * - 底部导航 (BottomNav) - 移动端
+ * - 浮动操作按钮 (FAB)
+ * 
+ * 支持键盘快捷键：按 '/' 键聚焦意图输入框
+ */
+
 "use client"
 
 import { type ReactNode, useEffect } from "react"
@@ -11,6 +25,11 @@ import { usePanelState } from "@/hooks/use-panel-state"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import type { MainViewState, PanelTab } from "./main-view-state"
 
+/**
+ * 判断目标元素是否为可编辑元素
+ * @param target - 事件目标
+ * @returns 是否可编辑
+ */
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   const tag = target.tagName

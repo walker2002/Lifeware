@@ -1,3 +1,10 @@
+/**
+ * @file project-form
+ * @brief 项目表单组件
+ * 
+ * 提供项目创建和编辑的表单界面
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -8,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea"
 import type { Project } from "@/usom/types/objects"
 import { Priority } from "@/usom/types/primitives"
 
+/**
+ * 项目表单数据
+ */
 export interface ProjectFormData {
   name: string
   description?: string

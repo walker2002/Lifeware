@@ -1,3 +1,10 @@
+/**
+ * @file sheet
+ * @brief 侧边栏组件
+ * 
+ * 基于 shadcn/ui 的侧边栏组件（Dialog 变体）
+ */
+
 "use client"
 
 import * as React from "react"

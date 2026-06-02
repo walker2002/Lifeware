@@ -1,3 +1,8 @@
+/**
+ * @file types
+ * @brief Context Engine 类型重导出
+ */
+
 export type {
   ContextProvider,
   ContextCapability,

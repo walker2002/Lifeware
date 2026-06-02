@@ -1,3 +1,10 @@
+/**
+ * @file slider
+ * @brief 滑块组件
+ * 
+ * 基于 shadcn/ui 的滑块组件
+ */
+
 "use client"
 
 import * as React from "react"

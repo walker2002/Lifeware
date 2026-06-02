@@ -1,3 +1,10 @@
+/**
+ * @file theme-toggle
+ * @brief 主题切换组件
+ * 
+ * 提供浅色/深色/系统主题切换功能
+ */
+
 "use client"
 
 import { Moon, Sun, Monitor } from "lucide-react"

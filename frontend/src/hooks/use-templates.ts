@@ -1,3 +1,10 @@
+/**
+ * @file use-templates
+ * @brief 习惯模板管理 Hook
+ * 
+ * 提供习惯模板的增删改查和应用等功能
+ */
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -13,6 +20,9 @@ import {
   applyTemplate as applyTemplateAction,
 } from "@/app/actions/intent"
 
+/**
+ * 模板 Hook 返回结果
+ */
 interface UseTemplatesResult {
   templates: HabitTemplate[]
   isLoading: boolean

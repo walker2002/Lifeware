@@ -1,3 +1,10 @@
+/**
+ * @file repository
+ * @brief 时间盒仓储实现
+ * 
+ * 实现 ITimeboxRepository 接口，提供时间盒数据的数据库操作
+ */
+
 import { eq, and, gte, lte } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import * as s from '@/lib/db/schema'
@@ -6,6 +13,12 @@ import type { Timebox, ExecutionRecord } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp, TimeboxStatus } from '@/usom/types/primitives'
 import { timeboxRowToUSOM, timeboxUSOMToRow } from '@/lib/db/repositories/mappers'
 
+/**
+ * 加载时间盒关联的任务和习惯 ID
+ * 
+ * @param timeboxId - 时间盒 ID
+ * @returns 关联的任务 ID 和习惯 ID 列表
+ */
 async function loadJunctions(timeboxId: USOM_ID): Promise<{ taskIds: USOM_ID[]; habitIds: USOM_ID[] }> {
   const [taskLinks, habitLinks] = await Promise.all([
     db.select().from(s.timeboxTasks).where(eq(s.timeboxTasks.timeboxId, timeboxId)),

@@ -1,11 +1,15 @@
-// SchedulingHandler — 智能编排处理器
-// Handler + Context Engine 双轨架构中的 Handler 组件
-// 接收 GenerationRequest（意图 + 组装好的上下文数据），产出 GenerationResult
-//
-// 约束:
-// - 不直接访问 Repository
-// - 不写入状态、不触发事件
-// - 纯函数式：input → output
+/**
+ * @file scheduling-handler
+ * @brief 智能日程编排 Handler
+ * 
+ * Handler + Context Engine 双轨架构中的 Handler 组件
+ * 接收 GenerationRequest（意图 + 组装好的上下文数据），产出 GenerationResult
+ * 
+ * 约束：
+ * - 不直接访问 Repository
+ * - 不写入状态、不触发事件
+ * - 纯函数式：input → output
+ */
 
 import type {
   DomainHandler,
@@ -22,30 +26,53 @@ import type { HabitTemplate } from '@/usom/types/objects'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
 
+/**
+ * 能量曲线
+ */
 interface EnergyProfile {
+  /** 高效时段 */
   peakHours: number[]
+  /** 低效时段 */
   lowHours: number[]
 }
 
+/**
+ * 日程项
+ */
 interface ScheduleItem {
+  /** ID */
   id: string
+  /** 标题 */
   title: string
+  /** 来源类型 */
   sourceType: GeneratedProposal['sourceType']
+  /** 优先级 */
   priority: string
+  /** 持续时间（分钟） */
   durationMinutes: number
+  /** 所需能量 */
   energyRequired?: string
+  /** 关联对象 ID */
   relatedObjectId: string
 }
 
+/**
+ * 时间槽
+ */
 interface TimeSlot {
+  /** 开始小时 */
   startHour: number
+  /** 开始分钟 */
   startMinute: number
+  /** 结束小时 */
   endHour: number
+  /** 结束分钟 */
   endMinute: number
 }
 
 // ─── 优先级排序权重 ──────────────────────────────────────────
 
+/** 优先级权重映射 */
 const PRIORITY_WEIGHT: Record<string, number> = {
   P0: 0,
   critical: 0,
@@ -57,6 +84,7 @@ const PRIORITY_WEIGHT: Record<string, number> = {
   low: 3,
 }
 
+/** 来源权重映射 */
 const SOURCE_WEIGHT: Record<string, number> = {
   planned: 0,
   habit: 1,

@@ -1,6 +1,12 @@
-// 开发环境全量种子数据脚本
-// 用法: npx tsx scripts/seed-dev.ts
-// 幂等设计：已有数据不重复插入，可安全重复运行
+/**
+ * @file seed-dev
+ * @brief 开发环境全量种子数据脚本
+ * 
+ * @usage npx tsx scripts/seed-dev.ts
+ * 
+ * 幂等设计：已有数据不重复插入，可安全重复运行
+ * 包含用户、目标、关键结果、任务、习惯、时间盒、复盘和意图等完整测试数据
+ */
 
 import 'dotenv/config'
 import { db } from '../src/lib/db'
@@ -8,9 +14,13 @@ import * as s from '../src/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
 // ─── 固定 ID（幂等）────────────────────────────────────────
+
+/** 测试用户 ID */
 const USER_ID = '00000000-0000-0000-0000-000000000001'
 
-// 预分配的种子数据 ID（全部硬编码，保证幂等）
+/**
+ * 预分配的种子数据 ID（全部硬编码，保证幂等）
+ */
 const IDS = {
   // 目标
   objHealth: '10000000-0000-0000-0000-000000000001',
@@ -49,32 +59,63 @@ const IDS = {
 }
 
 // ─── 辅助函数 ─────────────────────────────────────────────
+
+/**
+ * 获取 n 天前的日期
+ * @param n - 天数
+ * @returns 日期对象
+ */
 function daysAgo(n: number): Date {
   const d = new Date()
   d.setDate(d.getDate() - n)
   return d
 }
 
+/**
+ * 获取 n 天后的日期
+ * @param n - 天数
+ * @returns 日期对象
+ */
 function daysFromNow(n: number): Date {
   const d = new Date()
   d.setDate(d.getDate() + n)
   return d
 }
 
+/**
+ * 获取今天的日期字符串（YYYY-MM-DD）
+ * @returns 日期字符串
+ */
 function today(): string {
   return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * 格式化日期为字符串（YYYY-MM-DD）
+ * @param d - 日期对象
+ * @returns 日期字符串
+ */
 function formatDate(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+/**
+ * 获取今天指定时间的日期对象
+ * @param hour - 小时
+ * @param minute - 分钟（默认 0）
+ * @returns 日期对象
+ */
 function todayAt(hour: number, minute = 0): Date {
   const d = new Date()
   d.setHours(hour, minute, 0, 0)
   return d
 }
 
+/**
+ * 幂等插入数据（已存在则跳过）
+ * @param table - 数据库表
+ * @param values - 插入数据
+ */
 async function upsert<T extends { id: string }>(
   table: Parameters<typeof db.insert>[0],
   values: T,

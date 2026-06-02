@@ -1,7 +1,17 @@
+/**
+ * @file timezone-picker
+ * @brief 时区选择组件
+ * 
+ * 提供时区选择和设置功能
+ */
+
 "use client"
 
 import { useState, useCallback } from "react"
 
+/**
+ * 常用时区列表
+ */
 const COMMON_TIMEZONES = [
   'Asia/Shanghai',
   'Asia/Tokyo',

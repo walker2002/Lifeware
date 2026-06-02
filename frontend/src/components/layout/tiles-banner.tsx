@@ -1,7 +1,17 @@
+/**
+ * @file tiles-banner
+ * @brief 动作候选横幅组件
+ * 
+ * 水平展示 ActionCandidate 列表
+ */
+
 "use client"
 
 import type { ActionCandidate } from "@/usom/types/process"
 
+/**
+ * TilesBanner 组件属性
+ */
 interface TilesBannerProps {
   /** 行动候选列表 */
   candidates: ActionCandidate[]

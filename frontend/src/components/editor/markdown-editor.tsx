@@ -1,11 +1,25 @@
+/**
+ * @file markdown-editor
+ * @brief Markdown 编辑器组件
+ * 
+ * 提供 Markdown 内容编辑功能，支持预览和提交
+ */
+
 "use client"
 
 import { useState, useCallback } from "react"
 
+/**
+ * MarkdownEditor 组件属性
+ */
 interface MarkdownEditorProps {
+  /** 初始内容 */
   initialContent?: string
+  /** 提交回调 */
   onSubmit: (content: string) => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 是否正在加载 */
   isLoading?: boolean
 }
 

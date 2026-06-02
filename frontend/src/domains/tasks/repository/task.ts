@@ -1,3 +1,10 @@
+/**
+ * @file task
+ * @brief 任务仓储实现
+ * 
+ * 实现 ITaskRepository 接口，提供任务数据的数据库操作
+ */
+
 import { eq, and, isNull, gte, lte } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -7,6 +14,9 @@ import type { USOM_ID, DateOnly } from '../../../usom/types/primitives'
 import { taskRowToUSOM, taskUSOMToRow } from '../../../lib/db/repositories/mappers'
 import { v4 } from 'uuid'
 
+/**
+ * 任务仓储
+ */
 export class TaskRepository implements ITaskRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Task | null> {
     const rows = await db.select().from(s.tasks)

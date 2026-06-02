@@ -1,3 +1,10 @@
+/**
+ * @file habit-log
+ * @brief 习惯打卡记录仓储实现
+ * 
+ * 实现 IHabitLogRepository 接口，提供习惯打卡记录的数据库操作
+ */
+
 import { eq, and, gte, lte, asc } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -6,6 +13,9 @@ import type { HabitLog } from '../../../usom/types/objects'
 import type { USOM_ID, DateOnly } from '../../../usom/types/primitives'
 import { habitLogRowToUSOM, habitLogUSOMToRow } from '../../../lib/db/repositories/mappers'
 
+/**
+ * 习惯打卡记录仓储
+ */
 export class HabitLogRepository implements IHabitLogRepository {
   async findByHabitAndDate(habitId: USOM_ID, date: DateOnly, userId: USOM_ID): Promise<HabitLog | null> {
     const rows = await db.select().from(s.habitLogs)

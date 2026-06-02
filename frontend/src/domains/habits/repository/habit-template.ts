@@ -1,3 +1,10 @@
+/**
+ * @file habit-template
+ * @brief 习惯模板仓储实现
+ * 
+ * 实现 IHabitTemplateRepository 接口，提供习惯模板的数据库操作
+ */
+
 import { eq, and } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -16,6 +23,9 @@ import {
   templateHabitRowToItem,
 } from '../../../lib/db/repositories/mappers'
 
+/**
+ * 习惯模板仓储
+ */
 export class HabitTemplateRepository implements IHabitTemplateRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<HabitTemplate | null> {
     const rows = await db.select().from(s.habitTemplates)

@@ -1,21 +1,44 @@
+/**
+ * @file TimeboxList
+ * @brief 智能编排时间盒列表 Surface
+ * 
+ * CNUI Surface 组件，展示智能编排方案中的时间盒列表
+ */
+
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CnuiButton } from '@/components/cnui/components/Button'
 
+/**
+ * 时间盒项
+ */
 interface TimeboxItem {
+  /** 标题 */
   title: string
+  /** 开始时间 */
   startTime: string
+  /** 结束时间 */
   endTime: string
+  /** 颜色 */
   color?: string
 }
 
+/**
+ * 时间盒列表属性
+ */
 interface TimeboxListProps {
+  /** Surface 类型 */
   surfaceType: string
+  /** 数据模型 */
   dataModel: Record<string, unknown>
+  /** 数据变更回调 */
   onDataChange: (data: Record<string, unknown>) => void
+  /** 确认回调 */
   onConfirm: (data: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel?: () => void
+  /** 是否完成 */
   isDone?: boolean
 }
 

@@ -1,3 +1,10 @@
+/**
+ * @file card
+ * @brief 卡片组件
+ * 
+ * 基于 shadcn/ui 的卡片组件，包含 Card、CardHeader、CardTitle 等
+ */
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

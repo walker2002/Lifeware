@@ -1,16 +1,36 @@
+/**
+ * @file banner
+ * @brief 横幅提示组件
+ * 
+ * 提供信息、警告、错误三种类型的横幅提示
+ */
+
 "use client"
 
 import { X } from "lucide-react"
 
+/**
+ * 横幅变体类型
+ */
 type BannerVariant = "info" | "warning" | "error"
 
+/**
+ * Banner 组件属性
+ */
 interface BannerProps {
+  /** 变体类型 */
   variant: BannerVariant
+  /** 标题 */
   title: string
+  /** 描述文字 */
   description?: string
+  /** 关闭回调 */
   onClose: () => void
 }
 
+/**
+ * 变体样式映射
+ */
 const VARIANT_STYLES: Record<BannerVariant, { bar: string; bg: string }> = {
   info: {
     bar: "bg-info",

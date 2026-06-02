@@ -1,3 +1,10 @@
+/**
+ * @file project-tree
+ * @brief 项目树形结构组件
+ * 
+ * 展示项目及其任务的树形结构
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -5,6 +12,9 @@ import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import type { Project, Task } from "@/usom/types/objects"
 
+/**
+ * 树形项
+ */
 export interface TreeItem {
   type: "independent-task-section" | "project" | "task"
   id: string

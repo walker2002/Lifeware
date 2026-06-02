@@ -1,3 +1,10 @@
+/**
+ * @file button
+ * @brief 按钮组件
+ * 
+ * 基于 shadcn/ui 的按钮组件，支持多种变体和尺寸
+ */
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"

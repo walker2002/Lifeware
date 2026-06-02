@@ -1,10 +1,11 @@
 #!/usr/bin/env npx tsx
 /**
- * Manifest 诊断工具 — 校验所有 domain manifest.yaml 是否符合规范
- *
- * 使用方式: npx tsx scripts/validate-manifest.ts
- * 退出码: 0 = 全部通过, 1 = 有 error 级别问题
- *
+ * @file validate-manifest
+ * @brief Manifest 诊断工具 — 校验所有 domain manifest.yaml 是否符合规范
+ * 
+ * @usage npx tsx scripts/validate-manifest.ts
+ * @exitcode 0 = 全部通过, 1 = 有 error 级别问题
+ * 
  * 校验策略：
  *   - 直接解析 YAML 获取完整字段（避免 Zod schema 剥离未知字段）
  *   - 同时调用 loadDomainManifest 检测结构/语义错误
@@ -18,22 +19,41 @@ const DOMAINS_DIR = path.join(ROOT_DIR, 'src', 'domains')
 
 // ─── 类型定义 ────────────────────────────────────────────────────
 
+/**
+ * 诊断信息接口
+ */
 interface Diagnostic {
+  /** 域 ID */
   domainId: string
+  /** 严重级别 */
   level: 'error' | 'warning' | 'info'
+  /** 规则标识 */
   rule: string
+  /** 诊断消息 */
   message: string
 }
 
+/**
+ * 原始 Manifest 结构（直接从 YAML 解析）
+ */
 interface RawManifest {
+  /** 域 ID */
   id?: string
+  /** 域名称 */
   name?: string
+  /** 版本号 */
   version?: string
+  /** 意图触发器配置 */
   intent_triggers?: Array<Record<string, unknown>>
+  /** CNUI 表面配置 */
   cnui_surfaces?: Record<string, Record<string, unknown>>
+  /** 生成动作配置 */
   generation_actions?: Record<string, Record<string, unknown>>
+  /** 查询动作配置 */
   query_actions?: Record<string, Record<string, unknown>>
+  /** 生命周期配置 */
   lifecycle?: Record<string, unknown>
+  /** 订阅事件列表 */
   subscribed_events?: string[]
   [key: string]: unknown
 }
@@ -42,20 +62,43 @@ interface RawManifest {
 
 const diagnostics: Diagnostic[] = []
 
+/**
+ * 添加错误级别诊断
+ * @param domainId - 域 ID
+ * @param rule - 规则标识
+ * @param message - 诊断消息
+ */
 function addError(domainId: string, rule: string, message: string) {
   diagnostics.push({ domainId, level: 'error', rule, message })
 }
 
+/**
+ * 添加警告级别诊断
+ * @param domainId - 域 ID
+ * @param rule - 规则标识
+ * @param message - 诊断消息
+ */
 function addWarning(domainId: string, rule: string, message: string) {
   diagnostics.push({ domainId, level: 'warning', rule, message })
 }
 
+/**
+ * 添加信息级别诊断
+ * @param domainId - 域 ID
+ * @param rule - 规则标识
+ * @param message - 诊断消息
+ */
 function addInfo(domainId: string, rule: string, message: string) {
   diagnostics.push({ domainId, level: 'info', rule, message })
 }
 
 // ─── 工具函数 ───────────────────────────────────────────────────
 
+/**
+ * 将 kebab-case 转换为 PascalCase
+ * @param kebab - kebab-case 字符串
+ * @returns PascalCase 字符串
+ */
 function pascalCase(kebab: string): string {
   return kebab
     .split('-')
@@ -63,6 +106,10 @@ function pascalCase(kebab: string): string {
     .join('')
 }
 
+/**
+ * 获取所有合法的域 ID 列表
+ * @returns 域 ID 列表
+ */
 function getDomainIds(): string[] {
   const entries = fs.readdirSync(DOMAINS_DIR, { withFileTypes: true })
   return entries
@@ -78,6 +125,11 @@ function getDomainIds(): string[] {
 
 // ─── YAML 直接解析（绕过 Zod schema 以保留所有字段）────────────
 
+/**
+ * 直接解析 YAML 文件（不经过 Zod schema，保留所有字段）
+ * @param domainId - 域 ID
+ * @returns 解析结果
+ */
 function parseManifestYaml(domainId: string): { success: boolean; manifest?: RawManifest; error?: string } {
   const manifestPath = path.join(DOMAINS_DIR, domainId, 'manifest.yaml')
   if (!fs.existsSync(manifestPath)) {
@@ -99,6 +151,7 @@ function parseManifestYaml(domainId: string): { success: boolean; manifest?: Raw
  * 通过 manifest-loader 进行结构化/语义校验，收集其输出的错误。
  * loader 可能因为 Zod schema 剥离 unknown 字段而 pass，
  * 但此处仅用于收集 schema 级别的错误信息。
+ * @param domainId - 域 ID
  */
 function collectLoaderErrors(domainId: string): void {
   try {
@@ -128,6 +181,10 @@ function collectLoaderErrors(domainId: string): void {
 
 // ─── 单 domain 校验 ─────────────────────────────────────────────
 
+/**
+ * 校验单个域的 manifest
+ * @param domainId - 域 ID
+ */
 function validateDomain(domainId: string): void {
   // 先尝试 YAML 解析
   const parseResult = parseManifestYaml(domainId)

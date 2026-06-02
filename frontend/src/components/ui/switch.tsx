@@ -1,3 +1,10 @@
+/**
+ * @file switch
+ * @brief 开关组件
+ * 
+ * 基于 shadcn/ui 的开关组件
+ */
+
 "use client"
 
 import * as React from "react"

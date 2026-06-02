@@ -1,11 +1,32 @@
+/**
+ * @file main-content
+ * @brief 主内容区组件
+ * 
+ * 提供主内容区域布局和过渡动画
+ */
+
 "use client"
 
 import { type ReactNode, useState, useEffect } from "react"
 
+/**
+ * MainContent 组件属性
+ */
 interface MainContentProps {
+  /** 子内容 */
   children: ReactNode
-  /** 传入 view key 变化时触发过渡动画 */
+  /** 视图 key 变化时触发过渡动画 */
   viewKey?: string
+}
+
+/**
+ * SplitView 组件属性
+ */
+interface SplitViewProps {
+  /** 左侧内容 */
+  left: ReactNode
+  /** 右侧内容 */
+  right: ReactNode
 }
 
 export function MainContent({ children, viewKey }: MainContentProps) {

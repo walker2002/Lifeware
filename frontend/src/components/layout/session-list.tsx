@@ -1,17 +1,38 @@
+/**
+ * @file session-list
+ * @brief 会话列表组件
+ * 
+ * 展示 AI 会话历史，按时间分组（今天/昨天/更早）
+ */
+
 'use client'
 
 import { useState } from 'react'
 import type { AISessionSummary } from '@/usom/types/objects'
 import { Trash2, ChevronRight } from 'lucide-react'
 
+/**
+ * SessionList 组件属性
+ */
 interface SessionListProps {
+  /** 会话列表 */
   sessions: AISessionSummary[]
+  /** 当前活跃会话 ID */
   activeSessionId?: string
+  /** 选中会话回调 */
   onSelectSession: (sessionId: string) => void
+  /** 新建会话回调 */
   onNewSession: () => void
+  /** 删除会话回调 */
   onDeleteSession?: (sessionId: string) => void
 }
 
+/**
+ * 格式化时间戳
+ * 
+ * @param isoString - ISO 格式时间字符串
+ * @returns 格式化后的时间字符串
+ */
 function formatTime(isoString: string): string {
   const d = new Date(isoString)
   const month = d.getMonth() + 1

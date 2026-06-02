@@ -1,3 +1,10 @@
+/**
+ * @file okr-list
+ * @brief OKR 列表组件
+ * 
+ * 展示 OKR 列表，支持筛选、创建和详情查看
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -10,7 +17,9 @@ import type { OKRFormFields } from "./okr-form"
 import { OKRDetail } from "./okr-detail"
 import { useOKRs } from "@/hooks/use-okrs"
 
+/** 状态顺序 */
 const STATUS_ORDER: ObjectiveStatus[] = ["active", "draft", "paused", "completed", "discarded"]
+/** 状态标签 */
 const STATUS_LABELS: Record<string, string> = {
   all: "全部", active: "进行中", draft: "草稿", paused: "已暂停",
   completed: "已完成", discarded: "已废弃",

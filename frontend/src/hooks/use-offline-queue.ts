@@ -1,8 +1,19 @@
+/**
+ * @file use-offline-queue
+ * @brief 离线队列 Hook
+ * 
+ * 提供离线消息队列功能，网络恢复后自动发送
+ */
+
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
 
+/**
+ * 离线队列选项
+ */
 interface OfflineQueueOptions {
+  /** 发送消息回调 */
   onSend: (message: string) => Promise<void>
 }
 

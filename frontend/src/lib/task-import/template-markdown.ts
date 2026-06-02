@@ -1,17 +1,44 @@
+/**
+ * @file template-markdown
+ * @brief 任务导入模板 Markdown 生成与解析
+ * 
+ * 提供项目任务模板的 Markdown 生成和标题解析功能
+ */
+
+/**
+ * 模板任务结构
+ */
 export interface TemplateTask {
+  /** 任务标题 */
   title: string
+  /** 预估时长（分钟） */
   estimatedDuration?: number
+  /** 优先级 */
   priority?: string
+  /** 所需能量 */
   energyRequired?: string
+  /** 层级深度 */
   depth: number
+  /** 子任务列表 */
   children: TemplateTask[]
 }
 
+/**
+ * 解析后的模板结构
+ */
 export interface ParsedTemplate {
+  /** 项目名称 */
   projectName?: string
+  /** 任务列表 */
   tasks: Array<{ title: string; level: number }>
 }
 
+/**
+ * 将项目和任务转换为 Markdown 模板
+ * @param project - 项目信息
+ * @param tasks - 任务列表
+ * @returns Markdown 字符串
+ */
 export function projectToMarkdown(
   project: { name: string; priority?: string; defaultEarliestTime?: string; defaultLatestStartTime?: string; description?: string },
   tasks: TemplateTask[]
@@ -33,6 +60,11 @@ export function projectToMarkdown(
   return lines.join('\n')
 }
 
+/**
+ * 递归渲染任务到 Markdown 行
+ * @param task - 任务对象
+ * @param lines - 行数组（输出参数）
+ */
 function renderTask(task: TemplateTask, lines: string[]): void {
   const prefix = task.depth === 0 ? '# ' : '## '
   lines.push(`${prefix}${task.title}`)
@@ -46,6 +78,11 @@ function renderTask(task: TemplateTask, lines: string[]): void {
   }
 }
 
+/**
+ * 解析 Markdown 中的标题
+ * @param md - Markdown 字符串
+ * @returns 解析后的模板结构
+ */
 export function parseMarkdownHeadings(md: string): ParsedTemplate {
   const lines = md.split('\n')
   let projectName: string | undefined

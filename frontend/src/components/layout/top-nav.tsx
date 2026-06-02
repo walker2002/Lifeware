@@ -1,3 +1,10 @@
+/**
+ * @file top-nav
+ * @brief 顶部导航栏组件
+ * 
+ * 提供应用顶部的导航和设置入口
+ */
+
 "use client";
 
 import Image from "next/image";
@@ -6,9 +13,15 @@ import { Bell, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
+/**
+ * TopNav 组件属性
+ */
 interface TopNavProps {
+  /** 菜单按钮点击回调 */
   onMenuClick?: () => void;
+  /** 设置按钮点击回调 */
   onSettingsClick?: () => void;
+  /** 左面板是否打开 */
   isPanelOpen?: boolean;
 }
 

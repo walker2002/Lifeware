@@ -1,15 +1,32 @@
+/**
+ * @file use-resizable-panel
+ * @brief 可调整大小的面板 Hook
+ * 
+ * 提供可拖拽调整大小的面板功能，支持 localStorage 持久化宽度
+ */
+
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
 
+/** 默认最小宽度 */
 const DEFAULT_MIN_WIDTH = 200
+/** 默认最大宽度（屏幕比例） */
 const DEFAULT_MAX_WIDTH = 0.5
+/** 默认宽度 */
 const DEFAULT_WIDTH = 400
 
+/**
+ * 可调整大小面板选项
+ */
 interface UseResizablePanelOptions {
+  /** localStorage 存储键 */
   storageKey: string
+  /** 最小宽度 */
   minWidth?: number
+  /** 最大宽度（像素或屏幕比例） */
   maxWidth?: number
+  /** 默认宽度 */
   defaultWidth?: number
 }
 

@@ -1,3 +1,10 @@
+/**
+ * @file dynamic-form
+ * @brief 动态表单组件
+ * 
+ * 根据 FieldPrompt 配置动态渲染表单字段
+ */
+
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -9,21 +16,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+/**
+ * 表单字段配置
+ */
 export interface FieldPrompt {
+  /** 字段名 */
   name: string
+  /** 显示标签 */
   label: string
+  /** 字段类型 */
   type: 'text' | 'textarea' | 'number' | 'date' | 'time' | 'select' | 'multiselect' | 'toggle'
+  /** 是否必填 */
   required: boolean
+  /** 选项列表（select/multiselect 类型用） */
   options?: string[]
+  /** 默认值 */
   default_value?: unknown
+  /** 占位符文本 */
   placeholder?: string
 }
 
+/**
+ * DynamicForm 组件属性
+ */
 interface DynamicFormProps {
+  /** 字段配置列表 */
   fields: FieldPrompt[]
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
+  /** 提交回调 */
   onSubmit: (values: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel: () => void
 }
 

@@ -1,6 +1,13 @@
+/**
+ * @file markdown-parser
+ * @brief OKR Markdown 解析器
+ * 
+ * 解析和渲染 OKR 的 Markdown 格式文本
+ */
+
 import type { ParsedObjective, ParsedKeyResult } from './types'
 
-// 中文周期类型 → 系统英文值
+/** 中文周期类型 → 系统英文值映射 */
 const PERIOD_TYPE_CN_TO_EN: Record<string, string> = {
   '周': 'weekly',
   '月': 'monthly',
@@ -9,7 +16,7 @@ const PERIOD_TYPE_CN_TO_EN: Record<string, string> = {
   '年': 'annual',
 }
 
-// 系统英文值 → 中文周期类型
+/** 系统英文值 → 中文周期类型映射 */
 const PERIOD_TYPE_EN_TO_CN: Record<string, string> = {
   'weekly': '周',
   'monthly': '月',
@@ -18,13 +25,13 @@ const PERIOD_TYPE_EN_TO_CN: Record<string, string> = {
   'annual': '年',
 }
 
-// OKR 类型中文 → 英文
+/** OKR 类型中文 → 英文映射 */
 const OKR_TYPE_CN_TO_EN: Record<string, 'committed' | 'visionary'> = {
   '承诺型': 'committed',
   '愿景型': 'visionary',
 }
 
-// OKR 类型英文 → 中文
+/** OKR 类型英文 → 中文映射 */
 const OKR_TYPE_EN_TO_CN: Record<string, string> = {
   'committed': '承诺型',
   'visionary': '愿景型',
@@ -32,6 +39,8 @@ const OKR_TYPE_EN_TO_CN: Record<string, string> = {
 
 /**
  * 解析规范的 OKR Markdown 文本为 ParsedObjective 数组
+ * @param markdown - Markdown 文本
+ * @returns 解析后的 Objective 数组
  */
 export function parseOKRMarkdown(markdown: string): ParsedObjective[] {
   if (!markdown.trim()) return []
@@ -118,6 +127,10 @@ export function parseOKRMarkdown(markdown: string): ParsedObjective[] {
 
 /**
  * 根据周期类型和日期生成周期标签
+ * @param periodType - 周期类型
+ * @param periodStart - 周期开始日期
+ * @param periodEnd - 周期结束日期
+ * @returns 格式化的周期标签
  */
 function formatPeriodLabel(periodType: string | undefined, periodStart: string, periodEnd: string): string {
   const year = periodStart.slice(0, 4)
@@ -148,6 +161,8 @@ function formatPeriodLabel(periodType: string | undefined, periodStart: string, 
 
 /**
  * 将 ParsedObjective 数组渲染为规范 Markdown 文本
+ * @param objectives - Objective 数组
+ * @returns Markdown 文本
  */
 export function renderOKRsToMarkdown(objectives: ParsedObjective[]): string {
   return objectives.map((obj) => {

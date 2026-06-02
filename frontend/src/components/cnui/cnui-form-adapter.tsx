@@ -1,20 +1,46 @@
+/**
+ * @file cnui-form-adapter
+ * @brief CN-UI 表单适配器组件
+ * 
+ * 将 CN-UI dataModel 与 FormRegistry 中的表单组件进行适配和映射
+ */
+
 'use client'
 
 import { FormRegistry } from '@/lib/form-registry'
 
+/**
+ * CnuiFormAdapter 组件属性
+ */
 interface CnuiFormAdapterProps {
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
+  /** CN-UI 数据模型 */
   dataModel: Record<string, unknown>
+  /** 数据变更回调 */
   onDataChange: (data: Record<string, unknown>) => void
+  /** 确认回调 */
   onConfirm: (data: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 是否正在加载 */
   isLoading?: boolean
+  /** 是否已完成 */
   isDone?: boolean
+  /** 服务端错误信息 */
   serverErrors?: string[]
 }
 
-/** 将 CN-UI dataModel 映射为 Form 的 initial props */
+/**
+ * 将 CN-UI dataModel 映射为 Form 的 initial props
+ * 
+ * @param dataModel - CN-UI 数据模型
+ * @param mapping - 字段映射配置
+ * @param defaults - 默认值
+ * @returns 表单初始 props
+ */
 function mapDataToForm(
   dataModel: Record<string, unknown>,
   mapping: Record<string, string>,

@@ -1,15 +1,26 @@
-// Tasks 状态转换表 — task 和 project 两个对象的状态流转
-// task: (none) → draft → active → completed/archived
-// project: (none) → planning → active → paused/completed
-//         paused → active（恢复）
+/**
+ * @file transitions
+ * @brief Tasks 状态转换表
+ * 
+ * task: (none) → draft → active → completed/archived
+ * project: (none) → planning → active → paused/completed
+ *         paused → active（恢复）
+ */
 
 import type { TaskStatus, ProjectStatus } from '@/usom/types/primitives'
 import type { SystemEventType } from '@/usom/types/process'
 
+/**
+ * 状态转换定义
+ */
 export interface Transition<T extends string = string> {
+  /** 源状态（null 表示初始创建） */
   from: T | null
+  /** 目标状态 */
   to: T
+  /** 动作名称 */
   action: string
+  /** 系统事件类型 */
   eventType: SystemEventType
 }
 
@@ -29,6 +40,14 @@ export const projectTransitions: Transition<ProjectStatus>[] = [
   { from: 'completed', to: 'archived', action: 'archive',   eventType: 'ProjectArchived' },
 ]
 
+/**
+ * 查找状态转换
+ * 
+ * @param transitions - 转换列表
+ * @param from - 源状态
+ * @param action - 动作名称
+ * @returns 匹配的转换，未找到返回 null
+ */
 export function findTransition<T extends string>(
   transitions: Transition<T>[],
   from: T | null,

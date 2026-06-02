@@ -1,3 +1,11 @@
+/**
+ * @file intent
+ * @brief 意图处理 Server Action 模块
+ * 
+ * 处理用户意图提交、时间盒状态转换等核心业务逻辑
+ * 支持 AI 解析和表单解析两种输入模式
+ */
+
 "use server";
 
 import type { TimeboxSummary } from "@/usom/types/summaries";
@@ -35,7 +43,12 @@ import { surfaceHandlers as taskHandlers } from '@/domains/tasks/cnui/handlers';
 import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
 import { recordActivity } from './activity-recorder';
 
-// 各 domain 自注册的 handler 合并（新增 domain 只需加一行 import + spread）
+// ─── CNUI Handlers 注册 ───────────────────────────────────────────
+
+/**
+ * 各 domain 自注册的 CNUI handler 合并
+ * 新增 domain 只需加一行 import + spread
+ */
 const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
   ...habitHandlers,
   ...timeboxHandlers,
@@ -44,8 +57,11 @@ const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
 
 // ─── 类型定义 ───────────────────────────────────────────────────
 
-/** 意图提交结果 */
+/**
+ * 意图提交结果
+ */
 export interface IntentSubmissionResult {
+  /** 提交是否成功 */
   success: boolean;
   /** 最新的时间盒列表（供前端刷新） */
   timeboxes: TimeboxSummary[];
@@ -65,10 +81,16 @@ export interface IntentSubmissionResult {
 
 // ─── MVP 用户 ID ────────────────────────────────────────────────
 
+/** MVP 用户 ID（临时使用，待认证模块完善后移除） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 // ─── 辅助函数 ───────────────────────────────────────────────────
 
+/**
+ * 将 Timebox 对象转换为 TimeboxSummary
+ * @param timebox - 时间盒对象
+ * @returns 时间盒摘要
+ */
 function timeboxToSummary(timebox: Timebox): TimeboxSummary {
   return {
     id: timebox.id,
@@ -86,6 +108,12 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
   };
 }
 
+/**
+ * 根据日期范围获取时间盒摘要列表
+ * @param start - 开始日期
+ * @param end - 结束日期
+ * @returns 时间盒摘要列表
+ */
 async function fetchTimeboxSummariesByRange(
   start: Date,
   end: Date,
@@ -101,6 +129,10 @@ async function fetchTimeboxSummariesByRange(
   return timeboxes.map(timeboxToSummary);
 }
 
+/**
+ * 获取当天的时间盒摘要列表
+ * @returns 当天时间盒摘要列表
+ */
 async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -108,7 +140,15 @@ async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummariesByRange(startOfDay, endOfDay);
 }
 
-/** 创建并执行 Orchestrator 管道（提取公共逻辑） */
+/**
+ * 创建并执行 Orchestrator 管道（提取公共逻辑）
+ * 
+ * @param rawInput - 用户原始输入
+ * @param intentSupplier - 意图提供函数
+ * @param confirmed - 是否已确认
+ * @param traceEnabled - 是否启用追踪
+ * @returns 意图提交结果
+ */
 async function executePipeline(
   rawInput: string,
   intentSupplier: () => Promise<{ success: boolean; intent?: any; error?: string }>,
@@ -205,6 +245,14 @@ async function executePipeline(
 
 // ─── Server Actions ─────────────────────────────────────────────
 
+/**
+ * 提交自然语言意图
+ * 
+ * @param rawInput - 用户原始输入文本
+ * @param confirmed - 是否已确认（用于二次确认场景）
+ * @param traceEnabled - 是否启用追踪日志
+ * @returns 意图提交结果
+ */
 export async function submitIntent(
   rawInput: string,
   confirmed?: boolean,
@@ -232,6 +280,14 @@ export async function submitIntent(
   );
 }
 
+/**
+ * 提交表单模板意图
+ * 
+ * @param fields - 表单字段
+ * @param confirmed - 是否已确认
+ * @param traceEnabled - 是否启用追踪日志
+ * @returns 意图提交结果
+ */
 export async function submitTemplateIntent(
   fields: TemplateFormFields,
   confirmed?: boolean,
@@ -257,20 +313,39 @@ export async function submitTemplateIntent(
   );
 }
 
-// ─── 执行记录结果类型 ─────────────────────────────────────────────
+// ─── 状态转换结果类型 ─────────────────────────────────────────────
 
+/**
+ * 时间盒状态转换结果
+ */
 export interface TransitionResult {
+  /** 是否成功 */
   success: boolean
+  /** 更新后的时间盒摘要 */
   timebox?: TimeboxSummary
+  /** 动作面 */
   actionSurface?: ActionSurface
+  /** 错误信息 */
   error?: string
+  /** 警告信息 */
   warnings?: string[]
+  /** 是否需要确认 */
   needsConfirmation?: boolean
+  /** 确认消息 */
   confirmationMessage?: string
 }
 
 // ─── 状态转换 Server Action ──────────────────────────────────────
 
+/**
+ * 执行时间盒状态转换
+ * 
+ * @param timeboxId - 时间盒 ID
+ * @param action - 转换动作（start/end/cancel/log/overtime）
+ * @param executionRecord - 执行记录（仅 log 动作需要）
+ * @param confirmed - 是否已确认
+ * @returns 转换结果
+ */
 export async function transitionTimebox(
   timeboxId: string,
   action: 'start' | 'end' | 'cancel' | 'log' | 'overtime',
@@ -330,20 +405,37 @@ export async function transitionTimebox(
   }
 }
 
+/**
+ * 获取当天的时间盒列表
+ * @returns 时间盒摘要列表
+ */
 export async function getTimeboxes(): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummaries();
 }
 
 // ─── 执行意图结果类型 ─────────────────────────────────────────────
 
+/**
+ * 执行意图结果
+ */
 export interface ExecutionIntentResult {
+  /** 是否成功 */
   success: boolean;
+  /** 时间盒列表 */
   timeboxes: TimeboxSummary[];
+  /** 错误信息 */
   error?: string;
+  /** 匹配到的时间盒 ID */
   matchedTimeboxId?: string;
 }
 
-/** target 匹配：根据 AI 解析的 target 字段找到对应的时间盒 ID */
+/**
+ * target 匹配：根据 AI 解析的 target 字段找到对应的时间盒 ID
+ * 
+ * @param target - 目标信息
+ * @param timeboxes - 时间盒列表
+ * @returns 匹配的时间盒 ID，未匹配返回 null
+ */
 function matchTarget(
   target: { type: string; value: string },
   timeboxes: TimeboxSummary[],
@@ -368,6 +460,12 @@ function matchTarget(
 
 // ─── 自然语言执行意图 Server Action ────────────────────────────────
 
+/**
+ * 提交自然语言执行意图（执行/记录类型）
+ * 
+ * @param rawInput - 用户原始输入
+ * @returns 执行意图结果
+ */
 export async function submitExecutionIntent(
   rawInput: string,
 ): Promise<ExecutionIntentResult> {

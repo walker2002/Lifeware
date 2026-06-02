@@ -1,15 +1,29 @@
+/**
+ * @file objective-card
+ * @brief Objective 卡片组件
+ * 
+ * 展示单个 Objective 的摘要信息和进度
+ */
+
 "use client"
 
 import type { Objective, KeyResult } from "@/usom/types/objects"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
+/**
+ * Objective 卡片属性
+ */
 interface ObjectiveCardProps {
+  /** Objective 对象 */
   objective: Objective
+  /** 关联的 KeyResults */
   keyResults?: KeyResult[]
+  /** 点击回调 */
   onClick?: (id: string) => void
 }
 
+/** 状态标签映射 */
 const STATUS_LABELS: Record<string, string> = {
   draft: "草稿", active: "进行中", paused: "已暂停",
   completed: "已完成", discarded: "已废弃", archived: "已归档",

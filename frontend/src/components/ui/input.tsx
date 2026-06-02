@@ -1,3 +1,10 @@
+/**
+ * @file input
+ * @brief 输入框组件
+ * 
+ * 基于 shadcn/ui 的输入框组件
+ */
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

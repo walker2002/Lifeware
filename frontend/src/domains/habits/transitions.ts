@@ -1,14 +1,25 @@
-// Habits 状态转换表 — 从 nexus/core/state-machine/transitions.ts 复制
-// 状态流转: (none) → draft → active ⇄ suspended → archived
-// suspended → archived（用户归档，需二次确认）
+/**
+ * @file transitions
+ * @brief Habits 状态转换表
+ * 
+ * 状态流转: (none) → draft → active ⇄ suspended → archived
+ * suspended → archived（用户归档，需二次确认）
+ */
 
 import type { HabitStatus } from '@/usom/types/primitives'
 import type { SystemEventType } from '@/usom/types/process'
 
+/**
+ * 状态转换定义
+ */
 export interface Transition<T extends string = string> {
+  /** 源状态（null 表示初始创建） */
   from: T | null
+  /** 目标状态 */
   to: T
+  /** 动作名称 */
   action: string
+  /** 系统事件类型 */
   eventType: SystemEventType
 }
 
@@ -20,6 +31,14 @@ export const habitTransitions: Transition<HabitStatus>[] = [
   { from: 'suspended', to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
 ]
 
+/**
+ * 查找状态转换
+ * 
+ * @param transitions - 转换列表
+ * @param from - 源状态
+ * @param action - 动作名称
+ * @returns 匹配的转换，未找到返回 null
+ */
 export function findTransition<T extends string>(
   transitions: Transition<T>[],
   from: T | null,

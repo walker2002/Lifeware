@@ -1,3 +1,10 @@
+/**
+ * @file habit
+ * @brief 习惯仓储实现
+ * 
+ * 实现 IHabitRepository 接口，提供习惯数据的数据库操作
+ */
+
 import { eq, and, asc } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -13,6 +20,9 @@ import type { USOM_ID, DateOnly, Timestamp } from '../../../usom/types/primitive
 import { habitRowToUSOM, habitUSOMToRow } from '../../../lib/db/repositories/mappers'
 import { calculateStreak, calculateLongestStreak, calculateCompletion7d } from '../streak-calculator'
 
+/**
+ * 习惯仓储
+ */
 export class HabitRepository implements IHabitRepository {
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Habit | null> {
     const rows = await db.select().from(s.habits)

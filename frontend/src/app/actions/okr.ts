@@ -1,3 +1,10 @@
+/**
+ * @file okr
+ * @brief OKR（目标与关键结果）管理 Server Action 模块
+ * 
+ * 提供 OKR 的创建、查询、更新、删除等功能
+ */
+
 "use server";
 
 import type { Objective, KeyResult } from "@/usom/types/objects";
@@ -11,16 +18,29 @@ import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createEventBus } from "../../nexus/infrastructure/event-bus";
 
+/** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 
+/**
+ * OKR 操作结果
+ */
 export interface OKRActionResult<T = void> {
+  /** 是否成功 */
   success: boolean;
+  /** 返回数据 */
   data?: T;
+  /** 错误信息 */
   error?: string;
 }
 
 // ─── 查询 ────────────────────────────────────────────────────────
 
+/**
+ * 获取目标列表
+ * 
+ * @param status - 目标状态（可选）
+ * @returns 目标列表
+ */
 export async function getObjectives(
   status?: ObjectiveStatus,
 ): Promise<OKRActionResult<Objective[]>> {
@@ -35,6 +55,12 @@ export async function getObjectives(
   }
 }
 
+/**
+ * 根据 ID 获取目标详情（包含关键结果）
+ * 
+ * @param id - 目标 ID
+ * @returns 目标详情
+ */
 export async function getObjectiveById(
   id: string,
 ): Promise<OKRActionResult<ObjectiveWithKR>> {
@@ -48,6 +74,12 @@ export async function getObjectiveById(
   }
 }
 
+/**
+ * 获取指定目标的关键结果列表
+ * 
+ * @param objectiveId - 目标 ID
+ * @returns 关键结果列表
+ */
 export async function getKeyResultsByObjective(
   objectiveId: string,
 ): Promise<OKRActionResult<KeyResult[]>> {
@@ -62,6 +94,10 @@ export async function getKeyResultsByObjective(
 
 // ─── 操作 ────────────────────────────────────────────────────────
 
+/**
+ * 创建 OKR 编排器实例
+ * @returns OKR 编排器
+ */
 async function createOKROrchestrator() {
   const objectiveRepo = new ObjectiveRepository();
   const keyResultRepo = new KeyResultRepository();
@@ -88,6 +124,13 @@ async function createOKROrchestrator() {
   });
 }
 
+/**
+ * 构建意图对象
+ * 
+ * @param action - 动作名称
+ * @param fields - 动作字段
+ * @returns 意图对象
+ */
 function makeIntent(action: string, fields: Record<string, unknown>) {
   const now = new Date().toISOString() as Timestamp;
   return {
@@ -102,6 +145,12 @@ function makeIntent(action: string, fields: Record<string, unknown>) {
   };
 }
 
+/**
+ * 创建目标
+ * 
+ * @param input - 目标输入数据
+ * @returns 创建结果
+ */
 export async function createObjective(
   input: { title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2"; periodType?: string; periodStart?: string; periodEnd?: string },
 ): Promise<OKRActionResult<Objective>> {
@@ -121,6 +170,13 @@ export async function createObjective(
   }
 }
 
+/**
+ * 更新目标
+ * 
+ * @param objectiveId - 目标 ID
+ * @param fields - 更新字段
+ * @returns 更新结果
+ */
 export async function updateObjective(
   objectiveId: string,
   fields: Record<string, unknown>,
@@ -144,6 +200,12 @@ export async function updateObjective(
   }
 }
 
+/**
+ * 激活目标
+ * 
+ * @param objectiveId - 目标 ID
+ * @returns 操作结果
+ */
 export async function activateObjective(
   objectiveId: string,
 ): Promise<OKRActionResult> {
@@ -158,6 +220,13 @@ export async function activateObjective(
   }
 }
 
+/**
+ * 更改目标状态
+ * 
+ * @param objectiveId - 目标 ID
+ * @param action - 状态动作（pause/resume/complete/discard/archive）
+ * @returns 操作结果
+ */
 export async function changeObjectiveStatus(
   objectiveId: string,
   action: "pause" | "resume" | "complete" | "discard" | "archive",
@@ -180,6 +249,13 @@ export async function changeObjectiveStatus(
   }
 }
 
+/**
+ * 创建关键结果
+ * 
+ * @param objectiveId - 目标 ID
+ * @param input - 关键结果输入数据
+ * @returns 创建结果
+ */
 export async function createKeyResult(
   objectiveId: string,
   input: { title: string; description?: string; targetValue: number; unit: string },
@@ -200,6 +276,13 @@ export async function createKeyResult(
   }
 }
 
+/**
+ * 更新关键结果
+ * 
+ * @param keyResultId - 关键结果 ID
+ * @param fields - 更新字段
+ * @returns 更新结果
+ */
 export async function updateKeyResult(
   keyResultId: string,
   fields: Record<string, unknown>,
@@ -217,6 +300,13 @@ export async function updateKeyResult(
   }
 }
 
+/**
+ * 更新关键结果进度
+ * 
+ * @param keyResultId - 关键结果 ID
+ * @param currentValue - 当前值
+ * @returns 更新结果
+ */
 export async function updateKeyResultProgress(
   keyResultId: string,
   currentValue: number,

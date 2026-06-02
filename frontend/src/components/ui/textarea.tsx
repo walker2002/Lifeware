@@ -1,3 +1,10 @@
+/**
+ * @file textarea
+ * @brief 文本域组件
+ * 
+ * 基于 shadcn/ui 的文本域组件
+ */
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

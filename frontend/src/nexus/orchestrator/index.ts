@@ -1,6 +1,12 @@
-// Orchestrator — Nexus 管道协调器
-// 统一入口，按顺序协调: IntentEngine → RuleEngine → StateMachine → EventBus → ActionSurfaceEngine
-// 所有域通过 executeIntent() 统一入口
+/**
+ * @file index
+ * @brief Nexus 管道协调器
+ * 
+ * 统一入口，按顺序协调: IntentEngine → RuleEngine → StateMachine → EventBus → ActionSurfaceEngine
+ * 所有域通过 executeIntent() 统一入口
+ * 
+ * @see docs/usom-design.md Section 4.2
+ */
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
@@ -45,11 +51,31 @@ import { formatCNUIFromContext, formatTextSummary } from './query-cnui-formatter
 import { createAISessionManager } from '@/nexus/ai-runtime/session'
 import type { QueryResultEntry } from '@/nexus/ai-runtime/session'
 
+/**
+ * 意图引擎接口
+ * 负责解析用户自然语言输入为结构化意图
+ */
 interface IntentEngine {
+  /**
+   * 解析用户输入
+   * @param rawInput - 用户原始输入文本
+   * @param userId - 用户ID
+   * @returns 结构化意图对象
+   */
   parse(rawInput: string, userId: USOM_ID): Promise<StructuredIntent>
 }
 
+/**
+ * 规则引擎接口
+ * 负责评估意图的合法性和风险
+ */
 interface RuleEngine {
+  /**
+   * 评估意图
+   * @param intent - 结构化意图
+   * @param snapshot - 上下文快照
+   * @returns 评估结果（通过/警告/需确认）
+   */
   evaluate(
     intent: StructuredIntent,
     snapshot: ContextSnapshot,
@@ -60,16 +86,46 @@ interface RuleEngine {
   }>
 }
 
+/**
+ * 动作表面引擎接口
+ * 负责生成用户界面上的推荐操作
+ */
 interface ActionSurfaceEngine {
+  /**
+   * 生成动作表面
+   * @param snapshot - 上下文快照
+   * @param event - 系统事件（可选）
+   * @param userId - 用户ID（可选）
+   * @returns 动作表面对象
+   */
   generate(snapshot: ContextSnapshot, event?: SystemEvent, userId?: USOM_ID): Promise<ActionSurface>
 }
 
+/**
+ * 应用模板结果接口
+ * @property success - 是否成功
+ * @property generatedTimeboxes - 生成的时间盒列表
+ * @property error - 错误信息
+ */
 export interface ApplyTemplateResult {
   success: boolean
   generatedTimeboxes?: Timebox[]
   error?: string
 }
 
+/**
+ * 协调器执行结果接口
+ * @property success - 是否成功
+ * @property timebox - 生成/更新的时间盒
+ * @property habit - 生成/更新的习惯
+ * @property actionSurface - 动作表面
+ * @property error - 错误信息
+ * @property warnings - 警告信息列表
+ * @property needsConfirmation - 是否需要确认
+ * @property confirmationMessage - 确认消息
+ * @property generativeResult - 生成式结果
+ * @property queryResult - 查询结果
+ */
 export interface OrchestratorResult {
   success: boolean
   timebox?: Timebox
@@ -83,6 +139,22 @@ export interface OrchestratorResult {
   queryResult?: QueryResult
 }
 
+/**
+ * 协调器依赖接口
+ * @property timeboxRepo - 时间盒仓储
+ * @property eventRepo - 系统事件仓储
+ * @property intentEngine - 意图引擎
+ * @property ruleEngine - 规则引擎
+ * @property actionSurfaceEngine - 动作表面引擎（可选）
+ * @property habitRepo - 习惯仓储（可选）
+ * @property habitLogRepo - 习惯日志仓储（可选）
+ * @property templateRepo - 模板仓储（可选）
+ * @property objectiveRepo - 目标仓储（可选）
+ * @property keyResultRepo - 关键结果仓储（可选）
+ * @property taskRepo - 任务仓储（可选）
+ * @property projectRepo - 项目仓储（可选）
+ * @property onTrace - 追踪回调函数（可选）
+ */
 export interface OrchestratorDeps {
   timeboxRepo: ITimeboxRepository
   eventRepo: ISystemEventRepository
@@ -99,6 +171,11 @@ export interface OrchestratorDeps {
   onTrace?: (step: TraceStep) => void
 }
 
+/**
+ * 创建存根上下文快照
+ * @param userId - 用户ID
+ * @returns 上下文快照对象
+ */
 function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
   const now = new Date().toISOString() as Timestamp
   return {
@@ -125,6 +202,11 @@ function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
   }
 }
 
+/**
+ * 将上下文快照转换为 USOM 快照格式
+ * @param snapshot - 上下文快照
+ * @returns USOM 快照对象
+ */
 function toUSOMSnapshot(snapshot: ContextSnapshot): USOMSnapshot {
   return {
     userId: snapshot.userId,
@@ -144,6 +226,13 @@ function toUSOMSnapshot(snapshot: ContextSnapshot): USOMSnapshot {
   }
 }
 
+/**
+ * 追踪函数，记录执行步骤
+ * @param onTrace - 追踪回调函数
+ * @param component - 组件名称
+ * @param phase - 阶段（开始/结束）
+ * @param data - 输入输出数据
+ */
 function trace(
   onTrace: OrchestratorDeps['onTrace'],
   component: TraceComponent,
@@ -165,15 +254,31 @@ function trace(
 // Intent action → SM action 的动态映射（从各域 manifest 构建）
 const ACTION_MAP: Record<string, string> = buildActionMap()
 
+/**
+ * 将域动作转换为状态机动作
+ * @param domainAction - 域动作名称
+ * @returns 状态机动作名称
+ */
 function toStateMachineAction(domainAction: string): string {
   return ACTION_MAP[domainAction] ?? domainAction
 }
 
 // 从 targetDomain + action 动态推导 SM targetObject.type（基于 manifest.lifecycle 键）
+/**
+ * 从意图推导目标对象类型
+ * @param intent - 结构化意图
+ * @returns 对象类型名称
+ */
 function getObjectType(intent: StructuredIntent): string {
   return resolveObjectType(intent.targetDomain, intent.action)
 }
 
+/**
+ * 构建查询结果摘要
+ * @param intent - 结构化意图
+ * @param result - 查询结果
+ * @returns 查询结果条目
+ */
 function buildQueryResultSummary(intent: StructuredIntent, result: QueryResult): QueryResultEntry {
   const surfaceType = result.type === 'cnui' ? result.payload.surfaceType : undefined
 
@@ -203,6 +308,11 @@ function buildQueryResultSummary(intent: StructuredIntent, result: QueryResult):
   }
 }
 
+/**
+ * 创建协调器实例
+ * @param deps - 依赖项对象
+ * @returns 协调器实例
+ */
 export function createOrchestrator(deps: OrchestratorDeps) {
   const eventBus = createEventBus()
   const sessionManager = createAISessionManager()
@@ -214,7 +324,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
   const orchestrator = {
     eventBus,
 
-    /** 通过自然语言输入执行 Nexus 管道（创建路径） */
+    /**
+     * 通过自然语言输入执行 Nexus 管道（创建路径）
+     * @param rawInput - 用户自然语言输入
+     * @param userId - 用户ID
+     * @param confirmed - 是否已确认（用于二次确认场景）
+     * @returns 协调器执行结果
+     */
     async execute(rawInput: string, userId: USOM_ID, confirmed?: boolean): Promise<OrchestratorResult> {
       trace(deps.onTrace, 'IntentEngine', 'start', { input: { rawInput } })
       const intent = await deps.intentEngine.parse(rawInput, userId)
@@ -271,7 +387,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     },
 
-    /** 直接执行状态转换（非创建路径：start/end/cancel/log/overtime） */
+    /**
+     * 直接执行状态转换（非创建路径：start/end/cancel/log/overtime）
+     * @param objectId - 对象ID
+     * @param action - 动作类型
+     * @param userId - 用户ID
+     * @param payload - 附加负载数据
+     * @param confirmed - 是否已确认（用于二次确认场景）
+     * @returns 协调器执行结果
+     */
     async executeTransition(
       objectId: USOM_ID,
       action: string,
@@ -342,7 +466,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     },
 
-    /** 统一意图执行入口 — 所有域通过此方法处理 */
+    /**
+     * 统一意图执行入口 — 所有域通过此方法处理
+     * @param intent - 结构化意图对象
+     * @param userId - 用户ID
+     * @param confirmed - 是否已确认（用于二次确认场景）
+     * @returns 协调器执行结果
+     */
     async executeIntent(
       intent: StructuredIntent,
       userId: USOM_ID,

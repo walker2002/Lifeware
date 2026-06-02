@@ -1,3 +1,15 @@
+/**
+ * @file split-warning
+ * @brief 任务拆分警告组件
+ * 
+ * 当任务预估时长超过 12 小时时显示警告，建议拆分为子任务
+ */
+
+/**
+ * 拆分警告组件
+ * 
+ * @param estimatedDuration - 预估时长（分钟）
+ */
 export function SplitWarning({ estimatedDuration }: { estimatedDuration?: number | null }) {
   if (!estimatedDuration || estimatedDuration <= 720) return null
 

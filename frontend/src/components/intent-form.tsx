@@ -1,3 +1,10 @@
+/**
+ * @file intent-form
+ * @brief 表单模式的意图输入组件
+ * 
+ * 提供标题、开始时间、时长三个字段的表单输入，带前端验证
+ */
+
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -6,20 +13,33 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
-/** 表单提交的字段值 */
+/**
+ * 表单提交的字段值
+ */
 export interface TemplateFormFields {
+  /** 标题 */
   title: string;
+  /** 开始时间 */
   startTime: string;
+  /** 时长（分钟） */
   duration: number;
 }
 
-/** 验证错误映射 */
+/**
+ * 验证错误映射
+ */
 interface ValidationErrors {
+  /** 标题错误 */
   title?: string;
+  /** 开始时间错误 */
   startTime?: string;
+  /** 时长错误 */
   duration?: string;
 }
 
+/**
+ * IntentForm 组件属性
+ */
 interface IntentFormProps {
   /** 提交回调，接收已验证的表单字段和可选的确认标志 */
   onSubmit: (fields: TemplateFormFields, confirmed?: boolean) => void;

@@ -1,3 +1,10 @@
+/**
+ * @file command-menu
+ * @brief 命令菜单组件
+ * 
+ * 提供键盘快捷键唤起的命令搜索菜单
+ */
+
 "use client"
 
 import { useEffect } from "react"
@@ -10,17 +17,31 @@ import {
   CommandList,
 } from "@/components/ui/command"
 
+/**
+ * 可搜索项
+ */
 interface SearchableItem {
+  /** 唯一标识 */
   id: string
+  /** 显示标签 */
   label: string
+  /** 所属分组 */
   group: string
+  /** 图标组件 */
   icon: React.ComponentType<{ className?: string }>
+  /** 选中回调 */
   onSelect: () => void
 }
 
+/**
+ * CommandMenu 组件属性
+ */
 interface CommandMenuProps {
+  /** 是否打开 */
   open: boolean
+  /** 打开状态变更回调 */
   onOpenChange: (open: boolean) => void
+  /** 可搜索项列表 */
   items: SearchableItem[]
 }
 

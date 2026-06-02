@@ -1,3 +1,11 @@
+/**
+ * @file intent-input
+ * @brief 意图输入组件
+ * 
+ * 用户输入自然语言文本，点击提交或按回车调用 onSubmit。
+ * 加载时按钮显示 spinner，错误时在输入框下方显示错误信息。
+ */
+
 "use client";
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
@@ -5,6 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Send } from "lucide-react";
 
+/**
+ * IntentInput 组件属性
+ */
 interface IntentInputProps {
   /** 提交回调，接收用户原始输入和可选的确认标志 */
   onSubmit: (rawInput: string, confirmed?: boolean) => void;
@@ -14,12 +25,6 @@ interface IntentInputProps {
   error?: string;
 }
 
-/**
- * IntentInput — 意图输入组件
- *
- * 用户输入自然语言文本，点击提交或按回车调用 onSubmit。
- * 加载时按钮显示 spinner，错误时在输入框下方显示错误信息。
- */
 export function IntentInput({ onSubmit, isLoading, error }: IntentInputProps) {
   const [inputValue, setInputValue] = useState("");
 

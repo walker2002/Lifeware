@@ -1,3 +1,10 @@
+/**
+ * @file task-template
+ * @brief 任务模板仓储实现
+ * 
+ * 实现 ITaskTemplateRepository 接口，提供任务模板的数据库操作
+ */
+
 import { eq, and, isNull } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
@@ -7,6 +14,9 @@ import type { USOM_ID, DateOnly } from '../../../usom/types/primitives'
 import { projectTemplateRowToUSOM, projectTemplateUSOMToRow, taskTemplateRowToUSOM, taskTemplateUSOMToRow, projectRowToUSOM } from '../../../lib/db/repositories/mappers'
 import { v4 } from 'uuid'
 
+/**
+ * 任务模板仓储
+ */
 export class TaskTemplateRepository implements ITaskTemplateRepository {
   async findProjectTemplateById(id: USOM_ID, userId: USOM_ID): Promise<ProjectTemplate | null> {
     const rows = await db.select().from(s.projectTemplates)

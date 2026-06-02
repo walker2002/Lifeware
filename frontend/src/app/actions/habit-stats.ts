@@ -1,3 +1,10 @@
+/**
+ * @file habit-stats
+ * @brief 习惯统计 Server Action 模块
+ * 
+ * 提供习惯数据统计查询功能，包括日视图、周视图统计等
+ */
+
 "use server"
 
 import { HabitRepository } from "@/domains/habits/repository/habit"
@@ -7,18 +14,33 @@ import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date
 import type { HabitLog } from "@/usom/types/objects"
 import type { DateOnly } from "@/usom/types/primitives"
 
+/** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001" as any
 
 // ─── 日视图数据 ─────────────────────────────────────────────────
 
+/**
+ * 习惯日视图数据行
+ */
 export interface HabitDayRow {
+  /** 习惯 ID */
   habitId: string
+  /** 习惯标题 */
   title: string
+  /** 当前连续打卡天数 */
   streak: number
+  /** 7天完成率 */
   completionRate7d: number
+  /** 最近5天的打卡状态 */
   recent5Days: Array<{ date: string; status: HabitLog['completionStatus'] | null }>
 }
 
+/**
+ * 获取指定日期的习惯统计数据
+ * 
+ * @param date - 目标日期
+ * @returns 习惯日视图数据列表
+ */
 export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
   const habitRepo = new HabitRepository()
   const logRepo = new HabitLogRepository()
@@ -60,13 +82,26 @@ export async function getHabitStatsForDay(date: Date): Promise<HabitDayRow[]> {
 
 // ─── 周视图数据 ─────────────────────────────────────────────────
 
+/**
+ * 习惯周视图矩阵数据
+ */
 export interface HabitWeekMatrix {
+  /** 习惯 ID */
   habitId: string
+  /** 习惯标题 */
   title: string
+  /** 一周每天的打卡状态 */
   weekDays: Array<{ date: string; dayLabel: string; status: HabitLog['completionStatus'] | 'future' | null }>
+  /** 周完成率 */
   completionRate: number
 }
 
+/**
+ * 获取指定周的习惯统计数据
+ * 
+ * @param weekStart - 周开始日期
+ * @returns 习惯周视图矩阵数据列表
+ */
 export async function getHabitStatsForWeek(weekStart: Date): Promise<HabitWeekMatrix[]> {
   const habitRepo = new HabitRepository()
   const logRepo = new HabitLogRepository()

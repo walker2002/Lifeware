@@ -1,9 +1,19 @@
+/**
+ * @file use-panel-state
+ * @brief 面板状态管理 Hook
+ * 
+ * 管理 AI 面板的展开/收起状态，支持 localStorage 持久化
+ */
+
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
 
 const STORAGE_KEY = "lw-ai-panel-open";
 
+/**
+ * 面板状态管理 Hook
+ */
 export function usePanelState() {
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === "undefined") return true;

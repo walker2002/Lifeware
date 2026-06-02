@@ -1,11 +1,30 @@
+/**
+ * @file registry
+ * @brief Context Capability 注册中心
+ */
+
 import type { ContextCapability } from '@/usom/types/process'
 
+/** 能力注册表 */
 const capabilities = new Map<string, ContextCapability>()
 
+/**
+ * 注册 Context 能力
+ * @param cap - 能力定义
+ */
 export function registerContextCapability(cap: ContextCapability): void {
   capabilities.set(cap.id, cap)
 }
 
+/**
+ * 解析 Context 能力并校验结果
+ * @param capabilityId - 能力 ID
+ * @param query - 查询字符串
+ * @param params - 参数
+ * @param requiredVisibility - 要求的可见性
+ * @returns 校验后的数据
+ * @throws 当能力未注册、可见性不匹配或数据校验失败时
+ */
 export async function resolveContext(
   capabilityId: string,
   query: string,
@@ -33,6 +52,10 @@ export async function resolveContext(
   return parsed.data
 }
 
+/**
+ * 获取已注册的能力 ID 列表
+ * @returns 能力 ID 列表
+ */
 export function getRegisteredCapabilities(): string[] {
   return Array.from(capabilities.keys())
 }

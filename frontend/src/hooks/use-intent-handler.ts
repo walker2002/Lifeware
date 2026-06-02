@@ -1,3 +1,10 @@
+/**
+ * @file use-intent-handler
+ * @brief 意图处理 Hook
+ * 
+ * 处理用户意图提交、快捷方式解析、CNUI Surface 交互等功能
+ */
+
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
@@ -30,6 +37,9 @@ import { resolveSlashCommand } from "@/lib/slash-command"
 import { HABIT_USER_FACING } from "@/lib/constants/habit-messages"
 import type { IntentSubmissionResult } from "@/app/actions/intent"
 
+/**
+ * 意图处理器依赖项
+ */
 interface IntentHandlerDeps {
   setTimeboxes: React.Dispatch<React.SetStateAction<TimeboxSummary[]>>
   setActionSurface: React.Dispatch<React.SetStateAction<ActionSurface | undefined>>

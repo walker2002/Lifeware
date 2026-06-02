@@ -1,6 +1,10 @@
-// Action Surface Engine — 动作面引擎
-// 调用 DomainPlugin.onActionSurfaceRequest 生成 ActionSurface
-// 将候选项分类为 guide / tile / cue 三类
+/**
+ * @file index
+ * @brief Action Surface Engine — 动作面引擎
+ * 
+ * 调用 DomainPlugin.onActionSurfaceRequest 生成 ActionSurface
+ * 将候选项分类为 guide / tile / cue 三类
+ */
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type {
@@ -14,7 +18,17 @@ import type { DomainPlugin } from '@/usom/types/process'
 
 // ─── 引擎接口 ─────────────────────────────────────────────────
 
+/**
+ * 动作面引擎接口
+ */
 export interface ActionSurfaceEngine {
+  /**
+   * 生成动作面
+   * @param snapshot - 上下文快照
+   * @param event - 触发事件（可选）
+   * @param userId - 用户 ID（可选）
+   * @returns 动作面
+   */
   generate(
     snapshot: ContextSnapshot,
     event?: SystemEvent,
@@ -25,6 +39,11 @@ export interface ActionSurfaceEngine {
 // ─── Stub Signals（MVP 占位） ──────────────────────────────────
 
 /** 创建默认 DerivedSignals（MVP 阶段使用全零/默认值） */
+/**
+ * 创建默认的派生信号对象
+ * @param userId - 用户 ID
+ * @returns 默认的派生信号
+ */
 function createStubSignals(userId: USOM_ID): DerivedSignals {
   return {
     userId,

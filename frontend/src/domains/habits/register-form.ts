@@ -1,5 +1,10 @@
-// HabitForm CN-UI 注册 — 客户端/服务端安全
-// 由 habits/index.ts（服务端）和 page.tsx（客户端）导入
+/**
+ * @file register-form
+ * @brief HabitForm CN-UI 注册
+ * 
+ * 由 habits/index.ts（服务端）和 page.tsx（客户端）导入
+ */
+
 import { HabitForm } from './components/habit-form'
 import { FormRegistry } from '@/lib/form-registry'
 

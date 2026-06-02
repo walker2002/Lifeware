@@ -1,21 +1,49 @@
+/**
+ * @file trace-panel
+ * @brief 追踪面板组件
+ * 
+ * 展示意图处理的追踪日志，用于调试和问题诊断
+ */
+
 "use client"
 
 import { useState } from "react"
 import type { TraceSession, TraceStep } from "@/nexus/infrastructure/trace-logger/trace-types"
 
+/**
+ * TracePanel 组件属性
+ */
 interface TracePanelProps {
+  /** 追踪会话列表 */
   sessions: TraceSession[]
+  /** 是否可见 */
   visible: boolean
+  /** 切换可见性回调 */
   onToggle: () => void
 }
 
-/** 格式化时间戳为 HH:MM:SS */
+/**
+ * 格式化时间戳为 HH:MM:SS
+ * 
+ * @param ts - ISO 时间戳字符串
+ * @returns 格式化后的时间字符串
+ */
 function formatTs(ts: string): string {
   return new Date(ts).toLocaleTimeString("zh-CN", { hour12: false })
 }
 
-/** 步骤组件 */
-function StepItem({ step }: { step: TraceStep }) {
+/**
+ * 步骤组件属性
+ */
+interface StepItemProps {
+  /** 追踪步骤 */
+  step: TraceStep
+}
+
+/**
+ * 步骤组件
+ */
+function StepItem({ step }: StepItemProps) {
   const [expanded, setExpanded] = useState(false)
   const label = `${step.component}.${step.phase}`
 
@@ -63,8 +91,18 @@ function StepItem({ step }: { step: TraceStep }) {
   )
 }
 
-/** 会话组件 */
-function SessionItem({ session }: { session: TraceSession }) {
+/**
+ * 会话组件属性
+ */
+interface SessionItemProps {
+  /** 追踪会话 */
+  session: TraceSession
+}
+
+/**
+ * 会话组件
+ */
+function SessionItem({ session }: SessionItemProps) {
   const [expanded, setExpanded] = useState(false)
   const resultColor = session.result === "success" ? "text-success" : session.result === "error" ? "text-error" : "text-on-dark-soft"
 

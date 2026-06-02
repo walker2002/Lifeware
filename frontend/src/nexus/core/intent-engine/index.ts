@@ -1,5 +1,9 @@
-// Intent Engine 入口
-// 薄封装层，委托给 ai-parser 进行意图解析
+/**
+ * @file index
+ * @brief Intent Engine 入口
+ * 
+ * 薄封装层，委托给 ai-parser 进行意图解析
+ */
 
 import { parseWithAI, parseMultiTask } from './ai-parser'
 import type { AIParserResult, MultiTaskParserResult, BatchIntentResult, BatchItemResult } from './ai-parser'
@@ -11,6 +15,9 @@ import type { AIRuntime } from '@/nexus/ai-runtime'
 /**
  * 将 ShortcutMatch 转换为 AIParserResult
  * 快捷方式命中时 fields 为空对象，由调用方根据 action 填充
+ * @param match - 快捷方式匹配结果
+ * @param intentionId - 意图 ID
+ * @returns AI 解析结果
  */
 function shortcutToResult(match: ShortcutMatch, intentionId: USOM_ID): AIParserResult {
   return {
@@ -31,6 +38,10 @@ function shortcutToResult(match: ShortcutMatch, intentionId: USOM_ID): AIParserR
 /**
  * 解析用户自然语言输入为结构化意图（单任务）
  * 快捷方式（/开头）优先匹配，命中则跳过 AI 解析
+ * @param rawInput - 原始输入
+ * @param intentionId - 意图 ID
+ * @param aiRuntime - AI 运行时
+ * @returns AI 解析结果
  */
 export async function parse(
   rawInput: string,
@@ -45,6 +56,10 @@ export async function parse(
 
 /**
  * 解析用户自然语言输入中的多个时间盒任务
+ * @param rawInput - 原始输入
+ * @param intentionId - 意图 ID
+ * @param aiRuntime - AI 运行时
+ * @returns 多任务解析结果
  */
 export async function parseBatch(
   rawInput: string,

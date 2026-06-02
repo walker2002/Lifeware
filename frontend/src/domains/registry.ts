@@ -1,3 +1,10 @@
+/**
+ * @file registry
+ * @brief 领域插件注册表
+ * 
+ * 提供领域插件的注册、查找和快捷方式冲突检测功能
+ */
+
 import type { DomainId } from '@/usom/types/primitives'
 import type { DomainPlugin, DomainHandler } from '@/usom/types/process'
 import { timeboxPlugin } from './timebox'
@@ -16,10 +23,19 @@ const allPlugins = [timeboxPlugin, habitsPlugin, okrsPlugin, tasksPlugin]
 // 跳过加载失败的域（manifest 加载失败时 plugin 为 null）
 export const domainRegistry: DomainPlugin[] = allPlugins.filter(Boolean) as DomainPlugin[]
 
+/**
+ * 查找指定 ID 的领域插件
+ * 
+ * @param id - 领域 ID
+ * @returns 领域插件，未找到返回 undefined
+ */
 export function findDomain(id: DomainId | string): DomainPlugin | undefined {
   return domainRegistry.find(p => p.manifest.domainId === id)
 }
 
+/**
+ * 快捷方式冲突错误
+ */
 export class ShortcutConflictError extends Error {
   constructor(
     public readonly shortcut: string,
@@ -31,6 +47,12 @@ export class ShortcutConflictError extends Error {
   }
 }
 
+/**
+ * 根据快捷方式查找领域和动作
+ * 
+ * @param shortcut - 快捷方式字符串
+ * @returns 领域 ID 和动作名称，未找到返回 undefined
+ */
 export function getActionByShortcut(shortcut: string): { domainId: string; action: string } | undefined {
   for (const plugin of domainRegistry) {
     const triggers = plugin.manifest.intentTriggers
@@ -44,12 +66,24 @@ export function getActionByShortcut(shortcut: string): { domainId: string; actio
   return undefined
 }
 
+/**
+ * 获取指定领域和动作的视图路由
+ * 
+ * @param domainId - 领域 ID
+ * @param action - 动作名称
+ * @returns 组件路径和参数，未找到返回 undefined
+ */
 export function getViewRoute(domainId: string, action: string): { component: string; params?: Record<string, unknown> } | undefined {
   const domain = findDomain(domainId)
   if (!domain?.manifest.viewRoutes) return undefined
   return domain.manifest.viewRoutes[action]
 }
 
+/**
+ * 获取所有领域的所有动作
+ * 
+ * @returns 所有领域的动作列表
+ */
 export function getAllDomainActions(): Array<{
   domainId: string
   domainName: string

@@ -1,6 +1,10 @@
-// Rule Engine 入口
-// T018: 工厂函数，注册 timebox 规则，暴露 evaluate 方法
-// T027: 支持异步规则 + TimeOverlapRule 依赖注入
+/**
+ * @file index
+ * @brief Rule Engine 入口
+ * 
+ * T018: 工厂函数，注册 timebox 规则，暴露 evaluate 方法
+ * T027: 支持异步规则 + TimeOverlapRule 依赖注入
+ */
 
 import { evaluateRules, evaluateProposals } from './evaluator'
 import type { Rule, AggregatedResult, ProposalValidationResult } from './evaluator'
@@ -20,6 +24,7 @@ import { HabitConflictRule } from './rules/habit-conflict'
 
 // ─── 默认规则集（不含异步规则）──────────────────
 
+/** 默认规则集（不含异步规则） */
 const BASE_RULES: Rule[] = [
   FieldCompletenessRule,
   DurationRangeRule,
@@ -30,6 +35,9 @@ const BASE_RULES: Rule[] = [
 
 // ─── Rule Engine 接口 ─────────────────────────────────────────
 
+/**
+ * 规则引擎接口
+ */
 export interface RuleEngine {
   /**
    * 评估意图是否满足所有规则

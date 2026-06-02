@@ -1,3 +1,10 @@
+/**
+ * @file cnui-confirm-dialog
+ * @brief CN-UI 确认对话框组件
+ * 
+ * 提供通用的确认/取消对话框，用于危险操作的二次确认
+ */
+
 'use client'
 
 import {
@@ -11,13 +18,23 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 
+/**
+ * CnuiConfirmDialog 组件属性
+ */
 export interface CnuiConfirmDialogProps {
+  /** 是否打开对话框 */
   open: boolean
+  /** 标题 */
   title: string
+  /** 消息内容 */
   message: string
+  /** 确认回调 */
   onConfirm: () => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 确认按钮标签（默认"确认"） */
   confirmLabel?: string
+  /** 取消按钮标签（默认"取消"） */
   cancelLabel?: string
 }
 

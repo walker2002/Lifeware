@@ -1,3 +1,10 @@
+/**
+ * @file handlers
+ * @brief Habits CNUI Surface 处理器
+ * 
+ * 实现 CN-UI 协议的 Surface Handler，处理习惯相关的打开、提交事件
+ */
+
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
@@ -11,6 +18,7 @@ import type { SystemEvent, SystemEventType } from '@/usom/types/process'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
+/** 生命周期状态映射 */
 const LIFECYCLE_STATUS_MAP: Record<string, string> = {
   activateHabit: 'draft',
   suspendHabit: 'active',
@@ -18,6 +26,7 @@ const LIFECYCLE_STATUS_MAP: Record<string, string> = {
   reactivateHabit: 'suspended',
 }
 
+/** 生命周期状态机动作映射 */
 const LIFECYCLE_SM_ACTION: Record<string, string> = {
   activateHabit: 'activate',
   suspendHabit: 'suspend',
@@ -25,6 +34,12 @@ const LIFECYCLE_SM_ACTION: Record<string, string> = {
   reactivateHabit: 'reactivate',
 }
 
+/**
+ * 获取中文动作标签
+ * 
+ * @param action - 动作名称
+ * @returns 中文标签
+ */
 function getChineseActionLabel(action: string): string {
   const labels: Record<string, string> = {
     activate: '激活',
@@ -35,6 +50,12 @@ function getChineseActionLabel(action: string): string {
   return labels[action] ?? action
 }
 
+/**
+ * 根据状态获取习惯列表
+ * 
+ * @param status - 习惯状态
+ * @returns 习惯列表
+ */
 async function getItemsByStatus(status: string): Promise<Record<string, unknown>[]> {
   try {
     const repo = new HabitRepository()

@@ -1,3 +1,10 @@
+/**
+ * @file handlers
+ * @brief Timebox CNUI Surface 处理器
+ * 
+ * 实现 CN-UI 协议的 Surface Handler，处理时间盒相关的打开、提交事件
+ */
+
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 import { TimeboxRepository } from '@/domains/timebox/repository'
 import { TaskRepository } from '@/domains/tasks/repository'
@@ -8,10 +15,20 @@ import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
+/**
+ * 获取今日日期字符串
+ * 
+ * @returns ISO 日期字符串 (YYYY-MM-DD)
+ */
 async function getTodayDate(): Promise<string> {
   return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * 获取今日时间盒列表
+ * 
+ * @returns 今日时间盒数组
+ */
 async function getTodayTimeboxes(): Promise<Timebox[]> {
   try {
     const repo = new TimeboxRepository()

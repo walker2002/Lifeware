@@ -1,3 +1,13 @@
+/**
+ * @file loader
+ * @brief 领域 manifest 加载器
+ * 
+ * 负责从文件系统加载 YAML manifest 并进行三阶段验证：
+ * 1. YAML 语法解析
+ * 2. Zod 结构校验
+ * 3. 语义校验
+ */
+
 import fs from 'node:fs'
 import path from 'node:path'
 import { parse as yamlParse } from 'yaml'
@@ -5,6 +15,9 @@ import { ManifestSchema, type DomainManifest } from './schema'
 import { validateSemantics } from './validator'
 import type { ManifestLoadError } from './errors'
 
+/**
+ * Manifest 加载结果
+ */
 export type ManifestLoadResult =
   | { success: true; manifest: DomainManifest }
   | { success: false; errors: ManifestLoadError[] }
@@ -12,11 +25,14 @@ export type ManifestLoadResult =
 const cache = new Map<string, ManifestLoadResult>()
 
 /**
- * 加载域 manifest 文件。
- *
+ * 加载域 manifest 文件
+ * 
  * Next.js Turbopack 环境下 __dirname 不指向实际源码路径，
  * 因此改用 process.cwd() + src/domains/<domainId> 构建路径。
  * domainId 参数即目录名（如 "habits"、"timebox"）。
+ * 
+ * @param domainId - 领域 ID 或绝对路径
+ * @returns Manifest 加载结果
  */
 export function loadDomainManifest(domainId: string): ManifestLoadResult {
   const cached = cache.get(domainId)

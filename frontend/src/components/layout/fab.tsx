@@ -1,19 +1,39 @@
+/**
+ * @file fab
+ * @brief 浮动操作按钮组件
+ * 
+ * 提供快速创建和展开的浮动操作按钮
+ */
+
 "use client"
 
 import { useState } from "react"
 import { Plus, Check, Clock, ListTodo, X } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
+/**
+ * 快捷操作项
+ */
 interface QuickAction {
+  /** 显示标签 */
   label: string
+  /** 图标组件 */
   icon: React.ComponentType<{ className?: string }>
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
 }
 
+/**
+ * Fab 组件属性
+ */
 interface FabProps {
+  /** 快捷操作列表 */
   quickActions?: QuickAction[]
+  /** 成长内容 */
   growthContent: React.ReactNode
+  /** 操作回调 */
   onAction: (domainId: string, action: string) => void
 }
 

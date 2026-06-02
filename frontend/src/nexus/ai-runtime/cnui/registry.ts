@@ -1,19 +1,40 @@
+/**
+ * @file registry
+ * @brief CN-UI 表面注册中心
+ */
+
 import type React from 'react'
 import type { CnuiSurfaceHandler } from './types'
 
+/** 处理器加载器 */
 type HandlerLoader = () => CnuiSurfaceHandler
+
+/** 处理器模块路径 */
 type HandlerModulePath = string
 
+/** 表面注册项 */
 interface SurfaceRegistration {
+  /** 领域 ID */
   domainId: string
+  /** 表面类型 */
   surfaceType: string
+  /** 组件 */
   component: React.ComponentType<any>
+  /** 处理器模块路径 */
   handlerModulePath?: HandlerModulePath
 }
 
+/** CN-UI 表面注册表 */
 class CnuiSurfaceRegistry {
+  /** 注册表 Map */
   private map = new Map<string, SurfaceRegistration>()
 
+  /**
+   * 注册表面
+   * @param domainId - 领域 ID
+   * @param surfaceType - 表面类型
+   * @param reg - 注册信息
+   */
   register(
     domainId: string,
     surfaceType: string,
@@ -29,12 +50,19 @@ class CnuiSurfaceRegistry {
     this.map.set(surfaceType, { domainId, surfaceType, ...reg })
   }
 
+  /**
+   * 获取表面注册信息
+   * @param surfaceType - 表面类型
+   * @returns 注册信息或 undefined
+   */
   get(surfaceType: string): SurfaceRegistration | undefined {
     return this.map.get(surfaceType)
   }
 
   /**
    * 获取 handler，通过动态导入模块路径避免客户端打包
+   * @param surfaceType - 表面类型
+   * @returns 处理器或 undefined
    */
   getHandler(surfaceType: string): CnuiSurfaceHandler | undefined {
     const reg = this.map.get(surfaceType)

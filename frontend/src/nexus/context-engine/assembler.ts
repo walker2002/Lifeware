@@ -1,13 +1,26 @@
+/**
+ * @file assembler
+ * @brief 上下文组装器
+ * 
+ * 统一 Context 组装入口，区分 Query 和 Generation 两条路径
+ */
+
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { GenerationRequest, QueryContext, SessionQueryContext } from '@/usom/types/process'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 import { resolveContext } from './registry'
 
+/** 组装结果类型 */
 type AssemblyResult = GenerationRequest | QueryContext
 
 /**
  * 统一上下文组装入口。
  * 优先查 query_actions，其次查 generation_actions。
+ * @param intent - 结构化意图
+ * @param manifest - 领域 manifest
+ * @param session - AI 会话（可选）
+ * @returns 组装后的上下文
+ * @throws 当动作在两个配置中均未找到时
  */
 export async function assembleContext(
   intent: StructuredIntent,
@@ -28,6 +41,13 @@ export async function assembleContext(
 }
 
 /** 查询上下文组装 */
+/**
+ * 组装查询上下文
+ * @param intent - 意图
+ * @param config - 查询动作配置
+ * @param session - AI 会话
+ * @returns 查询上下文
+ */
 async function assembleQueryContext(
   intent: StructuredIntent,
   config: { context_capabilities: Array<{ id: string; query: string; params?: string[] }> },

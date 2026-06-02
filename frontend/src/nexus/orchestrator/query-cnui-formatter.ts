@@ -1,7 +1,17 @@
+/**
+ * @file query-cnui-formatter
+ * @brief 查询结果 CN-UI 格式化器
+ * 
+ * Shortcut Path 的声明式 CN-UI 组装
+ */
+
 import type { QueryContext, QueryResult } from '@/usom/types/process'
 
+/** 动作配置 */
 interface ActionConfig {
+  /** 响应模式 */
   response_mode: 'text' | 'cnui'
+  /** CN-UI 表面类型 */
   cnui_surface?: string
 }
 
@@ -9,6 +19,9 @@ interface ActionConfig {
  * Shortcut Path 的声明式 CN-UI 组装。
  *
  * 纯格式化函数 — 无条件分支、无数据聚合、无 AI 调用、无状态写入。
+ * @param queryContext - 查询上下文
+ * @param actionConfig - 动作配置
+ * @returns 查询结果
  */
 export function formatCNUIFromContext(
   queryContext: QueryContext,
@@ -43,7 +56,11 @@ export function formatCNUIFromContext(
   }
 }
 
-/** 降级文本摘要 */
+/**
+ * 降级文本摘要
+ * @param queryContext - 查询上下文
+ * @returns 文本摘要
+ */
 export function formatTextSummary(queryContext: QueryContext): string {
   const entries = Object.entries(queryContext.contexts)
   if (entries.length === 0) return '没有找到相关数据'

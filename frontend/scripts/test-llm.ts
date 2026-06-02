@@ -1,9 +1,22 @@
+/**
+ * @file test-llm
+ * @brief LLM 多提供商测试脚本
+ * 
+ * @usage npx tsx scripts/test-llm.ts
+ * 
+ * 测试所有配置的 LLM 提供商是否正常工作，验证 API 密钥配置和模型解析
+ */
+
 import 'dotenv/config'
 import { chat, listProviders, resolveModel } from '../src/lib/llm'
 
+/**
+ * 主函数：执行 LLM 提供商测试
+ */
 async function main() {
   console.log('=== LLM Multi-Provider Test ===\n')
 
+  // 获取所有配置的提供商
   const providers = listProviders()
   console.log('Configured providers:')
   for (const p of providers) {
@@ -11,6 +24,7 @@ async function main() {
   }
   console.log()
 
+  // 筛选已配置 API 密钥的提供商
   const configured = providers.filter(p => p.configured)
 
   if (configured.length === 0) {
@@ -21,6 +35,7 @@ async function main() {
     process.exit(1)
   }
 
+  // 测试每个已配置的提供商
   for (const provider of configured) {
     console.log(`--- Testing ${provider.name} (${provider.id}) ---`)
     for (const role of ['default', 'thinking', 'quick'] as const) {

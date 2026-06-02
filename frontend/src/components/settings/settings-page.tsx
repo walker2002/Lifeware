@@ -1,3 +1,10 @@
+/**
+ * @file settings-page
+ * @brief 设置页面组件
+ * 
+ * 提供通用、LLM、时区和习惯模板的设置功能
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -5,10 +12,18 @@ import { LLMSettings } from "./llm-settings"
 import { TimezonePicker } from "./timezone-picker"
 import { setTraceConfig, getTraceConfig } from "@/lib/config/trace-config"
 
+/**
+ * 设置分区类型
+ */
 type SettingsSection = 'general' | 'llm' | 'timezone' | 'templates'
 
+/**
+ * SettingsPage 组件属性
+ */
 interface SettingsPageProps {
+  /** 模板管理回调 */
   onTemplateManage?: () => void
+  /** 初始分区 */
   initialSection?: 'general' | 'llm' | 'timezone' | 'templates'
 }
 

@@ -1,3 +1,10 @@
+/**
+ * @file execution-log-dialog
+ * @brief 执行记录对话框组件
+ * 
+ * 用于在时间盒结束后记录执行情况，支持简化和详细两种模式
+ */
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -12,20 +19,36 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { ExecutionRecord } from "@/usom/types/objects";
 import { getCardBorderColor } from "@/lib/color-coding";
 
+/**
+ * 完成状态类型
+ */
 type CompletionStatus = "completed" | "partially_completed" | "not_completed";
 
+/**
+ * 完成状态选项配置
+ */
 const COMPLETION_OPTIONS: { value: CompletionStatus; label: string; color: string }[] = [
   { value: "completed", label: "已完成", color: "bg-success-soft text-success border-success" },
   { value: "partially_completed", label: "部分完成", color: "bg-warning-soft text-warning border-warning" },
   { value: "not_completed", label: "未完成", color: "bg-error-soft text-error border-error" },
 ];
 
+/**
+ * 评分标签
+ */
 const RATING_LABELS = ["", "很差", "较差", "一般", "良好", "很好"];
 
+/**
+ * ExecutionLogDialog 组件属性
+ */
 interface ExecutionLogDialogProps {
+  /** 时间盒摘要 */
   timebox: TimeboxSummary;
+  /** 是否打开对话框 */
   open: boolean;
+  /** 关闭回调 */
   onClose: () => void;
+  /** 提交回调 */
   onSubmit: (timeboxId: string, executionRecord: ExecutionRecord) => Promise<void>;
 }
 

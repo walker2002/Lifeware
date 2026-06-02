@@ -1,26 +1,52 @@
+/**
+ * @file HabitActionPanel
+ * @brief 习惯操作面板 Surface
+ * 
+ * CNUI Surface 组件，支持习惯的激活、暂停、恢复、归档操作
+ */
+
 'use client'
 
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
+/**
+ * 习惯项
+ */
 interface HabitItem {
+  /** ID */
   id: string
+  /** 标题 */
   title: string
+  /** 默认时间 */
   defaultTime: string
+  /** 连续天数 */
   streak: number
+  /** 频率类型 */
   frequencyType?: string
+  /** 状态 */
   status: string
 }
 
+/**
+ * 习惯操作面板属性
+ */
 interface HabitActionPanelProps {
+  /** Surface 类型 */
   surfaceType: string
+  /** 数据模型 */
   dataModel: Record<string, unknown>
+  /** 数据变更回调 */
   onDataChange: (data: Record<string, unknown>) => void
+  /** 确认回调 */
   onConfirm: (data: Record<string, unknown>) => void
+  /** 取消回调 */
   onCancel: () => void
+  /** 是否加载中 */
   isLoading?: boolean
 }
 
+/** 操作标签映射 */
 const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   activate: { title: '激活草稿习惯', button: '激活所选' },
   suspend: { title: '暂停活跃习惯', button: '暂停所选' },

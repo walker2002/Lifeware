@@ -1,9 +1,19 @@
+/**
+ * @file empty-state
+ * @brief 空状态展示组件
+ * 
+ * 用于展示空列表、无数据等场景，提供图标、标题、描述和可选操作按钮
+ */
+
 "use client"
 
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import type { LucideIcon } from "lucide-react"
 
+/**
+ * EmptyState 组件属性
+ */
 interface EmptyStateProps {
   /** 图标组件（48px） */
   icon: LucideIcon
@@ -13,7 +23,9 @@ interface EmptyStateProps {
   description?: string
   /** 可选操作按钮 */
   action?: {
+    /** 按钮标签 */
     label: string
+    /** 点击回调 */
     onClick: () => void
   }
 }

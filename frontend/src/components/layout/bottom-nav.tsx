@@ -1,10 +1,22 @@
+/**
+ * @file bottom-nav
+ * @brief 底部导航栏组件
+ * 
+ * 提供移动端的底部导航功能
+ */
+
 "use client"
 
 import { Home, MessageSquare, Settings } from "lucide-react"
 import type { MainViewState } from "@/components/layout/main-view-state"
 
+/**
+ * BottomNav 组件属性
+ */
 interface BottomNavProps {
+  /** 当前视图 */
   currentView: MainViewState['type']
+  /** 导航回调 */
   onNavigate: (view: MainViewState) => void
 }
 

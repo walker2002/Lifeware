@@ -1,3 +1,10 @@
+/**
+ * @file sonner
+ * @brief 提示组件
+ * 
+ * 基于 sonner 的提示/通知组件
+ */
+
 "use client"
 
 import {

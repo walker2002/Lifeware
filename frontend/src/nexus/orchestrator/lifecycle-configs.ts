@@ -1,11 +1,19 @@
-// Lifecycle 配置 — 从各域 manifest 动态加载
-// 已废弃内联对象，改为从 registry 读取
+/**
+ * @file lifecycle-configs
+ * @brief Lifecycle 配置
+ * 
+ * 从各域 manifest 动态加载 Lifecycle
+ * 已废弃内联对象，改为从 registry 读取
+ */
 
 import type { LifecycleDefinition, FieldMetadata } from '@/usom/types/domain-types'
 import { findDomain } from '@/domains/registry'
 
 /**
  * 从 manifest 获取指定域的 lifecycle 定义
+ * @param domainId - 领域 ID
+ * @param objectType - 对象类型
+ * @returns Lifecycle 定义或 undefined
  * @deprecated 直接使用 manifest.lifecycle 替代
  */
 export function getLifecycleFromManifest(domainId: string, objectType: string): LifecycleDefinition | undefined {
@@ -30,8 +38,14 @@ export function getLifecycleFromManifest(domainId: string, objectType: string): 
 
 // ─── 动态 ACTION_MAP 构建 ─────────────────────────────────────
 
+/** 领域 ID 列表 */
 const DOMAIN_IDS = ['timebox', 'habits', 'okrs', 'tasks']
 
+/**
+ * 将 snake_case 字符串转换为 PascalCase
+ * @param snake - snake_case 字符串
+ * @returns PascalCase 字符串
+ */
 function toPascalCase(snake: string): string {
   return snake.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
 }
@@ -43,6 +57,7 @@ function toPascalCase(snake: string): string {
  *   2. legacy snake_case：{action}_{snake_case_object_type} → {action}
  *   3. intent_triggers 中含有多个对象名的情况（如 updateKeyResultProgress）
  *      剥离已知对象名后得到 shortAction
+ * @returns action 映射表
  */
 export function buildActionMap(): Record<string, string> {
   const map: Record<string, string> = {}

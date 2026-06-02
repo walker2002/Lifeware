@@ -1,13 +1,25 @@
+/**
+ * @file use-auto-trigger
+ * @brief 自动触发 Hook
+ * 
+ * 自动检查时间盒状态，满足条件时自动触发状态转换
+ */
+
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 
+/**
+ * 自动触发选项
+ */
 interface UseAutoTriggerOptions {
-  timeboxes: TimeboxSummary[];
-  onTransition: (timeboxId: string, action: string) => Promise<void>;
+  /** 时间盒列表 */
+  timeboxes: TimeboxSummary[]
+  /** 状态转换回调 */
+  onTransition: (timeboxId: string, action: string) => Promise<void>
   /** 检查间隔（毫秒），默认 60000 */
-  intervalMs?: number;
+  intervalMs?: number
 }
 
 /**

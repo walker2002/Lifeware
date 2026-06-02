@@ -1,5 +1,9 @@
-// TraceLogger — Nexus 管道追踪日志核心模块
-// 记录各组件的输入/输出，维护内存中的会话缓冲区
+/**
+ * @file index
+ * @brief TraceLogger — Nexus 管道追踪日志核心模块
+ * 
+ * 记录各组件的输入/输出，维护内存中的会话缓冲区
+ */
 
 import type { Timestamp } from '@/usom/types/primitives'
 import type {
@@ -11,6 +15,7 @@ import type {
 } from './trace-types'
 import { getTraceConfig } from '@/lib/config/trace-config'
 
+/** 追踪日志器接口 */
 export interface TraceLogger {
   /** 开始新会话 */
   startSession(rawInput: string): void
@@ -26,8 +31,13 @@ export interface TraceLogger {
   onTrace: (step: TraceStep) => void
 }
 
+/** 步骤计数器 */
 let stepCounter = 0
 
+/**
+ * 创建追踪日志器
+ * @returns TraceLogger 实例
+ */
 export function createTraceLogger(): TraceLogger {
   const config = getTraceConfig()
   const sessions: TraceSession[] = []

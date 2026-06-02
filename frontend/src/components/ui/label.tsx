@@ -1,3 +1,10 @@
+/**
+ * @file label
+ * @brief 标签组件
+ * 
+ * 基于 shadcn/ui 的标签组件
+ */
+
 "use client"
 
 import * as React from "react"

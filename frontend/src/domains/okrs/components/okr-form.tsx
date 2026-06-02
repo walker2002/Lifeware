@@ -1,3 +1,10 @@
+/**
+ * @file okr-form
+ * @brief OKR 表单组件
+ * 
+ * 提供 OKR 创建和编辑的表单界面
+ */
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -6,6 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
+/**
+ * OKR 表单字段
+ */
 export interface OKRFormFields {
   title: string
   description?: string

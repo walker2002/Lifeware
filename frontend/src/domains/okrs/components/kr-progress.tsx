@@ -1,3 +1,10 @@
+/**
+ * @file kr-progress
+ * @brief KeyResult 进度展示组件
+ * 
+ * 展示单个 KeyResult 的进度信息，支持编辑更新
+ */
+
 "use client"
 
 import type { KeyResult } from "@/usom/types/objects"
@@ -5,10 +12,17 @@ import { Input } from "@/components/ui/input"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 
+/**
+ * KeyResult 进度组件属性
+ */
 interface KRProgressProps {
+  /** KeyResult 对象 */
   kr: KeyResult
+  /** KR 编号 */
   krNumber?: string
+  /** 是否可编辑 */
   editable?: boolean
+  /** 进度更新回调 */
   onProgressUpdate?: (krId: string, value: number) => Promise<KeyResult | null>
 }
 

@@ -1,3 +1,10 @@
+/**
+ * @file task-import-dialog
+ * @brief 任务导入对话框
+ * 
+ * 支持从文件导入任务模板
+ */
+
 "use client"
 
 import { useState, useRef } from "react"
@@ -6,9 +13,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { validateFile, parseFileToText, isTaskTemplate } from "@/lib/task-import/file-parser"
 import { extractTasks, type ImportPreview } from "@/lib/task-import/task-extractor"
 
+/**
+ * 任务导入对话框属性
+ */
 interface TaskImportDialogProps {
+  /** 是否打开 */
   open: boolean
+  /** 打开状态变更回调 */
   onOpenChange: (open: boolean) => void
+  /** 导入回调 */
   onImport: (preview: ImportPreview) => Promise<void>
 }
 

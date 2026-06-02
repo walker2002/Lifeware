@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * Domain 路由生成脚本
- *
+ * @file generate-routes
+ * @brief Domain 路由生成脚本
+ * 
  * 从所有 Domain 的 manifest.yaml 读取 view_routes 配置，
  * 自动生成 Next.js App Router 所需的路由文件到 app/ 目录。
- *
- * 用法：
+ * 
+ * @usage
  *   npm run generate:routes           # 生成所有路由
  *   npm run generate:routes --force   # 强制覆盖已存在文件
  *   npm run generate:routes --clean   # 清理孤立路由
@@ -22,28 +23,53 @@ const __dirname = path.dirname(__filename)
 
 // ─── 类型定义 ────────────────────────────────────────────────────────
 
+/**
+ * 视图路由配置
+ */
 interface ViewRouteConfig {
+  /** 组件路径 */
   component: string
+  /** URL 路径 */
   url?: string
+  /** 额外参数 */
   params?: Record<string, unknown>
 }
 
+/**
+ * Manifest 结构
+ */
 interface Manifest {
+  /** 域 ID */
   domainId: string
+  /** 视图路由配置 */
   view_routes?: Record<string, ViewRouteConfig>
 }
 
+/**
+ * 路由条目
+ */
 interface RouteEntry {
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
+  /** 组件路径 */
   component: string
+  /** URL 路径 */
   url: string
+  /** 额外参数 */
   params?: Record<string, unknown>
 }
 
+/**
+ * 生成选项
+ */
 interface GenerateOptions {
+  /** 是否强制覆盖已存在文件 */
   force?: boolean
+  /** 是否清理孤立路由 */
   clean?: boolean
+  /** 指定域列表 */
   domains?: string[]
 }
 
@@ -62,6 +88,9 @@ const AUTO_GENERATED_HEADER = `// ---
 
 // ─── 主函数 ───────────────────────────────────────────────────────────
 
+/**
+ * 主函数：执行路由生成流程
+ */
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const options: GenerateOptions = {
@@ -90,12 +119,22 @@ async function main() {
 
 // ─── 参数解析 ────────────────────────────────────────────────────────
 
+/**
+ * 解析命令行参数
+ * @param args - 参数数组
+ * @returns 解析后的参数
+ */
 function parseArgs(args: string[]): string[] {
   return args
 }
 
 // ─── 收集路由配置 ───────────────────────────────────────────────────
 
+/**
+ * 从所有域的 manifest.yaml 收集路由配置
+ * @param domainFilter - 域过滤列表（可选）
+ * @returns 路由条目列表
+ */
 async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
   const routes: RouteEntry[] = []
 
@@ -156,6 +195,11 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
 
 // ─── 验证路由配置 ───────────────────────────────────────────────────
 
+/**
+ * 验证路由配置的有效性
+ * @param routes - 路由条目列表
+ * @throws {Error} 验证失败时抛出错误
+ */
 async function validateRoutes(routes: RouteEntry[]): Promise<void> {
   const errors: string[] = []
   const warnings: string[] = []
@@ -200,6 +244,11 @@ async function validateRoutes(routes: RouteEntry[]): Promise<void> {
 
 // ─── 生成路由文件 ───────────────────────────────────────────────────
 
+/**
+ * 生成路由文件到 app 目录
+ * @param routes - 路由条目列表
+ * @param force - 是否强制覆盖已存在文件
+ */
 async function generateRoutes(routes: RouteEntry[], force: boolean): Promise<void> {
   for (const route of routes) {
     const outputPath = urlToFilePath(route.url)
@@ -229,6 +278,11 @@ async function generateRoutes(routes: RouteEntry[], force: boolean): Promise<voi
 
 // ─── 生成单个路由文件内容 ───────────────────────────────────────────
 
+/**
+ * 生成单个路由文件的内容
+ * @param route - 路由条目
+ * @returns 文件内容字符串
+ */
 function generateRouteFileContent(route: RouteEntry): string {
   const componentName = extractComponentName(route.component)
   const paramsProp = route.params ? JSON.stringify(route.params, null, 2) : '{}'
@@ -249,6 +303,11 @@ function generateRouteFileContent(route: RouteEntry): string {
 
 // ─── URL 转文件路径 ─────────────────────────────────────────────────
 
+/**
+ * 将 URL 路径转换为文件路径
+ * @param url - URL 路径
+ * @returns 文件路径
+ */
 function urlToFilePath(url: string): string {
   // 去掉开头的 /，转换为文件路径
   const relativePath = url.slice(1)
@@ -261,6 +320,11 @@ function urlToFilePath(url: string): string {
 
 // ─── 提取组件名 ─────────────────────────────────────────────────────
 
+/**
+ * 从组件路径中提取组件名称
+ * @param componentPath - 组件路径
+ * @returns 组件名称
+ */
 function extractComponentName(componentPath: string): string {
   const parts = componentPath.split('/')
   const fileName = parts[parts.length - 1]
@@ -269,6 +333,9 @@ function extractComponentName(componentPath: string): string {
 
 // ─── 清理孤立路由 ───────────────────────────────────────────────────
 
+/**
+ * 清理孤立的自动生成路由文件
+ */
 async function cleanOrphanedRoutes(): Promise<void> {
   console.log('🧹 Cleaning orphaned routes...')
 

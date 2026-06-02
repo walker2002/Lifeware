@@ -1,3 +1,10 @@
+/**
+ * @file timebox-card
+ * @brief 时间盒卡片组件
+ * 
+ * 展示单个时间盒的摘要信息和操作按钮
+ */
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -13,6 +20,7 @@ import type { TimeboxStatus } from "@/usom/types/primitives";
 import { getCardBorderColor, getCompletionIcon } from "@/lib/color-coding";
 import { MessageSquare } from "lucide-react";
 
+/** 时间盒状态样式映射 */
 const STATUS_STYLES: Record<
   TimeboxStatus,
   { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
@@ -25,6 +33,12 @@ const STATUS_STYLES: Record<
   logged: { variant: "secondary", label: "已记录" },
 };
 
+/**
+ * 格式化时间戳为 HH:MM
+ * 
+ * @param timestamp - ISO 时间戳
+ * @returns 格式化的时间字符串
+ */
 function formatTime(timestamp: string): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString("zh-CN", {

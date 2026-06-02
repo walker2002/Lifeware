@@ -1,10 +1,22 @@
+/**
+ * @file file-uploader
+ * @brief 文件上传组件
+ * 
+ * 提供文件选择和内容读取功能
+ */
+
 "use client"
 
 import { useCallback, useRef } from "react"
 import { Paperclip } from "lucide-react"
 
+/**
+ * FileUploader 组件属性
+ */
 interface FileUploaderProps {
+  /** 文件内容回调 */
   onFileContent: (content: string, filename: string) => void
+  /** 接受的文件类型 */
   accept?: string
 }
 

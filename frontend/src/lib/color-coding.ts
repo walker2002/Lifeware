@@ -1,9 +1,18 @@
+/**
+ * @file color-coding
+ * @brief 颜色编码工具函数
+ * 
+ * 提供执行记录相关的颜色和图标映射
+ */
+
 import type { ExecutionRecord } from "@/usom/types/objects";
 
 /**
- * 根据执行记录中的评分/能量等级返回卡片左侧边框颜色类名。
- *
- * 优先级：rating > energyLevel。均为默认值或无记录时返回透明。
+ * 根据执行记录中的评分/能量等级返回卡片左侧边框颜色类名
+ * 
+ * 优先级：rating > energyLevel。均为默认值或无记录时返回透明
+ * @param record - 执行记录
+ * @returns 边框颜色类名
  */
 export function getCardBorderColor(record?: ExecutionRecord): string {
   if (!record) return "border-l-transparent";

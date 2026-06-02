@@ -1,10 +1,26 @@
+/**
+ * @file status-badge
+ * @brief 状态徽章组件
+ * 
+ * 展示对象的状态（进行中/已暂停/已归档），使用不同颜色区分
+ */
+
 import { Badge } from "@/components/ui/badge"
 
+/**
+ * 状态类型
+ */
 type StatusType = "active" | "suspended" | "archived"
 
+/**
+ * StatusBadge 组件属性
+ */
 interface StatusBadgeProps {
+  /** 状态类型 */
   status: StatusType
+  /** 自定义标签（可选，默认使用预置标签） */
   label?: string
+  /** 尺寸大小 */
   size?: "sm" | "md"
 }
 

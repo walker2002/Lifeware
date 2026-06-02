@@ -1,6 +1,12 @@
-// State Machine — 对象生命周期执行器
-// 通用版：接收 LifecycleDefinition 驱动多域状态转换
-// 接收已批准的 StateProposal，执行状态转换，持久化并发布事件
+/**
+ * @file index
+ * @brief 对象生命周期状态机执行器
+ * 
+ * 通用版：接收 LifecycleDefinition 驱动多域状态转换
+ * 接收已批准的 StateProposal，执行状态转换，持久化并发布事件
+ * 
+ * @see docs/usom-design.md Section 4.2.3
+ */
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { StateProposal, SystemEvent } from '@/usom/types/process'
@@ -10,6 +16,13 @@ import type { LifecycleDefinition, FieldMetadata, LifecycleTransition } from '@/
 import { findTransition, timeboxTransitions } from '@/domains/timebox/transitions'
 
 // ─── 旧版接口（向后兼容，Phase 7 移除） ─────────────────────────
+/**
+ * 状态机执行结果接口
+ * @property success - 是否成功
+ * @property object - 操作后的对象
+ * @property event - 生成的系统事件
+ * @property error - 错误信息
+ */
 export interface StateMachineResult {
   success: boolean
   object?: Record<string, unknown>
@@ -17,19 +30,46 @@ export interface StateMachineResult {
   error?: string
 }
 
+/**
+ * 状态机依赖接口（旧版，向后兼容）
+ * @property timeboxRepo - 时间盒仓储
+ * @property eventRepo - 系统事件仓储
+ */
 export interface StateMachineDeps {
   timeboxRepo: { findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>; save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void> }
   eventRepo: ISystemEventRepository
 }
 
+/**
+ * 时间盒状态机接口
+ */
 export interface TimeboxStateMachine {
+  /**
+   * 执行状态转换
+   * @param proposal - 状态提案
+   * @param eventBus - 事件总线
+   * @param userId - 用户ID
+   * @returns 执行结果
+   */
   execute(proposal: StateProposal, eventBus: EventBus, userId: USOM_ID): Promise<StateMachineResult>
 }
 
+/**
+ * 创建时间盒状态机实例（旧版，向后兼容）
+ * @param deps - 依赖项
+ * @returns 时间盒状态机实例
+ */
 export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateMachine {
   const { timeboxRepo, eventRepo } = deps
 
   return {
+    /**
+     * 执行时间盒状态转换
+     * @param proposal - 状态提案
+     * @param eventBus - 事件总线
+     * @param userId - 用户ID
+     * @returns 执行结果
+     */
     async execute(proposal, eventBus, userId): Promise<StateMachineResult> {
       const now = new Date().toISOString() as Timestamp
 
@@ -107,11 +147,33 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
 
 // ─── 通用 State Machine ────────────────────────────────────────
 
+/**
+ * 通用仓储接口
+ */
 export interface GenericRepo {
+  /**
+   * 根据ID查找对象
+   * @param id - 对象ID
+   * @param userId - 用户ID
+   * @returns 对象或null
+   */
   findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
+  
+  /**
+   * 保存对象
+   * @param obj - 对象数据
+   * @param userId - 用户ID
+   */
   save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
 }
 
+/**
+ * 通用状态机依赖接口
+ * @property getRepository - 获取仓储的函数
+ * @property eventRepo - 系统事件仓储
+ * @property getLifecycle - 获取生命周期定义的函数
+ * @property getFieldMetadata - 获取字段元数据的函数（可选）
+ */
 export interface GenericStateMachineDeps {
   getRepository: (objectType: string) => GenericRepo
   eventRepo: ISystemEventRepository
@@ -119,6 +181,13 @@ export interface GenericStateMachineDeps {
   getFieldMetadata?: (domainId: string, objectType: string) => Record<string, FieldMetadata>
 }
 
+/**
+ * 查找生命周期转换规则
+ * @param lifecycle - 生命周期定义
+ * @param fromState - 当前状态
+ * @param action - 动作
+ * @returns 转换规则或undefined
+ */
 function findLifecycleTransition(
   lifecycle: LifecycleDefinition,
   fromState: string | null,
@@ -134,6 +203,11 @@ function findLifecycleTransition(
   })
 }
 
+/**
+ * 获取生命周期时间戳字段列表
+ * @param fieldMeta - 字段元数据
+ * @returns 时间戳字段名列表
+ */
 function getLifecycleTimestampFields(
   fieldMeta: Record<string, FieldMetadata> | undefined,
 ): string[] {
@@ -143,6 +217,12 @@ function getLifecycleTimestampFields(
     .map(([fieldName]) => fieldName)
 }
 
+/**
+ * 构建动作-时间戳映射
+ * @param lifecycle - 生命周期定义
+ * @param fieldMeta - 字段元数据
+ * @returns 动作到时间戳字段的映射
+ */
 function buildActionTimestampMap(
   lifecycle: LifecycleDefinition,
   fieldMeta: Record<string, FieldMetadata> | undefined,
@@ -163,10 +243,22 @@ function buildActionTimestampMap(
   return map
 }
 
+/**
+ * 创建通用状态机实例
+ * @param deps - 依赖项
+ * @returns 通用状态机实例
+ */
 export function createGenericStateMachine(deps: GenericStateMachineDeps) {
   const { getRepository, eventRepo, getLifecycle, getFieldMetadata } = deps
 
   return {
+    /**
+     * 执行状态转换
+     * @param proposal - 状态提案
+     * @param eventBus - 事件总线
+     * @param userId - 用户ID
+     * @returns 执行结果
+     */
     async execute(
       proposal: StateProposal,
       eventBus: EventBus,

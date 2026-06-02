@@ -1,5 +1,10 @@
-// Tasks Domain Plugin — 入口文件
-// 遵循 Constitution Principle VI: 纯粹被动组件
+/**
+ * @file index
+ * @brief Tasks 域插件入口文件
+ * 
+ * 遵循 Constitution Principle VI: 纯粹被动组件
+ * 负责注册 CNUI Surface 组件、加载域 manifest 并创建域插件
+ */
 
 import type { DomainPlugin } from '@/usom/types/process'
 import { loadDomainManifest } from '@/domains/manifest-loader'

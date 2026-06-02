@@ -1,3 +1,10 @@
+/**
+ * @file left-panel
+ * @brief 左侧面板组件
+ * 
+ * 提供 AI 助手和成长领域的 Tab 切换
+ */
+
 "use client"
 
 import type { ReactNode } from "react"
@@ -6,10 +13,17 @@ import { Home } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelTab } from "./main-view-state"
 
+/**
+ * LeftPanel 组件属性
+ */
 interface LeftPanelProps {
+  /** 当前 Tab */
   activeTab: PanelTab
+  /** Tab 变更回调 */
   onTabChange: (tab: PanelTab) => void
+  /** 主页按钮点击回调 */
   onHomeClick: () => void
+  /** 子内容 */
   children: ReactNode
 }
 

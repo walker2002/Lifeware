@@ -1,3 +1,10 @@
+/**
+ * @file use-conversation
+ * @brief 会话管理 Hook
+ * 
+ * 管理 AI 会话的生命周期，包括加载、保存、切换等操作
+ */
+
 "use client"
 
 import { useState, useCallback, useRef } from "react"
@@ -5,6 +12,9 @@ import { useAppView } from "@/contexts/app-context"
 import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
 import { fetchSessions, loadSessionMessages, createSession, saveMessage, deleteSession, tryGenerateTitle } from '@/app/actions/session'
 
+/**
+ * 会话管理 Hook
+ */
 export function useConversation() {
   const { mainViewState, setMainViewState } = useAppView()
 

@@ -1,3 +1,10 @@
+/**
+ * @file task-import-panel
+ * @brief 任务导入预览面板
+ * 
+ * 展示导入任务预览并执行导入
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -6,9 +13,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { ImportPreview } from "@/lib/task-import/task-extractor"
 
+/**
+ * 任务导入面板属性
+ */
 interface TaskImportPanelProps {
+  /** 导入预览数据 */
   preview: ImportPreview
+  /** 导入回调 */
   onImport: (preview: ImportPreview) => Promise<void>
+  /** 返回回调 */
   onBack: () => void
 }
 

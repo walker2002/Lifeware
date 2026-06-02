@@ -1,3 +1,10 @@
+/**
+ * @file habit-list
+ * @brief 习惯列表组件
+ * 
+ * 展示和管理习惯列表，支持分组、筛选和操作
+ */
+
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from "react"
@@ -7,6 +14,9 @@ import { HabitForm, type HabitFormFields } from "./habit-form"
 import { ChevronDown, ChevronRight, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+/**
+ * 习惯列表项
+ */
 interface HabitItem {
   id: string
   title: string

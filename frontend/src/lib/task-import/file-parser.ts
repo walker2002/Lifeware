@@ -1,11 +1,30 @@
-const ALLOWED_EXTENSIONS = ['.md', '.txt', '.docx', '.xlsx']
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+/**
+ * @file file-parser
+ * @brief 任务导入文件解析器
+ * 
+ * 验证和解析上传的文件为文本
+ */
 
+/** 允许的文件扩展名 */
+const ALLOWED_EXTENSIONS = ['.md', '.txt', '.docx', '.xlsx']
+/** 最大文件大小（5MB） */
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+/**
+ * 文件验证结果
+ */
 export interface FileValidation {
+  /** 是否有效 */
   valid: boolean
+  /** 错误信息 */
   error?: string
 }
 
+/**
+ * 验证文件格式和大小
+ * @param file - 文件对象
+ * @returns 验证结果
+ */
 export function validateFile(file: File): FileValidation {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
@@ -17,6 +36,11 @@ export function validateFile(file: File): FileValidation {
   return { valid: true }
 }
 
+/**
+ * 解析文件为文本
+ * @param file - 文件对象
+ * @returns 文件文本内容
+ */
 export async function parseFileToText(file: File): Promise<string> {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase()
 
@@ -38,6 +62,11 @@ export async function parseFileToText(file: File): Promise<string> {
   }
 }
 
+/**
+ * 判断文本是否为任务模板
+ * @param text - 文本内容
+ * @returns 是否为任务模板
+ */
 export function isTaskTemplate(text: string): boolean {
   return text.includes('## 项目:')
 }
