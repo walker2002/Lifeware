@@ -22,6 +22,7 @@ import { ScheduleView } from "@/components/views/schedule-view"
 import { ActionView } from "@/components/views/action-view"
 import { SettingsPage } from "@/components/settings/settings-page"
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog"
+import { PageBanner } from "@/components/layout/page-banner"
 import { ExecutionLogDialog } from "@/components/execution-log-dialog"
 import { Banner } from "@/components/feedback/banner"
 import { Button } from "@/components/ui/button"
@@ -99,11 +100,22 @@ function HomeContent() {
     : mainViewState.type === 'settings' ? <SettingsPage initialSection={mainViewState.section} />
     : null
 
+  const mainContentWithBanner = (
+    <div className="flex h-full flex-col">
+      {mainViewState.type === 'schedule' && (
+        <PageBanner domainId="home" title="我的时间盒" />
+      )}
+      <div className="flex-1 overflow-auto">
+        {mainContent}
+      </div>
+    </div>
+  )
+
   return (
     <>
       <AppShell activeTab={panelTab} onTabChange={setPanelTab} onHomeClick={handleHomeClick} onSettingsClick={handleSettingsClick}
         tilesBanner={tb.actionSurface && tb.actionSurface.tiles.length > 0 ? <TilesBanner candidates={tb.actionSurface.tiles} /> : undefined}
-        leftPanelContent={leftPanelContent} mainContent={mainContent} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
+        leftPanelContent={leftPanelContent} mainContent={mainContentWithBanner} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
         currentViewType={mainViewState.type}
         onBottomNavNavigate={(view) => {
           // BottomNav conversation tab 需要有效的 sessionId
