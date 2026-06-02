@@ -56,9 +56,12 @@ export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {
             {expanded === row.habitId && (
               <tr key={`${row.habitId}-detail`}>
                 <td colSpan={2 + row.recent5Days.length} className="bg-surface-soft/30 px-4 py-3">
-                  <div className="flex items-center gap-6 text-xs text-body/60">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-body/60">
                     <span>当前连续：<strong className="text-ink">{row.streak}</strong> 天</span>
                     <span>7日完成率：<strong className="text-ink">{Math.round(row.completionRate7d * 100)}%</strong></span>
+                    <span>开始时间：<strong className="text-ink">{row.startDate}</strong></span>
+                    <span>打卡总次数：<strong className="text-ink">{row.totalLogs}</strong></span>
+                    <span>最长连续：<strong className="text-ink">{row.longestStreak}</strong> 天</span>
                   </div>
                 </td>
               </tr>
