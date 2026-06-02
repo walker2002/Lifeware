@@ -80,7 +80,8 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
         .rbc-month-row + .rbc-month-row, .rbc-header + .rbc-header { border-color: #ebe6df; }
         .rbc-today { background: #f5f0e8; }
         .rbc-off-range-bg { background: #faf9f5; }
-        .rbc-event { border: none; border-radius: 4px; font-size: 12px; }
+        .rbc-row-segment { padding: 0 1px 1px; }
+        .rbc-event { border: none; border-radius: 4px; padding: 1px 4px; }
       `}</style>
       <Calendar
         localizer={localizer}
@@ -88,7 +89,7 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
         startAccessor="start"
         endAccessor="end"
         date={currentDate}
-        style={{ height: 500 }}
+        style={{ height: 650 }}
         messages={{
           today: "今天",
           previous: "上一页",

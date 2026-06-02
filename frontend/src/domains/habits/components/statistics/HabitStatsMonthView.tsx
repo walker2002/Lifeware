@@ -80,8 +80,9 @@ export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
         .rbc-month-row + .rbc-month-row, .rbc-header + .rbc-header { border-color: #ebe6df; }
         .rbc-today { background: #f5f0e8; }
         .rbc-off-range-bg { background: #faf9f5; }
-        .rbc-event { border: none; border-radius: 4px; font-size: 11px; line-height: 14px; min-height: 16px; background-color: #f5f0e8 !important; color: #141413 !important; }
-        .rbc-event-content { font-size: 11px; }
+        .rbc-row-segment { padding: 0 1px 1px; }
+        .rbc-event { border: none; border-radius: 4px; padding: 0 3px; font-size: 10px; line-height: 12px; min-height: 12px; background-color: #f5f0e8 !important; color: #141413 !important; }
+        .rbc-event-content { font-size: 10px; }
       `}</style>
       <Calendar
         localizer={localizer}
@@ -90,7 +91,7 @@ export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
         endAccessor="end"
         allDayAccessor="allDay"
         date={data[0] ? new Date(data[0].date) : new Date()}
-        style={{ height: 500 }}
+        style={{ height: 650 }}
         messages={{
           today: "今天",
           previous: "上一页",
