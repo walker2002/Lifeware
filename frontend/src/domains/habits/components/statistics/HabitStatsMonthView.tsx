@@ -4,10 +4,14 @@
  * @file HabitStatsMonthView
  * @brief 习惯统计月视图组件
  *
- * 以日历形式展示每月各日的已打卡习惯名称列表，
- * 每天最多显示 4 项，超出部分通过 Tooltip 悬停展开。
+ * 使用 react-big-calendar 展示每月各日的已打卡习惯名称列表，
+ * 与时间盒月视图保持一致的日历界面样式。
  */
 
+import { useMemo } from "react"
+import { Calendar, dateFnsLocalizer } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay } from "date-fns"
+import { zhCN } from "date-fns/locale"
 import type { MonthDaySummary } from "@/app/actions/habit-stats"
 import {
   Tooltip,
@@ -15,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import "react-big-calendar/lib/css/react-big-calendar.css"
 
 /** 月视图属性 */
 interface HabitStatsMonthViewProps {
@@ -22,11 +27,24 @@ interface HabitStatsMonthViewProps {
   data: MonthDaySummary[]
 }
 
-/** 星期标题 */
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
+/** 日历事件 */
+interface HabitCalendarEvent {
+  id: string
+  title: string
+  start: Date
+  end: Date
+  allDay: boolean
+}
 
-/** 每天最多显示的习惯名称数量 */
-const MAX_DISPLAY = 4
+const locales = { "zh-CN": zhCN }
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+})
 
 /**
  * 习惯统计月视图
@@ -35,90 +53,77 @@ const MAX_DISPLAY = 4
  * @returns 月视图 JSX
  */
 export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
-  const today = new Date()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-
-  const firstDayOfWeek = new Date(
-    data[0] ? parseInt(data[0].date.slice(0, 4)) : today.getFullYear(),
-    data[0] ? parseInt(data[0].date.slice(5, 7)) - 1 : today.getMonth(),
-    1,
-  ).getDay()
-  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
-
-  const weeks: (MonthDaySummary | null)[][] = []
-  let currentWeek: (MonthDaySummary | null)[] = Array(offset).fill(null)
-
-  for (const day of data) {
-    currentWeek.push(day)
-    if (currentWeek.length === 7) {
-      weeks.push(currentWeek)
-      currentWeek = []
+  const events = useMemo<HabitCalendarEvent[]>(() => {
+    const result: HabitCalendarEvent[] = []
+    for (const day of data) {
+      const baseDate = new Date(day.date)
+      baseDate.setHours(0, 0, 0, 0)
+      for (const name of day.habitNames) {
+        result.push({
+          id: `${day.date}-${name}`,
+          title: name,
+          start: new Date(baseDate),
+          end: new Date(baseDate),
+          allDay: true,
+        })
+      }
     }
-  }
-  if (currentWeek.length > 0) {
-    while (currentWeek.length < 7) currentWeek.push(null)
-    weeks.push(currentWeek)
-  }
+    return result
+  }, [data])
 
   return (
-    <div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-hairline">
-            {WEEKDAYS.map(d => (
-              <th key={d} className="py-1.5 text-center font-medium text-body/50 text-xs">{d}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {weeks.map((week, wi) => (
-            <tr key={wi}>
-              {week.map((day, di) => {
-                if (!day) return <td key={`empty-${di}`} className="py-1.5" />
-                const isToday = day.date === todayStr
-                const displayed = day.habitNames.slice(0, MAX_DISPLAY)
-                const remaining = day.habitNames.length - MAX_DISPLAY
-                const hasMore = remaining > 0
-
-                return (
-                  <td key={day.date} className={`py-1.5 px-0.5 text-center ${isToday ? 'bg-primary/5 rounded' : ''}`}>
-                    <div className={`text-xs ${isToday ? 'font-bold text-primary' : 'text-ink'}`}>{day.day}</div>
-                    <div className="mt-0.5 flex flex-col gap-0.5">
-                      {displayed.map((name, i) => (
-                        <span
-                          key={i}
-                          className="inline-block truncate rounded bg-surface-soft px-1.5 py-0.5 text-[10px] text-ink"
-                          title={name}
-                        >
-                          {name}
-                        </span>
-                      ))}
-                      {hasMore && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-block cursor-pointer rounded px-1.5 py-0.5 text-[10px] text-primary">
-                                +{remaining} more
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-[200px]">
-                              <div className="flex flex-col gap-1">
-                                {day.habitNames.map((name, i) => (
-                                  <span key={i} className="text-xs">{name}</span>
-                                ))}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="w-full rounded-lg border border-hairline bg-surface-card p-4">
+      <style>{`
+        .rbc-calendar { font-family: "Inter", sans-serif; }
+        .rbc-header { border-bottom-color: #e6dfd8; }
+        .rbc-month-view { border-color: #e6dfd8; }
+        .rbc-month-row + .rbc-month-row, .rbc-header + .rbc-header { border-color: #ebe6df; }
+        .rbc-today { background: #f5f0e8; }
+        .rbc-off-range-bg { background: #faf9f5; }
+        .rbc-event { border: none; border-radius: 4px; font-size: 11px; line-height: 14px; min-height: 16px; background-color: #f5f0e8 !important; color: #141413 !important; }
+        .rbc-event-content { font-size: 11px; }
+      `}</style>
+      <Calendar
+        localizer={localizer}
+        events={events}
+        startAccessor="start"
+        endAccessor="end"
+        allDayAccessor="allDay"
+        date={data[0] ? new Date(data[0].date) : new Date()}
+        style={{ height: 500 }}
+        messages={{
+          today: "今天",
+          previous: "上一页",
+          next: "下一页",
+          month: "月",
+          week: "周",
+          day: "日",
+          agenda: "日程",
+        }}
+        views={["month"]}
+        defaultView="month"
+        toolbar={false}
+        components={{
+          showMore: ({ count, remainingEvents }) => (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="rbc-button-link rbc-show-more">
+                    +{count} more
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[240px]">
+                  <div className="flex flex-col gap-1">
+                    {remainingEvents.map((evt: HabitCalendarEvent, i: number) => (
+                      <span key={i} className="text-xs truncate">{evt.title}</span>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ),
+        }}
+      />
     </div>
   )
 }
