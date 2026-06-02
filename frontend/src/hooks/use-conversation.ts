@@ -158,7 +158,7 @@ export function useConversation() {
   }, [mainViewState, activeSessionId, setMainViewState])
 
   /** CNUI 表面状态变更 → 持久化到消息中 + 后端 session */
-  const handleSurfaceStateChange = useCallback(async (surfaceId: string, state: SurfaceState) => {
+  const handleSurfaceStateChange = useCallback(async (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => {
     // 1. 更新本地 messages
     setConversationMessages(prev => prev.map(msg => {
       if (msg.cnuiSurface?.cnuiSurfaceId === surfaceId) {
@@ -171,7 +171,7 @@ export function useConversation() {
     const sid = activeSessionIdRef.current
     if (sid && (state === 'saved' || state === 'cancelled')) {
       try {
-        await saveSurfaceOutcome(sid, surfaceId, state)
+        await saveSurfaceOutcome(sid, surfaceId, state, data)
       } catch (err) {
         console.error('[handleSurfaceStateChange] 持久化 surface 状态失败:', err)
       }

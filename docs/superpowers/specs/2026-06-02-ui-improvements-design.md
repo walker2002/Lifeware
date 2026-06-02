@@ -18,7 +18,7 @@
 
 用户对 CN-UI surface 执行"保存"或"取消"后，刷新页面这些 surface 仍显示为可编辑状态。原因是 surface 状态仅存于 React state（内存），刷新即丢失。
 
-### 方案：Session 记录持久化
+### 方案：Session stateSnapshot 持久化
 
 #### 数据流
 
@@ -27,13 +27,17 @@
        ↓
 CnuiSurfaceWrapper → lifecycleActions.requestSave / requestCancel
        ↓
-use-cnui-lifecycle 更新本地 state → 调用后端 API
+use-cnui-lifecycle 更新本地 state → 调用 onStateChange 回调
        ↓
-后端 API → memoryFramework.record() 记录 surface 状态到 session
+useConversation.handleSurfaceStateChange → 更新本地 messages + 调用 saveSurfaceOutcome
+       ↓
+后端 saveSurfaceOutcome → 写入 session.stateSnapshot.cnuiSurfaceStates
        ↓
 页面刷新
        ↓
-use-cnui-lifecycle 初始化 → 从 session API 查询 surface 状态
+ConversationView mount → 调用 getSessionSurfaceOutcomes(sessionId)
+       ↓
+合并后端恢复的状态与消息中的状态 → useCnuiLifecycle 初始化
        ↓
 已完成的 surface → CnuiSurfaceWrapper 渲染只读视图（现有 isDone 分支）
 ```
@@ -42,16 +46,17 @@ use-cnui-lifecycle 初始化 → 从 session API 查询 surface 状态
 
 | 文件 | 改动 |
 |---|---|
-| `components/cnui/use-cnui-lifecycle.ts` | 新增初始化逻辑：mount 时从后端查询 session 的 surface 状态，恢复 `surfaceStates` 和 `surfaceData` |
-| `nexus/ai-runtime/cnui/manager.ts`（或 service 层） | 新增 `recordSurfaceOutcome(surfaceId, status, dataModel)` — 保存/取消时调用 |
-| `nexus/ai-runtime/cnui/manager.ts` | 新增 `getSessionSurfaceStates(sessionId)` — 查询该 session 下所有 surface 的最终状态 |
-| `app/api/sessions/[id]/surfaces/route.ts` | 暴露 GET 接口供前端查询 |
+| `app/actions/session.ts` | 新增 `saveSurfaceOutcome` 和 `getSessionSurfaceOutcomes` server actions |
+| `hooks/use-conversation.ts` | `handleSurfaceStateChange` 改为 async，调用 `saveSurfaceOutcome` 持久化 |
+| `components/layout/conversation-view.tsx` | 新增 `sessionId` prop，mount 时调用 `getSessionSurfaceOutcomes` 恢复状态 |
+| `app/page.tsx` | 向 `ConversationView` 传递 `sessionId` |
 
 #### 关键设计决策
 
-1. **存储方式**：利用现有 session message 机制，surface 状态作为 session 的一条 message 记录（`role: 'system'`, `content: { type: 'surface_outcome', surfaceId, status, dataModel }`）。
-2. **前端恢复时机**：`use-cnui-lifecycle` 的 `useEffect` 首次 mount 时查询一次，后续操作实时更新本地 state。
-3. **不新建数据库表**：复用 session message 存储，符合宪章 Memory Framework 拥有 session 写权限的约束（Single-Writer Invariant III）。
+1. **存储方式**：利用 `ai_sessions` 表已有的 `stateSnapshot`（jsonb）字段，在 `cnuiSurfaceStates` 键下存储 surface 最终状态。此字段原本用于会话状态快照，与 surface 状态的"会话级恢复"语义一致。
+2. **未采用 session message 方案的原因**：session message（Memory Framework L1）是追加式消息流，适合对话内容记录；surface 状态需要按 surfaceId 覆盖更新，stateSnapshot 的键值结构更适合。两者都是合法的 session 数据存储方式，stateSnapshot 在实现上更简洁。
+3. **前端恢复时机**：`ConversationView` 的 `useEffect` 在 mount / sessionId 变化时查询一次，与 `messages` 中提取的初始状态合并（后端状态优先级更高）。
+4. **不新建数据库表**：复用 `ai_sessions.stateSnapshot` 字段。
 
 #### 宪章合规性
 
@@ -135,13 +140,14 @@ domainId = "tasks"  → ["/banner-tasks1.png", "/banner-tasks2.png", "/banner-ta
 domainId = "timebox" → ["/banner-timebox1.png", "/banner-timebox2.png"]
 ```
 
-组件 mount 时 `Math.random()` 选一张，用 `useState` 缓存避免重渲染换图。
+组件 mount 时通过 `useEffect` + `Math.random()` 选一张（client-side only，避免 SSR 水合不匹配）。
 
 #### 标题来源
 
-- 从 Domain manifest 注册信息中读取 `displayName`，通过 domain registry accessor 方法获取。
-- Home 固定标题为 `"我的时间盒"`。
-- 不在前端硬编码 domain 标题（符合宪章 Manifest Runtime Consumption 约束）。
+- **当前实现**：标题通过 `title` prop 传入，由调用方决定。
+- **Home 页面**：固定标题为 `"我的时间盒"`。
+- **Habits 页面**：固定标题为 `"习惯管理"`。
+- **未来改进**：从 Domain manifest 注册信息中读取 `displayName`，通过 domain registry accessor 方法获取。当前 manifest 尚未包含 `displayName` 字段，待后续补充后迁移。
 
 #### 样式规格
 

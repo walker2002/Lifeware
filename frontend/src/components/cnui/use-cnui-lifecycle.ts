@@ -74,7 +74,7 @@ export interface CnuiLifecycleActions {
 export function useCnuiLifecycle(
   onSubmit: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<void>,
   initialStates?: Record<string, SurfaceState>,
-  onStateChange?: (surfaceId: string, state: SurfaceState) => void,
+  onStateChange?: (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => void,
 ): [CnuiLifecycleState, CnuiLifecycleActions] {
   const [surfaceStates, setSurfaceStates] = useState<Record<string, SurfaceState>>(initialStates ?? {})
   const [surfaceData, setSurfaceData] = useState<Record<string, Record<string, unknown>>>({})
@@ -144,7 +144,7 @@ export function useCnuiLifecycle(
     try {
       await onSubmit(surfaceId, domainId, action, pendingData)
       setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'saved' }))
-      onStateChange?.(surfaceId, 'saved')
+      onStateChange?.(surfaceId, 'saved', pendingData)
     } catch {
       setValidationErrors(prev => ({ ...prev, [surfaceId]: ['保存失败，请稍后重试'] }))
     } finally {

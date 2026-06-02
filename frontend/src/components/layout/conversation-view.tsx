@@ -57,7 +57,7 @@ interface ConversationViewProps {
   /** CN-UI 确认回调 */
   onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
   /** 动作面状态变更回调 */
-  onSurfaceStateChange?: (surfaceId: string, state: SurfaceState) => void
+  onSurfaceStateChange?: (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => void
 }
 
 export function ConversationView({ messages, sessionId, onSendMessage, isLoading, recentSessions, onSelectSession, intentTriggers, frequentIntents, onCnuiConfirm, onSurfaceStateChange }: ConversationViewProps) {
