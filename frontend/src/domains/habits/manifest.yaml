@@ -79,25 +79,6 @@ intent_triggers:
       - 有什么模板可以用
     keywords: [模板, template]
     view_route: /habits/templates
-  - action: list_active_habits
-    shortcut: /myHabits
-    description: 在对话中查看习惯列表
-    response_type: cnui
-    cnui_surface: habit-list-card
-    examples:
-      - 看看我的习惯
-      - 有哪些习惯
-      - 习惯列表
-    keywords: [看看习惯, 有哪些习惯, 习惯列表]
-  - action: habit_statistics
-    shortcut: /habitStats
-    description: 查询习惯统计
-    response_type: text
-    examples:
-      - 习惯统计
-      - 跑步坚持多久了
-      - 冥想打卡情况
-    keywords: [统计, streak, 坚持, 打卡情况]
   - action: view_statistics
     shortcut: /habitStatsView
     description: 习惯统计
@@ -255,25 +236,7 @@ generation_actions:
     session_enabled: true
 
 # ─── 区块 I: query_actions ─────────────────────────────────────────
-query_actions:
-  list_active_habits:
-    description: 在对话中查看活跃习惯列表
-    response_mode: cnui
-    cnui_surface: habit-list-card
-    context_capabilities:
-      - id: activeHabits
-        query: active_habits
-        params: [userId]
-  habit_statistics:
-    description: 查询习惯完成情况统计（需要 LLM 分析）
-    response_mode: text
-    context_capabilities:
-      - id: habitLogs
-        query: recent_habit_logs
-        params: [userId]
-      - id: habitStreaks
-        query: habit_streaks
-        params: [userId]
+query_actions: {}
 
 # ─── 区块 J: cascade_rules ──────────────────────────────────────
 cascade_rules:
@@ -296,6 +259,3 @@ cnui_surfaces:
     description: 习惯创建表单卡片
     handler: ./cnui/handlers
 
-  habit-list-card:
-    description: 在对话中展示活跃习惯列表卡片
-    handler: ./cnui/handlers
