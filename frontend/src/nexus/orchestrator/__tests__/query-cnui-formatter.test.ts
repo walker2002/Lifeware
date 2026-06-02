@@ -31,12 +31,12 @@ describe('formatCNUIFromContext', () => {
 
     const result = formatCNUIFromContext(qc, {
       response_mode: 'cnui',
-      cnui_surface: 'habit-list-card',
+      cnui_surface: 'generic-list',
     })
 
     expect(result.type).toBe('cnui')
     if (result.type === 'cnui') {
-      expect(result.payload.surfaceType).toBe('habit-list-card')
+      expect(result.payload.surfaceType).toBe('generic-list')
       expect(result.payload.components[0].type).toBe('list')
       expect(result.payload.components[0].props.items).toHaveLength(2)
       expect(result.payload.actions).toEqual([{ type: 'dismiss', label: '关闭' }])

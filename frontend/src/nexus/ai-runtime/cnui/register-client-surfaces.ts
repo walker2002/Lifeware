@@ -8,7 +8,6 @@ import { cnuiRegistry } from './registry'
 import { HabitActionPanel } from '@/domains/habits/cnui/surfaces/HabitActionPanel'
 import { HabitCheckinPanel } from '@/domains/habits/cnui/surfaces/HabitCheckinPanel'
 import { HabitCreationCard } from '@/domains/habits/cnui/surfaces/HabitCreationCard'
-import { HabitListCard } from '@/domains/habits/cnui/surfaces/HabitListCard'
 
 // Timebox surfaces
 import { TimeboxList } from '@/domains/timebox/cnui/surfaces/TimeboxList'
@@ -16,7 +15,6 @@ import { TimeboxList } from '@/domains/timebox/cnui/surfaces/TimeboxList'
 cnuiRegistry.register('habits', 'habit-action-panel', { component: HabitActionPanel })
 cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckinPanel })
 cnuiRegistry.register('habits', 'habit-creation-card', { component: HabitCreationCard })
-cnuiRegistry.register('habits', 'habit-list-card', { component: HabitListCard })
 cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })
 
 // Tasks surfaces

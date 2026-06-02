@@ -34,7 +34,7 @@ describe('QueryContext type', () => {
           keyMetrics: {},
         },
         answerText: '找到3个习惯',
-        cnuiSurfaceType: 'habit-list-card',
+        cnuiSurfaceType: 'generic-list',
         timestamp: '2026-05-24T00:00:00Z',
         relevance: 1.0,
       }],
@@ -48,7 +48,7 @@ describe('QueryContext type', () => {
     const cnuiResult = {
       type: 'cnui' as const,
       payload: {
-        surfaceType: 'habit-list-card',
+        surfaceType: 'generic-list',
         components: [],
         actions: [{ type: 'dismiss', label: '关闭' }],
       },
@@ -58,7 +58,7 @@ describe('QueryContext type', () => {
       expect(typeof textResult.content).toBe('string')
     }
     if (cnuiResult.type === 'cnui') {
-      expect(cnuiResult.payload.surfaceType).toBe('habit-list-card')
+      expect(cnuiResult.payload.surfaceType).toBe('generic-list')
     }
   })
 

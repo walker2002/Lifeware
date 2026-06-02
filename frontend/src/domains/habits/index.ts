@@ -16,7 +16,6 @@ import './register-form'
 import { HabitActionPanel } from './cnui/surfaces/HabitActionPanel'
 import { HabitCheckinPanel } from './cnui/surfaces/HabitCheckinPanel'
 import { HabitCreationCard } from './cnui/surfaces/HabitCreationCard'
-import { HabitListCard } from './cnui/surfaces/HabitListCard'
 
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
@@ -34,10 +33,6 @@ cnuiRegistry.register('habits', 'habit-checkin-panel', {
 })
 cnuiRegistry.register('habits', 'habit-creation-card', {
   component: HabitCreationCard,
-  handlerModulePath,
-})
-cnuiRegistry.register('habits', 'habit-list-card', {
-  component: HabitListCard,
   handlerModulePath,
 })
 

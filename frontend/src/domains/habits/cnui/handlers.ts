@@ -278,5 +278,4 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'habit-action-panel': habitCnuiHandler,
   'habit-checkin-panel': habitCnuiHandler,
   'habit-creation-card': habitCnuiHandler,
-  'habit-list-card': habitCnuiHandler,
 }

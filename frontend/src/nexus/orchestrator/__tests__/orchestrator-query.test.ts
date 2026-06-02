@@ -134,7 +134,7 @@ describe('Orchestrator Query Path', () => {
           list_active_habits: {
             description: 'List habits',
             response_mode: 'cnui',
-            cnui_surface: 'habit-list-card',
+            cnui_surface: 'generic-list',
             context_capabilities: [
               { id: 'activeHabits', query: 'test', params: ['userId'] },
             ],
