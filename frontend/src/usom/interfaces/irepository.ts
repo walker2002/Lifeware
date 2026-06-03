@@ -7,12 +7,11 @@
  * T-03: Nexus 组件不直接处理 userId
  */
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ProjectStatus, AISessionStatus } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
-  Objective, KeyResult, Task, Habit, HabitLog, Timebox, Review,
+  Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
-  Project, ProjectTemplate, TaskTemplate,
   AISession, AISessionSummary, ChatMessage, UserSettings, TaskExecutionLog,
 } from '../types/objects'
 import type {
@@ -77,6 +76,75 @@ export interface IUserCalibrationRepository {
 // ─── Task ──────────────────────────────────────────────────────
 
 /**
+ * 任务过滤条件
+ */
+export interface TaskFilters {
+  /** 任务状态 */
+  status?: Task['status'] | Task['status'][]
+  /** 关联线索 ID */
+  threadId?: USOM_ID
+  /** 父任务 ID */
+  parentId?: USOM_ID | null
+  /** 清晰度等级 */
+  clarityLevel?: ClarityLevel
+  /** 复杂度标签 */
+  complexityTag?: ComplexityTag
+  /** 能量画像 */
+  energyProfile?: EnergyProfile
+  /** 调度约束 */
+  schedulingConstraint?: SchedulingConstraint
+  /** 追踪模式 */
+  trackingMode?: TrackingMode
+}
+
+/**
+ * 创建任务输入
+ */
+export interface CreateTaskInput {
+  /** 任务标题 */
+  title: string
+  /** 任务描述 */
+  description?: string
+  /** 优先级 */
+  priority: Priority
+  /** 所需能量等级 */
+  energyRequired: EnergyLevel
+  /** 预估时长（分钟） */
+  estimatedDuration: number
+  /** 关联线索 ID */
+  threadId?: USOM_ID
+  /** 父任务 ID */
+  parentId?: USOM_ID
+  /** 清晰度等级 */
+  clarityLevel: ClarityLevel
+  /** 复杂度标签 */
+  complexityTag: ComplexityTag
+  /** 分解等级 */
+  decompositionLevel: DecompositionLevel
+  /** 捕获模式 */
+  captureMode: CaptureMode
+  /** 能量画像 */
+  energyProfile: EnergyProfile
+  /** 调度约束 */
+  schedulingConstraint: SchedulingConstraint
+  /** 追踪模式 */
+  trackingMode: TrackingMode
+  /** 频率类型 */
+  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
+  /** 周几执行（用于周频率） */
+  daysOfWeek?: number[]
+  /** 开始日期 */
+  startDate?: DateOnly
+  /** 结束日期 */
+  endDate?: DateOnly
+  /** 标签列表 */
+  tags?: string[]
+}
+
+/** 更新任务输入 */
+export type UpdateTaskInput = Partial<CreateTaskInput>
+
+/**
  * 任务仓储接口
  */
 export interface ITaskRepository {
@@ -89,20 +157,20 @@ export interface ITaskRepository {
   findById(id: USOM_ID, userId: USOM_ID): Promise<Task | null>
 
   /**
+   * 根据用户 ID 查找任务
+   * @param userId - 用户 ID
+   * @param filters - 过滤条件
+   * @returns 任务列表
+   */
+  findByUserId(userId: USOM_ID, filters?: TaskFilters): Promise<Task[]>
+
+  /**
    * 根据状态查找任务
    * @param status - 任务状态
    * @param userId - 用户 ID
    * @returns 任务列表
    */
   findByStatus(status: Task['status'], userId: USOM_ID): Promise<Task[]>
-
-  /**
-   * 根据时间盒查找任务
-   * @param timeboxId - 时间盒 ID
-   * @param userId - 用户 ID
-   * @returns 任务列表
-   */
-  findByTimebox(timeboxId: USOM_ID, userId: USOM_ID): Promise<Task[]>
 
   /**
    * 查找活跃任务
@@ -112,27 +180,12 @@ export interface ITaskRepository {
   findActive(userId: USOM_ID): Promise<Task[]>
 
   /**
-   * 根据项目查找任务
-   * @param projectId - 项目 ID
-   * @param userId - 用户 ID
-   * @returns 任务列表
-   */
-  findByProject(projectId: USOM_ID, userId: USOM_ID): Promise<Task[]>
-
-  /**
    * 根据父任务查找子任务
    * @param parentId - 父任务 ID
    * @param userId - 用户 ID
    * @returns 子任务列表
    */
   findByParent(parentId: USOM_ID, userId: USOM_ID): Promise<Task[]>
-
-  /**
-   * 查找独立任务（无父任务）
-   * @param userId - 用户 ID
-   * @returns 独立任务列表
-   */
-  findIndependent(userId: USOM_ID): Promise<Task[]>
 
   /**
    * 查找所有任务
@@ -151,11 +204,21 @@ export interface ITaskRepository {
   findByDateRange(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Task[]>
 
   /**
-   * 保存任务
-   * @param task - 任务对象
+   * 创建任务
+   * @param input - 创建输入
    * @param userId - 用户 ID
+   * @returns 创建的任务
    */
-  save(task: Task, userId: USOM_ID): Promise<void>
+  create(input: CreateTaskInput, userId: USOM_ID): Promise<Task>
+
+  /**
+   * 更新任务
+   * @param id - 任务 ID
+   * @param input - 更新输入
+   * @param userId - 用户 ID
+   * @returns 更新后的任务
+   */
+  update(id: USOM_ID, input: UpdateTaskInput, userId: USOM_ID): Promise<Task>
 
   /**
    * 更新任务状态
@@ -167,12 +230,11 @@ export interface ITaskRepository {
   updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task>
 
   /**
-   * 批量创建任务
-   * @param tasks - 任务输入列表
+   * 保存任务
+   * @param task - 任务对象
    * @param userId - 用户 ID
-   * @returns 创建的任务列表
    */
-  bulkCreate(tasks: CreateTaskInput[], userId: USOM_ID): Promise<Task[]>
+  save(task: Task, userId: USOM_ID): Promise<void>
 
   /**
    * 归档任务
@@ -182,200 +244,123 @@ export interface ITaskRepository {
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
 }
 
+// ─── Thread ─────────────────────────────────────────────────────
+
 /**
- * 创建任务输入
+ * 线索过滤条件
  */
-export interface CreateTaskInput {
-  /** 任务标题 */
-  title: string
-  /** 任务描述 */
-  description?: string
-  /** 优先级 */
-  priority: Priority
-  /** 所需能量等级 */
-  energyRequired: EnergyLevel
-  /** 预估时长（分钟） */
-  estimatedDuration: number
-  /** 所属项目 ID */
-  projectId?: USOM_ID
-  /** 父任务 ID */
-  parentId?: USOM_ID
-  /** 频率类型 */
-  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
-  /** 周几执行（用于周频率） */
-  daysOfWeek?: number[]
-  /** 开始日期 */
-  startDate?: DateOnly
-  /** 结束日期 */
-  endDate?: DateOnly
+export interface ThreadFilters {
+  /** 线索状态 */
+  status?: ThreadStatus | ThreadStatus[]
+  /** 清晰度等级 */
+  clarityLevel?: ClarityLevel
+  /** 复杂度标签 */
+  complexityTag?: ComplexityTag
+  /** 能量画像 */
+  energyProfile?: EnergyProfile
+  /** 调度约束 */
+  schedulingConstraint?: SchedulingConstraint
 }
 
-// ─── Project ─────────────────────────────────────────────────────
+/**
+ * 创建线索输入
+ */
+export interface CreateThreadInput {
+  /** 线索标题 */
+  title: string
+  /** 线索描述 */
+  description?: string
+  /** 清晰度等级 */
+  clarityLevel: ClarityLevel
+  /** 复杂度标签 */
+  complexityTag: ComplexityTag
+  /** 能量画像 */
+  energyProfile: EnergyProfile
+  /** 调度约束 */
+  schedulingConstraint: SchedulingConstraint
+  /** 追踪模式 */
+  trackingMode: TrackingMode
+  /** 标签列表 */
+  tags?: string[]
+}
+
+/** 更新线索输入 */
+export type UpdateThreadInput = Partial<CreateThreadInput>
 
 /**
- * 项目仓储接口
+ * 线索仓储接口
  */
-export interface IProjectRepository {
+export interface IThreadRepository {
   /**
-   * 根据 ID 查找项目
-   * @param id - 项目 ID
+   * 根据 ID 查找线索
+   * @param id - 线索 ID
    * @param userId - 用户 ID
-   * @returns 项目或 null
+   * @returns 线索或 null
    */
-  findById(id: USOM_ID, userId: USOM_ID): Promise<Project | null>
+  findById(id: USOM_ID, userId: USOM_ID): Promise<Thread | null>
 
   /**
-   * 根据用户 ID 查找项目
+   * 根据用户 ID 查找线索
    * @param userId - 用户 ID
    * @param filters - 过滤条件
-   * @returns 项目列表
+   * @returns 线索列表
    */
-  findByUserId(userId: USOM_ID, filters?: ProjectFilters): Promise<Project[]>
+  findByUserId(userId: USOM_ID, filters?: ThreadFilters): Promise<Thread[]>
 
   /**
-   * 根据状态查找项目
-   * @param status - 项目状态
+   * 根据状态查找线索
+   * @param status - 线索状态
    * @param userId - 用户 ID
-   * @returns 项目列表
+   * @returns 线索列表
    */
-  findByStatus(status: ProjectStatus, userId: USOM_ID): Promise<Project[]>
+  findByStatus(status: ThreadStatus, userId: USOM_ID): Promise<Thread[]>
 
   /**
-   * 创建项目
+   * 创建线索
    * @param input - 创建输入
    * @param userId - 用户 ID
-   * @returns 创建的项目
+   * @returns 创建的线索
    */
-  create(input: CreateProjectInput, userId: USOM_ID): Promise<Project>
+  create(input: CreateThreadInput, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 更新项目
-   * @param id - 项目 ID
+   * 更新线索
+   * @param id - 线索 ID
    * @param input - 更新输入
    * @param userId - 用户 ID
-   * @returns 更新后的项目
+   * @returns 更新后的线索
    */
-  update(id: USOM_ID, input: UpdateProjectInput, userId: USOM_ID): Promise<Project>
+  update(id: USOM_ID, input: UpdateThreadInput, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 更新项目状态
-   * @param id - 项目 ID
+   * 更新线索状态
+   * @param id - 线索 ID
    * @param status - 新状态
    * @param userId - 用户 ID
-   * @returns 更新后的项目
+   * @returns 更新后的线索
    */
-  updateStatus(id: USOM_ID, status: ProjectStatus, userId: USOM_ID): Promise<Project>
+  updateStatus(id: USOM_ID, status: ThreadStatus, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 保存为模板
-   * @param id - 项目 ID
+   * 保存线索
+   * @param thread - 线索对象
    * @param userId - 用户 ID
-   * @returns 项目模板
    */
-  saveAsTemplate(id: USOM_ID, userId: USOM_ID): Promise<ProjectTemplate>
+  save(thread: Thread, userId: USOM_ID): Promise<void>
 
   /**
-   * 删除项目
-   * @param id - 项目 ID
+   * 删除线索
+   * @param id - 线索 ID
    * @param userId - 用户 ID
    */
   delete(id: USOM_ID, userId: USOM_ID): Promise<void>
 
   /**
-   * 归档项目
-   * @param id - 项目 ID
+   * 归档线索
+   * @param id - 线索 ID
    * @param userId - 用户 ID
    */
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
-}
-
-/**
- * 项目过滤条件
- */
-export interface ProjectFilters {
-  /** 项目状态 */
-  status?: ProjectStatus | ProjectStatus[]
-}
-
-/**
- * 创建项目输入
- */
-export interface CreateProjectInput {
-  /** 项目名称 */
-  name: string
-  /** 项目描述 */
-  description?: string
-  /** 开始日期 */
-  startDate?: DateOnly
-  /** 结束日期 */
-  endDate?: DateOnly
-  /** 优先级 */
-  priority?: Priority
-  /** 颜色 */
-  color?: string
-  /** 标签列表 */
-  tags?: string[]
-}
-
-/** 更新项目输入 */
-export type UpdateProjectInput = Partial<CreateProjectInput>
-
-// ─── TaskTemplate ────────────────────────────────────────────────
-
-/**
- * 任务模板仓储接口
- */
-export interface ITaskTemplateRepository {
-  /**
-   * 根据 ID 查找项目模板
-   * @param id - 模板 ID
-   * @param userId - 用户 ID
-   * @returns 项目模板或 null
-   */
-  findProjectTemplateById(id: USOM_ID, userId: USOM_ID): Promise<ProjectTemplate | null>
-
-  /**
-   * 查找用户的所有项目模板
-   * @param userId - 用户 ID
-   * @returns 项目模板列表
-   */
-  findProjectTemplates(userId: USOM_ID): Promise<ProjectTemplate[]>
-
-  /**
-   * 根据项目模板查找任务模板
-   * @param projectTemplateId - 项目模板 ID
-   * @returns 任务模板列表
-   */
-  findTasksByProject(projectTemplateId: USOM_ID): Promise<TaskTemplate[]>
-
-  /**
-   * 保存项目模板
-   * @param template - 项目模板对象
-   * @param userId - 用户 ID
-   */
-  saveProjectTemplate(template: ProjectTemplate, userId: USOM_ID): Promise<void>
-
-  /**
-   * 保存任务模板
-   * @param template - 任务模板对象
-   */
-  saveTaskTemplate(template: TaskTemplate): Promise<void>
-
-  /**
-   * 从模板创建项目
-   * @param projectTemplateId - 项目模板 ID
-   * @param dates - 日期配置
-   * @param userId - 用户 ID
-   * @returns 创建的项目
-   */
-  createFromTemplate(projectTemplateId: USOM_ID, dates: { startDate?: DateOnly; endDate?: DateOnly }, userId: USOM_ID): Promise<Project>
-
-  /**
-   * 删除项目模板
-   * @param id - 模板 ID
-   * @param userId - 用户 ID
-   */
-  deleteProjectTemplate(id: USOM_ID, userId: USOM_ID): Promise<void>
 }
 
 // ─── Habit ─────────────────────────────────────────────────────
