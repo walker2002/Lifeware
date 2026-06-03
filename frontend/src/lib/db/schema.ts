@@ -126,106 +126,91 @@ export const keyResults = pgTable('key_results', {
   index('idx_key_results_due_date').on(table.userId, table.dueDate),
 ])
 
-// ─── 4.3 projects ──────────────────────────────────────────────
-export const projects = pgTable('projects', {
+// ─── 4.3 threads（主线）──────────────────────────────────────────
+export const threads = pgTable('threads', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
   name: text('name').notNull(),
   description: text('description'),
-  status: text('status', { enum: ['planning', 'active', 'paused', 'completed', 'archived'] }).notNull(),
+  color: text('color'),
+  status: text('status', { enum: ['active', 'paused', 'completed', 'archived'] }).notNull(),
+
   startDate: date('start_date'),
   endDate: date('end_date'),
   priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
-  color: text('color'),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
-  notes: text('notes'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
-  index('idx_projects_user_status').on(table.userId, table.status),
-  index('idx_projects_user_start_date').on(table.userId, table.startDate),
+  index('idx_threads_user_status').on(table.userId, table.status),
+  index('idx_threads_user_start').on(table.userId, table.startDate),
 ])
 
-// ─── 4.3b project_templates ─────────────────────────────────────
-export const projectTemplates = pgTable('project_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  description: text('description'),
-  priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
-  color: text('color'),
-  tags: jsonb('tags').notNull().$type<string[]>().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index('idx_project_templates_user').on(table.userId),
-])
-
-// ─── 4.3c task_templates ────────────────────────────────────────
-export const taskTemplates = pgTable('task_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  projectTemplateId: uuid('project_template_id').references(() => projectTemplates.id, { onDelete: 'cascade' }),
-  parentTemplateId: uuid('parent_template_id').references((): any => taskTemplates.id, { onDelete: 'set null' }),
-  title: text('title').notNull(),
-  description: text('description'),
-  priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }),
-  energyRequired: text('energy_required', { enum: ['high', 'medium', 'low'] }),
-  estimatedDuration: integer('estimated_duration'),
-  frequencyType: text('frequency_type', { enum: ['once', 'daily', 'weekly', 'custom'] }),
-  sortOrder: integer('sort_order').notNull().default(0),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index('idx_task_templates_project').on(table.projectTemplateId),
-  index('idx_task_templates_parent').on(table.parentTemplateId),
-])
-
-// ─── 4.4 tasks ────────────────────────────────────────────────
+// ─── 4.4 tasks（重构后）──────────────────────────────────────────
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'scheduled', 'in_progress', 'on_hold', 'completed', 'archived'] }).notNull(),
+  // 层级关联
+  parentId: uuid('parent_id').references((): any => tasks.id, { onDelete: 'set null' }),
+  threadId: uuid('thread_id').references(() => threads.id, { onDelete: 'set null' }),
+
+  // 执行轴状态
+  status: text('status', { enum: ['todo', 'planned', 'in_progress', 'completed', 'archived'] }).notNull(),
+
+  // 核心字段
   title: text('title').notNull(),
   description: text('description'),
   priority: text('priority', { enum: ['critical', 'high', 'medium', 'low'] }).notNull(),
   energyRequired: text('energy_required', { enum: ['high', 'medium', 'low'] }).notNull(),
-  estimatedDuration: integer('estimated_duration').notNull(),
+  estimatedDuration: integer('estimated_duration'),
   actualDuration: integer('actual_duration'),
 
-  keyResultId: uuid('key_result_id').references(() => keyResults.id, { onDelete: 'set null' }),
-  timeboxId: uuid('timebox_id'), // soft reference, no FK
-
   dueDate: date('due_date'),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
 
-  tags: jsonb('tags').notNull().$type<string[]>().default([]),
+  // 周期性（有限次）
   recurrence: jsonb('recurrence').$type<{ frequency: string; interval: number; endDate?: string }>(),
 
+  tags: jsonb('tags').notNull().$type<string[]>().default([]),
   notes: text('notes'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 
-  parentId: uuid('parent_id').references((): any => tasks.id, { onDelete: 'set null' }),
-  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
-  frequencyType: text('frequency_type', { enum: ['once', 'daily', 'weekly', 'custom'] }),
-  daysOfWeek: jsonb('days_of_week').$type<number[]>(),
-  startDate: date('start_date'),
-  endDate: date('end_date'),
+  // ── AI 维护标签 ──
+  clarity: text('clarity', { enum: ['fuzzy', 'scoped', 'actionable'] }).notNull().default('fuzzy'),
+  complexity: jsonb('complexity').notNull().$type<string[]>().default([]),
+  decomposition: text('decomposition', { enum: ['atomic', 'splittable', 'splitting_in_progress', 'decomposed'] }),
+
+  // ── 用户管理标签 ──
+  captureMode: text('capture_mode', { enum: ['scheduled', 'ad_hoc', 'retrospective'] }).notNull().default('ad_hoc'),
+  energyProfile: text('energy_profile', { enum: ['light', 'deep', 'admin', 'creative', 'reactive'] }),
+  schedulingConstraint: text('scheduling_constraint', { enum: ['hard_deadline', 'soft_target', 'opportunistic', 'recurring'] }),
+  tracking: text('tracking', { enum: ['none', 'check_in', 'log', 'review'] }).notNull().default('check_in'),
+
+  // AI 辅助扩展数据
+  aiTags: jsonb('ai_tags').notNull().$type<Record<string, unknown>>().default({}),
 }, (table) => [
   index('idx_tasks_user_status').on(table.userId, table.status),
-  index('idx_tasks_priority').on(table.userId, table.priority),
-  index('idx_tasks_due_date').on(table.userId, table.dueDate),
-  index('idx_tasks_key_result').on(table.keyResultId),
-  index('idx_tasks_timebox').on(table.timeboxId),
-  index('idx_tasks_user_project').on(table.userId, table.projectId),
+  index('idx_tasks_user_clarity').on(table.userId, table.clarity),
   index('idx_tasks_user_parent').on(table.userId, table.parentId),
-  index('idx_tasks_project_status').on(table.projectId, table.status),
+  index('idx_tasks_user_thread').on(table.userId, table.threadId),
+  index('idx_tasks_user_priority').on(table.userId, table.priority),
+  index('idx_tasks_user_energy').on(table.userId, table.energyProfile),
+  index('idx_tasks_user_constraint').on(table.userId, table.schedulingConstraint),
+  index('idx_tasks_user_tracking').on(table.userId, table.tracking),
+  index('idx_tasks_due_date').on(table.userId, table.dueDate),
+  check('check_tasks_dates', sql`${table.endDate} IS NULL OR ${table.endDate} >= ${table.startDate}`),
 ])
 
 // ─── 4.4 habits ───────────────────────────────────────────────

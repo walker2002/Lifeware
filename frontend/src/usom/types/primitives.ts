@@ -354,7 +354,7 @@ export type USOMObjectType =
   | 'objective' | 'key_result'
   | 'task' | 'habit' | 'habit_log' | 'task_execution_log'
   | 'timebox' | 'review'
-  | 'intention' | 'project'
+  | 'intention' | 'thread'
 
 // ─── External Types (MVP stub) ────────────────────────────────
 /**

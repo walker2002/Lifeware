@@ -1,13 +1,12 @@
 // USOM <-> DB Mapping Functions
 // Bidirectional conversion between USOM objects and Drizzle row types.
 
-import type { USOM_ID, Timestamp, DateOnly } from '../../../usom/types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../../../usom/types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
-  Objective, KeyResult, Task, Habit, HabitFrequency, HabitLog,
+  Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog,
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
-  Project, ProjectTemplate, TaskTemplate,
   AISession, ChatMessage, TaskExecutionLog,
 } from '../../../usom/types/objects'
 import type {
@@ -54,47 +53,54 @@ export function userUSOMToRow(user: User) {
 // --- Task --------------------------------------------------------
 type TaskRow = {
   id: string; userId: string; schemaVersion: number;
+  parentId: string | null; threadId: string | null;
   status: string; title: string; description: string | null;
   priority: string; energyRequired: string;
-  estimatedDuration: number; actualDuration: number | null;
-  keyResultId: string | null; timeboxId: string | null;
-  dueDate: string | null;
-  tags: string[]; recurrence: unknown;
-  notes: string | null;
+  estimatedDuration: number | null; actualDuration: number | null;
+  dueDate: string | null; startDate: string | null; endDate: string | null;
+  recurrence: { frequency: string; interval: number; endDate?: string } | null;
+  tags: string[]; notes: string | null;
   createdAt: Date; updatedAt: Date;
   completedAt: Date | null; archivedAt: Date | null;
-  parentId: string | null; projectId: string | null;
-  frequencyType: string | null; daysOfWeek: number[] | null;
-  startDate: string | null; endDate: string | null;
+  clarity: string; complexity: string[]; decomposition: string | null;
+  captureMode: string; energyProfile: string | null;
+  schedulingConstraint: string | null; tracking: string;
+  aiTags: Record<string, unknown>;
 }
 
 export function taskRowToUSOM(row: TaskRow): Task {
-  const status = row.status === 'scheduled' ? 'in_progress' : row.status as Task['status']
   return {
     id: row.id,
-    status,
+    status: row.status as Task['status'],
     title: row.title,
     description: row.description ?? undefined,
     priority: row.priority as Task['priority'],
     energyRequired: row.energyRequired as Task['energyRequired'],
-    estimatedDuration: row.estimatedDuration,
+    estimatedDuration: row.estimatedDuration ?? undefined,
     actualDuration: row.actualDuration ?? undefined,
-    keyResultId: row.keyResultId ?? undefined,
-    timeboxId: row.timeboxId ?? undefined,
-    tags: row.tags ?? [],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
-    recurrence: row.recurrence as Task['recurrence'],
+    startDate: (row.startDate as DateOnly) ?? undefined,
+    endDate: (row.endDate as DateOnly) ?? undefined,
+    recurrence: row.recurrence ?? undefined,
+    tags: row.tags ?? [],
+    notes: row.notes ?? undefined,
+    parentId: row.parentId ? row.parentId as USOM_ID : undefined,
+    threadId: row.threadId ? row.threadId as USOM_ID : undefined,
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     completedAt: toISO(row.completedAt),
     archivedAt: toISO(row.archivedAt),
-    notes: row.notes ?? undefined,
-    parentId: row.parentId ?? undefined,
-    projectId: row.projectId ?? undefined,
-    frequencyType: row.frequencyType as Task['frequencyType'],
-    daysOfWeek: row.daysOfWeek ?? undefined,
-    startDate: (row.startDate as DateOnly) ?? undefined,
-    endDate: (row.endDate as DateOnly) ?? undefined,
+    // AI 维护标签
+    clarity: row.clarity as ClarityLevel,
+    complexity: (row.complexity ?? []) as ComplexityTag[],
+    decomposition: (row.decomposition as DecompositionLevel) ?? undefined,
+    // 用户管理标签
+    captureMode: row.captureMode as CaptureMode,
+    energyProfile: (row.energyProfile as EnergyProfile) ?? undefined,
+    schedulingConstraint: (row.schedulingConstraint as SchedulingConstraint) ?? undefined,
+    tracking: row.tracking as TrackingMode,
+    // AI 辅助扩展
+    aiTags: row.aiTags ?? {},
   }
 }
 
@@ -102,27 +108,34 @@ export function taskUSOMToRow(task: Task, userId: USOM_ID) {
   return {
     id: task.id,
     userId: userId,
+    parentId: task.parentId ?? null,
+    threadId: task.threadId ?? null,
     status: task.status,
     title: task.title,
     description: task.description ?? null,
     priority: task.priority,
     energyRequired: task.energyRequired,
-    estimatedDuration: task.estimatedDuration,
+    estimatedDuration: task.estimatedDuration ?? null,
     actualDuration: task.actualDuration ?? null,
-    keyResultId: task.keyResultId ?? null,
-    timeboxId: task.timeboxId ?? null,
     dueDate: task.dueDate ?? null,
-    tags: task.tags,
+    startDate: task.startDate ?? null,
+    endDate: task.endDate ?? null,
     recurrence: task.recurrence ?? null,
+    tags: task.tags,
     notes: task.notes ?? null,
     completedAt: toDate(task.completedAt),
     archivedAt: toDate(task.archivedAt),
-    parentId: task.parentId ?? null,
-    projectId: task.projectId ?? null,
-    frequencyType: task.frequencyType ?? null,
-    daysOfWeek: task.daysOfWeek ?? null,
-    startDate: task.startDate ?? null,
-    endDate: task.endDate ?? null,
+    // AI 维护标签
+    clarity: task.clarity,
+    complexity: task.complexity,
+    decomposition: task.decomposition ?? null,
+    // 用户管理标签
+    captureMode: task.captureMode,
+    energyProfile: task.energyProfile ?? null,
+    schedulingConstraint: task.schedulingConstraint ?? null,
+    tracking: task.tracking,
+    // AI 辅助扩展
+    aiTags: task.aiTags,
   }
 }
 
@@ -799,30 +812,28 @@ export function energyLogToRow(log: EnergyLog, userId: USOM_ID) {
   }
 }
 
-// --- Project ------------------------------------------------------
-type ProjectRow = {
+// --- Thread ------------------------------------------------------
+type ThreadRow = {
   id: string; userId: string; schemaVersion: number;
   name: string; description: string | null;
-  status: string;
+  color: string | null; status: string;
   startDate: string | null; endDate: string | null;
-  priority: string | null; color: string | null;
-  tags: string[]; notes: string | null;
+  priority: string | null; tags: string[];
   createdAt: Date; updatedAt: Date;
   completedAt: Date | null; archivedAt: Date | null;
 }
 
-export function projectRowToUSOM(row: ProjectRow): Project {
+export function threadRowToUSOM(row: ThreadRow): Thread {
   return {
-    id: row.id,
+    id: row.id as USOM_ID,
+    status: row.status as Thread['status'],
     name: row.name,
     description: row.description ?? undefined,
-    status: row.status as Project['status'],
-    startDate: (row.startDate as DateOnly) ?? undefined,
-    endDate: (row.endDate as DateOnly) ?? undefined,
-    priority: row.priority as Project['priority'],
     color: row.color ?? undefined,
+    startDate: row.startDate ? (row.startDate as DateOnly) : undefined,
+    endDate: row.endDate ? (row.endDate as DateOnly) : undefined,
+    priority: row.priority as Thread['priority'] ?? undefined,
     tags: row.tags ?? [],
-    notes: row.notes ?? undefined,
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     completedAt: toISO(row.completedAt),
@@ -830,98 +841,20 @@ export function projectRowToUSOM(row: ProjectRow): Project {
   }
 }
 
-export function projectUSOMToRow(project: Project, userId: USOM_ID) {
+export function threadUSOMToRow(thread: Thread, userId: USOM_ID) {
   return {
-    id: project.id,
+    id: thread.id,
     userId,
-    name: project.name,
-    description: project.description ?? null,
-    status: project.status,
-    startDate: project.startDate ?? null,
-    endDate: project.endDate ?? null,
-    priority: project.priority ?? null,
-    color: project.color ?? null,
-    tags: project.tags,
-    notes: project.notes ?? null,
-    completedAt: toDate(project.completedAt),
-    archivedAt: toDate(project.archivedAt),
-  }
-}
-
-// --- ProjectTemplate ------------------------------------------------
-type ProjectTemplateRow = {
-  id: string; userId: string;
-  name: string; description: string | null;
-  priority: string | null; color: string | null;
-  tags: string[];
-  createdAt: Date; updatedAt: Date;
-}
-
-export function projectTemplateRowToUSOM(row: ProjectTemplateRow): ProjectTemplate {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? undefined,
-    priority: row.priority as ProjectTemplate['priority'],
-    color: row.color ?? undefined,
-    tags: row.tags ?? [],
-    createdAt: row.createdAt.toISOString() as Timestamp,
-    updatedAt: row.updatedAt.toISOString() as Timestamp,
-  }
-}
-
-export function projectTemplateUSOMToRow(template: ProjectTemplate, userId: USOM_ID) {
-  return {
-    id: template.id,
-    userId,
-    name: template.name,
-    description: template.description ?? null,
-    priority: template.priority ?? null,
-    color: template.color ?? null,
-    tags: template.tags,
-  }
-}
-
-// --- TaskTemplate ---------------------------------------------------
-type TaskTemplateRow = {
-  id: string; projectTemplateId: string | null;
-  parentTemplateId: string | null;
-  title: string; description: string | null;
-  priority: string | null; energyRequired: string | null;
-  estimatedDuration: number | null;
-  frequencyType: string | null;
-  sortOrder: number;
-  createdAt: Date;
-}
-
-export function taskTemplateRowToUSOM(row: TaskTemplateRow): TaskTemplate {
-  return {
-    id: row.id,
-    projectTemplateId: row.projectTemplateId ?? undefined,
-    parentTemplateId: row.parentTemplateId ?? undefined,
-    title: row.title,
-    description: row.description ?? undefined,
-    priority: row.priority as TaskTemplate['priority'],
-    energyRequired: row.energyRequired as TaskTemplate['energyRequired'],
-    estimatedDuration: row.estimatedDuration ?? undefined,
-    frequencyType: row.frequencyType as TaskTemplate['frequencyType'],
-    sortOrder: row.sortOrder,
-    createdAt: row.createdAt.toISOString() as Timestamp,
-  }
-}
-
-export function taskTemplateUSOMToRow(template: TaskTemplate) {
-  return {
-    id: template.id,
-    projectTemplateId: template.projectTemplateId ?? null,
-    parentTemplateId: template.parentTemplateId ?? null,
-    title: template.title,
-    description: template.description ?? null,
-    priority: template.priority ?? null,
-    energyRequired: template.energyRequired ?? null,
-    estimatedDuration: template.estimatedDuration ?? null,
-    frequencyType: template.frequencyType ?? null,
-    sortOrder: template.sortOrder,
+    name: thread.name,
+    description: thread.description ?? null,
+    color: thread.color ?? null,
+    status: thread.status,
+    startDate: thread.startDate ?? null,
+    endDate: thread.endDate ?? null,
+    priority: thread.priority ?? null,
+    tags: thread.tags,
+    completedAt: toDate(thread.completedAt),
+    archivedAt: toDate(thread.archivedAt),
   }
 }
 

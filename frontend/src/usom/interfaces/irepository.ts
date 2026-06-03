@@ -81,20 +81,20 @@ export interface IUserCalibrationRepository {
 export interface TaskFilters {
   /** 任务状态 */
   status?: Task['status'] | Task['status'][]
-  /** 关联线索 ID */
+  /** 关联主线 ID */
   threadId?: USOM_ID
   /** 父任务 ID */
   parentId?: USOM_ID | null
   /** 清晰度等级 */
-  clarityLevel?: ClarityLevel
+  clarity?: ClarityLevel
   /** 复杂度标签 */
-  complexityTag?: ComplexityTag
+  complexity?: ComplexityTag
   /** 能量画像 */
   energyProfile?: EnergyProfile
   /** 调度约束 */
   schedulingConstraint?: SchedulingConstraint
   /** 追踪模式 */
-  trackingMode?: TrackingMode
+  tracking?: TrackingMode
 }
 
 /**
@@ -105,34 +105,30 @@ export interface CreateTaskInput {
   title: string
   /** 任务描述 */
   description?: string
-  /** 优先级 */
-  priority: Priority
-  /** 所需能量等级 */
-  energyRequired: EnergyLevel
-  /** 预估时长（分钟） */
-  estimatedDuration: number
-  /** 关联线索 ID */
+  /** 优先级（默认 P1） */
+  priority?: Priority
+  /** 所需能量等级（默认 medium） */
+  energyRequired?: EnergyLevel
+  /** 预估时长（分钟），模糊任务可不填 */
+  estimatedDuration?: number
+  /** 关联主线 ID */
   threadId?: USOM_ID
   /** 父任务 ID */
   parentId?: USOM_ID
   /** 清晰度等级 */
-  clarityLevel: ClarityLevel
-  /** 复杂度标签 */
-  complexityTag: ComplexityTag
+  clarity: ClarityLevel
+  /** 复杂度标签列表 */
+  complexity: ComplexityTag[]
   /** 分解等级 */
-  decompositionLevel: DecompositionLevel
+  decomposition?: DecompositionLevel
   /** 捕获模式 */
   captureMode: CaptureMode
   /** 能量画像 */
-  energyProfile: EnergyProfile
+  energyProfile?: EnergyProfile
   /** 调度约束 */
-  schedulingConstraint: SchedulingConstraint
+  schedulingConstraint?: SchedulingConstraint
   /** 追踪模式 */
-  trackingMode: TrackingMode
-  /** 频率类型 */
-  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
-  /** 周几执行（用于周频率） */
-  daysOfWeek?: number[]
+  tracking: TrackingMode
   /** 开始日期 */
   startDate?: DateOnly
   /** 结束日期 */
@@ -247,39 +243,31 @@ export interface ITaskRepository {
 // ─── Thread ─────────────────────────────────────────────────────
 
 /**
- * 线索过滤条件
+ * 主线过滤条件
  */
 export interface ThreadFilters {
-  /** 线索状态 */
+  /** 主线状态 */
   status?: ThreadStatus | ThreadStatus[]
-  /** 清晰度等级 */
-  clarityLevel?: ClarityLevel
-  /** 复杂度标签 */
-  complexityTag?: ComplexityTag
-  /** 能量画像 */
-  energyProfile?: EnergyProfile
-  /** 调度约束 */
-  schedulingConstraint?: SchedulingConstraint
+  /** 优先级 */
+  priority?: Priority
 }
 
 /**
- * 创建线索输入
+ * 创建主线输入
  */
 export interface CreateThreadInput {
-  /** 线索标题 */
-  title: string
-  /** 线索描述 */
+  /** 主线名称 */
+  name: string
+  /** 主线描述 */
   description?: string
-  /** 清晰度等级 */
-  clarityLevel: ClarityLevel
-  /** 复杂度标签 */
-  complexityTag: ComplexityTag
-  /** 能量画像 */
-  energyProfile: EnergyProfile
-  /** 调度约束 */
-  schedulingConstraint: SchedulingConstraint
-  /** 追踪模式 */
-  trackingMode: TrackingMode
+  /** 主线颜色 */
+  color?: string
+  /** 开始日期 */
+  startDate?: DateOnly
+  /** 结束日期 */
+  endDate?: DateOnly
+  /** 优先级 */
+  priority?: Priority
   /** 标签列表 */
   tags?: string[]
 }
@@ -288,76 +276,76 @@ export interface CreateThreadInput {
 export type UpdateThreadInput = Partial<CreateThreadInput>
 
 /**
- * 线索仓储接口
+ * 主线仓储接口
  */
 export interface IThreadRepository {
   /**
-   * 根据 ID 查找线索
-   * @param id - 线索 ID
+   * 根据 ID 查找主线
+   * @param id - 主线 ID
    * @param userId - 用户 ID
-   * @returns 线索或 null
+   * @returns 主线或 null
    */
   findById(id: USOM_ID, userId: USOM_ID): Promise<Thread | null>
 
   /**
-   * 根据用户 ID 查找线索
+   * 根据用户 ID 查找主线
    * @param userId - 用户 ID
    * @param filters - 过滤条件
-   * @returns 线索列表
+   * @returns 主线列表
    */
   findByUserId(userId: USOM_ID, filters?: ThreadFilters): Promise<Thread[]>
 
   /**
-   * 根据状态查找线索
-   * @param status - 线索状态
+   * 根据状态查找主线
+   * @param status - 主线状态
    * @param userId - 用户 ID
-   * @returns 线索列表
+   * @returns 主线列表
    */
   findByStatus(status: ThreadStatus, userId: USOM_ID): Promise<Thread[]>
 
   /**
-   * 创建线索
+   * 创建主线
    * @param input - 创建输入
    * @param userId - 用户 ID
-   * @returns 创建的线索
+   * @returns 创建的主线
    */
   create(input: CreateThreadInput, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 更新线索
-   * @param id - 线索 ID
+   * 更新主线
+   * @param id - 主线 ID
    * @param input - 更新输入
    * @param userId - 用户 ID
-   * @returns 更新后的线索
+   * @returns 更新后的主线
    */
   update(id: USOM_ID, input: UpdateThreadInput, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 更新线索状态
-   * @param id - 线索 ID
+   * 更新主线状态
+   * @param id - 主线 ID
    * @param status - 新状态
    * @param userId - 用户 ID
-   * @returns 更新后的线索
+   * @returns 更新后的主线
    */
   updateStatus(id: USOM_ID, status: ThreadStatus, userId: USOM_ID): Promise<Thread>
 
   /**
-   * 保存线索
-   * @param thread - 线索对象
+   * 保存主线
+   * @param thread - 主线对象
    * @param userId - 用户 ID
    */
   save(thread: Thread, userId: USOM_ID): Promise<void>
 
   /**
-   * 删除线索
-   * @param id - 线索 ID
+   * 删除主线
+   * @param id - 主线 ID
    * @param userId - 用户 ID
    */
   delete(id: USOM_ID, userId: USOM_ID): Promise<void>
 
   /**
-   * 归档线索
-   * @param id - 线索 ID
+   * 归档主线
+   * @param id - 主线 ID
    * @param userId - 用户 ID
    */
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>

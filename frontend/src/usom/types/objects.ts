@@ -209,16 +209,15 @@ export interface KeyResult {
 
 // ─── 3.6a Thread ──────────────────────────────────────────────
 /**
- * 线索接口（替代原 Project）
- * @property id - 线索唯一标识
- * @property status - 线索状态
- * @property title - 线索标题
- * @property description - 线索描述
- * @property clarityLevel - 清晰度等级
- * @property complexityTag - 复杂度标签
- * @property energyProfile - 能量画像
- * @property schedulingConstraint - 调度约束
- * @property trackingMode - 追踪模式
+ * 主线接口（替代原 Project）
+ * @property id - 主线唯一标识
+ * @property status - 主线状态
+ * @property name - 主线名称
+ * @property description - 主线描述
+ * @property color - 主线颜色
+ * @property startDate - 开始日期
+ * @property endDate - 结束日期
+ * @property priority - 优先级
  * @property tags - 标签列表
  * @property notes - 备注
  * @property createdAt - 创建时间
@@ -229,13 +228,12 @@ export interface KeyResult {
 export interface Thread {
   id: USOM_ID
   status: ThreadStatus
-  title: string
+  name: string
   description?: string
-  clarityLevel: ClarityLevel
-  complexityTag: ComplexityTag
-  energyProfile: EnergyProfile
-  schedulingConstraint: SchedulingConstraint
-  trackingMode: TrackingMode
+  color?: string
+  startDate?: DateOnly
+  endDate?: DateOnly
+  priority?: Priority
   tags: Tag[]
   notes?: Notes
   createdAt: Timestamp
@@ -253,19 +251,18 @@ export interface Thread {
  * @property description - 任务描述
  * @property priority - 优先级
  * @property energyRequired - 能量需求等级
- * @property estimatedDuration - 预计持续时间（分钟）
+ * @property estimatedDuration - 预计持续时间（分钟），模糊任务可为 null
  * @property actualDuration - 实际持续时间（分钟）
- * @property keyResultId - 关联的关键结果ID
- * @property timeboxId - 关联的时间盒ID
- * @property threadId - 关联的线索ID
+ * @property threadId - 关联的主线ID
  * @property parentId - 父任务ID（用于任务层级）
- * @property clarityLevel - 清晰度等级
- * @property complexityTag - 复杂度标签
- * @property decompositionLevel - 分解等级
+ * @property clarity - 清晰度等级
+ * @property complexity - 复杂度标签列表
+ * @property decomposition - 分解等级
  * @property captureMode - 捕获模式
  * @property energyProfile - 能量画像
  * @property schedulingConstraint - 调度约束
- * @property trackingMode - 追踪模式
+ * @property tracking - 追踪模式
+ * @property aiTags - AI 辅助扩展数据
  * @property tags - 标签列表
  * @property dueDate - 截止日期
  * @property recurrence - 重复规则
@@ -273,8 +270,6 @@ export interface Thread {
  * @property updatedAt - 更新时间
  * @property completedAt - 完成时间
  * @property archivedAt - 归档时间
- * @property frequencyType - 频率类型
- * @property daysOfWeek - 每周重复的天数
  * @property startDate - 开始日期
  * @property endDate - 结束日期
  * @property lastExecutionRecord - 最近一次执行记录（查询时聚合，非持久化）
@@ -287,19 +282,18 @@ export interface Task {
   description?: string
   priority: Priority
   energyRequired: EnergyLevel
-  estimatedDuration: DurationMinutes
-  actualDuration?: DurationMinutes
-  keyResultId?: USOM_ID
-  timeboxId?: USOM_ID
+  estimatedDuration?: number
+  actualDuration?: number
   threadId?: USOM_ID
   parentId?: USOM_ID
-  clarityLevel: ClarityLevel
-  complexityTag: ComplexityTag
-  decompositionLevel: DecompositionLevel
+  clarity: ClarityLevel
+  complexity: ComplexityTag[]
+  decomposition?: DecompositionLevel
   captureMode: CaptureMode
-  energyProfile: EnergyProfile
-  schedulingConstraint: SchedulingConstraint
-  trackingMode: TrackingMode
+  energyProfile?: EnergyProfile
+  schedulingConstraint?: SchedulingConstraint
+  tracking: TrackingMode
+  aiTags: Record<string, unknown>
   tags: Tag[]
   dueDate?: DateOnly
   recurrence?: RecurrenceRule
@@ -307,8 +301,6 @@ export interface Task {
   updatedAt: Timestamp
   completedAt?: Timestamp
   archivedAt?: Timestamp
-  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
-  daysOfWeek?: number[]
   startDate?: DateOnly
   endDate?: DateOnly
   /** 最近一次执行记录（查询时从 task_execution_logs 聚合，非持久化字段） */
