@@ -1196,7 +1196,7 @@ function createMockThreadRepo() {
 describe('Orchestrator — Tasks 意图分发', () => {
   const userId = 'user-001' as USOM_ID
 
-  it('createTask 意图 → 调用 taskRepo.bulkCreate 并发布 TaskCreated 事件', async () => {
+  it('createTask 意图 → 调用 taskRepo.create 并发布 TaskCreated 事件', async () => {
     const taskIntent: StructuredIntent = {
       id: 'intent-task-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
@@ -1231,8 +1231,8 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const result = await orchestrator.executeIntent(taskIntent, userId)
 
     expect(result.success).toBe(true)
-    expect(taskRepo.bulkCreate).toHaveBeenCalledWith(
-      [expect.objectContaining({ title: '完成报告', priority: 'high', threadId: 'thread-001' })],
+    expect(taskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '完成报告', priority: 'high', threadId: 'thread-001' }),
       userId,
     )
     expect(eventRepo.append).toHaveBeenCalledWith(
