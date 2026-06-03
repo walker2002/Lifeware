@@ -1015,7 +1015,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             priority: (intent.fields.priority ?? 'medium') as import('@/usom/types/primitives').Priority,
             energyRequired: (intent.fields.energyRequired ?? 'medium') as import('@/usom/types/primitives').EnergyLevel,
             estimatedDuration: (intent.fields.estimatedDuration ?? 60) as number,
-            projectId: intent.fields.projectId as USOM_ID | undefined,
+            threadId: intent.fields.threadId as USOM_ID | undefined,
             parentId: intent.fields.parentId as USOM_ID | undefined,
             frequencyType: intent.fields.frequencyType as 'once' | 'daily' | 'weekly' | 'custom' | undefined,
             daysOfWeek: intent.fields.daysOfWeek as number[] | undefined,
