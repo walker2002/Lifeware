@@ -1182,6 +1182,7 @@ function createMockThreadRepo() {
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
+    save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
   }
