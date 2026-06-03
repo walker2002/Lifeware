@@ -1,12 +1,6 @@
-export { ProjectForm, type ProjectFormData } from "./project-form"
-export { TaskForm, type TaskFormData } from "./task-form"
-export { ProjectTree, type TreeItem } from "./project-tree"
-export { ProjectDetail } from "./project-detail"
-export { DetailPanel } from "./detail-panel"
-export { ProjectsView } from "./projects-view"
-export { StatusBadge } from "./status-badge"
-export { SplitWarning } from "./split-warning"
-export { TaskList, buildTree, type TaskWithChildren } from "./task-list"
-export { TaskImportDialog } from "./task-import-dialog"
-export { TaskImportPanel } from "./task-import-panel"
-export { TemplateDialog } from "./template-dialog"
+/**
+ * @file index
+ * @brief Tasks Domain 组件导出
+ */
+
+export { SystemCognitionPanel } from "./system-cognition-panel"

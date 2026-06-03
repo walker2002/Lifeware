@@ -31,7 +31,7 @@ export class ActiveTasksProvider implements ContextProvider {
     if (query !== 'active_with_details') return []
 
     const { userId } = params as { userId: USOM_ID }
-    const tasks = await this.repo.findByStatus('active', userId)
+    const tasks = await this.repo.findActive(userId)
 
     return tasks.map(t => ({
       id: t.id,
@@ -39,7 +39,9 @@ export class ActiveTasksProvider implements ContextProvider {
       priority: t.priority,
       energyRequired: t.energyRequired,
       estimatedDuration: t.estimatedDuration,
-      projectId: t.projectId,
+      threadId: t.threadId,
+      clarity: t.clarity,
+      decomposition: t.decomposition,
     }))
   }
 }
