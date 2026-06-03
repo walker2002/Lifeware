@@ -250,6 +250,24 @@ body {
 .timebox-month-calendar .rbc-row-content-scroll-container { overflow: hidden; }
 
 /* ========================================================================
+   react-big-calendar 暗色模式覆盖
+   ======================================================================== */
+
+.dark .habit-month-calendar .rbc-header { border-bottom-color: var(--hairline); }
+.dark .habit-month-calendar .rbc-month-view { border-color: var(--hairline); }
+.dark .habit-month-calendar .rbc-month-row + .rbc-month-row,
+.dark .habit-month-calendar .rbc-header + .rbc-header { border-color: var(--hairline-soft); }
+.dark .habit-month-calendar .rbc-today { background: var(--surface-soft); }
+.dark .habit-month-calendar .rbc-off-range-bg { background: var(--canvas); }
+
+.dark .timebox-month-calendar .rbc-header { border-bottom-color: var(--hairline); }
+.dark .timebox-month-calendar .rbc-month-view { border-color: var(--hairline); }
+.dark .timebox-month-calendar .rbc-month-row + .rbc-month-row,
+.dark .timebox-month-calendar .rbc-header + .rbc-header { border-color: var(--hairline-soft); }
+.dark .timebox-month-calendar .rbc-today { background: var(--surface-soft); }
+.dark .timebox-month-calendar .rbc-off-range-bg { background: var(--canvas); }
+
+/* ========================================================================
    暗色模式（UI-DESIGN-SPEC §1.6, §12）
    通过 <html class="dark"> 切换，所有令牌在 .dark 中重定义
    ======================================================================== */

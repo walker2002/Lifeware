@@ -158,8 +158,8 @@ export function HabitStatsMonthView({ data }: HabitStatsMonthViewProps) {
         }}
         eventPropGetter={(event: HabitCalendarEvent) => ({
           style: {
-            backgroundColor: event.type === "showMore" ? "transparent" : "#f5f0e8",
-            color: "#141413",
+            backgroundColor: event.type === "showMore" ? "transparent" : "var(--surface-soft)",
+            color: "var(--ink)",
             border: "none",
             borderRadius: "4px",
             padding: "2px 4px",

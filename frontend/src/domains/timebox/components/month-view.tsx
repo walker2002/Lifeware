@@ -155,7 +155,7 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
 
       if (hidden.length > 0) {
         const baseDate = new Date(dayKey)
-        baseDate.setHours(0, 0, 0, 0)
+        baseDate.setHours(23, 59, 59, 0)
         moreEvents.push({
           id: `${dayKey}-more`,
           title: `+${hidden.length} more`,
@@ -198,7 +198,11 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
             backgroundColor: event.isMore
               ? "transparent"
               : STATUS_BG[event.status] ?? STATUS_BG.planned,
-            color: event.status === "running" ? "#ffffff" : "#141413",
+            color: event.isMore
+              ? "var(--ink)"
+              : event.status === "running"
+                ? "#ffffff"
+                : "var(--ink)",
             borderLeft: event.isMore
               ? "none"
               : `4px solid ${BORDER_COLOR_MAP[getCardBorderColor(event.executionRecord)] ?? "transparent"}`,
