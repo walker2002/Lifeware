@@ -45,7 +45,7 @@ async function getTodayTimeboxes(): Promise<Timebox[]> {
 async function getActiveTasks(): Promise<Task[]> {
   try {
     const repo = new TaskRepository()
-    return repo.findByStatus('active', MVP_USER_ID)
+    return repo.findByStatus('todo', MVP_USER_ID)
   } catch (e) {
     console.error('[timeboxCnuiHandler] 查询活跃任务失败:', e)
     return []

@@ -1,7 +1,7 @@
 /**
  * @file hooks
- * @brief Tasks 域钩子函数工厂
- * 
+ * @brief Tasks 域钩子函数工厂（重构后）
+ *
  * 工厂函数模式，遵循 Constitution Principle VI: 无副作用、无数据库调用
  * 提供意图验证、事件响应和动作表面请求处理能力
  */
@@ -13,18 +13,19 @@ import type {
   ActionCandidate,
   ActionSurfaceSuggestion,
   MetricUpdate,
-} from '@/usom/types/process'
-import type { StructuredIntent } from '@/usom/types/objects'
-import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
-import type { DomainManifest } from '@/domains/manifest-loader/schema'
+} from '../../usom/types/process'
+import type { StructuredIntent } from '../../usom/types/objects'
+import type { USOM_ID, ActionCategory } from '../../usom/types/primitives'
+import type { DomainManifest } from '../../domains/manifest-loader/schema'
+import { validateTaskFields, validateThreadFields } from './validation'
 
 /**
  * 构建状态转换映射
- * @param transitions - 转换规则数组
- * @returns 状态转换映射表
+ * @param transitions - 生命周期转换列表
+ * @returns 源状态到目标状态的映射
  */
 function buildTransitionMap(
-  transitions: Array<{ from: string | string[] | null; to: string }>
+  transitions: Array<{ from: string | string[] | null; to: string }>,
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {}
   for (const t of transitions) {
@@ -47,8 +48,8 @@ export function createTasksHooks(manifest: DomainManifest) {
   const taskTransitions = manifest.lifecycle.task
     ? buildTransitionMap(manifest.lifecycle.task.transitions)
     : {}
-  const projectTransitions = manifest.lifecycle.project
-    ? buildTransitionMap(manifest.lifecycle.project.transitions)
+  const threadTransitions = manifest.lifecycle.thread
+    ? buildTransitionMap(manifest.lifecycle.thread.transitions)
     : {}
 
   /**
@@ -64,37 +65,33 @@ export function createTasksHooks(manifest: DomainManifest) {
     const errors: string[] = []
     const { fields, action } = intent
 
-    if (action === 'createProject' || action === 'updateProject') {
-      const name = fields['name']
-      if (action === 'createProject' && (!name || (typeof name === 'string' && name.trim() === ''))) {
-        errors.push('项目名称必填')
-      }
-      if (typeof name === 'string' && name.length > 200) {
-        errors.push('项目名称不能超过 200 字符')
-      }
-    }
-
     if (action === 'createTask' || action === 'updateTask') {
-      const title = fields['title']
-      if (action === 'createTask' && (!title || (typeof title === 'string' && title.trim() === ''))) {
-        errors.push('任务标题必填')
-      }
-      const estimatedDuration = fields['estimatedDuration']
-      if (estimatedDuration !== undefined && (typeof estimatedDuration !== 'number' || estimatedDuration <= 0)) {
-        errors.push('预估时长必须大于 0')
-      }
+      const result = validateTaskFields(fields, action as 'createTask' | 'updateTask')
+      errors.push(...result.errors)
     }
 
-    // 状态转换验证
+    if (action === 'createThread' || action === 'updateThread') {
+      const result = validateThreadFields(fields, action as 'createThread' | 'updateThread')
+      errors.push(...result.errors)
+    }
+
+    // 生命周期状态转换验证
     const targetStatus = fields['targetStatus'] as string | undefined
     const currentStatus = fields['currentStatus'] as string | undefined
-    const targetType = fields['targetType'] as string | undefined
+    const targetType = fields['targetType'] as 'task' | 'thread' | undefined
 
     if (targetStatus && currentStatus && targetType) {
-      const transitions = targetType === 'project' ? projectTransitions : taskTransitions
+      const transitions = targetType === 'thread' ? threadTransitions : taskTransitions
       const allowed = transitions[currentStatus] ?? []
       if (!allowed.includes(targetStatus)) {
         errors.push(`${currentStatus} 状态不能转换为 ${targetStatus}`)
+      }
+    }
+
+    if (action === 'promoteToThread') {
+      const taskId = fields['taskId']
+      if (!taskId || typeof taskId !== 'string') {
+        errors.push('taskId 必填')
       }
     }
 
@@ -115,41 +112,63 @@ export function createTasksHooks(manifest: DomainManifest) {
       return { metrics: [], suggestions: [] }
     }
 
-    const name = (event.payload['name'] || event.payload['title'] as string) || '未命名'
+    const title = (event.payload['title'] || event.payload['name'] || '未命名') as string
 
     switch (event.type) {
-      case 'ProjectCreated':
+      case 'ThreadCreated':
         return {
-          metrics: [{ metricKey: 'project_created', value: 1 }],
+          metrics: [{ metricKey: 'thread_created', value: 1 }],
           suggestions: [{
-            actionType: 'complete_task',
-            label: `新项目已创建: ${name}，开始添加任务`,
+            actionType: 'create_task',
+            label: `新主线已创建: ${title}，添加第一个任务`,
             weight: 60,
           }],
         }
 
-      case 'ProjectActivated':
-        return {
-          metrics: [],
-          suggestions: [{ actionType: 'complete_task', label: `项目已激活: ${name}`, weight: 70 }],
-        }
-
-      case 'ProjectCompleted':
-        return {
-          metrics: [{ metricKey: 'project_completed', value: 1 }],
-          suggestions: [{ actionType: 'review_okr', label: `项目已完成: ${name}`, weight: 80 }],
-        }
-
-      case 'ExecutionLogged': {
-        const sourceType = event.payload['sourceType'] as string
-        if (sourceType === 'task') {
-          return { metrics: [], suggestions: [] }
+      case 'TaskCreated': {
+        const clarity = event.payload['clarity'] as string
+        if (clarity === 'fuzzy') {
+          return {
+            metrics: [],
+            suggestions: [{
+              actionType: 'refine_task',
+              label: `新任务很模糊，需要细化: ${title}`,
+              weight: 70,
+            }],
+          }
         }
         return {
-          metrics: [{ metricKey: 'task_execution_needs_update', value: 1 }],
+          metrics: [{ metricKey: 'task_created', value: 1 }],
           suggestions: [],
         }
       }
+
+      case 'TaskActivated':
+      case 'TaskPlanned':
+        return {
+          metrics: [],
+          suggestions: [{
+            actionType: 'complete_task',
+            label: `任务已就绪: ${title}`,
+            weight: 50,
+          }],
+        }
+
+      case 'TaskCompleted':
+        return {
+          metrics: [{ metricKey: 'task_completed', value: 1 }],
+          suggestions: [{
+            actionType: 'review_task',
+            label: `任务已完成: ${title}，进行复盘`,
+            weight: 60,
+          }],
+        }
+
+      case 'ExecutionLogged':
+        return {
+          metrics: [{ metricKey: 'task_execution_logged', value: 1 }],
+          suggestions: [],
+        }
 
       default:
         return { metrics: [], suggestions: [] }
@@ -179,6 +198,30 @@ export function createTasksHooks(manifest: DomainManifest) {
           actionType: 'complete_task',
           category: 'cue',
           weight: task.priority === 'critical' ? 90 : 70,
+        })
+      }
+
+      if ((task as any).clarity === 'fuzzy') {
+        actions.push({
+          id: `task-refine-${task.id}` as unknown as USOM_ID,
+          sourceObjectId: task.id as unknown as USOM_ID,
+          sourceObjectType: 'task',
+          label: `任务需要细化: ${task.title}`,
+          actionType: 'refine_task',
+          category: 'cue',
+          weight: 65,
+        })
+      }
+
+      if ((task as any).decomposition === 'splittable') {
+        actions.push({
+          id: `task-split-${task.id}` as unknown as USOM_ID,
+          sourceObjectId: task.id as unknown as USOM_ID,
+          sourceObjectType: 'task',
+          label: `任务建议拆分: ${task.title}`,
+          actionType: 'split_task',
+          category: 'cue',
+          weight: 55,
         })
       }
     }

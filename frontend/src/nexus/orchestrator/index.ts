@@ -10,7 +10,7 @@
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
-import type { HabitStatus, ObjectiveStatus, TaskStatus, ProjectStatus } from '@/usom/types/primitives'
+import type { HabitStatus, ObjectiveStatus, TaskStatus, ThreadStatus } from '@/usom/types/primitives'
 import type {
   StateProposal,
   SystemEvent,
@@ -31,7 +31,7 @@ import type {
   IObjectiveRepository,
   IKeyResultRepository,
   ITaskRepository,
-  IProjectRepository,
+  IThreadRepository,
   IHabitLogRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
@@ -152,7 +152,7 @@ export interface OrchestratorResult {
  * @property objectiveRepo - 目标仓储（可选）
  * @property keyResultRepo - 关键结果仓储（可选）
  * @property taskRepo - 任务仓储（可选）
- * @property projectRepo - 项目仓储（可选）
+ * @property threadRepo - 主线仓储（可选）
  * @property onTrace - 追踪回调函数（可选）
  */
 export interface OrchestratorDeps {
@@ -167,7 +167,7 @@ export interface OrchestratorDeps {
   objectiveRepo?: IObjectiveRepository
   keyResultRepo?: IKeyResultRepository
   taskRepo?: ITaskRepository
-  projectRepo?: IProjectRepository
+  threadRepo?: IThreadRepository
   onTrace?: (step: TraceStep) => void
 }
 
@@ -935,21 +935,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
 
         const now = new Date().toISOString() as Timestamp
-        const isProjectAction = intent.action.toLowerCase().includes('project')
+        const isThreadAction = intent.action.toLowerCase().includes('thread')
 
-        if (isProjectAction) {
-          // Project 操作
-          if (!deps.projectRepo) {
-            return { success: false, error: 'ProjectRepository 未配置' }
+        if (isThreadAction) {
+          // 主线操作
+          if (!deps.threadRepo) {
+            return { success: false, error: 'ThreadRepository 未配置' }
           }
 
           if (action === 'create') {
-            const transition = getTransitionFromManifest('tasks', 'project', null, 'create')
+            const transition = getTransitionFromManifest('tasks', 'thread', null, 'create')
             if (!transition) {
-              return { success: false, error: '非法状态转换: 项目创建失败' }
+              return { success: false, error: '非法状态转换: 主线创建失败' }
             }
 
-            const project = await deps.projectRepo.create(
+            const thread = await deps.threadRepo.create(
               {
                 name: intent.fields.name as string,
                 description: intent.fields.description as string | undefined,
@@ -966,7 +966,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
               type: transition.eventType as SystemEventType,
               occurredAt: now,
               triggeredBy: 'state_machine',
-              payload: { projectId: project.id, name: project.name, toStatus: transition.to },
+              payload: { threadId: thread.id, name: thread.name, toStatus: transition.to },
               snapshotId: '' as USOM_ID,
             }
             await deps.eventRepo.append(event, userId)
@@ -976,24 +976,24 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           }
 
           // 非 create: 状态转换
-          const projectId = intent.fields.projectId as USOM_ID
-          const existing = await deps.projectRepo.findById(projectId, userId)
+          const threadId = intent.fields.threadId as USOM_ID
+          const existing = await deps.threadRepo.findById(threadId, userId)
           if (!existing) {
-            return { success: false, error: '项目不存在' }
+            return { success: false, error: '主线不存在' }
           }
 
-          const transition = getTransitionFromManifest('tasks', 'project', existing.status, action)
+          const transition = getTransitionFromManifest('tasks', 'thread', existing.status, action)
           if (!transition) {
             return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
           }
 
-          await deps.projectRepo.updateStatus(projectId, transition.to as ProjectStatus, userId)
+          await deps.threadRepo.updateStatus(threadId, transition.to as ThreadStatus, userId)
           const event: SystemEvent = {
             id: crypto.randomUUID() as USOM_ID,
             type: transition.eventType as SystemEventType,
             occurredAt: now,
             triggeredBy: 'state_machine',
-            payload: { projectId, name: existing.name, fromStatus: existing.status, toStatus: transition.to },
+            payload: { threadId, name: existing.name, fromStatus: existing.status, toStatus: transition.to },
             snapshotId: '' as USOM_ID,
           }
           await deps.eventRepo.append(event, userId)
@@ -1009,21 +1009,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return { success: false, error: '非法状态转换: 任务创建失败' }
           }
 
-          const tasks = await deps.taskRepo.bulkCreate([{
+          const created = await deps.taskRepo.create({
             title: intent.fields.title as string,
             description: intent.fields.description as string | undefined,
             priority: (intent.fields.priority ?? 'medium') as import('@/usom/types/primitives').Priority,
             energyRequired: (intent.fields.energyRequired ?? 'medium') as import('@/usom/types/primitives').EnergyLevel,
             estimatedDuration: (intent.fields.estimatedDuration ?? 60) as number,
-            projectId: intent.fields.projectId as USOM_ID | undefined,
+            threadId: intent.fields.threadId as USOM_ID | undefined,
             parentId: intent.fields.parentId as USOM_ID | undefined,
-            frequencyType: intent.fields.frequencyType as 'once' | 'daily' | 'weekly' | 'custom' | undefined,
-            daysOfWeek: intent.fields.daysOfWeek as number[] | undefined,
             startDate: intent.fields.startDate as import('@/usom/types/primitives').DateOnly | undefined,
             endDate: intent.fields.endDate as import('@/usom/types/primitives').DateOnly | undefined,
-          }], userId)
-
-          const created = tasks[0]
+            clarity: (intent.fields.clarity as import('@/usom/types/primitives').ClarityLevel) ?? 'scoped',
+            complexity: (intent.fields.complexity as import('@/usom/types/primitives').ComplexityTag[]) ?? ['routine'],
+            captureMode: 'ad_hoc',
+            tracking: 'none',
+          }, userId)
           if (!created) {
             return { success: false, error: '任务创建失败' }
           }

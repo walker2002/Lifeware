@@ -1,22 +1,84 @@
-# Domain Manifest - Tasks (六区块完整版)
+# Domain Manifest - Tasks (重构版)
 # 遵循 Domain 注册指南 manifest.yaml 模板
 
 id: tasks
-version: 1.1.0
-name: Tasks & Projects
-description: 任务与项目管理 — 将目标分解为可执行的任务单元
+version: 2.0.0
+name: Tasks & Threads
+description: 任务与主线管理 — 从模糊想法到可执行任务的演化系统
 
 # ─── 区块 A: intent_triggers ─────────────────────────────────────
 intent_triggers:
+  # 主线相关
+  - action: createThread
+    shortcut: /createThread
+    description: 创建一条新主线
+    response_type: cnui
+    cnui_surface: thread-creation-card
+    examples:
+      - 创建新主线叫事业进阶
+      - 建立健康管理主线
+    keywords: [主线, thread, 创建]
+
+  - action: promoteToThread
+    shortcut: /promoteToThread
+    description: 将现有任务提升为主线
+    response_type: cnui
+    cnui_surface: thread-promote-card
+    examples:
+      - 把这个任务提升为主线
+      - 设为事业主线
+    keywords: [提升, 主线, promote]
+
+  - action: updateThread
+    shortcut: /updateThread
+    description: 更新主线信息
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 修改主线颜色
+      - 更新主线时间范围
+    keywords: [修改, 更新, edit]
+
+  - action: archiveThread
+    shortcut: /archiveThread
+    description: 归档主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 归档这条主线
+    keywords: [归档, archive]
+
+  # 任务相关
   - action: createTask
     shortcut: /createTask
-    description: 创建一个新任务
+    description: 创建新任务
     response_type: cnui
     cnui_surface: task-creation-card
     examples:
       - 创建一个任务
-      - 添加一个新任务叫"完成报告"
+      - 添加新任务叫完成报告
     keywords: [任务, task, 创建, 添加]
+
+  - action: refineTask
+    shortcut: /refineTask
+    description: AI 帮助细化模糊任务
+    response_type: cnui
+    cnui_surface: task-action-panel
+    examples:
+      - 细化这个任务
+      - 帮我拆解任务
+    keywords: [细化, refine, 拆解]
+
+  - action: splitTask
+    shortcut: /splitTask
+    description: AI 建议拆分可拆分任务
+    response_type: cnui
+    cnui_surface: task-split-card
+    examples:
+      - 拆分这个任务
+      - 建议子任务
+    keywords: [拆分, split, 子任务]
+
   - action: updateTask
     shortcut: /updateTask
     description: 更新任务信息
@@ -25,130 +87,125 @@ intent_triggers:
     examples:
       - 修改任务标题
       - 更新任务优先级
-    keywords: [修改, 更新, edit, update]
+    keywords: [修改, 更新, edit]
+
   - action: completeTask
     shortcut: /completeTask
-    description: 完成一个任务
+    description: 完成任务
     response_type: cnui
     cnui_surface: task-action-panel
     examples:
       - 完成这个任务
       - 标记任务已完成
-    keywords: [完成, complete, done]
+    keywords: [完成, complete]
+
   - action: archiveTask
     shortcut: /archiveTask
-    description: 归档一个任务
+    description: 归档任务
     response_type: cnui
     cnui_surface: task-action-panel
     examples:
       - 归档这个任务
     keywords: [归档, archive]
-  - action: createProject
-    shortcut: /createProject
-    description: 创建一个新项目
+
+  # 查看
+  - action: viewTaskTree
+    shortcut: /tasks
+    description: 查看任务树
     response_type: page
-    view_route: /projects/new
+    view_route: /tasks
     examples:
-      - 创建一个新项目
-      - 新建项目叫"产品重构"
-    keywords: [项目, project, 创建, 新建]
-  - action: updateProject
-    shortcut: /updateProject
-    description: 更新项目信息
-    response_type: page
-    view_route: /projects
-    examples:
-      - 修改项目名称
-      - 更新项目状态
-    keywords: [修改, 更新, edit, update]
-  - action: archiveProject
-    shortcut: /archiveProject
-    description: 归档一个项目
-    response_type: page
-    view_route: /projects
-    examples:
-      - 归档这个项目
-    keywords: [归档, archive]
-  - action: view_list
-    shortcut: /projects
-    description: 查看项目与任务列表
-    response_type: page
-    examples:
-      - 查看所有项目
+      - 查看所有任务
       - 显示任务列表
-    keywords: [项目列表, 任务列表, 查看]
-    view_route: /projects
-  - action: view_detail
-    shortcut: /projectDetail
-    description: 查看项目或任务详情
+    keywords: [任务列表, 查看, 任务树]
+
+  - action: viewTaskDetail
+    shortcut: /taskDetail
+    description: 查看任务详情
     response_type: page
+    view_route: /tasks/[id]
     examples:
-      - 查看项目详情
-      - 打开任务详情
+      - 查看任务详情
+      - 打开任务
     keywords: [详情, detail]
-    view_route: /projects/[id]
+
+  - action: viewThreadDetail
+    shortcut: /threadDetail
+    description: 查看主线详情
+    response_type: page
+    view_route: /threads/[id]
+    examples:
+      - 查看主线详情
+      - 打开主线
+    keywords: [主线, 详情]
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
   task:
-    states: [draft, active, completed, archived]
-    initial_state: draft
+    states: [todo, planned, in_progress, completed, archived]
+    initial_state: todo
     transitions:
       - from: null
-        to: draft
+        to: todo
         trigger: intent
         action: create
         event_type: TaskCreated
-      - from: draft
-        to: active
+      - from: todo
+        to: planned
         trigger: intent
-        action: activate
-        event_type: TaskActivated
-      - from: active
+        action: plan
+        event_type: TaskPlanned
+      - from: planned
+        to: in_progress
+        trigger: intent
+        action: start
+        event_type: TaskStarted
+      - from: todo
+        to: in_progress
+        trigger: intent
+        action: start
+        event_type: TaskStarted
+      - from: in_progress
         to: completed
         trigger: intent
         action: complete
         event_type: TaskCompleted
-      - from: active
-        to: archived
-        trigger: intent
-        action: archive
-        event_type: TaskArchived
-    terminal_states: [completed, archived]
-  project:
-    states: [planning, active, paused, completed, archived]
-    initial_state: planning
-    transitions:
-      - from: null
-        to: planning
-        trigger: intent
-        action: create
-        event_type: ProjectCreated
-      - from: planning
-        to: active
-        trigger: intent
-        action: activate
-        event_type: ProjectActivated
-      - from: active
-        to: paused
-        trigger: intent
-        action: pause
-        event_type: ProjectPaused
-      - from: paused
-        to: active
-        trigger: intent
-        action: resume
-        event_type: ProjectResumed
-      - from: active
-        to: completed
-        trigger: intent
-        action: complete
-        event_type: ProjectCompleted
       - from: completed
         to: archived
         trigger: intent
         action: archive
-        event_type: ProjectArchived
+        event_type: TaskArchived
+    terminal_states: [archived]
+
+  thread:
+    states: [active, paused, completed, archived]
+    initial_state: active
+    transitions:
+      - from: null
+        to: active
+        trigger: intent
+        action: create
+        event_type: ThreadCreated
+      - from: active
+        to: paused
+        trigger: intent
+        action: pause
+        event_type: ThreadPaused
+      - from: paused
+        to: active
+        trigger: intent
+        action: resume
+        event_type: ThreadResumed
+      - from: active
+        to: completed
+        trigger: intent
+        action: complete
+        event_type: ThreadCompleted
+      - from: completed
+        to: archived
+        trigger: intent
+        action: archive
+        event_type: ThreadArchived
     terminal_states: [archived]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
@@ -159,7 +216,7 @@ field_metadata:
     required: true
   name:
     type: string
-    label: 项目名称
+    label: 主线名称
     required: true
   description:
     type: string
@@ -170,6 +227,11 @@ field_metadata:
     label: 优先级
     required: false
     options: [critical, high, medium, low]
+  energyRequired:
+    type: enum
+    label: 所需能量
+    required: false
+    options: [high, medium, low]
   estimatedDuration:
     type: number
     label: 预估时长（分钟）
@@ -178,29 +240,21 @@ field_metadata:
     type: date
     label: 截止日期
     required: false
-  status:
-    type: enum
-    label: 状态
-    required: false
-  targetStatus:
+  color:
     type: string
-    label: 目标状态
-    required: false
-  targetType:
-    type: string
-    label: 目标类型
+    label: 颜色
     required: false
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:
-  - action: activate
-    label: 激活
+  - action: plan
+    label: 计划
+    confirm_required: false
+  - action: start
+    label: 开始
     confirm_required: false
   - action: complete
     label: 完成
-    confirm_required: false
-  - action: pause
-    label: 暂停
     confirm_required: false
   - action: archive
     label: 归档
@@ -231,15 +285,20 @@ required_fields:
       label: 截止日期
       type: date
       required: false
-  createProject:
+
+  createThread:
     - name: name
-      label: 项目名称
+      label: 主线名称
       type: text
       required: true
-      placeholder: 例如：产品重构
+      placeholder: 例如：事业进阶
     - name: description
       label: 描述
       type: textarea
+      required: false
+    - name: color
+      label: 颜色
+      type: color
       required: false
     - name: priority
       label: 优先级
@@ -249,46 +308,41 @@ required_fields:
 
 # ─── 区块 F: subscribed_events ───────────────────────────────────
 subscribed_events:
-  - TimeboxStarted
-  - TimeboxEnded
-  - ProjectCreated
-  - ProjectActivated
-  - ProjectPaused
-  - ProjectResumed
-  - ProjectCompleted
-  - ProjectArchived
+  - ThreadCreated
+  - ThreadPaused
+  - ThreadResumed
+  - ThreadCompleted
+  - ThreadArchived
   - TaskCreated
-  - TaskActivated
+  - TaskPlanned
+  - TaskStarted
   - TaskCompleted
   - TaskArchived
   - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
-  createTask:
-    component: domains/tasks/pages/TaskFormPage
-    url: /tasks/new
-    params:
-      mode: create
-  createProject:
-    component: domains/tasks/pages/ProjectFormPage
-    url: /projects/new
-    params:
-      mode: create
-  # view_list: 手动维护在 app/projects/page.tsx（服务器组件，含数据获取）
+  viewTaskTree:
+    component: domains/tasks/pages/TaskTreePage
+    url: /tasks
+  viewTaskDetail:
+    component: domains/tasks/pages/TaskDetailPage
+    url: /tasks/[id]
+  viewThreadDetail:
+    component: domains/tasks/pages/ThreadDetailPage
+    url: /threads/[id]
 
 # ─── 区块 H: cnui_surfaces ───────────────────────────────────────
 cnui_surfaces:
+  thread-creation-card:
+    handler: ./cnui/handlers
+  thread-promote-card:
+    handler: ./cnui/handlers
   task-creation-card:
     handler: ./cnui/handlers
   task-edit-card:
     handler: ./cnui/handlers
   task-action-panel:
     handler: ./cnui/handlers
-
-# ─── 区块 J: cascade_rules ──────────────────────────────────────
-cascade_rules:
-  - on_event: 'ExecutionLogged'
-    condition: "payload.sourceType == 'timebox'"
-    action: 'log_task_execution'
-    auto_execute: true
+  task-split-card:
+    handler: ./cnui/handlers

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TaskRepository } from '../../../../domains/tasks/repository/task'
-import { Priority, EnergyLevel } from '../../../../usom/types/primitives'
 
 // Mock db
 vi.mock('../../index', () => {
@@ -52,9 +51,9 @@ describe('TaskRepository', () => {
     vi.clearAllMocks()
   })
 
-  describe('findByProject', () => {
-    it('应返回指定项目下的所有任务', async () => {
-      const result = await repo.findByProject('proj-1', userId)
+  describe('findByUserId', () => {
+    it('应返回指定用户的所有任务', async () => {
+      const result = await repo.findByUserId(userId)
       expect(Array.isArray(result)).toBe(true)
     })
   })
@@ -62,13 +61,6 @@ describe('TaskRepository', () => {
   describe('findByParent', () => {
     it('应返回指定父任务下的所有子任务', async () => {
       const result = await repo.findByParent('parent-1', userId)
-      expect(Array.isArray(result)).toBe(true)
-    })
-  })
-
-  describe('findIndependent', () => {
-    it('应返回所有未关联项目的独立任务', async () => {
-      const result = await repo.findIndependent(userId)
       expect(Array.isArray(result)).toBe(true)
     })
   })
@@ -82,19 +74,9 @@ describe('TaskRepository', () => {
 
   describe('updateStatus', () => {
     it('应更新任务状态并返回任务对象', async () => {
-      const result = await repo.updateStatus('task-1', 'active', userId)
+      const result = await repo.updateStatus('task-1', 'todo', userId)
       // 由于 mock 返回空结果, 会抛出错误, 但类型验证通过
       expect(result).toBeDefined()
-    })
-  })
-
-  describe('bulkCreate', () => {
-    it('应批量创建任务', async () => {
-      const result = await repo.bulkCreate([
-        { title: '批量任务1', priority: Priority.Medium, energyRequired: EnergyLevel.Medium, estimatedDuration: 60 },
-        { title: '批量任务2', priority: Priority.High, energyRequired: EnergyLevel.High, estimatedDuration: 120 },
-      ], userId)
-      expect(Array.isArray(result)).toBe(true)
     })
   })
 })

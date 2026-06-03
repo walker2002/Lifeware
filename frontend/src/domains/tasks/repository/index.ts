@@ -1,3 +1,7 @@
+/**
+ * @file index
+ * @brief Tasks Domain 仓储导出
+ */
+
 export { TaskRepository } from './task'
-export { ProjectRepository } from './project'
-export { TaskTemplateRepository } from './task-template'
+export { ThreadRepository } from './thread'

@@ -184,26 +184,22 @@ export type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'dis
 
 /**
  * 任务状态
- * - draft: 草稿
- * - active: 活跃中
- * - scheduled: 已计划（保留用于向后兼容）
+ * - todo: 待办
+ * - planned: 已计划
  * - in_progress: 进行中
- * - on_hold: 暂停中
  * - completed: 已完成
  * - archived: 已归档
- * @deprecated 'scheduled' 已过时，请使用 'in_progress'
  */
-export type TaskStatus = 'draft' | 'active' | 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'archived'
+export type TaskStatus = 'todo' | 'planned' | 'in_progress' | 'completed' | 'archived'
 
 /**
- * 项目状态
- * - planning: 规划中
+ * 线索状态
  * - active: 活跃中
  * - paused: 已暂停
  * - completed: 已完成
  * - archived: 已归档
  */
-export type ProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+export type ThreadStatus = 'active' | 'paused' | 'completed' | 'archived'
 
 /**
  * 习惯状态
@@ -258,6 +254,70 @@ export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
  */
 export type AISessionStatus = 'active' | 'archived' | 'deleted'
 
+// ─── Task Domain Primitives ────────────────────────────────────
+/**
+ * 清晰度等级
+ * - fuzzy: 模糊，仅有大致方向
+ * - scoped: 已界定范围，边界清晰
+ * - actionable: 可执行，可转化为具体任务
+ */
+export type ClarityLevel = 'fuzzy' | 'scoped' | 'actionable'
+
+/**
+ * 复杂度标签
+ * - routine: 常规任务，流程已知
+ * - structure_unknown: 结构未知，需要探索
+ * - multi_step: 多步骤任务
+ * - exploratory: 探索性任务
+ * - creative: 创造性任务
+ */
+export type ComplexityTag = 'routine' | 'structure_unknown' | 'multi_step' | 'exploratory' | 'creative'
+
+/**
+ * 分解等级
+ * - atomic: 原子任务，不可再分
+ * - splittable: 可拆分，但尚未拆分
+ * - splitting_in_progress: 拆分进行中
+ * - decomposed: 已分解为子任务
+ */
+export type DecompositionLevel = 'atomic' | 'splittable' | 'splitting_in_progress' | 'decomposed'
+
+/**
+ * 捕获模式
+ * - scheduled: 计划内捕获
+ * - ad_hoc: 临时捕获
+ * - retrospective: 回顾性捕获
+ */
+export type CaptureMode = 'scheduled' | 'ad_hoc' | 'retrospective'
+
+/**
+ * 能量画像
+ * - light: 轻量任务，低认知负荷
+ * - deep: 深度任务，需要专注
+ * - admin: 行政事务
+ * - creative: 创造性工作
+ * - reactive: 响应式工作
+ */
+export type EnergyProfile = 'light' | 'deep' | 'admin' | 'creative' | 'reactive'
+
+/**
+ * 调度约束
+ * - hard_deadline: 硬性截止日期
+ * - soft_target: 软性目标日期
+ * - opportunistic: 机会性，有空就做
+ * - recurring: 重复性任务
+ */
+export type SchedulingConstraint = 'hard_deadline' | 'soft_target' | 'opportunistic' | 'recurring'
+
+/**
+ * 追踪模式
+ * - none: 不追踪
+ * - check_in: 定期检查
+ * - log: 记录日志
+ * - review: 复盘追踪
+ */
+export type TrackingMode = 'none' | 'check_in' | 'log' | 'review'
+
 // ─── Domain & Action Types ─────────────────────────────────────
 /**
  * 域标识符，用于路由意图到正确的处理模块
@@ -280,6 +340,10 @@ export type ActionType =
   | 'streak_milestone_hint'  // 连续打卡里程碑提示
   | 'habit_risk_warning'     // 习惯风险警告
   | 'complete_task'          // 完成任务
+  | 'create_task'            // 创建任务
+  | 'refine_task'            // 细化任务
+  | 'review_task'            // 复盘任务
+  | 'split_task'             // 拆分任务
   | 'start_timebox'          // 开始时间盒
   | 'review_okr'             // 复盘 OKR
   | 'create_review'          // 创建复盘
@@ -294,7 +358,7 @@ export type USOMObjectType =
   | 'objective' | 'key_result'
   | 'task' | 'habit' | 'habit_log' | 'task_execution_log'
   | 'timebox' | 'review'
-  | 'intention' | 'project'
+  | 'intention' | 'thread'
 
 // ─── External Types (MVP stub) ────────────────────────────────
 /**

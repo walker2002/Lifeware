@@ -65,9 +65,9 @@ vi.mock('../lifecycle-configs', () => ({
     createKeyResult: 'create', updateKeyResult: 'update', updateKeyResultProgress: 'updateProgress', deleteKeyResult: 'deleteDraft',
     create_objective: 'create', create_key_result: 'create',
     createTask: 'create', updateTask: 'update', completeTask: 'complete', archiveTask: 'archive', activateTask: 'activate',
-    createProject: 'create', updateProject: 'update', activateProject: 'activate', pauseProject: 'pause', resumeProject: 'resume',
-    completeProject: 'complete', archiveProject: 'archive',
-    create_task: 'create', create_project: 'create',
+    createThread: 'create', updateThread: 'update', pauseThread: 'pause', resumeThread: 'resume',
+    completeThread: 'complete', archiveThread: 'archive',
+    create_task: 'create', create_thread: 'create',
   }),
   resolveObjectType: (domainId: string, _action: string) => {
     const map: Record<string, string> = { timebox: 'timebox', habits: 'habit', okrs: 'objective', tasks: 'task' }
@@ -97,13 +97,12 @@ vi.mock('../lifecycle-configs', () => ({
         { from: 'active', action: 'complete', to: 'completed', eventType: 'TaskCompleted' },
         { from: 'active', action: 'archive', to: 'archived', eventType: 'TaskArchived' },
       ],
-      project: [
-        { from: null, action: 'create', to: 'planning', eventType: 'ProjectCreated' },
-        { from: 'planning', action: 'activate', to: 'active', eventType: 'ProjectActivated' },
-        { from: 'active', action: 'pause', to: 'paused', eventType: 'ProjectPaused' },
-        { from: 'paused', action: 'resume', to: 'active', eventType: 'ProjectResumed' },
-        { from: 'active', action: 'complete', to: 'completed', eventType: 'ProjectCompleted' },
-        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ProjectArchived' },
+      thread: [
+        { from: null, action: 'create', to: 'active', eventType: 'ThreadCreated' },
+        { from: 'active', action: 'pause', to: 'paused', eventType: 'ThreadPaused' },
+        { from: 'paused', action: 'resume', to: 'active', eventType: 'ThreadResumed' },
+        { from: 'active', action: 'complete', to: 'completed', eventType: 'ThreadCompleted' },
+        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ThreadArchived' },
       ],
     }
     const transitions = lifecycles[objectType] ?? []
@@ -1121,15 +1120,31 @@ describe('Orchestrator — executeIntent 统一入口', () => {
 function createMockTaskRepo() {
   return {
     findById: vi.fn().mockResolvedValue(null),
+    findByUserId: vi.fn().mockResolvedValue([]),
     findByStatus: vi.fn().mockResolvedValue([]),
-    findByTimebox: vi.fn().mockResolvedValue([]),
-    findActive: vi.fn().mockResolvedValue([]),
-    findByProject: vi.fn().mockResolvedValue([]),
+    findByThread: vi.fn().mockResolvedValue([]),
     findByParent: vi.fn().mockResolvedValue([]),
-    findIndependent: vi.fn().mockResolvedValue([]),
-    findAll: vi.fn().mockResolvedValue([]),
+    findActive: vi.fn().mockResolvedValue([]),
+    findByClarity: vi.fn().mockResolvedValue([]),
     findByDateRange: vi.fn().mockResolvedValue([]),
-    save: vi.fn().mockResolvedValue(undefined),
+    findAll: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockImplementation(async (input) => ({
+      id: 'task-new-001' as USOM_ID,
+      status: 'todo',
+      title: input.title,
+      priority: input.priority ?? 'medium',
+      energyRequired: input.energyRequired ?? 'medium',
+      estimatedDuration: input.estimatedDuration ?? 60,
+      tags: [],
+      clarity: 'fuzzy',
+      complexity: [],
+      captureMode: 'ad_hoc',
+      tracking: 'check_in',
+      aiTags: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })),
+    update: vi.fn().mockResolvedValue({}),
     updateStatus: vi.fn().mockImplementation(async (id, status) => ({
       id,
       status,
@@ -1141,32 +1156,21 @@ function createMockTaskRepo() {
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
-    bulkCreate: vi.fn().mockImplementation(async (inputs) =>
-      inputs.map((input: Record<string, unknown>, i: number) => ({
-        id: `task-new-${i}` as USOM_ID,
-        status: 'draft',
-        title: input.title,
-        priority: input.priority ?? 'medium',
-        energyRequired: input.energyRequired ?? 'medium',
-        estimatedDuration: input.estimatedDuration ?? 60,
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }))
-    ),
+    save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
   }
 }
 
-/** 创建 mock ProjectRepository */
-function createMockProjectRepo() {
+/** 创建 mock ThreadRepository */
+function createMockThreadRepo() {
   return {
     findById: vi.fn().mockResolvedValue(null),
     findByUserId: vi.fn().mockResolvedValue([]),
     findByStatus: vi.fn().mockResolvedValue([]),
     create: vi.fn().mockImplementation(async (input) => ({
-      id: 'project-new-001' as USOM_ID,
-      status: 'planning',
+      id: 'thread-new-001' as USOM_ID,
+      status: 'active',
       name: input.name,
       description: input.description,
       priority: input.priority,
@@ -1178,12 +1182,12 @@ function createMockProjectRepo() {
     updateStatus: vi.fn().mockImplementation(async (id, status) => ({
       id,
       status,
-      name: '测试项目',
+      name: '测试主线',
       tags: [],
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
-    saveAsTemplate: vi.fn().mockResolvedValue({}),
+    save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
   }
@@ -1192,7 +1196,7 @@ function createMockProjectRepo() {
 describe('Orchestrator — Tasks 意图分发', () => {
   const userId = 'user-001' as USOM_ID
 
-  it('createTask 意图 → 调用 taskRepo.bulkCreate 并发布 TaskCreated 事件', async () => {
+  it('createTask 意图 → 调用 taskRepo.create 并发布 TaskCreated 事件', async () => {
     const taskIntent: StructuredIntent = {
       id: 'intent-task-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
@@ -1203,7 +1207,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
         priority: 'high',
         energyRequired: 'high',
         estimatedDuration: 120,
-        projectId: 'proj-001',
+        threadId: 'thread-001',
       },
       confidence: 1.0,
       resolvedBy: 'template_form',
@@ -1211,7 +1215,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
     }
 
     const taskRepo = createMockTaskRepo()
-    const projectRepo = createMockProjectRepo()
+    const threadRepo = createMockThreadRepo()
     const ruleEngine = createMockRuleEngine('pass')
     const eventRepo = createMockEventRepo()
 
@@ -1221,14 +1225,14 @@ describe('Orchestrator — Tasks 意图分发', () => {
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       taskRepo,
-      projectRepo,
+      threadRepo,
     })
 
     const result = await orchestrator.executeIntent(taskIntent, userId)
 
     expect(result.success).toBe(true)
-    expect(taskRepo.bulkCreate).toHaveBeenCalledWith(
-      [expect.objectContaining({ title: '完成报告', priority: 'high', projectId: 'proj-001' })],
+    expect(taskRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '完成报告', priority: 'high', threadId: 'thread-001' }),
       userId,
     )
     expect(eventRepo.append).toHaveBeenCalledWith(
@@ -1279,15 +1283,15 @@ describe('Orchestrator — Tasks 意图分发', () => {
     expect(taskRepo.updateStatus).toHaveBeenCalledWith('task-001', 'completed', userId)
   })
 
-  it('createProject 意图 → 调用 projectRepo.create 并发布 ProjectCreated 事件', async () => {
-    const projectIntent: StructuredIntent = {
-      id: 'intent-proj-001' as USOM_ID,
+  it('createThread 意图 → 调用 threadRepo.create 并发布 ThreadCreated 事件', async () => {
+    const threadIntent: StructuredIntent = {
+      id: 'intent-thread-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
       targetDomain: 'tasks',
-      action: 'createProject',
+      action: 'createThread',
       fields: {
         name: '产品重构',
-        description: 'Q3 核心项目',
+        description: 'Q3 核心主线',
         priority: 'high',
       },
       confidence: 1.0,
@@ -1296,7 +1300,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
     }
 
     const taskRepo = createMockTaskRepo()
-    const projectRepo = createMockProjectRepo()
+    const threadRepo = createMockThreadRepo()
     const eventRepo = createMockEventRepo()
 
     const orchestrator = createOrchestrator({
@@ -1305,42 +1309,42 @@ describe('Orchestrator — Tasks 意图分发', () => {
       intentEngine: createMockIntentEngine(),
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo,
-      projectRepo,
+      threadRepo,
     })
 
-    const result = await orchestrator.executeIntent(projectIntent, userId)
+    const result = await orchestrator.executeIntent(threadIntent, userId)
 
     expect(result.success).toBe(true)
-    expect(projectRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ name: '产品重构', description: 'Q3 核心项目' }),
+    expect(threadRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '产品重构', description: 'Q3 核心主线' }),
       userId,
     )
     expect(eventRepo.append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'ProjectCreated' }),
+      expect.objectContaining({ type: 'ThreadCreated' }),
       userId,
     )
   })
 
-  it('archiveProject 意图 → 更新项目状态为 archived', async () => {
-    const existingProject = {
-      id: 'proj-001' as USOM_ID,
+  it('archiveThread 意图 → 更新主线状态为 archived', async () => {
+    const existingThread = {
+      id: 'thread-001' as USOM_ID,
       status: 'completed' as const,
-      name: '已完成项目',
+      name: '已完成主线',
       tags: [],
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: '2026-05-15T08:00:00Z',
     }
-    const projectRepo = createMockProjectRepo()
-    projectRepo.findById.mockResolvedValue(existingProject)
-    projectRepo.updateStatus.mockResolvedValue({ ...existingProject, status: 'archived' })
+    const threadRepo = createMockThreadRepo()
+    threadRepo.findById.mockResolvedValue(existingThread)
+    threadRepo.updateStatus.mockResolvedValue({ ...existingThread, status: 'archived' })
     const eventRepo = createMockEventRepo()
 
     const intent: StructuredIntent = {
-      id: 'intent-arch-p-001' as USOM_ID,
+      id: 'intent-arch-t-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
       targetDomain: 'tasks',
-      action: 'archiveProject',
-      fields: { projectId: 'proj-001' },
+      action: 'archiveThread',
+      fields: { threadId: 'thread-001' },
       confidence: 1.0,
       resolvedBy: 'template_form',
       createdAt: '2026-05-15T09:00:00Z',
@@ -1352,16 +1356,16 @@ describe('Orchestrator — Tasks 意图分发', () => {
       intentEngine: createMockIntentEngine(),
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo: createMockTaskRepo(),
-      projectRepo,
+      threadRepo,
     })
 
     const result = await orchestrator.executeIntent(intent, userId)
 
     expect(result.success).toBe(true)
-    expect(projectRepo.findById).toHaveBeenCalledWith('proj-001', userId)
-    expect(projectRepo.updateStatus).toHaveBeenCalledWith('proj-001', 'archived', userId)
+    expect(threadRepo.findById).toHaveBeenCalledWith('thread-001', userId)
+    expect(threadRepo.updateStatus).toHaveBeenCalledWith('thread-001', 'archived', userId)
     expect(eventRepo.append).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'ProjectArchived' }),
+      expect.objectContaining({ type: 'ThreadArchived' }),
       userId,
     )
   })

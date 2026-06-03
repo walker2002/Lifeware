@@ -3,7 +3,7 @@
 import { HabitListPage } from "@/domains/habits/pages/HabitListPage"
 import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage"
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
-import { ProjectsView } from "@/domains/tasks/components/projects-view"
+import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
 import { ScheduleView } from "@/components/views/schedule-view"
 
 const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
@@ -14,10 +14,10 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
     view_statistics: HabitStatisticsPage,
   },
   tasks: {
-    view_list: ProjectsView,
-    view_detail: ProjectsView,
-    createProject: ProjectsView,
-    createTask: ProjectsView,
+    view_list: TaskTreePage,
+    view_detail: TaskTreePage,
+    createThread: TaskTreePage,
+    createTask: TaskTreePage,
   },
 }
 

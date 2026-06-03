@@ -350,12 +350,8 @@ export async function handleTaskCompletedKRProgress(
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
     if (!kr || kr.status !== "active") return { success: true };
 
-    // 查找关联到此 KR 的所有任务
-    const { db } = await import("@/lib/db");
-    const { tasks } = await import("@/lib/db/schema");
-    const { eq, and } = await import("drizzle-orm");
-    const linkedTasks = await db.select().from(tasks)
-      .where(and(eq(tasks.keyResultId, keyResultId), eq(tasks.userId, MVP_USER_ID)));
+    // TODO: keyResultId 已从 tasks 表移除，需要通过 junction 表重新关联
+    const linkedTasks: any[] = [];
 
     const totalLinked = linkedTasks.length;
     if (totalLinked === 0) return { success: true };
@@ -395,11 +391,8 @@ export async function handleTaskDeletedKRRecalc(
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
     if (!kr || kr.status !== "active") return { success: true };
 
-    const { db } = await import("@/lib/db");
-    const { tasks } = await import("@/lib/db/schema");
-    const { eq, and } = await import("drizzle-orm");
-    const linkedTasks = await db.select().from(tasks)
-      .where(and(eq(tasks.keyResultId, keyResultId), eq(tasks.userId, MVP_USER_ID)));
+    // TODO: keyResultId 已从 tasks 表移除，需要通过 junction 表重新关联
+    const linkedTasks: any[] = [];
 
     const totalLinked = linkedTasks.length;
     if (totalLinked === 0) {

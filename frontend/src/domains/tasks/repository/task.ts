@@ -1,72 +1,67 @@
 /**
  * @file task
- * @brief 任务仓储实现
- * 
- * 实现 ITaskRepository 接口，提供任务数据的数据库操作
+ * @brief 任务仓储实现（重构后）
+ *
+ * 实现 ITaskRepository 接口，支持嵌套任务、主线关联、标签查询
  */
 
-import { eq, and, isNull, gte, lte } from 'drizzle-orm'
+import { eq, and, isNull, inArray, gte, lte } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
-import type { ITaskRepository, CreateTaskInput } from '../../../usom/interfaces/irepository'
+import type { ITaskRepository, CreateTaskInput, UpdateTaskInput, TaskFilters } from '../../../usom/interfaces/irepository'
 import type { Task } from '../../../usom/types/objects'
-import type { USOM_ID, DateOnly } from '../../../usom/types/primitives'
+import type { USOM_ID, DateOnly, Timestamp } from '../../../usom/types/primitives'
+import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 import { taskRowToUSOM, taskUSOMToRow } from '../../../lib/db/repositories/mappers'
-import { v4 } from 'uuid'
 
 /**
  * 任务仓储
  */
 export class TaskRepository implements ITaskRepository {
+  // ─── 查询方法 ──────────────────────────────────────────────────
+
   async findById(id: USOM_ID, userId: USOM_ID): Promise<Task | null> {
     const rows = await db.select().from(s.tasks)
       .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
     return rows[0] ? taskRowToUSOM(rows[0] as any) : null
   }
 
-  async findByStatus(status: Task['status'], userId: USOM_ID): Promise<Task[]> {
+  async findByUserId(userId: USOM_ID, filters?: TaskFilters): Promise<Task[]> {
+    const conditions = [eq(s.tasks.userId, userId)]
+    if (filters?.status) {
+      if (Array.isArray(filters.status)) {
+        conditions.push(inArray(s.tasks.status, filters.status))
+      } else {
+        conditions.push(eq(s.tasks.status, filters.status))
+      }
+    }
+    if (filters?.clarity) conditions.push(eq(s.tasks.clarity, filters.clarity))
+    if (filters?.threadId) conditions.push(eq(s.tasks.threadId, filters.threadId))
+    if (filters?.parentId === null) {
+      conditions.push(isNull(s.tasks.parentId))
+    } else if (filters?.parentId) {
+      conditions.push(eq(s.tasks.parentId, filters.parentId))
+    }
+
     const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.status, status), eq(s.tasks.userId, userId)))
+      .where(and(...conditions))
     return rows.map(r => taskRowToUSOM(r as any))
   }
 
-  async findByTimebox(timeboxId: USOM_ID, userId: USOM_ID): Promise<Task[]> {
-    const junctions = await db.select().from(s.timeboxTasks)
-      .where(eq(s.timeboxTasks.timeboxId, timeboxId))
-    const taskIds = junctions.map(j => j.taskId)
-    if (taskIds.length === 0) return []
-    const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.userId, userId), eq(s.tasks.timeboxId, timeboxId)))
-    return rows.map(r => taskRowToUSOM(r as any))
+  async findByStatus(status: Task['status'], userId: USOM_ID): Promise<Task[]> {
+    return this.findByUserId(userId, { status })
+  }
+
+  async findByParent(parentId: USOM_ID, userId: USOM_ID): Promise<Task[]> {
+    return this.findByUserId(userId, { parentId })
   }
 
   async findActive(userId: USOM_ID): Promise<Task[]> {
     const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.userId, userId), eq(s.tasks.status, 'active')))
-    return rows.map(r => taskRowToUSOM(r as any))
-  }
-
-  async findByProject(projectId: USOM_ID, userId: USOM_ID): Promise<Task[]> {
-    const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.projectId, projectId), eq(s.tasks.userId, userId)))
-    return rows.map(r => taskRowToUSOM(r as any))
-  }
-
-  async findByParent(parentId: USOM_ID, userId: USOM_ID): Promise<Task[]> {
-    const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.parentId, parentId), eq(s.tasks.userId, userId)))
-    return rows.map(r => taskRowToUSOM(r as any))
-  }
-
-  async findIndependent(userId: USOM_ID): Promise<Task[]> {
-    const rows = await db.select().from(s.tasks)
-      .where(and(eq(s.tasks.userId, userId), isNull(s.tasks.projectId)))
-    return rows.map(r => taskRowToUSOM(r as any))
-  }
-
-  async findAll(userId: USOM_ID): Promise<Task[]> {
-    const rows = await db.select().from(s.tasks)
-      .where(eq(s.tasks.userId, userId))
+      .where(and(
+        eq(s.tasks.userId, userId),
+        eq(s.tasks.status, 'todo'),
+      ))
     return rows.map(r => taskRowToUSOM(r as any))
   }
 
@@ -74,10 +69,116 @@ export class TaskRepository implements ITaskRepository {
     const rows = await db.select().from(s.tasks)
       .where(and(
         eq(s.tasks.userId, userId),
-        gte(s.tasks.startDate, start),
-        lte(s.tasks.startDate, end),
+        gte(s.tasks.dueDate, start),
+        lte(s.tasks.dueDate, end),
       ))
     return rows.map(r => taskRowToUSOM(r as any))
+  }
+
+  async findAll(userId: USOM_ID): Promise<Task[]> {
+    return this.findByUserId(userId)
+  }
+
+  // ─── 写入方法 ──────────────────────────────────────────────────
+
+  async create(data: CreateTaskInput, userId: USOM_ID): Promise<Task> {
+    const id = crypto.randomUUID() as USOM_ID
+    const now = new Date().toISOString() as Timestamp
+
+    const task: Task = {
+      id,
+      status: 'todo',
+      title: data.title,
+      description: data.description,
+      priority: data.priority ?? Priority.Medium,
+      energyRequired: data.energyRequired ?? EnergyLevel.Medium,
+      estimatedDuration: data.estimatedDuration,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      threadId: data.threadId,
+      parentId: data.parentId,
+      tags: data.tags ?? [],
+      notes: undefined,
+      createdAt: now,
+      updatedAt: now,
+
+      // AI 维护标签（初始计算）
+      clarity: data.clarity,
+      complexity: data.complexity,
+      decomposition: data.decomposition,
+
+      // 用户管理标签
+      captureMode: data.captureMode,
+      energyProfile: data.energyProfile,
+      schedulingConstraint: data.schedulingConstraint,
+      tracking: data.tracking,
+
+      // AI 辅助扩展
+      aiTags: {},
+    }
+
+    const row = taskUSOMToRow(task, userId)
+    await db.insert(s.tasks).values(row)
+    return task
+  }
+
+  async update(id: USOM_ID, data: UpdateTaskInput, userId: USOM_ID): Promise<Task> {
+    const existing = await this.findById(id, userId)
+    if (!existing) throw new Error(`Task ${id} not found`)
+
+    const updated: Task = {
+      ...existing,
+      ...(data.title !== undefined && { title: data.title }),
+      ...(data.description !== undefined && { description: data.description }),
+      ...(data.priority !== undefined && { priority: data.priority }),
+      ...(data.energyRequired !== undefined && { energyRequired: data.energyRequired }),
+      ...(data.estimatedDuration !== undefined && { estimatedDuration: data.estimatedDuration }),
+      ...(data.dueDate !== undefined && { dueDate: data.dueDate }),
+      ...(data.startDate !== undefined && { startDate: data.startDate }),
+      ...(data.endDate !== undefined && { endDate: data.endDate }),
+      ...(data.threadId !== undefined && { threadId: data.threadId }),
+      ...(data.parentId !== undefined && { parentId: data.parentId }),
+      ...(data.tags !== undefined && { tags: data.tags }),
+      ...(data.recurrence !== undefined && { recurrence: data.recurrence }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+      ...(data.clarity !== undefined && { clarity: data.clarity }),
+      ...(data.complexity !== undefined && { complexity: data.complexity }),
+      ...(data.decomposition !== undefined && { decomposition: data.decomposition }),
+      ...(data.captureMode !== undefined && { captureMode: data.captureMode }),
+      ...(data.energyProfile !== undefined && { energyProfile: data.energyProfile }),
+      ...(data.schedulingConstraint !== undefined && { schedulingConstraint: data.schedulingConstraint }),
+      ...(data.tracking !== undefined && { tracking: data.tracking }),
+      updatedAt: new Date().toISOString() as Timestamp,
+    }
+
+    const row = taskUSOMToRow(updated, userId)
+    await db.update(s.tasks).set(row)
+      .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
+    return updated
+  }
+
+  async updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task> {
+    const existing = await this.findById(id, userId)
+    if (!existing) throw new Error(`Task ${id} not found`)
+
+    const now = new Date()
+    const updates: Record<string, unknown> = {
+      status,
+      updatedAt: now,
+    }
+    if (status === 'completed') updates.completedAt = now
+    if (status === 'archived') updates.archivedAt = now
+
+    await db.update(s.tasks).set(updates)
+      .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
+
+    return {
+      ...existing,
+      status,
+      updatedAt: now.toISOString() as Timestamp,
+      ...(status === 'completed' && { completedAt: now.toISOString() as Timestamp }),
+      ...(status === 'archived' && { archivedAt: now.toISOString() as Timestamp }),
+    }
   }
 
   async save(task: Task, userId: USOM_ID): Promise<void> {
@@ -86,46 +187,6 @@ export class TaskRepository implements ITaskRepository {
       target: s.tasks.id,
       set: row,
     })
-  }
-
-  async updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task> {
-    const updates: Record<string, unknown> = { status, updatedAt: new Date() }
-    if (status === 'completed') updates.completedAt = new Date()
-    if (status === 'archived') updates.archivedAt = new Date()
-    await db.update(s.tasks).set(updates)
-      .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
-    return (await this.findById(id, userId))!
-  }
-
-  async bulkCreate(inputs: CreateTaskInput[], userId: USOM_ID): Promise<Task[]> {
-    const now = new Date()
-    const tasks: Task[] = []
-    for (const input of inputs) {
-      const id = v4()
-      await db.insert(s.tasks).values({
-        id,
-        userId,
-        title: input.title,
-        description: input.description ?? null,
-        priority: input.priority,
-        energyRequired: input.energyRequired,
-        estimatedDuration: input.estimatedDuration,
-        status: 'draft',
-        projectId: input.projectId ?? null,
-        parentId: input.parentId ?? null,
-        frequencyType: input.frequencyType ?? null,
-        daysOfWeek: input.daysOfWeek ?? null,
-        startDate: input.startDate ?? null,
-        endDate: input.endDate ?? null,
-        tags: [],
-        recurrence: null,
-        notes: null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      tasks.push((await this.findById(id, userId))!)
-    }
-    return tasks
   }
 
   async archive(id: USOM_ID, userId: USOM_ID): Promise<void> {

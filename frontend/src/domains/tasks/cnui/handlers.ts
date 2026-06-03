@@ -108,14 +108,19 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
           id: taskId,
           title: title.trim(),
           description: (fields['description'] as string) || undefined,
-          status: 'draft',
+          status: 'todo',
           priority: (fields['priority'] as any) || 'medium',
           energyRequired: (fields['energyRequired'] as any) || 'medium',
           estimatedDuration: (fields['estimatedDuration'] as number) || 30,
           tags: [],
+          clarity: (fields['clarity'] as any) ?? 'scoped',
+          complexity: (fields['complexity'] as any) ?? ['routine'],
+          captureMode: 'ad_hoc',
+          tracking: 'none',
+          aiTags: {},
           createdAt: now,
           updatedAt: now,
-        }, MVP_USER_ID as USOM_ID)
+        } as any, MVP_USER_ID as USOM_ID)
 
         const transition = findTransition(taskTransitions, null, 'create')
         if (transition) {
@@ -224,4 +229,7 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'task-creation-card': taskCnuiHandler,
   'task-edit-card': taskCnuiHandler,
   'task-action-panel': taskCnuiHandler,
+  'thread-creation-card': taskCnuiHandler,
+  'thread-promote-card': taskCnuiHandler,
+  'task-split-card': taskCnuiHandler,
 }

@@ -10,7 +10,9 @@ import type {
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
   CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
-  ProjectStatus, AISessionStatus,
+  ThreadStatus, AISessionStatus,
+  ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
+  EnergyProfile, SchedulingConstraint, TrackingMode,
 } from './primitives'
 
 // ─── 3.1 User ─────────────────────────────────────────────────
@@ -205,6 +207,39 @@ export interface KeyResult {
   updatedAt: Timestamp
 }
 
+// ─── 3.6a Thread ──────────────────────────────────────────────
+/**
+ * 主线接口（替代原 Project）
+ * @property id - 主线唯一标识
+ * @property status - 主线状态
+ * @property name - 主线名称
+ * @property description - 主线描述
+ * @property color - 主线颜色
+ * @property startDate - 开始日期
+ * @property endDate - 结束日期
+ * @property priority - 优先级
+ * @property tags - 标签列表
+ * @property createdAt - 创建时间
+ * @property updatedAt - 更新时间
+ * @property completedAt - 完成时间
+ * @property archivedAt - 归档时间
+ */
+export interface Thread {
+  id: USOM_ID
+  status: ThreadStatus
+  name: string
+  description?: string
+  color?: string
+  startDate?: DateOnly
+  endDate?: DateOnly
+  priority?: Priority
+  tags: Tag[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
+}
+
 // ─── 3.7 Task ─────────────────────────────────────────────────
 /**
  * 任务接口
@@ -214,10 +249,18 @@ export interface KeyResult {
  * @property description - 任务描述
  * @property priority - 优先级
  * @property energyRequired - 能量需求等级
- * @property estimatedDuration - 预计持续时间（分钟）
+ * @property estimatedDuration - 预计持续时间（分钟），模糊任务可为 null
  * @property actualDuration - 实际持续时间（分钟）
- * @property keyResultId - 关联的关键结果ID
- * @property timeboxId - 关联的时间盒ID
+ * @property threadId - 关联的主线ID
+ * @property parentId - 父任务ID（用于任务层级）
+ * @property clarity - 清晰度等级
+ * @property complexity - 复杂度标签列表
+ * @property decomposition - 分解等级
+ * @property captureMode - 捕获模式
+ * @property energyProfile - 能量画像
+ * @property schedulingConstraint - 调度约束
+ * @property tracking - 追踪模式
+ * @property aiTags - AI 辅助扩展数据
  * @property tags - 标签列表
  * @property dueDate - 截止日期
  * @property recurrence - 重复规则
@@ -225,10 +268,6 @@ export interface KeyResult {
  * @property updatedAt - 更新时间
  * @property completedAt - 完成时间
  * @property archivedAt - 归档时间
- * @property parentId - 父任务ID（用于任务层级）
- * @property projectId - 关联的项目ID
- * @property frequencyType - 频率类型
- * @property daysOfWeek - 每周重复的天数
  * @property startDate - 开始日期
  * @property endDate - 结束日期
  * @property lastExecutionRecord - 最近一次执行记录（查询时聚合，非持久化）
@@ -241,10 +280,18 @@ export interface Task {
   description?: string
   priority: Priority
   energyRequired: EnergyLevel
-  estimatedDuration: DurationMinutes
-  actualDuration?: DurationMinutes
-  keyResultId?: USOM_ID
-  timeboxId?: USOM_ID
+  estimatedDuration?: number
+  actualDuration?: number
+  threadId?: USOM_ID
+  parentId?: USOM_ID
+  clarity: ClarityLevel
+  complexity: ComplexityTag[]
+  decomposition?: DecompositionLevel
+  captureMode: CaptureMode
+  energyProfile?: EnergyProfile
+  schedulingConstraint?: SchedulingConstraint
+  tracking: TrackingMode
+  aiTags: Record<string, unknown>
   tags: Tag[]
   dueDate?: DateOnly
   recurrence?: RecurrenceRule
@@ -252,10 +299,6 @@ export interface Task {
   updatedAt: Timestamp
   completedAt?: Timestamp
   archivedAt?: Timestamp
-  parentId?: USOM_ID
-  projectId?: USOM_ID
-  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
-  daysOfWeek?: number[]
   startDate?: DateOnly
   endDate?: DateOnly
   /** 最近一次执行记录（查询时从 task_execution_logs 聚合，非持久化字段） */
@@ -296,93 +339,6 @@ export interface TaskExecutionLog {
   note?: Notes
   loggedAt: Timestamp
   source: 'manual' | 'timebox_sync'
-}
-
-// ─── 3.7a Project ──────────────────────────────────────────────
-/**
- * 项目接口
- * @property id - 项目唯一标识
- * @property status - 项目状态
- * @property name - 项目名称
- * @property description - 项目描述
- * @property startDate - 开始日期
- * @property endDate - 结束日期
- * @property priority - 优先级
- * @property color - 项目颜色
- * @property tags - 标签列表
- * @property notes - 备注
- * @property createdAt - 创建时间
- * @property updatedAt - 更新时间
- * @property completedAt - 完成时间
- * @property archivedAt - 归档时间
- */
-export interface Project {
-  id: USOM_ID
-  status: ProjectStatus
-  name: string
-  description?: string
-  startDate?: DateOnly
-  endDate?: DateOnly
-  priority?: Priority
-  color?: string
-  tags: Tag[]
-  notes?: Notes
-  createdAt: Timestamp
-  updatedAt: Timestamp
-  completedAt?: Timestamp
-  archivedAt?: Timestamp
-}
-
-// ─── 3.7b ProjectTemplate ─────────────────────────────────────
-/**
- * 项目模板接口
- * @property id - 模板唯一标识
- * @property name - 模板名称
- * @property description - 模板描述
- * @property priority - 默认优先级
- * @property color - 默认颜色
- * @property tags - 标签列表
- * @property createdAt - 创建时间
- * @property updatedAt - 更新时间
- */
-export interface ProjectTemplate {
-  id: USOM_ID
-  name: string
-  description?: string
-  priority?: Priority
-  color?: string
-  tags: Tag[]
-  createdAt: Timestamp
-  updatedAt: Timestamp
-}
-
-// ─── 3.7c TaskTemplate ────────────────────────────────────────
-/**
- * 任务模板接口
- * @property id - 模板唯一标识
- * @property projectTemplateId - 关联的项目模板ID
- * @property parentTemplateId - 父任务模板ID
- * @property title - 任务标题
- * @property description - 任务描述
- * @property priority - 默认优先级
- * @property energyRequired - 能量需求等级
- * @property estimatedDuration - 预计持续时间（分钟）
- * @property frequencyType - 频率类型
- * @property sortOrder - 排序顺序
- * @property createdAt - 创建时间
- */
-export interface TaskTemplate {
-  id: USOM_ID
-  projectTemplateId?: USOM_ID
-  parentTemplateId?: USOM_ID
-  title: string
-  description?: string
-  priority?: Priority
-  energyRequired?: EnergyLevel
-  estimatedDuration?: number
-  frequencyType?: 'once' | 'daily' | 'weekly' | 'custom'
-  sortOrder: number
-  createdAt: Timestamp
 }
 
 // MVP stub — type only, no business logic
