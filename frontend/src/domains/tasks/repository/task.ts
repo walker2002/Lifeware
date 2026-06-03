@@ -5,7 +5,7 @@
  * 实现 ITaskRepository 接口，支持嵌套任务、主线关联、标签查询
  */
 
-import { eq, and, isNull, gte, lte } from 'drizzle-orm'
+import { eq, and, isNull, inArray, gte, lte } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { ITaskRepository, CreateTaskInput, UpdateTaskInput, TaskFilters } from '../../../usom/interfaces/irepository'
@@ -28,8 +28,12 @@ export class TaskRepository implements ITaskRepository {
 
   async findByUserId(userId: USOM_ID, filters?: TaskFilters): Promise<Task[]> {
     const conditions = [eq(s.tasks.userId, userId)]
-    if (filters?.status && !Array.isArray(filters.status)) {
-      conditions.push(eq(s.tasks.status, filters.status))
+    if (filters?.status) {
+      if (Array.isArray(filters.status)) {
+        conditions.push(inArray(s.tasks.status, filters.status))
+      } else {
+        conditions.push(eq(s.tasks.status, filters.status))
+      }
     }
     if (filters?.clarity) conditions.push(eq(s.tasks.clarity, filters.clarity))
     if (filters?.threadId) conditions.push(eq(s.tasks.threadId, filters.threadId))

@@ -47,8 +47,9 @@ describe('T015: Tasks manifest.yaml 六区块完整性', () => {
     expect(threadMatch).not.toBeNull()
   })
 
-  it('intent_triggers 应包含 view_list 和 view_detail 的 view_route', () => {
-    expect(manifestContent).toMatch(/view_route:\s*\/projects/)
+  it('intent_triggers 应包含 /tasks 和 /threads 的 view_route', () => {
+    expect(manifestContent).toMatch(/view_route:\s*\/tasks/)
+    expect(manifestContent).toMatch(/view_route:\s*\/threads\/\[id\]/)
   })
 })
 

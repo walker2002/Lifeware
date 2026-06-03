@@ -5,7 +5,7 @@
  * 实现 IThreadRepository 接口，提供主线数据的数据库操作
  */
 
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IThreadRepository, CreateThreadInput, UpdateThreadInput } from '../../../usom/interfaces/irepository'
@@ -27,8 +27,12 @@ export class ThreadRepository implements IThreadRepository {
 
   async findByUserId(userId: USOM_ID, filters?: { status?: Thread['status'] | Thread['status'][] }): Promise<Thread[]> {
     const conditions = [eq(s.threads.userId, userId)]
-    if (filters?.status && !Array.isArray(filters.status)) {
-      conditions.push(eq(s.threads.status, filters.status))
+    if (filters?.status) {
+      if (Array.isArray(filters.status)) {
+        conditions.push(inArray(s.threads.status, filters.status))
+      } else {
+        conditions.push(eq(s.threads.status, filters.status))
+      }
     }
     const rows = await db.select().from(s.threads)
       .where(and(...conditions))

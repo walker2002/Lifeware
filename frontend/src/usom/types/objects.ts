@@ -219,7 +219,6 @@ export interface KeyResult {
  * @property endDate - 结束日期
  * @property priority - 优先级
  * @property tags - 标签列表
- * @property notes - 备注
  * @property createdAt - 创建时间
  * @property updatedAt - 更新时间
  * @property completedAt - 完成时间
@@ -235,7 +234,6 @@ export interface Thread {
   endDate?: DateOnly
   priority?: Priority
   tags: Tag[]
-  notes?: Notes
   createdAt: Timestamp
   updatedAt: Timestamp
   completedAt?: Timestamp
