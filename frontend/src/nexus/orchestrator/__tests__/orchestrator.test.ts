@@ -1120,15 +1120,31 @@ describe('Orchestrator — executeIntent 统一入口', () => {
 function createMockTaskRepo() {
   return {
     findById: vi.fn().mockResolvedValue(null),
+    findByUserId: vi.fn().mockResolvedValue([]),
     findByStatus: vi.fn().mockResolvedValue([]),
-    findByTimebox: vi.fn().mockResolvedValue([]),
-    findActive: vi.fn().mockResolvedValue([]),
     findByThread: vi.fn().mockResolvedValue([]),
     findByParent: vi.fn().mockResolvedValue([]),
-    findIndependent: vi.fn().mockResolvedValue([]),
-    findAll: vi.fn().mockResolvedValue([]),
+    findActive: vi.fn().mockResolvedValue([]),
+    findByClarity: vi.fn().mockResolvedValue([]),
     findByDateRange: vi.fn().mockResolvedValue([]),
-    save: vi.fn().mockResolvedValue(undefined),
+    findAll: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockImplementation(async (input) => ({
+      id: 'task-new-001' as USOM_ID,
+      status: 'todo',
+      title: input.title,
+      priority: input.priority ?? 'medium',
+      energyRequired: input.energyRequired ?? 'medium',
+      estimatedDuration: input.estimatedDuration ?? 60,
+      tags: [],
+      clarity: 'fuzzy',
+      complexity: [],
+      captureMode: 'ad_hoc',
+      tracking: 'check_in',
+      aiTags: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })),
+    update: vi.fn().mockResolvedValue({}),
     updateStatus: vi.fn().mockImplementation(async (id, status) => ({
       id,
       status,
@@ -1140,19 +1156,8 @@ function createMockTaskRepo() {
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
-    bulkCreate: vi.fn().mockImplementation(async (inputs) =>
-      inputs.map((input: Record<string, unknown>, i: number) => ({
-        id: `task-new-${i}` as USOM_ID,
-        status: 'draft',
-        title: input.title,
-        priority: input.priority ?? 'medium',
-        energyRequired: input.energyRequired ?? 'medium',
-        estimatedDuration: input.estimatedDuration ?? 60,
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }))
-    ),
+    save: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
   }
 }
