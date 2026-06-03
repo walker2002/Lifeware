@@ -35,22 +35,22 @@ interface MonthViewProps {
 /** 每天最多显示的事件数量 */
 const MAX_VISIBLE = 4
 
-/** 状态背景色映射 */
+/** 状态背景色映射（CSS 变量令牌，自动适配亮/暗色模式） */
 const STATUS_BG: Record<TimeboxStatus, string> = {
-  planned: "#e6dfd8",
-  running: "#cc785c",
-  overtime: "#f97316",
-  ended: "#8e8b82",
-  cancelled: "#d1d5db",
-  logged: "#5db872",
+  planned: "var(--status-planned-bg)",
+  running: "var(--status-running-bg)",
+  overtime: "var(--status-overtime-bg)",
+  ended: "var(--status-ended-bg)",
+  cancelled: "var(--status-cancelled-bg)",
+  logged: "var(--status-logged-bg)",
 }
 
-/** 边框颜色映射 */
+/** 边框颜色映射（CSS 变量令牌，自动适配亮/暗色模式） */
 const BORDER_COLOR_MAP: Record<string, string> = {
-  "border-l-coral-400": "#e8a090",
-  "border-l-slate-400": "#94a3b8",
-  "border-l-amber-400": "#fbbf24",
-  "border-l-gray-400": "#9ca3af",
+  "border-l-coral-400": "var(--border-coral)",
+  "border-l-slate-400": "var(--border-slate)",
+  "border-l-amber-400": "var(--border-amber)",
+  "border-l-gray-400": "var(--border-gray)",
   "border-l-transparent": "transparent",
 }
 
@@ -203,10 +203,10 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
               : event.status === "running"
                 ? "#ffffff"
                 : "var(--ink)",
+            border: "none",
             borderLeft: event.isMore
               ? "none"
               : `4px solid ${BORDER_COLOR_MAP[getCardBorderColor(event.executionRecord)] ?? "transparent"}`,
-            border: "none",
             borderRadius: "4px",
             padding: "2px 4px",
             fontSize: "12px",

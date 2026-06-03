@@ -37,6 +37,20 @@
   --error-soft: #fde8e8;
   --info-soft: #e8f0f8;
 
+  /* --- 时间盒状态背景色 --- */
+  --status-planned-bg: #e6dfd8;
+  --status-running-bg: #cc785c;
+  --status-overtime-bg: #f97316;
+  --status-ended-bg: #8e8b82;
+  --status-cancelled-bg: #d1d5db;
+  --status-logged-bg: #5db872;
+
+  /* --- 时间盒状态边框色 --- */
+  --border-coral: #e8a090;
+  --border-slate: #94a3b8;
+  --border-amber: #fbbf24;
+  --border-gray: #9ca3af;
+
   /* --- 交互叠加色（UI-DESIGN-SPEC §1.5）--- */
   --hover-overlay: rgba(20,20,19,0.04);
   --pressed-overlay: rgba(20,20,19,0.08);
@@ -226,46 +240,19 @@ body {
 }
 
 /* ========================================================================
-   react-big-calendar 习惯月视图覆盖（确保 dummy row 测量正确）
+   react-big-calendar 月视图覆盖（习惯 & 时间盒共用）
+   使用 CSS 变量令牌，自动适配亮/暗色模式
    ======================================================================== */
 
-.habit-month-calendar { font-family: "Inter", sans-serif; }
-.habit-month-calendar .rbc-header { border-bottom-color: #e6dfd8; }
-.habit-month-calendar .rbc-month-view { border-color: #e6dfd8; }
-.habit-month-calendar .rbc-month-row + .rbc-month-row,
-.habit-month-calendar .rbc-header + .rbc-header { border-color: #ebe6df; }
-.habit-month-calendar .rbc-today { background: #f5f0e8; }
-.habit-month-calendar .rbc-off-range-bg { background: #faf9f5; }
-.habit-month-calendar .rbc-row-segment { padding: 0 1px 1px; }
-.habit-month-calendar .rbc-row-content-scroll-container { overflow: hidden; }
-
-.timebox-month-calendar { font-family: "Inter", sans-serif; }
-.timebox-month-calendar .rbc-header { border-bottom-color: #e6dfd8; }
-.timebox-month-calendar .rbc-month-view { border-color: #e6dfd8; }
-.timebox-month-calendar .rbc-month-row + .rbc-month-row,
-.timebox-month-calendar .rbc-header + .rbc-header { border-color: #ebe6df; }
-.timebox-month-calendar .rbc-today { background: #f5f0e8; }
-.timebox-month-calendar .rbc-off-range-bg { background: #faf9f5; }
-.timebox-month-calendar .rbc-row-segment { padding: 0 1px 1px; }
-.timebox-month-calendar .rbc-row-content-scroll-container { overflow: hidden; }
-
-/* ========================================================================
-   react-big-calendar 暗色模式覆盖
-   ======================================================================== */
-
-.dark .habit-month-calendar .rbc-header { border-bottom-color: var(--hairline); }
-.dark .habit-month-calendar .rbc-month-view { border-color: var(--hairline); }
-.dark .habit-month-calendar .rbc-month-row + .rbc-month-row,
-.dark .habit-month-calendar .rbc-header + .rbc-header { border-color: var(--hairline-soft); }
-.dark .habit-month-calendar .rbc-today { background: var(--surface-soft); }
-.dark .habit-month-calendar .rbc-off-range-bg { background: var(--canvas); }
-
-.dark .timebox-month-calendar .rbc-header { border-bottom-color: var(--hairline); }
-.dark .timebox-month-calendar .rbc-month-view { border-color: var(--hairline); }
-.dark .timebox-month-calendar .rbc-month-row + .rbc-month-row,
-.dark .timebox-month-calendar .rbc-header + .rbc-header { border-color: var(--hairline-soft); }
-.dark .timebox-month-calendar .rbc-today { background: var(--surface-soft); }
-.dark .timebox-month-calendar .rbc-off-range-bg { background: var(--canvas); }
+:is(.habit-month-calendar, .timebox-month-calendar) { font-family: "Inter", sans-serif; }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-header { border-bottom-color: var(--hairline); }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-month-view { border-color: var(--hairline); }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-month-row + .rbc-month-row,
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-header + .rbc-header { border-color: var(--hairline-soft); }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-today { background: var(--surface-soft); }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-off-range-bg { background: var(--canvas); }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-row-segment { padding: 0 1px 1px; }
+:is(.habit-month-calendar, .timebox-month-calendar) .rbc-row-content-scroll-container { overflow: hidden; }
 
 /* ========================================================================
    暗色模式（UI-DESIGN-SPEC §1.6, §12）
@@ -299,6 +286,20 @@ body {
   --warning-soft: #2e2818;
   --error-soft: #2e1818;
   --info-soft: #182838;
+
+  /* --- 时间盒状态背景色（暗色模式）--- */
+  --status-planned-bg: #3a3530;
+  --status-running-bg: #d4886a;
+  --status-overtime-bg: #c46a18;
+  --status-ended-bg: #5a584f;
+  --status-cancelled-bg: #444240;
+  --status-logged-bg: #4a9a5e;
+
+  /* --- 时间盒状态边框色（暗色模式）--- */
+  --border-coral: #b07a68;
+  --border-slate: #7a8a98;
+  --border-amber: #c49a1a;
+  --border-gray: #7a8085;
 
   /* --- 交互叠加色（暗色模式下 light-on-dark）--- */
   --hover-overlay: rgba(250,249,245,0.06);
