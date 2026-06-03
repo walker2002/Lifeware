@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { tasksPlugin } from '../index'
 import { createTasksHooks } from '../hooks'
-import { taskTransitions, projectTransitions, findTransition } from '../transitions'
+import { taskTransitions, threadTransitions, findTransition } from '../transitions'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
 
@@ -38,13 +38,13 @@ describe('T015: Tasks manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toContain('subscribed_events:')
   })
 
-  it('lifecycle 应包含 task 和 project 两个对象定义', () => {
+  it('lifecycle 应包含 task 和 thread 两个对象定义', () => {
     // 验证 task 对象
     const taskMatch = manifestContent.match(/\btask:\s*\n\s+states:/)
     expect(taskMatch).not.toBeNull()
-    // 验证 project 对象
-    const projectMatch = manifestContent.match(/\bproject:\s*\n\s+states:/)
-    expect(projectMatch).not.toBeNull()
+    // 验证 thread 对象
+    const threadMatch = manifestContent.match(/\bthread:\s*\n\s+states:/)
+    expect(threadMatch).not.toBeNull()
   })
 
   it('intent_triggers 应包含 view_list 和 view_detail 的 view_route', () => {
@@ -72,26 +72,26 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       intent_triggers: [],
       lifecycle: {
         task: {
-          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
-          initial_state: 'draft',
+          states: ['todo', 'planned', 'in_progress', 'completed', 'archived'],
+          initial_state: 'todo',
           transitions: [
-            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
-            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
-            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+            { from: null, to: 'todo', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'todo', to: 'planned', trigger: 'intent', action: 'plan', event_type: 'TaskPlanned' },
+            { from: 'planned', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
+            { from: 'in_progress', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
           ],
           terminal_states: ['completed', 'archived'],
         },
-        project: {
-          states: ['planning', 'active', 'paused', 'completed', 'archived'],
-          initial_state: 'planning',
+        thread: {
+          states: ['active', 'paused', 'completed', 'archived'],
+          initial_state: 'active',
           transitions: [
-            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
-            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
-            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
-            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
-            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+            { from: null, to: 'active', trigger: 'intent', action: 'create', event_type: 'ThreadCreated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ThreadPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ThreadResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ThreadCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ThreadArchived' },
           ],
           terminal_states: ['archived'],
         },
@@ -99,7 +99,7 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       field_metadata: {},
       list_actions: [],
       required_fields: {},
-      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+      subscribed_events: ['ThreadCreated', 'ThreadPaused', 'ThreadResumed', 'ThreadCompleted', 'ThreadArchived', 'TaskCreated', 'TaskPlanned', 'TaskStarted', 'TaskCompleted', 'TaskArchived'],
     }
     const hooks = createTasksHooks(mockManifest as any)
     expect(typeof hooks.onValidate).toBe('function')
@@ -116,26 +116,26 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       intent_triggers: [],
       lifecycle: {
         task: {
-          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
-          initial_state: 'draft',
+          states: ['todo', 'planned', 'in_progress', 'completed', 'archived'],
+          initial_state: 'todo',
           transitions: [
-            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
-            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
-            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+            { from: null, to: 'todo', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'todo', to: 'planned', trigger: 'intent', action: 'plan', event_type: 'TaskPlanned' },
+            { from: 'planned', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
+            { from: 'in_progress', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
           ],
           terminal_states: ['completed', 'archived'],
         },
-        project: {
-          states: ['planning', 'active', 'paused', 'completed', 'archived'],
-          initial_state: 'planning',
+        thread: {
+          states: ['active', 'paused', 'completed', 'archived'],
+          initial_state: 'active',
           transitions: [
-            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
-            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
-            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
-            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
-            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+            { from: null, to: 'active', trigger: 'intent', action: 'create', event_type: 'ThreadCreated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ThreadPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ThreadResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ThreadCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ThreadArchived' },
           ],
           terminal_states: ['archived'],
         },
@@ -143,7 +143,7 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       field_metadata: {},
       list_actions: [],
       required_fields: {},
-      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+      subscribed_events: ['ThreadCreated', 'ThreadPaused', 'ThreadResumed', 'ThreadCompleted', 'ThreadArchived', 'TaskCreated', 'TaskPlanned', 'TaskStarted', 'TaskCompleted', 'TaskArchived'],
     }
     const { onValidate } = createTasksHooks(mockManifest as any)
     const result = onValidate(
@@ -156,84 +156,77 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
 })
 
 describe('T017: Tasks transitions.ts 转换表验证', () => {
-  it('taskTransitions 应有 4 条转换', () => {
+  it('taskTransitions 应有 6 条转换', () => {
     expect(Array.isArray(taskTransitions)).toBe(true)
-    expect(taskTransitions.length).toBe(4)
+    expect(taskTransitions.length).toBe(6)
   })
 
-  it('projectTransitions 应有 6 条转换', () => {
-    expect(Array.isArray(projectTransitions)).toBe(true)
-    expect(projectTransitions.length).toBe(6)
+  it('threadTransitions 应有 5 条转换', () => {
+    expect(Array.isArray(threadTransitions)).toBe(true)
+    expect(threadTransitions.length).toBe(5)
   })
 
-  it('taskTransitions: findTransition(null, "create") 返回 { to: "draft", eventType: "TaskCreated" }', () => {
+  it('taskTransitions: findTransition(null, "create") 返回 { to: "todo", eventType: "TaskCreated" }', () => {
     const t = findTransition(taskTransitions, null, 'create')
     expect(t).not.toBeNull()
-    expect(t!.to).toBe('draft')
+    expect(t!.to).toBe('todo')
     expect(t!.eventType).toBe('TaskCreated')
   })
 
-  it('taskTransitions: findTransition("draft", "activate") 返回正确转换', () => {
-    const t = findTransition(taskTransitions, 'draft', 'activate')
+  it('taskTransitions: findTransition("todo", "plan") 返回正确转换', () => {
+    const t = findTransition(taskTransitions, 'todo', 'plan')
     expect(t).not.toBeNull()
-    expect(t!.to).toBe('active')
-    expect(t!.eventType).toBe('TaskActivated')
+    expect(t!.to).toBe('planned')
+    expect(t!.eventType).toBe('TaskPlanned')
   })
 
-  it('taskTransitions: findTransition("active", "complete") 返回正确转换', () => {
-    const t = findTransition(taskTransitions, 'active', 'complete')
+  it('taskTransitions: findTransition("in_progress", "complete") 返回正确转换', () => {
+    const t = findTransition(taskTransitions, 'in_progress', 'complete')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('completed')
     expect(t!.eventType).toBe('TaskCompleted')
   })
 
-  it('taskTransitions: findTransition("active", "archive") 返回正确转换', () => {
-    const t = findTransition(taskTransitions, 'active', 'archive')
+  it('taskTransitions: findTransition("completed", "archive") 返回正确转换', () => {
+    const t = findTransition(taskTransitions, 'completed', 'archive')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('archived')
     expect(t!.eventType).toBe('TaskArchived')
   })
 
-  it('projectTransitions: findTransition(null, "create") 返回 { to: "planning", eventType: "ProjectCreated" }', () => {
-    const t = findTransition(projectTransitions, null, 'create')
-    expect(t).not.toBeNull()
-    expect(t!.to).toBe('planning')
-    expect(t!.eventType).toBe('ProjectCreated')
-  })
-
-  it('projectTransitions: findTransition("planning", "activate") 返回正确转换', () => {
-    const t = findTransition(projectTransitions, 'planning', 'activate')
+  it('threadTransitions: findTransition(null, "create") 返回 { to: "active", eventType: "ThreadCreated" }', () => {
+    const t = findTransition(threadTransitions, null, 'create')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('active')
-    expect(t!.eventType).toBe('ProjectActivated')
+    expect(t!.eventType).toBe('ThreadCreated')
   })
 
-  it('projectTransitions: findTransition("active", "pause") 返回正确转换', () => {
-    const t = findTransition(projectTransitions, 'active', 'pause')
+  it('threadTransitions: findTransition("active", "pause") 返回正确转换', () => {
+    const t = findTransition(threadTransitions, 'active', 'pause')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('paused')
-    expect(t!.eventType).toBe('ProjectPaused')
+    expect(t!.eventType).toBe('ThreadPaused')
   })
 
-  it('projectTransitions: findTransition("paused", "resume") 返回正确转换', () => {
-    const t = findTransition(projectTransitions, 'paused', 'resume')
+  it('threadTransitions: findTransition("paused", "resume") 返回正确转换', () => {
+    const t = findTransition(threadTransitions, 'paused', 'resume')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('active')
-    expect(t!.eventType).toBe('ProjectResumed')
+    expect(t!.eventType).toBe('ThreadResumed')
   })
 
-  it('projectTransitions: findTransition("active", "complete") 返回正确转换', () => {
-    const t = findTransition(projectTransitions, 'active', 'complete')
+  it('threadTransitions: findTransition("active", "complete") 返回正确转换', () => {
+    const t = findTransition(threadTransitions, 'active', 'complete')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('completed')
-    expect(t!.eventType).toBe('ProjectCompleted')
+    expect(t!.eventType).toBe('ThreadCompleted')
   })
 
-  it('projectTransitions: findTransition("completed", "archive") 返回正确转换', () => {
-    const t = findTransition(projectTransitions, 'completed', 'archive')
+  it('threadTransitions: findTransition("completed", "archive") 返回正确转换', () => {
+    const t = findTransition(threadTransitions, 'completed', 'archive')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('archived')
-    expect(t!.eventType).toBe('ProjectArchived')
+    expect(t!.eventType).toBe('ThreadArchived')
   })
 })
 

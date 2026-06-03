@@ -8,6 +8,7 @@ import type {
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
   AISession, ChatMessage, TaskExecutionLog,
+  RecurrenceRule,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -81,7 +82,7 @@ export function taskRowToUSOM(row: TaskRow): Task {
     dueDate: (row.dueDate as DateOnly) ?? undefined,
     startDate: (row.startDate as DateOnly) ?? undefined,
     endDate: (row.endDate as DateOnly) ?? undefined,
-    recurrence: row.recurrence ?? undefined,
+    recurrence: (row.recurrence as RecurrenceRule) ?? undefined,
     tags: row.tags ?? [],
     notes: row.notes ?? undefined,
     parentId: row.parentId ? row.parentId as USOM_ID : undefined,

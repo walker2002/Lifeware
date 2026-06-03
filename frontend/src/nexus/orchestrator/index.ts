@@ -1009,7 +1009,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return { success: false, error: '非法状态转换: 任务创建失败' }
           }
 
-          const tasks = await deps.taskRepo.bulkCreate([{
+          const created = await deps.taskRepo.create({
             title: intent.fields.title as string,
             description: intent.fields.description as string | undefined,
             priority: (intent.fields.priority ?? 'medium') as import('@/usom/types/primitives').Priority,
@@ -1017,13 +1017,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             estimatedDuration: (intent.fields.estimatedDuration ?? 60) as number,
             threadId: intent.fields.threadId as USOM_ID | undefined,
             parentId: intent.fields.parentId as USOM_ID | undefined,
-            frequencyType: intent.fields.frequencyType as 'once' | 'daily' | 'weekly' | 'custom' | undefined,
-            daysOfWeek: intent.fields.daysOfWeek as number[] | undefined,
             startDate: intent.fields.startDate as import('@/usom/types/primitives').DateOnly | undefined,
             endDate: intent.fields.endDate as import('@/usom/types/primitives').DateOnly | undefined,
-          }], userId)
-
-          const created = tasks[0]
+            clarity: (intent.fields.clarity as import('@/usom/types/primitives').ClarityLevel) ?? 'scoped',
+            complexity: (intent.fields.complexity as import('@/usom/types/primitives').ComplexityTag[]) ?? ['routine'],
+            captureMode: 'ad_hoc',
+            tracking: 'none',
+          }, userId)
           if (!created) {
             return { success: false, error: '任务创建失败' }
           }

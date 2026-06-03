@@ -7,12 +7,13 @@
  * T-03: Nexus 组件不直接处理 userId
  */
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode, Notes } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
   AISession, AISessionSummary, ChatMessage, UserSettings, TaskExecutionLog,
+  RecurrenceRule,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
@@ -135,6 +136,12 @@ export interface CreateTaskInput {
   endDate?: DateOnly
   /** 标签列表 */
   tags?: string[]
+  /** 截止日期 */
+  dueDate?: DateOnly
+  /** 重复规则 */
+  recurrence?: RecurrenceRule
+  /** 备注 */
+  notes?: Notes
 }
 
 /** 更新任务输入 */

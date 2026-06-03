@@ -11,6 +11,7 @@ import * as s from '../../../lib/db/schema'
 import type { ITaskRepository, CreateTaskInput, UpdateTaskInput, TaskFilters } from '../../../usom/interfaces/irepository'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID, DateOnly, Timestamp } from '../../../usom/types/primitives'
+import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 import { taskRowToUSOM, taskUSOMToRow } from '../../../lib/db/repositories/mappers'
 
 /**
@@ -85,8 +86,8 @@ export class TaskRepository implements ITaskRepository {
       status: 'todo',
       title: data.title,
       description: data.description,
-      priority: data.priority ?? 'medium',
-      energyRequired: data.energyRequired ?? 'medium',
+      priority: data.priority ?? Priority.Medium,
+      energyRequired: data.energyRequired ?? EnergyLevel.Medium,
       estimatedDuration: data.estimatedDuration,
       startDate: data.startDate,
       endDate: data.endDate,
