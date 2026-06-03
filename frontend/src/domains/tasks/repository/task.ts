@@ -102,16 +102,16 @@ export class TaskRepository implements ITaskRepository {
       createdAt: now,
       updatedAt: now,
 
-      // AI 维护标签（初始计算）
-      clarity: data.clarity,
-      complexity: data.complexity,
+      // AI 维护标签（默认值 + 后续由 AI 计算）
+      clarity: data.clarity ?? 'fuzzy',
+      complexity: data.complexity ?? [],
       decomposition: data.decomposition,
 
-      // 用户管理标签
-      captureMode: data.captureMode,
+      // 用户管理标签（默认值）
+      captureMode: data.captureMode ?? 'ad_hoc',
       energyProfile: data.energyProfile,
       schedulingConstraint: data.schedulingConstraint,
-      tracking: data.tracking,
+      tracking: data.tracking ?? 'check_in',
 
       // AI 辅助扩展
       aiTags: {},

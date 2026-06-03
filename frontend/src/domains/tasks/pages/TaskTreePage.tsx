@@ -7,16 +7,11 @@
 
 'use client'
 
-import { useState } from 'react'
-import type { USOM_ID } from '../../../usom/types/primitives'
-
 /**
  * 任务树页面组件
  * @description 三栏布局：主线列表 + 任务树
  */
 export default function TaskTreePage() {
-  const [selectedThreadId, setSelectedThreadId] = useState<USOM_ID | null>(null)
-
   return (
     <div className="flex h-full">
       {/* 左侧：主线列表 */}

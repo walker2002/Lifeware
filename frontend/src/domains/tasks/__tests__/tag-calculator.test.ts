@@ -9,6 +9,7 @@ import {
   calculateComplexity,
   calculateDecomposition,
   recommendParentComplexity,
+  recalculateAITags,
 } from '../tag-calculator'
 import type { Task } from '../../../usom/types/objects'
 
@@ -53,6 +54,25 @@ describe('calculateClarity', () => {
     expect(calculateClarity(task)).toBe('fuzzy')
   })
 
+  it('description 正好 10 个字符时应返回 scoped（边界：>= 10 视为有意义）', () => {
+    const task = makeTask({ title: '测试', description: '一二三四五六七八九十一' })
+    expect(calculateClarity(task)).toBe('scoped')
+  })
+
+  it('description 9 个字符时应返回 fuzzy', () => {
+    const task = makeTask({ title: '测试', description: '一二三四五六七八九' })
+    expect(calculateClarity(task)).toBe('fuzzy')
+  })
+
+  it('description 超过 10 字符且有意义时应按后续规则判断', () => {
+    const task = makeTask({
+      title: '完成周报',
+      description: '整理本周工作进展并提交',
+      estimatedDuration: 30,
+    })
+    expect(calculateClarity(task)).toBe('actionable')
+  })
+
   it('description 有意义但缺少 estimatedDuration 时应返回 scoped', () => {
     const task = makeTask({
       title: '完成周报',
@@ -83,6 +103,11 @@ describe('calculateComplexity', () => {
     const task = makeTask({ estimatedDuration: 60 })
     expect(calculateComplexity(task)).not.toContain('multi_step')
   })
+
+  it('childCount > 2 时应包含 multi_step', () => {
+    const task = makeTask({ estimatedDuration: 60, aiTags: { childCount: 3 } })
+    expect(calculateComplexity(task)).toContain('multi_step')
+  })
 })
 
 // ─── calculateDecomposition ──────────────────────────────────────
@@ -96,6 +121,38 @@ describe('calculateDecomposition', () => {
   it('duration > 120 且无子任务时应返回 splittable', () => {
     const task = makeTask({ estimatedDuration: 180 })
     expect(calculateDecomposition(task)).toBe('splittable')
+  })
+
+  it('有子任务且未全部完成时应返回 splitting_in_progress', () => {
+    const task = makeTask({
+      estimatedDuration: 200,
+      aiTags: { childCount: 3, childCompletionRate: 0.5 },
+    })
+    expect(calculateDecomposition(task)).toBe('splitting_in_progress')
+  })
+
+  it('有子任务且全部完成时应返回 decomposed', () => {
+    const task = makeTask({
+      estimatedDuration: 200,
+      aiTags: { childCount: 3, childCompletionRate: 1 },
+    })
+    expect(calculateDecomposition(task)).toBe('decomposed')
+  })
+})
+
+// ─── recalculateAITags ────────────────────────────────────────────
+
+describe('recalculateAITags', () => {
+  it('应返回更新后的 clarity/complexity/decomposition', () => {
+    const task = makeTask({
+      title: '完成周报',
+      description: '整理本周工作进展，撰写周报文档并提交给上级',
+      estimatedDuration: 30,
+    })
+    const result = recalculateAITags(task)
+    expect(result.clarity).toBe('actionable')
+    expect(Array.isArray(result.complexity)).toBe(true)
+    expect(result.decomposition).toBeDefined()
   })
 })
 

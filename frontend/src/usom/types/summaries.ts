@@ -6,6 +6,7 @@ import type {
   Priority, EnergyLevel, PeriodType,
   ObjectiveStatus, KeyResultStatus, TaskStatus,
   HabitStatus, TimeboxStatus, IntentionStatus,
+  ClarityLevel, DecompositionLevel,
 } from './primitives'
 
 export interface TaskSummary {
@@ -16,6 +17,10 @@ export interface TaskSummary {
   energyRequired: EnergyLevel
   dueDate?: DateOnly
   keyResultId?: USOM_ID
+  /** 认知清晰度 */
+  clarity?: ClarityLevel
+  /** 拆分建议状态 */
+  decomposition?: DecompositionLevel
 }
 
 export interface HabitSummary {

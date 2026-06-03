@@ -21,7 +21,7 @@ const TaskArraySchema = z.array(z.object({
   priority: z.string(),
   energyRequired: z.string().optional(),
   estimatedDuration: z.number(),
-  projectId: z.string().nullable().optional(),
+  threadId: z.string().nullable().optional(),
 }))
 
 const HabitArraySchema = z.array(z.object({

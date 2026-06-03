@@ -116,20 +116,20 @@ export interface CreateTaskInput {
   threadId?: USOM_ID
   /** 父任务 ID */
   parentId?: USOM_ID
-  /** 清晰度等级 */
-  clarity: ClarityLevel
-  /** 复杂度标签列表 */
-  complexity: ComplexityTag[]
-  /** 分解等级 */
+  /** 清晰度等级（默认 fuzzy，由 Repository 自动计算） */
+  clarity?: ClarityLevel
+  /** 复杂度标签列表（默认 []，由 AI 语义分析补充） */
+  complexity?: ComplexityTag[]
+  /** 分解等级（由 Repository 自动计算） */
   decomposition?: DecompositionLevel
-  /** 捕获模式 */
-  captureMode: CaptureMode
+  /** 捕获模式（默认 ad_hoc） */
+  captureMode?: CaptureMode
   /** 能量画像 */
   energyProfile?: EnergyProfile
   /** 调度约束 */
   schedulingConstraint?: SchedulingConstraint
-  /** 追踪模式 */
-  tracking: TrackingMode
+  /** 追踪模式（默认 check_in） */
+  tracking?: TrackingMode
   /** 开始日期 */
   startDate?: DateOnly
   /** 结束日期 */

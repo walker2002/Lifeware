@@ -30,8 +30,8 @@ describe('SchedulingHandler', () => {
     const request = makeRequest({
       existingTimeboxes: [],
       activeTasks: [
-        { id: 't1', title: '写代码', priority: 'high', energyRequired: 'high', estimatedDuration: 60, projectId: null },
-        { id: 't2', title: '代码审查', priority: 'medium', energyRequired: 'medium', estimatedDuration: 60, projectId: null },
+        { id: 't1', title: '写代码', priority: 'high', energyRequired: 'high', estimatedDuration: 60, threadId: null },
+        { id: 't2', title: '代码审查', priority: 'medium', energyRequired: 'medium', estimatedDuration: 60, threadId: null },
       ],
       pendingHabits: [
         { id: 'h1', title: '晨跑', defaultTime: '07:00', defaultDuration: 30, frequencyType: 'daily' },
@@ -58,7 +58,7 @@ describe('SchedulingHandler', () => {
         },
       ],
       activeTasks: [
-        { id: 't1', title: '任务A', priority: 'P1', energyRequired: 'medium', estimatedDuration: 60, projectId: null },
+        { id: 't1', title: '任务A', priority: 'P1', energyRequired: 'medium', estimatedDuration: 60, threadId: null },
       ],
       pendingHabits: [],
       habitTemplates: [],
@@ -92,7 +92,7 @@ describe('SchedulingHandler', () => {
     const request = makeRequest({
       existingTimeboxes: [],
       activeTasks: [
-        { id: 't1', title: '高能任务', priority: 'high', energyRequired: 'high', estimatedDuration: 60, projectId: null },
+        { id: 't1', title: '高能任务', priority: 'high', energyRequired: 'high', estimatedDuration: 60, threadId: null },
       ],
       pendingHabits: [],
       habitTemplates: [],
@@ -112,7 +112,7 @@ describe('SchedulingHandler', () => {
     const request = makeRequest({
       existingTimeboxes: [],
       activeTasks: [
-        { id: 't1', title: '任务', priority: 'P2', energyRequired: 'low', estimatedDuration: 30, projectId: null },
+        { id: 't1', title: '任务', priority: 'P2', energyRequired: 'low', estimatedDuration: 30, threadId: null },
       ],
       pendingHabits: [
         { id: 'h1', title: '独立习惯', defaultTime: '08:00', defaultDuration: 20, frequencyType: 'daily' },

@@ -201,7 +201,7 @@ export function createTasksHooks(manifest: DomainManifest) {
         })
       }
 
-      if ((task as any).clarity === 'fuzzy') {
+      if (task.clarity === 'fuzzy') {
         actions.push({
           id: `task-refine-${task.id}` as unknown as USOM_ID,
           sourceObjectId: task.id as unknown as USOM_ID,
@@ -213,7 +213,7 @@ export function createTasksHooks(manifest: DomainManifest) {
         })
       }
 
-      if ((task as any).decomposition === 'splittable') {
+      if (task.decomposition === 'splittable') {
         actions.push({
           id: `task-split-${task.id}` as unknown as USOM_ID,
           sourceObjectId: task.id as unknown as USOM_ID,

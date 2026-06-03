@@ -52,18 +52,14 @@ cnuiRegistry.register('tasks', 'task-split-card', {
 const result = loadDomainManifest('tasks')
 
 if (!result.success) {
-  for (const error of result.errors) {
-    console.warn(`[manifest-loader] ${error.domainId}: ${error.message}`)
-  }
+  throw new Error(
+    `[tasks] manifest 加载失败: ${result.errors.map(e => e.message).join(', ')}`,
+  )
 }
 
-const hooks = result.success
-  ? createTasksHooks(result.manifest)
-  : null as any
+const hooks = createTasksHooks(result.manifest)
 
-export const tasksPlugin: DomainPlugin = result.success
-  ? createDomainPlugin(result.manifest, hooks)
-  : null!
+export const tasksPlugin: DomainPlugin = createDomainPlugin(result.manifest, hooks)
 
 export { createTasksHooks } from './hooks'
 export { taskTransitions, threadTransitions, findTransition } from './transitions'
