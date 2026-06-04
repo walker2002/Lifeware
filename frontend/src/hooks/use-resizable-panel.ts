@@ -38,15 +38,16 @@ export function useResizablePanel(options: UseResizablePanelOptions) {
     defaultWidth = DEFAULT_WIDTH,
   } = options
 
-  const [leftWidth, setLeftWidth] = useState(() => {
-    if (typeof window === "undefined") return defaultWidth
+  const [leftWidth, setLeftWidth] = useState(defaultWidth)
+
+  // 客户端首次挂载后从 localStorage 恢复宽度，避免 SSR 水合不匹配
+  useEffect(() => {
     const stored = localStorage.getItem(storageKey)
     if (stored) {
       const num = Number(stored)
-      if (!Number.isNaN(num) && num > 0) return num
+      if (!Number.isNaN(num) && num > 0) setLeftWidth(num)
     }
-    return defaultWidth
-  })
+  }, [storageKey])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const draggingRef = useRef(false)
