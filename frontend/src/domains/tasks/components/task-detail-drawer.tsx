@@ -11,7 +11,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'

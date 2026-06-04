@@ -142,7 +142,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
           </div>
         </div>
 
-        {/* 事后补录：额外时间字段 */}
+        {/* 事后补录：额外时间字段 — TODO: 提取为 <RetrospectiveFields /> 共享组件 */}
         {task.captureMode === 'retrospective' && (
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -236,7 +236,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
           </div>
         </div>
 
-        {/* 事后补录：额外时间字段 */}
+        {/* 事后补录：额外时间字段 — TODO: 提取为 <RetrospectiveFields /> 共享组件 */}
         {task.captureMode === 'retrospective' && (
           <div className="grid grid-cols-3 gap-3">
             <div>

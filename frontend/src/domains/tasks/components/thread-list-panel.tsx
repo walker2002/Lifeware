@@ -101,7 +101,7 @@ export function ThreadListPanel({
   // ─── 合计计数 ────────────────────────────────────────────────
 
   const totalCount = threads.reduce((sum, t) => sum + t.taskCount, 0)
-  const orphanCount = 0 // TODO: 单独查询无主线的任务数量
+  // TODO: 单独查询无主线的任务数量，当前显示为占位符
 
   // IItem 点击处理
   const handleClick = useCallback((threadId: string) => {
@@ -146,7 +146,7 @@ export function ThreadListPanel({
             <FolderOpen className="size-4 text-muted" />
           </div>
           <span className="flex-1 text-sm font-medium text-ink">无主线任务</span>
-          <span className="text-xs text-muted">{orphanCount}</span>
+          <span className="text-xs text-muted-soft">—</span>
         </button>
 
         {/* ─── 分隔线 ────────────────────────────────────────── */}

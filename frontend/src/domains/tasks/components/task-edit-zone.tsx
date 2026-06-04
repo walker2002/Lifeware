@@ -212,6 +212,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
   const saveField = useCallback(async (field: string, value: unknown) => {
     setSavingField(field)
     try {
+      // TODO: title 修改后应触发后端 clarity 重新计算，B 区认知面板需同步刷新
       const updated = await updateTask(task.id, { [field]: value })
       onTaskUpdate(updated)
     } finally {

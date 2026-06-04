@@ -127,6 +127,7 @@ export function TaskTreeView({
   const [loading, setLoading] = useState(true)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [childData, setChildData] = useState<Map<string, Task[]>>(new Map())
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set())
   const [quickAddText, setQuickAddText] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -173,6 +174,7 @@ export function TaskTreeView({
       setLoading(true)
       setExpandedIds(new Set())
       setChildData(new Map())
+      setLoadedIds(new Set())
 
       try {
         const filters: Record<string, unknown> = { parentId: null }
@@ -233,7 +235,7 @@ export function TaskTreeView({
     })
 
     // 如果尚未加载子任务，延迟加载
-    if (!node.loaded && node.childCount > 0) {
+    if (!loadedIds.has(id) && node.childCount > 0) {
       try {
         const children = await getSubtasks(id)
         setChildData(prev => {
@@ -241,12 +243,12 @@ export function TaskTreeView({
           next.set(id, children)
           return next
         })
-        node.loaded = true
+        setLoadedIds(prev => new Set(prev).add(id))
       } catch {
         toast.error('加载子任务失败')
       }
     }
-  }, [])
+  }, [loadedIds])
 
   // ─── 快速添加任务 ──────────────────────────────────────────
 
@@ -531,6 +533,7 @@ function TaskTreeRow({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
+              aria-label="状态变更"
               className={cn('shrink-0 size-4 rounded-full flex items-center justify-center', STATUS_DOT_CLASS[task.status] || 'border border-muted bg-transparent')}>
               {task.status === 'completed' && <Check className="size-2.5 text-on-primary" />}
             </button>
@@ -607,6 +610,7 @@ function TaskTreeRow({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
+              aria-label="更多操作"
               className="shrink-0 size-5 flex items-center justify-center text-muted opacity-0 group-hover:opacity-100 transition-opacity">
               <MoreHorizontal className="size-3.5" />
             </button>
