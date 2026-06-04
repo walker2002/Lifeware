@@ -112,7 +112,6 @@ async function createOKROrchestrator() {
   });
 
   return createOrchestrator({
-    timeboxRepo,
     eventRepo,
     intentEngine: { parse: async () => { throw new Error("not used") } },
     ruleEngine: {
@@ -125,8 +124,6 @@ async function createOKROrchestrator() {
         };
       },
     },
-    objectiveRepo,
-    keyResultRepo,
     getRepo: (domainId: string, objectType: string) => {
       if (domainId === 'okrs') {
         const repo = okrsRepos[objectType]

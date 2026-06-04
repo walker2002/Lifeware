@@ -22,6 +22,7 @@ import { HabitRepository } from "@/domains/habits/repository/habit";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-repo-adapter";
+import { createHabitsGenericRepo } from "@/domains/habits/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
 import { parseHabitWithAI } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
@@ -184,7 +185,6 @@ async function executePipeline(
     const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
 
     const orchestrator = createOrchestrator({
-      timeboxRepo,
       eventRepo,
       intentEngine: { parse: async () => parseResult.intent! },
       ruleEngine: {
@@ -371,7 +371,6 @@ export async function transitionTimebox(
     const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
 
     const orchestrator = createOrchestrator({
-      timeboxRepo,
       eventRepo,
       intentEngine: { parse: async () => { throw new Error("not used") } },
       ruleEngine: {
@@ -409,7 +408,7 @@ export async function transitionTimebox(
     );
 
     // 获取更新后的时间盒用于返回摘要
-    const updatedTimebox = result.timebox;
+    const updatedTimebox = result.object as Timebox | undefined;
 
     return {
       success: result.success,
@@ -656,8 +655,11 @@ export async function submitHabitIntent(
     const habitRepo = await getHabitRepo();
     const eventRepo = new SystemEventRepository();
 
+    const habitsRepos = createHabitsGenericRepo({
+      habitRepo: habitRepo as any,
+      habitLogRepo: undefined as any,
+    });
     const orchestrator = createOrchestrator({
-      timeboxRepo: new TimeboxRepository(),
       eventRepo,
       intentEngine: { parse: async () => { throw new Error("not used") } },
       ruleEngine: {
@@ -667,7 +669,14 @@ export async function submitHabitIntent(
           confirmations: [],
         }),
       },
-      habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits') {
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
     });
 
     const intentionId = crypto.randomUUID();
@@ -691,7 +700,7 @@ export async function submitHabitIntent(
       return { success: false, error: result.error };
     }
 
-    return { success: true, habit: result.habit };
+    return { success: true, habit: result.object as Habit | undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.CREATE_FAILED;
     return { success: false, error: message };
@@ -707,8 +716,11 @@ export async function updateHabitStatus(
     const habitRepo = await getHabitRepo();
     const eventRepo = new SystemEventRepository();
 
+    const habitsRepos = createHabitsGenericRepo({
+      habitRepo: habitRepo as any,
+      habitLogRepo: undefined as any,
+    });
     const orchestrator = createOrchestrator({
-      timeboxRepo: new TimeboxRepository(),
       eventRepo,
       intentEngine: { parse: async () => { throw new Error("not used") } },
       ruleEngine: {
@@ -718,7 +730,14 @@ export async function updateHabitStatus(
           confirmations: [],
         }),
       },
-      habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits') {
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
     });
 
     const now = new Date().toISOString() as Timestamp;
@@ -746,7 +765,7 @@ export async function updateHabitStatus(
       return { success: false, error: result.error };
     }
 
-    return { success: true, habit: result.habit };
+    return { success: true, habit: result.object as Habit | undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.STATUS_UPDATE_FAILED;
     return { success: false, error: message };
@@ -797,8 +816,11 @@ export async function logHabit(
     const { HabitLogRepository } = await import('@/domains/habits/repository/habit-log')
     const habitLogRepo = new HabitLogRepository()
 
+    const habitsRepos = createHabitsGenericRepo({
+      habitRepo: habitRepo as any,
+      habitLogRepo: habitLogRepo as any,
+    })
     const orchestrator = createOrchestrator({
-      timeboxRepo: new TimeboxRepository(),
       eventRepo,
       intentEngine: { parse: async () => { throw new Error('not used') } },
       ruleEngine: {
@@ -808,8 +830,14 @@ export async function logHabit(
           confirmations: [],
         }),
       },
-      habitRepo,
-      habitLogRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits') {
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
     })
 
     const now = new Date().toISOString() as Timestamp
@@ -830,7 +858,7 @@ export async function logHabit(
       return { success: false, error: result.error }
     }
 
-    return { success: true, habit: result.habit }
+    return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : '打卡失败' }
   }
@@ -867,8 +895,11 @@ export async function updateHabit(
     const habitRepo = await getHabitRepo();
     const eventRepo = new SystemEventRepository();
 
+    const habitsRepos = createHabitsGenericRepo({
+      habitRepo: habitRepo as any,
+      habitLogRepo: undefined as any,
+    });
     const orchestrator = createOrchestrator({
-      timeboxRepo: new TimeboxRepository(),
       eventRepo,
       intentEngine: { parse: async () => { throw new Error("not used") } },
       ruleEngine: {
@@ -878,7 +909,14 @@ export async function updateHabit(
           confirmations: [],
         }),
       },
-      habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits') {
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
     });
 
     const now = new Date().toISOString() as Timestamp;
@@ -900,7 +938,7 @@ export async function updateHabit(
       return { success: false, error: result.error };
     }
 
-    return { success: true, habit: result.habit };
+    return { success: true, habit: result.object as Habit | undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.UPDATE_FAILED;
     return { success: false, error: message };
@@ -1019,13 +1057,9 @@ export async function applyTemplate(
   date: string,
 ): Promise<TemplateActionResult> {
   try {
-    const habitRepo = await getHabitRepo();
-    const templateRepo = await getTemplateRepo();
-    const timeboxRepo = new TimeboxRepository();
     const eventRepo = new SystemEventRepository();
 
     const orchestrator = createOrchestrator({
-      timeboxRepo,
       eventRepo,
       intentEngine: { parse: async () => { throw new Error("not used") } },
       ruleEngine: {
@@ -1035,8 +1069,7 @@ export async function applyTemplate(
           confirmations: [],
         }),
       },
-      habitRepo,
-      templateRepo,
+      getRepo: () => { throw new Error('applyTemplate not yet migrated to generic SM') },
     });
 
     const result = await orchestrator.applyTemplate(templateId, date, MVP_USER_ID);
