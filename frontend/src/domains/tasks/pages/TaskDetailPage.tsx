@@ -18,7 +18,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Archive, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
-import { TaskRepository } from '../../tasks/repository/task'
+import { getTaskById, archiveTask } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from '../../tasks/components/task-edit-zone'
 import { SystemCognitionPanel } from '../../tasks/components/system-cognition-panel'
@@ -80,7 +80,6 @@ export default function TaskDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [archiving, setArchiving] = useState(false)
 
-  const repo = useMemo(() => new TaskRepository(), [])
   const userId = 'placeholder' as USOM_ID
 
   // ─── 加载任务 ───
@@ -88,7 +87,7 @@ export default function TaskDetailPage() {
     setLoading(true)
     setNotFound(false)
     try {
-      const t = await repo.findById(taskId, userId)
+      const t = await getTaskById(taskId)
       if (!t) { setNotFound(true); setTask(null) }
       else setTask(t)
     } catch {
@@ -97,7 +96,7 @@ export default function TaskDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [taskId, userId, repo])
+  }, [taskId])
 
   useEffect(() => { loadTask() }, [loadTask])
 
@@ -111,12 +110,12 @@ export default function TaskDetailPage() {
     if (!task) return
     setArchiving(true)
     try {
-      await repo.archive(task.id, userId)
+      await archiveTask(task.id)
       setTask(prev => prev ? { ...prev, status: 'archived' as const } : prev)
     } finally {
       setArchiving(false)
     }
-  }, [task, userId, repo])
+  }, [task])
 
   // ─── 面包屑 ───
   const breadcrumb = useMemo(() => {
@@ -196,7 +195,7 @@ export default function TaskDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* A 区：任务信息编辑 */}
             <div className="lg:col-span-3">
-              <TaskEditZone task={task} repo={repo} onTaskUpdate={handleTaskUpdate} />
+              <TaskEditZone task={task} onTaskUpdate={handleTaskUpdate} />
             </div>
 
             {/* B 区：系统认知面板 */}
@@ -209,7 +208,6 @@ export default function TaskDetailPage() {
           <SubtaskList
             taskId={task.id}
             userId={userId}
-            repo={repo}
             onOpenTask={(id) => router.push(`/tasks/${id}`)}
           />
 
@@ -217,7 +215,6 @@ export default function TaskDetailPage() {
           <TaskCompleteZone
             task={task}
             userId={userId}
-            repo={repo}
             onTaskUpdate={handleTaskUpdate}
           />
         </div>

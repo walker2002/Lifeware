@@ -11,10 +11,10 @@
 import { useState, useCallback } from 'react'
 import { Brain, Cloud, ClipboardList, Sparkles, Flame, Pencil, Check, X } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
-import type { TaskRepository } from '../repository/task'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 import type { TrackingMode } from '../../../usom/types/primitives'
 import { cn } from '@/lib/utils'
+import { updateTask } from '@/app/actions/tasks'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
 
@@ -22,8 +22,6 @@ import { cn } from '@/lib/utils'
 interface TaskEditZoneProps {
   /** 当前任务对象 */
   task: Task
-  /** 任务仓储实例 */
-  repo: TaskRepository
   /** 任务更新回调 */
   onTaskUpdate: (task: Task) => void
 }
@@ -207,19 +205,19 @@ function InlineTextarea({
  * A 区 — 任务信息 inline 编辑区域
  * @param props - 组件属性
  */
-export function TaskEditZone({ task, repo, onTaskUpdate }: TaskEditZoneProps) {
+export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
   const [savingField, setSavingField] = useState<string | null>(null)
 
   /** 通用字段保存 */
   const saveField = useCallback(async (field: string, value: unknown) => {
     setSavingField(field)
     try {
-      const updated = await repo.update(task.id, { [field]: value }, 'placeholder' as any)
+      const updated = await updateTask(task.id, { [field]: value })
       onTaskUpdate(updated)
     } finally {
       setSavingField(null)
     }
-  }, [task.id, repo, onTaskUpdate])
+  }, [task.id, onTaskUpdate])
 
   const EnergyIcon = task.energyProfile ? ENERGY_ICONS[task.energyProfile] : null
 

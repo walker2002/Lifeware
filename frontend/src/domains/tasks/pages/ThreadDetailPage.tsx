@@ -15,9 +15,16 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Pause, Play, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ThreadRepository, type ThreadWithCount } from '../repository/thread'
+import { getThreadById, getThreadWithCount, updateThreadStatus } from '@/app/actions/tasks'
 import { TaskTreeView } from '../components/task-tree-view'
 import type { Thread } from '../../../usom/types/objects'
+
+/** 带任务计数的 Thread 查询结果 */
+interface ThreadWithCount {
+  thread: Thread
+  taskCount: number
+  completedTaskCount: number
+}
 
 /**
  * 主线详情页组件
@@ -29,24 +36,21 @@ export default function ThreadDetailPage() {
   const [thread, setThread] = useState<Thread | null>(null)
   const [counts, setCounts] = useState<ThreadWithCount | null>(null)
   const [loading, setLoading] = useState(true)
-  const repo = new ThreadRepository()
 
   useEffect(() => {
     async function load() {
-      const userId = 'placeholder' as any
-      const t = await repo.findById(id as any, userId)
+      const t = await getThreadById(id)
       if (!t) { setLoading(false); return }
       setThread(t)
-      const all = await repo.findAllWithCount(userId)
-      setCounts(all.find(wc => wc.thread.id === id) ?? null)
+      const wc = await getThreadWithCount(id)
+      setCounts(wc)
       setLoading(false)
     }
     load()
   }, [id])
 
   const handleStatusChange = async (newStatus: Thread['status']) => {
-    const userId = 'placeholder' as any
-    const updated = await repo.updateStatus(thread!.id as any, newStatus, userId)
+    const updated = await updateThreadStatus(thread!.id, newStatus)
     setThread(updated)
   }
 

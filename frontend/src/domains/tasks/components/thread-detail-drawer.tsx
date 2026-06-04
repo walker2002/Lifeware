@@ -12,9 +12,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ExternalLink, Pause, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ThreadRepository, type ThreadWithCount } from '../repository/thread'
+import { getThreadById, getThreadWithCount, createThread, updateThreadStatus } from '@/app/actions/tasks'
 import { TaskTreeView } from './task-tree-view'
 import type { Thread } from '../../../usom/types/objects'
+
+/** 带任务计数的 Thread 查询结果 */
+interface ThreadWithCount {
+  thread: Thread
+  taskCount: number
+  completedTaskCount: number
+}
 
 const PRESET_COLORS = ['#E74C3C', '#E67E22', '#F1C40F', '#2ECC71', '#1ABC9C', '#3498DB', '#9B59B6', '#95A5A6']
 
@@ -41,7 +48,6 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
   const [notFound, setNotFound] = useState(false)
 
   const router = useRouter()
-  const repo = new ThreadRepository()
 
   // ─── 详情模式：加载主线数据 ─────────────────────────────────────────
   useEffect(() => {
@@ -52,16 +58,15 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
       setLoadingDetail(true)
       setNotFound(false)
       try {
-        const userId = 'placeholder' as any
-        const t = await repo.findById(threadId as any, userId)
+        const t = await getThreadById(threadId)
         if (!t) {
           if (!cancelled) { setNotFound(true); setThread(null) }
           return
         }
         if (!cancelled) setThread(t)
 
-        const all = await repo.findAllWithCount(userId)
-        if (!cancelled) setCounts(all.find(wc => wc.thread.id === threadId) ?? null)
+        const wc = await getThreadWithCount(threadId)
+        if (!cancelled) setCounts(wc)
       } catch {
         if (!cancelled) { setNotFound(true); setThread(null) }
       } finally {
@@ -71,18 +76,17 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
 
     load()
     return () => { cancelled = true }
-  }, [isCreate, threadId, repo])
+  }, [isCreate, threadId])
 
   // ─── 状态操作 ─────────────────────────────────────────────────────
   const handleStatusChange = useCallback(async (newStatus: Thread['status']) => {
-    const userId = 'placeholder' as any
     try {
-      const updated = await repo.updateStatus(thread!.id as any, newStatus, userId)
+      const updated = await updateThreadStatus(thread!.id, newStatus)
       setThread(updated)
     } catch {
       // 静默降级
     }
-  }, [thread, repo])
+  }, [thread])
 
   // ─── 创建模式表单状态 ─────────────────────────────────────────────
   const [name, setName] = useState('')
@@ -96,16 +100,15 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
   const handleSave = async () => {
     if (!name.trim()) return
     setSaving(true)
-    const userId = 'placeholder' as any
     try {
-      await repo.create({
+      await createThread({
         name: name.trim(),
         color,
         priority: priority as any || undefined,
         startDate: startDate as any || undefined,
         endDate: endDate as any || undefined,
         description: description || undefined,
-      }, userId)
+      })
       onClose()
     } catch (e) {
       setSaving(false)

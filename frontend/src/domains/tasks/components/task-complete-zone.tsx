@@ -15,8 +15,8 @@
 import { useState, useCallback } from 'react'
 import { CheckCircle2, Clock, FileText, Save, Send, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { updateTask, updateTaskStatus } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
-import type { TaskRepository } from '../repository/task'
 import type { USOM_ID } from '../../../usom/types/primitives'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
@@ -27,8 +27,6 @@ interface TaskCompleteZoneProps {
   task: Task
   /** 当前用户 ID */
   userId: USOM_ID
-  /** 任务仓储实例 */
-  repo: TaskRepository
   /** 任务更新回调 */
   onTaskUpdate: (task: Task) => void
 }
@@ -47,17 +45,17 @@ interface ReviewFormData {
  * D 区 — 任务完成/追踪区域
  * @param props - 组件属性
  */
-export function TaskCompleteZone({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
+export function TaskCompleteZone({ task, userId, onTaskUpdate }: TaskCompleteZoneProps) {
   // 根据 tracking 模式分发
   switch (task.tracking) {
     case 'none':
       return null
     case 'check_in':
-      return <CheckInForm task={task} userId={userId} repo={repo} onTaskUpdate={onTaskUpdate} />
+      return <CheckInForm task={task} onTaskUpdate={onTaskUpdate} />
     case 'log':
-      return <LogForm task={task} userId={userId} repo={repo} onTaskUpdate={onTaskUpdate} />
+      return <LogForm task={task} onTaskUpdate={onTaskUpdate} />
     case 'review':
-      return <ReviewForm task={task} userId={userId} repo={repo} onTaskUpdate={onTaskUpdate} />
+      return <ReviewForm task={task} onTaskUpdate={onTaskUpdate} />
     default:
       return null
   }
@@ -100,7 +98,7 @@ function CompletedSummary({ task }: { task: Task }) {
 /**
  * Check-in 追踪模式：实际用时 + 标记完成
  */
-function CheckInForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
+function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task) => void }) {
   const [actualDuration, setActualDuration] = useState(task.estimatedDuration != null ? String(task.estimatedDuration) : '')
   const [saving, setSaving] = useState(false)
 
@@ -112,12 +110,9 @@ function CheckInForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps
     setSaving(true)
     try {
       const dur = parseInt(actualDuration, 10)
-      const updates: Record<string, unknown> = { status: 'completed' }
-      if (dur && !isNaN(dur)) updates.actualDuration = dur
-      // Use updateStatus for the status change, then update other fields
-      const updated = await repo.updateStatus(task.id, 'completed', userId)
+      const updated = await updateTaskStatus(task.id, 'completed')
       if (dur && !isNaN(dur)) {
-        const updated2 = await repo.update(task.id, { actualDuration: dur } as any, userId)
+        const updated2 = await updateTask(task.id, { actualDuration: dur } as any)
         onTaskUpdate(updated2)
       } else {
         onTaskUpdate(updated)
@@ -125,7 +120,7 @@ function CheckInForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps
     } finally {
       setSaving(false)
     }
-  }, [actualDuration, task.id, userId, repo, onTaskUpdate])
+  }, [actualDuration, task.id, onTaskUpdate])
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">
@@ -193,7 +188,7 @@ function CheckInForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps
 /**
  * Log 追踪模式：实际用时 + 本次产出 + 标记完成
  */
-function LogForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
+function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task) => void }) {
   const [actualDuration, setActualDuration] = useState(task.estimatedDuration != null ? String(task.estimatedDuration) : '')
   const [output, setOutput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -206,12 +201,12 @@ function LogForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
     setSaving(true)
     try {
       const dur = parseInt(actualDuration, 10)
-      const updated = await repo.updateStatus(task.id, 'completed', userId)
+      const updated = await updateTaskStatus(task.id, 'completed')
       const patch: Record<string, unknown> = {}
       if (dur && !isNaN(dur)) patch.actualDuration = dur
       if (output.trim()) patch.notes = output.trim()
       if (Object.keys(patch).length > 0) {
-        const updated2 = await repo.update(task.id, patch as any, userId)
+        const updated2 = await updateTask(task.id, patch as any)
         onTaskUpdate(updated2)
       } else {
         onTaskUpdate(updated)
@@ -219,7 +214,7 @@ function LogForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
     } finally {
       setSaving(false)
     }
-  }, [actualDuration, output, task.id, userId, repo, onTaskUpdate])
+  }, [actualDuration, output, task.id, onTaskUpdate])
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">
@@ -298,7 +293,7 @@ function LogForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
 /**
  * Review 追踪模式：结构化复盘表单 + 保存草稿 + 完成并提交
  */
-function ReviewForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
+function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task) => void }) {
   const [form, setForm] = useState<ReviewFormData>({
     output: '',
     method: '',
@@ -320,25 +315,25 @@ function ReviewForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps)
     setSaving('draft')
     try {
       const notes = buildReviewNotes(form)
-      const updated = await repo.update(task.id, { notes } as any, userId)
+      const updated = await updateTask(task.id, { notes } as any)
       onTaskUpdate(updated)
     } finally {
       setSaving(null)
     }
-  }, [form, task.id, userId, repo, onTaskUpdate])
+  }, [form, task.id, onTaskUpdate])
 
   /** 完成并提交复盘 */
   const handleComplete = useCallback(async () => {
     setSaving('complete')
     try {
       const notes = buildReviewNotes(form)
-      const updated = await repo.updateStatus(task.id, 'completed', userId)
-      const updated2 = await repo.update(task.id, { notes } as any, userId)
+      await updateTaskStatus(task.id, 'completed')
+      const updated2 = await updateTask(task.id, { notes } as any)
       onTaskUpdate(updated2)
     } finally {
       setSaving(null)
     }
-  }, [form, task.id, userId, repo, onTaskUpdate])
+  }, [form, task.id, onTaskUpdate])
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">

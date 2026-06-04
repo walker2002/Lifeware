@@ -10,8 +10,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Loader2, ChevronRight, Circle, CircleDot, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getSubtasks, createTask } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
-import type { TaskRepository } from '../repository/task'
 import type { USOM_ID } from '../../../usom/types/primitives'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
@@ -22,8 +22,6 @@ interface SubtaskListProps {
   taskId: USOM_ID
   /** 当前用户 ID */
   userId: USOM_ID
-  /** 任务仓储实例 */
-  repo: TaskRepository
   /** 打开子任务详情回调 */
   onOpenTask: (taskId: USOM_ID) => void
 }
@@ -71,7 +69,7 @@ const PRIORITY_LABELS: Record<string, string> = {
  * C 区 — 子任务列表组件
  * @param props - 组件属性
  */
-export function SubtaskList({ taskId, userId, repo, onOpenTask }: SubtaskListProps) {
+export function SubtaskList({ taskId, userId, onOpenTask }: SubtaskListProps) {
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
@@ -81,7 +79,7 @@ export function SubtaskList({ taskId, userId, repo, onOpenTask }: SubtaskListPro
   const loadSubtasks = useCallback(async () => {
     setLoading(true)
     try {
-      const list = await repo.findByParent(taskId, userId)
+      const list = await getSubtasks(taskId)
       // 按状态排序：in_progress > planned > todo > completed > archived
       list.sort((a, b) => {
         const orderA = STATUS_ORDER[a.status] ?? 5
@@ -94,7 +92,7 @@ export function SubtaskList({ taskId, userId, repo, onOpenTask }: SubtaskListPro
     } finally {
       setLoading(false)
     }
-  }, [taskId, userId, repo])
+  }, [taskId])
 
   useEffect(() => {
     loadSubtasks()
@@ -106,17 +104,17 @@ export function SubtaskList({ taskId, userId, repo, onOpenTask }: SubtaskListPro
     if (!title) return
     setAdding(true)
     try {
-      await repo.create({
+      await createTask({
         title,
         parentId: taskId,
         threadId: undefined,
-      }, userId)
+      })
       setNewTitle('')
       await loadSubtasks()
     } finally {
       setAdding(false)
     }
-  }, [newTitle, taskId, userId, repo, loadSubtasks])
+  }, [newTitle, taskId, loadSubtasks])
 
   const completedCount = subtasks.filter(t => t.status === 'completed').length
   const total = subtasks.length

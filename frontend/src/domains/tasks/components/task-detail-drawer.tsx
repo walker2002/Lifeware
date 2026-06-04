@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
-import { TaskRepository } from '../repository/task'
+import { getTaskById } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
@@ -82,14 +82,12 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
   const startWidth = useRef(DEFAULT_WIDTH)
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  const repo = useMemo(() => new TaskRepository(), [])
-
   // ─── 加载任务 ───
   const loadTask = useCallback(async () => {
     setLoading(true)
     setNotFound(false)
     try {
-      const t = await repo.findById(taskId, userId)
+      const t = await getTaskById(taskId)
       if (!t) { setNotFound(true); setTask(null) }
       else setTask(t)
     } catch {
@@ -98,7 +96,7 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
     } finally {
       setLoading(false)
     }
-  }, [taskId, userId, repo])
+  }, [taskId])
 
   useEffect(() => { loadTask() }, [loadTask])
 
@@ -231,7 +229,7 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
               )}
 
               {/* ── A 区：任务编辑 ── */}
-              <TaskEditZone task={task} repo={repo} onTaskUpdate={handleTaskUpdate} />
+              <TaskEditZone task={task} onTaskUpdate={handleTaskUpdate} />
 
               {/* ── 小屏：展开按钮 ── */}
               <div className="block sm:hidden">
@@ -250,13 +248,11 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
                     <SubtaskList
                       taskId={task.id}
                       userId={userId}
-                      repo={repo}
                       onOpenTask={(id) => { /* 在小屏中替换当前抽屉内容 */ }}
                     />
                     <TaskCompleteZone
                       task={task}
                       userId={userId}
-                      repo={repo}
                       onTaskUpdate={handleTaskUpdate}
                     />
                   </div>
@@ -272,7 +268,6 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
                 <SubtaskList
                   taskId={task.id}
                   userId={userId}
-                  repo={repo}
                   onOpenTask={() => {}}
                 />
 
@@ -280,7 +275,6 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
                 <TaskCompleteZone
                   task={task}
                   userId={userId}
-                  repo={repo}
                   onTaskUpdate={handleTaskUpdate}
                 />
               </div>

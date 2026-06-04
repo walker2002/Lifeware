@@ -43,7 +43,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { TaskRepository } from '../repository/task'
+import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -130,8 +130,6 @@ export function TaskTreeView({
   const [quickAddText, setQuickAddText] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
-  const repo = useMemo(() => new TaskRepository(), [])
-
   // ─── 键盘快捷键 ──────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -177,33 +175,31 @@ export function TaskTreeView({
       setChildData(new Map())
 
       try {
-        const filters: { parentId: null; threadId?: string } = { parentId: null }
+        const filters: Record<string, unknown> = { parentId: null }
         if (threadId !== '__all__' && threadId !== '__orphan__') {
           filters.threadId = threadId
         } else if (threadId === '__orphan__') {
           // 无主线任务：threadId 为 null
-          ;(filters as any).threadId = undefined
+          filters.threadId = undefined
         }
 
-        const tasks = await repo.findByUserId('placeholder' as any, filters)
+        const tasks = await getTasks(filters)
 
         // 对于 __orphan__，需要额外过滤 threadId === undefined
         let filtered = tasks
         if (threadId === '__orphan__') {
-          // 服务端过滤：只保留没有 threadId 的任务
-          // 注意：这里假设查询本身已做过滤，若未做则在此补充
           filtered = tasks.filter(t => !t.threadId)
         }
 
         // 获取所有根节点的子任务计数
         const parentIds = filtered.map(t => t.id)
-        const childCounts = await repo.getChildCounts(parentIds, 'placeholder' as any)
+        const childCounts = await getChildCounts(parentIds)
 
         const nodes: TreeNode[] = filtered.map(task => ({
           task,
           depth: 0,
           children: [],
-          childCount: childCounts.get(task.id) ?? 0,
+          childCount: childCounts[task.id] ?? 0,
           expanded: false,
           loaded: false,
         }))
@@ -218,7 +214,7 @@ export function TaskTreeView({
 
     load()
     return () => { cancelled = true }
-  }, [threadId, repo])
+  }, [threadId])
 
   // ─── 展开/折叠 ───────────────────────────────────────────────
 
@@ -238,7 +234,7 @@ export function TaskTreeView({
     // 如果尚未加载子任务，延迟加载
     if (!node.loaded && node.childCount > 0) {
       try {
-        const children = await repo.findByParent(id, 'placeholder' as any)
+        const children = await getSubtasks(id)
         setChildData(prev => {
           const next = new Map(prev)
           next.set(id, children)
@@ -249,21 +245,20 @@ export function TaskTreeView({
         // 加载失败静默降级
       }
     }
-  }, [repo])
+  }, [])
 
   // ─── 快速添加任务 ──────────────────────────────────────────
 
   const handleQuickAdd = useCallback(async () => {
     if (!quickAddText.trim() || isCreating) return
     setIsCreating(true)
-    const userId = 'placeholder' as any
     try {
-      const newTask = await repo.create({
+      const newTask = await createTask({
         title: quickAddText.trim(),
         captureMode: 'ad_hoc',
         threadId: threadId !== '__all__' && threadId !== '__orphan__'
           ? threadId as any : undefined,
-      }, userId)
+      })
       setRootNodes(prev => [...prev, {
         task: newTask,
         depth: 0,
@@ -279,20 +274,19 @@ export function TaskTreeView({
     } finally {
       setIsCreating(false)
     }
-  }, [quickAddText, isCreating, repo, threadId])
+  }, [quickAddText, isCreating, threadId])
 
   // ─── 状态变更 ──────────────────────────────────────────────
 
   const handleStatusChange = useCallback(async (taskId: string, newStatus: Task['status']) => {
-    const userId = 'placeholder' as any
     try {
-      await repo.updateStatus(taskId as any, newStatus, userId)
+      await updateTaskStatusAction(taskId, newStatus)
       setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
       toast.success('任务状态已更新')
     } catch {
       toast.error('操作失败，请重试')
     }
-  }, [repo])
+  }, [])
 
   // ─── 渲染 ────────────────────────────────────────────────────
 
@@ -329,7 +323,6 @@ export function TaskTreeView({
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
                   onPromoteToThread={onPromoteToThread}
-                  repo={repo}
                 />
               ))}
             </div>
@@ -372,7 +365,6 @@ interface TaskTreeRowProps {
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
   onPromoteToThread?: (taskId: string) => void
-  repo: TaskRepository
 }
 
 /**
@@ -388,7 +380,6 @@ function SortableTaskRow({
   onOpenTaskDetail,
   onStatusChange,
   onPromoteToThread,
-  repo,
 }: { id: string } & TaskTreeRowProps) {
   const {
     attributes,
@@ -427,7 +418,6 @@ function SortableTaskRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onPromoteToThread={onPromoteToThread}
-          repo={repo}
         />
       </div>
     </div>
@@ -446,7 +436,6 @@ function TaskTreeRow({
   onOpenTaskDetail,
   onStatusChange,
   onPromoteToThread,
-  repo,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
   const isExpanded = expandedIds.has(task.id)
@@ -664,7 +653,6 @@ function TaskTreeRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onPromoteToThread={onPromoteToThread}
-          repo={repo}
         />
       ))}
     </>

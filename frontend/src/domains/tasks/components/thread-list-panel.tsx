@@ -12,7 +12,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListTodo, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ThreadRepository, type ThreadWithCount } from '../repository/thread'
+import { getThreads } from '@/app/actions/tasks'
+import type { Thread } from '../../../usom/types/objects'
+
+/** 带任务计数的 Thread 查询结果 */
+interface ThreadWithCount {
+  thread: Thread
+  taskCount: number
+  completedTaskCount: number
+}
 
 // ═══════════════════════════════════════════════════════════════
 // 类型定义
@@ -71,13 +79,11 @@ export function ThreadListPanel({
 
   useEffect(() => {
     let cancelled = false
-    const repo = new ThreadRepository()
 
     async function load() {
       setLoading(true)
       try {
-        // NOTE: userId 暂时使用占位值，后续接入认证系统
-        const data = await repo.findAllWithCount('placeholder' as any)
+        const data = await getThreads()
         if (!cancelled) setThreads(data)
       } catch {
         // 数据库不可用时静默降级
