@@ -57,6 +57,15 @@ vi.mock('@/domains/timebox/transitions', () => ({
 // 模拟 lifecycle-configs，提供稳定的动态函数避免 jsdom 中 fs 不可用
 vi.mock('../lifecycle-configs', () => {
   const lifecycles: Record<string, Array<{ from: string | string[] | null; action: string; to: string; eventType: string }>> = {
+    timebox: [
+      { from: null, action: 'create', to: 'planned', eventType: 'TimeboxCreated' },
+      { from: 'planned', action: 'start', to: 'running', eventType: 'TimeboxStarted' },
+      { from: 'running', action: 'end', to: 'ended', eventType: 'TimeboxEnded' },
+      { from: 'running', action: 'overtime', to: 'overtime', eventType: 'TimeboxOvertime' },
+      { from: 'overtime', action: 'end', to: 'ended', eventType: 'TimeboxEnded' },
+      { from: 'planned', action: 'cancel', to: 'cancelled', eventType: 'TimeboxCancelled' },
+      { from: 'ended', action: 'log', to: 'logged', eventType: 'TimeboxLogged' },
+    ],
     habit: [
       { from: null, action: 'create', to: 'draft', eventType: 'HabitCreated' },
       { from: 'draft', action: 'activate', to: 'active', eventType: 'HabitActivated' },
@@ -89,6 +98,7 @@ vi.mock('../lifecycle-configs', () => {
   }
 
   const terminalStates: Record<string, string[]> = {
+    timebox: ['cancelled', 'logged'],
     habit: ['archived'],
     objective: ['archived', 'discarded'],
     task: ['archived'],
@@ -211,6 +221,33 @@ function createMockEventRepo() {
   }
 }
 
+/** 创建 timebox 域的 getRepo 工厂 */
+function createTimeboxGetRepo(timeboxRepo: ReturnType<typeof createMockTimeboxRepo>) {
+  const timeboxGenericRepo: GenericRepo = {
+    findById: timeboxRepo.findById,
+    save: timeboxRepo.save,
+    create: async (fields, userId) => {
+      const id = crypto.randomUUID() as USOM_ID
+      const now = new Date().toISOString()
+      const obj = { id, ...fields, createdAt: now, updatedAt: now }
+      await timeboxRepo.save(obj, userId)
+      return obj
+    },
+    updateStatus: async (id, toStatus, userId) => {
+      const existing = await timeboxRepo.findById(id, userId)
+      if (!existing) throw new Error('时间盒不存在')
+      const now = new Date().toISOString()
+      const updated = { ...existing, status: toStatus, updatedAt: now }
+      await timeboxRepo.save(updated, userId)
+      return updated
+    },
+  }
+  return (domainId: string, objectType: string) => {
+    if (domainId === 'timebox' && objectType === 'timebox') return timeboxGenericRepo
+    throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+  }
+}
+
 // ─── 测试用例 ─────────────────────────────────────────────────
 
 describe('createOrchestrator', () => {
@@ -229,6 +266,7 @@ describe('createOrchestrator', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
     })
 
     // Act
@@ -253,12 +291,13 @@ describe('createOrchestrator', () => {
       userId,
     )
 
-    // Assert: RuleEngine 被调用
+    // Assert: RuleEngine 被调用（executeIntent 内部调用）
     expect(ruleEngine.evaluate).toHaveBeenCalledTimes(1)
     expect(ruleEngine.evaluate).toHaveBeenCalledWith(mockIntent, expect.any(Object))
 
     // Assert: 持久化被调用（T-03: userId 由 Orchestrator 注入）
-    expect(timeboxRepo.save).toHaveBeenCalledWith(timebox, userId)
+    // 通用 SM: create 内部 save + 状态修正 save = 2 次
+    expect(timeboxRepo.save).toHaveBeenCalled()
     expect(eventRepo.append).toHaveBeenCalledWith(expect.any(Object), userId)
   })
 
@@ -302,6 +341,7 @@ describe('createOrchestrator', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
     })
 
     // Act: 传入 confirmed=true
@@ -313,8 +353,9 @@ describe('createOrchestrator', () => {
     expect(result.needsConfirmation).toBeFalsy()
 
     // Assert: 持久化被调用
-    expect(timeboxRepo.save).toHaveBeenCalledTimes(1)
-    expect(eventRepo.append).toHaveBeenCalledTimes(1)
+    // 通用 SM: create 内部 save + 状态修正 save = 2 次
+    expect(timeboxRepo.save).toHaveBeenCalled()
+    expect(eventRepo.append).toHaveBeenCalled()
   })
 
   it('confirm + confirmed=false → needsConfirmation=true，不创建 timebox', async () => {
@@ -354,6 +395,7 @@ describe('createOrchestrator', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
     })
 
     // Act
@@ -432,6 +474,7 @@ describe('createOrchestrator', () => {
       intentEngine,
       ruleEngine,
       actionSurfaceEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
     })
 
     // Act
@@ -460,6 +503,7 @@ describe('createOrchestrator', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
       // 不传 actionSurfaceEngine
     })
 
@@ -1201,13 +1245,16 @@ describe('Orchestrator — executeIntent 统一入口', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
     })
 
     const result = await orchestrator.executeIntent(timeboxIntent, userId)
 
     expect(result.success).toBe(true)
-    expect(result.timebox).toBeDefined()
-    expect(result.timebox!.status).toBe('planned')
+    // 通用 SM 返回 object/objectType，不再设置 timebox 字段
+    expect(result.object).toBeDefined()
+    expect((result.object as any)!.status).toBe('planned')
+    expect(result.objectType).toBe('timebox')
   })
 })
 

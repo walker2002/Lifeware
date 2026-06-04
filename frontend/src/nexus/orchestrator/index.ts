@@ -35,7 +35,7 @@ import type {
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOMSnapshot } from '@/usom/types/process'
-import { createTimeboxStateMachine, createGenericStateMachine } from '../core/state-machine'
+import { createGenericStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain, findHandler } from '@/domains/registry'
 import { buildActionMap, resolveObjectType, getLifecycleFromManifest } from './lifecycle-configs'
@@ -321,10 +321,6 @@ function buildQueryResultSummary(intent: StructuredIntent, result: QueryResult):
 export function createOrchestrator(deps: OrchestratorDeps) {
   const eventBus = createEventBus()
   const sessionManager = createAISessionManager()
-  const timeboxSM = createTimeboxStateMachine({
-    timeboxRepo: deps.timeboxRepo as unknown as import('../core/state-machine').StateMachineDeps['timeboxRepo'],
-    eventRepo: deps.eventRepo,
-  })
 
   const orchestrator = {
     eventBus,
@@ -341,55 +337,25 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const intent = await deps.intentEngine.parse(rawInput, userId)
       trace(deps.onTrace, 'IntentEngine', 'end', { input: { rawInput }, output: { intent } })
 
-      const snapshot = createStubSnapshot(userId)
+      // 委托给 executeIntent（统一走通用 SM 路径）
+      const result = await orchestrator.executeIntent(intent, userId, confirmed)
 
-      trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
-      const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
-      trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
+      // 兼容：通用 SM 路径返回 object，旧调用方读取 timebox
+      if (result.success && result.object && result.objectType === 'timebox') {
+        result.timebox = result.object as unknown as Timebox
+      }
 
-      if (ruleResult.result === 'confirm' && !confirmed) {
-        return {
-          success: false,
-          needsConfirmation: true,
-          confirmationMessage: ruleResult.confirmations?.join('; '),
+      // ActionSurface 生成（executeIntent 不处理，由 execute 补充）
+      if (result.success) {
+        const snapshot = createStubSnapshot(userId)
+        trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot } })
+        if (deps.actionSurfaceEngine) {
+          result.actionSurface = await deps.actionSurfaceEngine.generate(snapshot, undefined, userId)
         }
+        trace(deps.onTrace, 'ActionSurfaceEngine', 'end', { input: { snapshot }, output: { actionSurface: result.actionSurface } })
       }
 
-      const proposal: StateProposal = {
-        id: crypto.randomUUID() as USOM_ID,
-        intentId: intent.id,
-        targetObject: { type: 'timebox' },
-        action: toStateMachineAction(intent.action),
-        payload: intent.fields,
-        approvedAt: new Date().toISOString() as Timestamp,
-        approvedBy: 'rule_engine',
-      }
-
-      trace(deps.onTrace, 'StateMachine', 'start', { input: { proposal } })
-      const smResult = await timeboxSM.execute(proposal, eventBus, userId)
-      trace(deps.onTrace, 'StateMachine', 'end', {
-        input: { proposal },
-        output: { success: smResult.success, object: smResult.object },
-        error: smResult.error,
-      })
-
-      if (!smResult.success) {
-        return { success: false, error: smResult.error }
-      }
-
-      trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot, event: smResult.event } })
-      let actionSurface: ActionSurface | undefined
-      if (deps.actionSurfaceEngine) {
-        actionSurface = await deps.actionSurfaceEngine.generate(snapshot, smResult.event, userId)
-      }
-      trace(deps.onTrace, 'ActionSurfaceEngine', 'end', { input: { snapshot }, output: { actionSurface } })
-
-      return {
-        success: true,
-        timebox: smResult.object as Timebox | undefined,
-        actionSurface,
-        warnings: ruleResult.warnings,
-      }
+      return result
     },
 
     /**
@@ -408,8 +374,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       payload: Record<string, unknown> = {},
       confirmed?: boolean,
     ): Promise<OrchestratorResult> {
-      const snapshot = createStubSnapshot(userId)
-
+      // 构造 stub intent 并委托给 executeIntent（统一走通用 SM 路径）
       const stubIntent: StructuredIntent = {
         id: crypto.randomUUID() as USOM_ID,
         intentionId: '' as USOM_ID,
@@ -418,57 +383,18 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         fields: { objectId, ...payload },
         confidence: 1.0,
         resolvedBy: 'template_form',
+        pathType: 'contract',
         createdAt: new Date().toISOString() as Timestamp,
       }
 
-      trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent: stubIntent } })
-      const ruleResult = await deps.ruleEngine.evaluate(stubIntent, snapshot)
-      trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent: stubIntent }, output: { ruleResult } })
+      const result = await orchestrator.executeIntent(stubIntent, userId, confirmed)
 
-      if (ruleResult.result === 'confirm' && !confirmed) {
-        return {
-          success: false,
-          needsConfirmation: true,
-          confirmationMessage: ruleResult.confirmations?.join('; '),
-          warnings: ruleResult.warnings,
-        }
+      // 兼容：通用 SM 路径返回 object，旧调用方读取 timebox
+      if (result.success && result.object && result.objectType === 'timebox') {
+        result.timebox = result.object as unknown as Timebox
       }
 
-      const proposal: StateProposal = {
-        id: crypto.randomUUID() as USOM_ID,
-        intentId: '' as USOM_ID,
-        targetObject: { type: 'timebox', id: objectId },
-        action,
-        payload,
-        approvedAt: new Date().toISOString() as Timestamp,
-        approvedBy: 'rule_engine',
-      }
-
-      trace(deps.onTrace, 'StateMachine', 'start', { input: { proposal } })
-      const smResult = await timeboxSM.execute(proposal, eventBus, userId)
-      trace(deps.onTrace, 'StateMachine', 'end', {
-        input: { proposal },
-        output: { success: smResult.success, object: smResult.object },
-        error: smResult.error,
-      })
-
-      if (!smResult.success) {
-        return { success: false, error: smResult.error }
-      }
-
-      trace(deps.onTrace, 'ActionSurfaceEngine', 'start', { input: { snapshot, event: smResult.event } })
-      let actionSurface: ActionSurface | undefined
-      if (deps.actionSurfaceEngine) {
-        actionSurface = await deps.actionSurfaceEngine.generate(snapshot, smResult.event, userId)
-      }
-      trace(deps.onTrace, 'ActionSurfaceEngine', 'end', { input: { snapshot }, output: { actionSurface } })
-
-      return {
-        success: true,
-        timebox: smResult.object as Timebox | undefined,
-        actionSurface,
-        warnings: ruleResult.warnings,
-      }
+      return result
     },
 
     /**
@@ -531,39 +457,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // 3. 路由到域特定处理
+      // 3. 路由到通用 SM 处理
       const action = toStateMachineAction(intent.action)
 
-      // ─── Timebox 域: 使用旧版 SM（保持兼容） ──────────
-      if (domainId === 'timebox') {
-        const proposal: StateProposal = {
-          id: crypto.randomUUID() as USOM_ID,
-          intentId: intent.id,
-          targetObject: { type: 'timebox' },
-          action,
-          payload: intent.fields,
-          approvedAt: new Date().toISOString() as Timestamp,
-          approvedBy: 'rule_engine',
-        }
-
-        const smResult = await timeboxSM.execute(proposal, eventBus, userId)
-        if (!smResult.success) {
-          return { success: false, error: smResult.error }
-        }
-
-        // 域插件 onEvent 回调
-        if (domain && smResult.event) {
-          await domain.onEvent(smResult.event, usomSnapshot)
-        }
-
-        return {
-          success: true,
-          timebox: smResult.object as Timebox | undefined,
-          warnings: ruleResult.warnings,
-        }
-      }
-
-      // ─── 通用 SM 路径（已迁移的域） ─────────────────────
+      // ─── 通用 SM 路径（所有已迁移的域） ─────────────────────
       if (deps.getRepo) {
         const smObjectType = getObjectType(intent)
         const repo = deps.getRepo(domainId, smObjectType)

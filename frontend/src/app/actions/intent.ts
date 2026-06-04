@@ -21,6 +21,7 @@ import { IntentionRepository } from "@/lib/db/repositories/intention.repository"
 import { HabitRepository } from "@/domains/habits/repository/habit";
 import { createOrchestrator } from "../../nexus/orchestrator";
 import { createRuleEngine } from "../../nexus/core/rule-engine";
+import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
 import { parseHabitWithAI } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
@@ -180,6 +181,8 @@ async function executePipeline(
     const eventRepo = new SystemEventRepository();
     const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
+    const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
@@ -195,6 +198,14 @@ async function executePipeline(
         },
       },
       actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'timebox') {
+          const repo = timeboxRepos[objectType]
+          if (!repo) throw new Error(`未找到 Timebox repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
       onTrace: logger?.onTrace,
     });
 
@@ -357,6 +368,8 @@ export async function transitionTimebox(
     const eventRepo = new SystemEventRepository();
     const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
+    const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
@@ -372,6 +385,14 @@ export async function transitionTimebox(
         },
       },
       actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'timebox') {
+          const repo = timeboxRepos[objectType]
+          if (!repo) throw new Error(`未找到 Timebox repo: ${objectType}`)
+          return repo
+        }
+        throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
     });
 
     const payload: Record<string, unknown> = {};
