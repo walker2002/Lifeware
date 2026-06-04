@@ -9,6 +9,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ListTodo, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThreadRepository, type ThreadWithCount } from '../repository/thread'
@@ -49,8 +50,22 @@ export function ThreadListPanel({
   onSelectThread,
   onOpenThreadDetail,
 }: ThreadListPanelProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const curClarity = searchParams.get('clarity') ?? ''
+  const curStatus = searchParams.get('status') ?? ''
+
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
+
+  // ─── 筛选参数更新 ────────────────────────────────────────────
+
+  const updateFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set(key, value)
+    else params.delete(key)
+    router.push(`/tasks?${params.toString()}`, { scroll: false })
+  }
 
   // ─── 数据加载 ────────────────────────────────────────────────
 
@@ -184,11 +199,48 @@ export function ThreadListPanel({
         )}
       </nav>
 
-      {/* ═══ 底部筛选区域（占位） ═══════════════════════════════ */}
-      <footer className="border-t border-hairline px-4 py-3">
-        <p className="text-xs text-muted">
-          筛选：状态 · 优先级 · 日期
-        </p>
+      {/* ═══ 底部筛选区域 ═══════════════════════════════════ */}
+      <footer className="border-t border-hairline-soft px-3 py-3 space-y-2">
+        <div>
+          <p className="text-[10px] text-muted-soft mb-1">clarity</p>
+          <div className="flex flex-wrap gap-1">
+            {['', 'fuzzy', 'scoped', 'actionable'].map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => updateFilter('clarity', v)}
+                className={cn(
+                  'rounded px-2 py-0.5 text-[11px] transition-colors',
+                  curClarity === v
+                    ? 'bg-surface-cream-strong text-ink font-medium'
+                    : 'text-muted hover:bg-surface-soft',
+                )}
+              >
+                {v || '全部'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-soft mb-1">status</p>
+          <div className="flex flex-wrap gap-1">
+            {['', 'todo', 'planned', 'in_progress', 'completed'].map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => updateFilter('status', v)}
+                className={cn(
+                  'rounded px-2 py-0.5 text-[11px] transition-colors',
+                  curStatus === v
+                    ? 'bg-surface-cream-strong text-ink font-medium'
+                    : 'text-muted hover:bg-surface-soft',
+                )}
+              >
+                {v || '全部'}
+              </button>
+            ))}
+          </div>
+        </div>
       </footer>
     </div>
   )
