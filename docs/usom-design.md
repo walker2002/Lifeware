@@ -455,6 +455,8 @@ interface Task {
   completedAt?:          Timestamp
   archivedAt?:           Timestamp
   notes?:                Notes
+  acceptance_criteria?:  string             // 验收标准（占位）
+  expected_output?:      string             // 预期产出物描述（占位）
 }
 
 type TaskStatus = 'draft' | 'active' | 'in_progress' | 'on_hold' | 'completed' | 'archived'
