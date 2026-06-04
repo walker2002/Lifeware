@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ExternalLink, Pause, Play } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getThreadById, getThreadWithCount, createThread, updateThreadStatus } from '@/app/actions/tasks'
 import { TaskTreeView } from './task-tree-view'
@@ -84,7 +85,7 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
       const updated = await updateThreadStatus(thread!.id, newStatus)
       setThread(updated)
     } catch {
-      // 静默降级
+      toast.error('操作失败，请重试')
     }
   }, [thread])
 
@@ -244,7 +245,7 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 z-30 bg-[rgba(20,20,19,0.3)]" onClick={onClose} />
+      <div className="fixed inset-0 z-30 bg-scrim" onClick={onClose} />
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 z-40 h-full w-[480px] bg-canvas shadow-lg border-l border-hairline flex flex-col">
@@ -287,7 +288,7 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
                       className="size-8 rounded-md border-2 transition-colors hover:scale-110"
                       style={{
                         backgroundColor: c,
-                        borderColor: c === color ? '#141413' : 'transparent',
+                        borderColor: c === color ? 'var(--ink)' : 'transparent',
                       }}
                       aria-label={`颜色 ${c}`}
                     />

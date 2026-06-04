@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Loader2, ChevronRight, Circle, CircleDot, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getSubtasks, createTask } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
@@ -89,6 +90,7 @@ export function SubtaskList({ taskId, userId, onOpenTask }: SubtaskListProps) {
       setSubtasks(list)
     } catch {
       setSubtasks([])
+      toast.error('加载子任务失败')
     } finally {
       setLoading(false)
     }

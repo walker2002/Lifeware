@@ -207,6 +207,7 @@ export function TaskTreeView({
         if (!cancelled) setRootNodes(nodes)
       } catch {
         if (!cancelled) setRootNodes([])
+        toast.error('加载任务失败，请刷新重试')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -242,7 +243,7 @@ export function TaskTreeView({
         })
         node.loaded = true
       } catch {
-        // 加载失败静默降级
+        toast.error('加载子任务失败')
       }
     }
   }, [])
@@ -531,7 +532,7 @@ function TaskTreeRow({
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
               className={cn('shrink-0 size-4 rounded-full flex items-center justify-center', STATUS_DOT_CLASS[task.status] || 'border border-muted bg-transparent')}>
-              {task.status === 'completed' && <Check className="size-2.5 text-white" />}
+              {task.status === 'completed' && <Check className="size-2.5 text-on-primary" />}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
@@ -611,7 +612,7 @@ function TaskTreeRow({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('子任务创建即将支持') }}>
               在此下方新建子任务
             </DropdownMenuItem>
             {!task.parentId && !task.threadId && (
@@ -619,11 +620,11 @@ function TaskTreeRow({
                 提升为主线
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('关联主线即将支持') }}>
               关联到主线...
             </DropdownMenuItem>
             {task.threadId && (
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('移出主线即将支持') }}>
                 移出主线
               </DropdownMenuItem>
             )}
@@ -631,7 +632,7 @@ function TaskTreeRow({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenTaskDetail?.(task.id) }}>
               编辑任务
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('复制任务即将支持') }}>
               复制任务
             </DropdownMenuItem>
             <DropdownMenuSeparator />

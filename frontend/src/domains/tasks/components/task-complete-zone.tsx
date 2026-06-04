@@ -173,7 +173,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
           type="button"
           onClick={handleComplete}
           disabled={saving}
-          className="h-9 w-full rounded-md bg-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
+          className="h-9 w-full rounded-md bg-success text-on-primary text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
         >
           <CheckCircle2 className="size-4" />
           {saving ? '保存中…' : '标记完成'}
@@ -278,7 +278,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
           type="button"
           onClick={handleComplete}
           disabled={saving}
-          className="h-9 w-full rounded-md bg-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
+          className="h-9 w-full rounded-md bg-success text-on-primary text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
         >
           <FileText className="size-4" />
           {saving ? '保存中…' : '记录并完成'}
@@ -390,7 +390,7 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
             type="button"
             onClick={handleComplete}
             disabled={saving !== null}
-            className="h-9 flex-1 rounded-md bg-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
+            className="h-9 flex-1 rounded-md bg-success text-on-primary text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
           >
             <Send className="size-4" />
             {saving === 'complete' ? '提交中…' : '完成并提交复盘'}

@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListTodo, FolderOpen } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getThreads } from '@/app/actions/tasks'
 import type { Thread } from '../../../usom/types/objects'
@@ -86,8 +87,8 @@ export function ThreadListPanel({
         const data = await getThreads()
         if (!cancelled) setThreads(data)
       } catch {
-        // 数据库不可用时静默降级
         if (!cancelled) setThreads([])
+        toast.error('加载主线列表失败，请刷新重试')
       } finally {
         if (!cancelled) setLoading(false)
       }
