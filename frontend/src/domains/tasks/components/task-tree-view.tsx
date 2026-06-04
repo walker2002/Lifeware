@@ -19,6 +19,7 @@ import {
   ListTodo,
   Check,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
@@ -44,6 +45,8 @@ export interface TaskTreeViewProps {
   threadId?: string
   /** 打开任务详情回调 */
   onOpenTaskDetail?: (taskId: string) => void
+  /** 将任务提升为主线回调 */
+  onPromoteToThread?: (taskId: string) => void
 }
 
 // ─── 本地树节点类型 ────────────────────────────────────────────
@@ -103,6 +106,7 @@ const ENERGY_ICON: Record<string, React.ComponentType<{ className?: string }>> =
 export function TaskTreeView({
   threadId = '__all__',
   onOpenTaskDetail,
+  onPromoteToThread,
 }: TaskTreeViewProps) {
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -204,30 +208,41 @@ export function TaskTreeView({
     if (!quickAddText.trim() || isCreating) return
     setIsCreating(true)
     const userId = 'placeholder' as any
-    const newTask = await repo.create({
-      title: quickAddText.trim(),
-      captureMode: 'ad_hoc',
-      threadId: threadId !== '__all__' && threadId !== '__orphan__'
-        ? threadId as any : undefined,
-    }, userId)
-    setRootNodes(prev => [...prev, {
-      task: newTask,
-      depth: 0,
-      children: [],
-      childCount: 0,
-      expanded: false,
-      loaded: false,
-    }])
-    setQuickAddText('')
-    setIsCreating(false)
+    try {
+      const newTask = await repo.create({
+        title: quickAddText.trim(),
+        captureMode: 'ad_hoc',
+        threadId: threadId !== '__all__' && threadId !== '__orphan__'
+          ? threadId as any : undefined,
+      }, userId)
+      setRootNodes(prev => [...prev, {
+        task: newTask,
+        depth: 0,
+        children: [],
+        childCount: 0,
+        expanded: false,
+        loaded: false,
+      }])
+      setQuickAddText('')
+      toast.success('任务已创建')
+    } catch {
+      toast.error('创建任务失败，请重试')
+    } finally {
+      setIsCreating(false)
+    }
   }, [quickAddText, isCreating, repo, threadId])
 
   // ─── 状态变更 ──────────────────────────────────────────────
 
   const handleStatusChange = useCallback(async (taskId: string, newStatus: Task['status']) => {
     const userId = 'placeholder' as any
-    await repo.updateStatus(taskId as any, newStatus, userId)
-    setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
+    try {
+      await repo.updateStatus(taskId as any, newStatus, userId)
+      setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
+      toast.success('任务状态已更新')
+    } catch {
+      toast.error('操作失败，请重试')
+    }
   }, [repo])
 
   // ─── 渲染 ────────────────────────────────────────────────────
@@ -258,6 +273,7 @@ export function TaskTreeView({
               onToggle={handleToggle}
               onOpenTaskDetail={onOpenTaskDetail}
               onStatusChange={handleStatusChange}
+              onPromoteToThread={onPromoteToThread}
               repo={repo}
             />
           ))}
@@ -298,6 +314,7 @@ interface TaskTreeRowProps {
   onToggle: (node: TreeNode) => void
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
+  onPromoteToThread?: (taskId: string) => void
   repo: TaskRepository
 }
 
@@ -312,6 +329,7 @@ function TaskTreeRow({
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
+  onPromoteToThread,
   repo,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
@@ -492,7 +510,7 @@ function TaskTreeRow({
               在此下方新建子任务
             </DropdownMenuItem>
             {!task.parentId && !task.threadId && (
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPromoteToThread?.(task.id) }}>
                 提升为主线
               </DropdownMenuItem>
             )}
@@ -529,6 +547,7 @@ function TaskTreeRow({
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
+          onPromoteToThread={onPromoteToThread}
           repo={repo}
         />
       ))}

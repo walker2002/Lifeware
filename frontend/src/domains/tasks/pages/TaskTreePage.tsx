@@ -58,6 +58,11 @@ export default function TaskTreePage() {
     setDrawer({ type: 'closed' })
   }, [])
 
+  /** 将任务提升为主线（打开 __new__ 模式主线详情抽屉） */
+  const promoteToThread = useCallback((taskId: string) => {
+    setDrawer({ type: 'thread', threadId: '__new__' })
+  }, [])
+
   // ─── 主线选择 ────────────────────────────────────────────────
 
   /** 选中主线并关闭移动端面板 */
@@ -168,6 +173,7 @@ export default function TaskTreePage() {
           <TaskTreeView
             threadId={selectedThreadId}
             onOpenTaskDetail={openTaskDetail}
+            onPromoteToThread={promoteToThread}
           />
         </main>
       </div>
