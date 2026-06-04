@@ -19,7 +19,8 @@ function makeMockRepo(existing?: Record<string, unknown> | null): GenericRepo {
     save: vi.fn(async (obj: Record<string, unknown>) => { store.set(obj.id as string, obj) }),
     create: vi.fn(async (fields: Record<string, unknown>, _userId: string) => {
       const id = crypto.randomUUID()
-      const obj = { id, ...fields }
+      const now = new Date().toISOString()
+      const obj = { id, createdAt: now, updatedAt: now, ...fields }
       store.set(id, obj)
       return obj
     }),

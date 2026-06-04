@@ -334,45 +334,32 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
         }
       }
 
-      // 3. 构造目标对象
+      // 3. 构造目标对象并持久化
       let object: Record<string, unknown>
       const lifecycleTimestampFields = getLifecycleTimestampFields(fieldMeta)
+      const repo = getRepository(objectType)
 
       if (existingObject) {
-        object = {
-          ...existingObject,
-          status: transition.to,
-          updatedAt: now,
-        }
+        // 状态转换：使用 updateStatus
+        object = await repo.updateStatus(objectId!, transition.to as string, userId)
 
         // 自动设置 lifecycle_timestamp 字段
         const actionTimestampMap = buildActionTimestampMap(lifecycle, fieldMeta)
         const timestampKey = actionTimestampMap[proposal.action]
         if (timestampKey && lifecycleTimestampFields.includes(timestampKey)) {
-          object[timestampKey] = now
+          object = { ...object, [timestampKey]: now }
+          await repo.save(object, userId)
         }
       } else {
-        // 创建：从 payload 构造新对象
-        const id = crypto.randomUUID() as USOM_ID
-        object = {
-          id,
-          status: transition.to,
-          createdAt: now,
-          updatedAt: now,
-          ...proposal.payload,
-        }
+        // 创建：使用 repo.create，由 Repository 负责 ID 生成和字段映射
+        object = await repo.create(proposal.payload, userId)
 
-        // 初始化 lifecycle_timestamp 字段为 undefined（后续转换时设置）
-        for (const field of lifecycleTimestampFields) {
-          if (!(field in object)) {
-            object[field] = undefined
-          }
+        // 确保 status 正确（Repository 可能不知道目标 status）
+        if (object.status !== transition.to) {
+          object = { ...object, status: transition.to }
+          await repo.save(object, userId)
         }
       }
-
-      // 4. 持久化
-      const repo = getRepository(objectType)
-      await repo.save(object, userId)
 
       // 5. 构造并持久化 SystemEvent
       const event: SystemEvent = {
