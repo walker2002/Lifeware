@@ -182,6 +182,7 @@ export default function TaskTreePage() {
       {drawer.type === 'task' && (
         <TaskDetailDrawer
           taskId={drawer.taskId}
+          userId={'placeholder' as any}
           onClose={closeDrawer}
         />
       )}
