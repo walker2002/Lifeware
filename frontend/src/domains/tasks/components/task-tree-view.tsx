@@ -100,6 +100,8 @@ export function TaskTreeView({
   const [loading, setLoading] = useState(true)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [childData, setChildData] = useState<Map<string, Task[]>>(new Map())
+  const [quickAddText, setQuickAddText] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
 
   const repo = useMemo(() => new TaskRepository(), [])
 
@@ -188,6 +190,30 @@ export function TaskTreeView({
     }
   }, [repo])
 
+  // ─── 快速添加任务 ──────────────────────────────────────────
+
+  const handleQuickAdd = useCallback(async () => {
+    if (!quickAddText.trim() || isCreating) return
+    setIsCreating(true)
+    const userId = 'placeholder' as any
+    const newTask = await repo.create({
+      title: quickAddText.trim(),
+      captureMode: 'ad_hoc',
+      threadId: threadId !== '__all__' && threadId !== '__orphan__'
+        ? threadId as any : undefined,
+    }, userId)
+    setRootNodes(prev => [...prev, {
+      task: newTask,
+      depth: 0,
+      children: [],
+      childCount: 0,
+      expanded: false,
+      loaded: false,
+    }])
+    setQuickAddText('')
+    setIsCreating(false)
+  }, [quickAddText, isCreating, repo, threadId])
+
   // ─── 渲染 ────────────────────────────────────────────────────
 
   return (
@@ -220,6 +246,23 @@ export function TaskTreeView({
           ))}
         </div>
       )}
+
+      {/* ═══ 行内快速创建 ═══════════════════════════════════════ */}
+      <div className="px-3 py-2 border-t border-hairline-soft">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={quickAddText}
+            onChange={e => setQuickAddText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleQuickAdd() }}
+            placeholder="+ 快速添加任务，回车确认"
+            className="flex-1 h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
+          />
+          {isCreating && (
+            <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
