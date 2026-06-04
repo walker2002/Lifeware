@@ -49,10 +49,18 @@ vi.mock('@/domains/timebox/transitions', () => ({
   findTransition: () => undefined,
 }))
 
-vi.mock('./lifecycle-configs', () => ({
-  buildActionMap: () => ({}),
+vi.mock('../lifecycle-configs', () => ({
+  buildActionMap: () => ({ createTimebox: 'create' }),
   resolveObjectType: () => 'timebox',
   getTransitionFromManifest: () => undefined,
+  getLifecycleFromManifest: () => ({
+    states: ['planned', 'running', 'ended', 'cancelled', 'logged'],
+    initial_state: 'planned',
+    transitions: [
+      { from: null, action: 'create', to: 'planned', event_type: 'TimeboxCreated' },
+    ],
+    terminal_states: ['cancelled', 'logged'],
+  }),
 }))
 
 import { createOrchestrator } from '../index'
@@ -61,15 +69,6 @@ import { assembleContext } from '@/nexus/context-engine'
 
 function makeDeps() {
   return {
-    timeboxRepo: {
-      findById: vi.fn().mockResolvedValue(null),
-      findRunning: vi.fn().mockResolvedValue([]),
-      findByStatus: vi.fn().mockResolvedValue([]),
-      findUpcoming: vi.fn().mockResolvedValue([]),
-      findByDateRange: vi.fn().mockResolvedValue([]),
-      save: vi.fn(),
-      archive: vi.fn(),
-    },
     eventRepo: {
       append: vi.fn(),
     },
@@ -79,6 +78,12 @@ function makeDeps() {
     ruleEngine: {
       evaluate: vi.fn().mockResolvedValue({ result: 'pass', warnings: [] }),
     },
+    getRepo: () => ({
+      findById: vi.fn().mockResolvedValue(null),
+      save: vi.fn(),
+      create: vi.fn().mockResolvedValue({ id: 'mock-id' }),
+      updateStatus: vi.fn().mockResolvedValue({ id: 'mock-id', status: 'planned' }),
+    }),
   }
 }
 
