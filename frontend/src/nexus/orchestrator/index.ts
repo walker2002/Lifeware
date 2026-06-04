@@ -9,8 +9,8 @@
  */
 
 import type { USOM_ID, Timestamp, USOMObjectType } from '@/usom/types/primitives'
-import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
-import type { HabitStatus, ObjectiveStatus } from '@/usom/types/primitives'
+import type { Timebox, Habit, Objective, KeyResult } from '@/usom/types/objects'
+import type { ObjectiveStatus } from '@/usom/types/primitives'
 import type {
   StateProposal,
   SystemEvent,
@@ -555,7 +555,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
         // 域插件 onEvent 回调
         if (domain && smResult.event) {
-          domain.onEvent(smResult.event, usomSnapshot)
+          await domain.onEvent(smResult.event, usomSnapshot)
         }
 
         return {
@@ -563,164 +563,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           timebox: smResult.object as Timebox | undefined,
           warnings: ruleResult.warnings,
         }
-      }
-
-      // ─── Habit 域 ────────────────────────────────────
-      if (domainId === 'habits') {
-        if (!deps.habitRepo) {
-          return { success: false, error: 'HabitRepository 未配置' }
-        }
-
-        const now = new Date().toISOString() as Timestamp
-
-        if (action === 'create') {
-          const transition = getTransitionFromManifest('habits', 'habit', null, 'create')
-          if (!transition) {
-            return { success: false, error: '非法状态转换: 习惯创建失败' }
-          }
-
-          const habit = await deps.habitRepo.create(
-            {
-              title: intent.fields.title as string,
-              description: intent.fields.description as string | undefined,
-              defaultTime: intent.fields.defaultTime as string,
-              earliestTime: intent.fields.earliestTime as string,
-              latestStartTime: intent.fields.latestStartTime as string,
-              defaultDuration: intent.fields.defaultDuration as number,
-              minDuration: intent.fields.minDuration as number,
-              trackable: intent.fields.trackable as boolean,
-              frequencyType: (intent.fields.frequencyType ?? 'daily') as HabitFrequency['type'],
-              daysOfWeek: intent.fields.daysOfWeek as number[] | undefined,
-              startDate: intent.fields.startDate as import('@/usom/types/primitives').DateOnly,
-              endDate: intent.fields.endDate as import('@/usom/types/primitives').DateOnly | undefined,
-              keyResultId: intent.fields.keyResultId as USOM_ID | undefined,
-              tags: intent.fields.tags as string[] | undefined,
-            },
-            userId,
-          )
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: { habitId: habit.id, intentId: intent.id, toStatus: transition.to },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, habit, warnings: ruleResult.warnings }
-        }
-
-        if (action === 'updateHabit') {
-          const habitId = intent.fields.habitId as USOM_ID
-          const existing = await deps.habitRepo.findById(habitId, userId)
-          if (!existing) {
-            return { success: false, error: '习惯不存在' }
-          }
-
-          const { habitId: _hid, ...updateFields } = intent.fields
-          const updated = await deps.habitRepo.update(habitId, updateFields as import('@/usom/interfaces/irepository').UpdateHabitInput, userId)
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: 'habit.updated' as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: { habitId, intentId: intent.id },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, habit: updated, warnings: ruleResult.warnings }
-        }
-
-        if (action === 'logHabit') {
-          if (!deps.habitLogRepo) {
-            return { success: false, error: 'HabitLogRepository 未配置' }
-          }
-
-          const habitId = intent.fields.habitId as USOM_ID
-          const existing = await deps.habitRepo.findById(habitId, userId)
-          if (!existing) {
-            return { success: false, error: '习惯不存在' }
-          }
-
-          const today = now.slice(0, 10) as import('@/usom/types/primitives').DateOnly
-          const existingLog = await deps.habitLogRepo.findByHabitAndDate(habitId, today, userId)
-          if (existingLog) {
-            return { success: false, error: '今日已打卡' }
-          }
-
-          const logId = crypto.randomUUID() as USOM_ID
-          const habitLog: import('@/usom/types/objects').HabitLog = {
-            id: logId,
-            habitId,
-            date: today,
-            completionStatus: 'completed',
-            actualDuration: intent.fields.actualDuration as number | undefined,
-            plannedDuration: existing.defaultDuration,
-            completionRating: intent.fields.completionRating as number | undefined,
-            energyLevel: intent.fields.energyLevel as number | undefined,
-            note: intent.fields.note as string | undefined,
-            loggedAt: now,
-            source: 'manual',
-          }
-
-          await deps.habitLogRepo.save(habitLog, userId)
-
-          // 重新计算 streak 指标
-          await orchestrator.recalculateHabitMetrics(habitId, userId)
-          const updatedHabit = await deps.habitRepo.findById(habitId, userId)
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: 'HabitLogged' as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: {
-              habitId,
-              intentId: intent.id,
-              streak: updatedHabit?.streak ?? existing.streak,
-              title: existing.title,
-              trackable: existing.trackable,
-              logId,
-            },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, habit: updatedHabit ?? undefined, warnings: ruleResult.warnings }
-        }
-
-        // 状态转换（activate/suspend/reactivate/archive）
-        const habitId = intent.fields.habitId as USOM_ID
-        const existing = await deps.habitRepo.findById(habitId, userId)
-        if (!existing) {
-          return { success: false, error: '习惯不存在' }
-        }
-
-        const transition = getTransitionFromManifest('habits', 'habit', existing.status, action)
-        if (!transition) {
-          return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
-        }
-
-        const updated = await deps.habitRepo.updateStatus(habitId, transition.to as HabitStatus, userId)
-        const event: SystemEvent = {
-          id: crypto.randomUUID() as USOM_ID,
-          type: transition.eventType as SystemEventType,
-          occurredAt: now,
-          triggeredBy: 'state_machine',
-          payload: { habitId, intentId: intent.id, fromStatus: existing.status, toStatus: transition.to },
-          snapshotId: '' as USOM_ID,
-        }
-        await deps.eventRepo.append(event, userId)
-        eventBus.publish(event)
-
-        return { success: true, habit: updated, warnings: ruleResult.warnings }
       }
 
       // ─── OKR 域 ──────────────────────────────────────
@@ -955,7 +797,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           intentId: intent.id,
           targetObject: {
             type: smObjectType as USOMObjectType,
-            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : 'objectId'] as USOM_ID | undefined),
+            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : smObjectType === 'habit' ? 'habitId' : 'objectId'] as USOM_ID | undefined),
           },
           action,
           payload: intent.fields,
@@ -970,7 +812,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
 
         if (domain && smResult.event) {
-          domain.onEvent(smResult.event, usomSnapshot)
+          await domain.onEvent(smResult.event, usomSnapshot)
         }
 
         return {

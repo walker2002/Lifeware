@@ -20,11 +20,26 @@ import type { DomainManifest } from '@/domains/manifest-loader/schema'
 import { validateHabitFields, isValidHHMM } from './validation'
 
 /**
+ * Habits onEvent 钩子可注入的仓储接口
+ * @property calculateStreak - 计算连续天数
+ * @property calculateLongestStreak - 计算最长连续天数
+ * @property calculateCompletion7d - 计算 7 天完成率
+ * @property updateMetrics - 更新习惯指标
+ */
+export interface HabitsEventRepos {
+  calculateStreak(habitId: USOM_ID, userId: string): Promise<number>
+  calculateLongestStreak(habitId: USOM_ID, userId: string): Promise<number>
+  calculateCompletion7d(habitId: USOM_ID, userId: string): Promise<number>
+  updateMetrics(habitId: USOM_ID, userId: string, metrics: { streak: number; longestStreak: number; completionRate7d: number }): Promise<void>
+}
+
+/**
  * 创建习惯域钩子函数
  * @param manifest - 域 manifest
+ * @param repos - 可选的仓储接口（用于 streak 重算等副作用）
  * @returns 钩子函数对象
  */
-export function createHabitsHooks(manifest: DomainManifest) {
+export function createHabitsHooks(manifest: DomainManifest, repos?: HabitsEventRepos) {
   const subscribedEvents = new Set(manifest.subscribed_events)
   const validFrequencyTypes = new Set(
     manifest.field_metadata.frequencyType?.options ?? ['daily', 'weekly', 'custom']
@@ -127,10 +142,10 @@ export function createHabitsHooks(manifest: DomainManifest) {
    * @param _snapshot - USOM 快照
    * @returns 指标更新和动作表面建议
    */
-  function onEvent(
+  async function onEvent(
     event: SystemEvent,
     _snapshot: USOMSnapshot,
-  ): { metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] } {
+  ): Promise<{ metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }> {
     if (!subscribedEvents.has(event.type)) {
       return { metrics: [], suggestions: [] }
     }
@@ -181,6 +196,22 @@ export function createHabitsHooks(manifest: DomainManifest) {
             value: 1,
           })
         }
+
+        // streak 重算：当 repos 可用时，在 onEvent 中执行指标更新
+        if (repos) {
+          const habitId = event.payload['habitId'] as string | undefined
+          if (habitId) {
+            try {
+              const streak = await repos.calculateStreak(habitId, _snapshot.userId)
+              const longestStreak = await repos.calculateLongestStreak(habitId, _snapshot.userId)
+              const completionRate7d = await repos.calculateCompletion7d(habitId, _snapshot.userId)
+              await repos.updateMetrics(habitId, _snapshot.userId, { streak, longestStreak, completionRate7d })
+            } catch {
+              // streak 重算失败不影响主流程
+            }
+          }
+        }
+
         return {
           metrics,
           suggestions: [{

@@ -247,8 +247,8 @@ describe('Habits Domain Plugin — onValidate', () => {
 
 // ─── onEvent 测试 ────────────────────────────────────────────
 describe('Habits Domain Plugin — onEvent', () => {
-  it('HabitCreated 事件应返回建议', () => {
-    const result = habitsPlugin.onEvent(
+  it('HabitCreated 事件应返回建议', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'HabitCreated', payload: { title: '晨跑' } }),
       makeSnapshot(),
     )
@@ -257,8 +257,8 @@ describe('Habits Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBe(50)
   })
 
-  it('HabitStreakMilestone 事件应返回高权重建议', () => {
-    const result = habitsPlugin.onEvent(
+  it('HabitStreakMilestone 事件应返回高权重建议', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'HabitStreakMilestone', payload: { title: '晨跑', streak: 7 } }),
       makeSnapshot(),
     )
@@ -266,8 +266,8 @@ describe('Habits Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBe(90)
   })
 
-  it('HabitLogged 事件应返回低权重建议', () => {
-    const result = habitsPlugin.onEvent(
+  it('HabitLogged 事件应返回低权重建议', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'HabitLogged', payload: { title: '晨跑' } }),
       makeSnapshot(),
     )
@@ -275,8 +275,8 @@ describe('Habits Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBe(40)
   })
 
-  it('HabitSkipped 事件 streak>3 应返回 weight=80', () => {
-    const result = habitsPlugin.onEvent(
+  it('HabitSkipped 事件 streak>3 应返回 weight=80', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'HabitSkipped', payload: { title: '晨跑', streak: 5 } }),
       makeSnapshot(),
     )
@@ -284,8 +284,8 @@ describe('Habits Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBe(80)
   })
 
-  it('HabitSkipped 事件 streak<=3 应返回 weight=60', () => {
-    const result = habitsPlugin.onEvent(
+  it('HabitSkipped 事件 streak<=3 应返回 weight=60', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'HabitSkipped', payload: { title: '晨跑', streak: 2 } }),
       makeSnapshot(),
     )
@@ -293,8 +293,8 @@ describe('Habits Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBe(60)
   })
 
-  it('未订阅的事件应返回空结果', () => {
-    const result = habitsPlugin.onEvent(
+  it('未订阅的事件应返回空结果', async () => {
+    const result = await habitsPlugin.onEvent(
       makeEvent({ type: 'TaskCreated', payload: {} }),
       makeSnapshot(),
     )

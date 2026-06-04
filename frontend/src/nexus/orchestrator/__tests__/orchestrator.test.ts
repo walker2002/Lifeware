@@ -55,65 +55,95 @@ vi.mock('@/domains/timebox/transitions', () => ({
 }))
 
 // 模拟 lifecycle-configs，提供稳定的动态函数避免 jsdom 中 fs 不可用
-vi.mock('../lifecycle-configs', () => ({
-  buildActionMap: () => ({
-    createTimebox: 'create', startTimebox: 'start', endTimebox: 'end', overtimeTimebox: 'overtime', cancelTimebox: 'cancel', logTimebox: 'log',
-    create_timebox: 'create', start_timebox: 'start', end_timebox: 'end', overtime_timebox: 'overtime', cancel_timebox: 'cancel', log_timebox: 'log',
-    createHabit: 'create', activateHabit: 'activate', suspendHabit: 'suspend', archiveHabit: 'archive', reactivateHabit: 'reactivate', logHabit: 'log',
-    createObjective: 'create', updateObjective: 'update', activateObjective: 'activate', pauseObjective: 'pause', resumeObjective: 'resume',
-    completeObjective: 'complete', discardObjective: 'discard', archiveObjective: 'archive',
-    createKeyResult: 'create', updateKeyResult: 'update', updateKeyResultProgress: 'updateProgress', deleteKeyResult: 'deleteDraft',
-    create_objective: 'create', create_key_result: 'create',
-    createTask: 'create', updateTask: 'update', completeTask: 'complete', archiveTask: 'archive', activateTask: 'activate',
-    createThread: 'create', updateThread: 'update', pauseThread: 'pause', resumeThread: 'resume',
-    completeThread: 'complete', archiveThread: 'archive',
-    create_task: 'create', create_thread: 'create',
-  }),
-  resolveObjectType: (domainId: string, _action: string) => {
-    const map: Record<string, string> = { timebox: 'timebox', habits: 'habit', okrs: 'objective', tasks: 'task' }
-    return map[domainId] ?? domainId
-  },
-  getTransitionFromManifest: (_domainId: string, objectType: string, fromState: string | null, action: string) => {
-    const lifecycles: Record<string, Array<{ from: string | string[] | null; action: string; to: string; eventType: string }>> = {
-      habit: [
-        { from: null, action: 'create', to: 'draft', eventType: 'HabitCreated' },
-        { from: 'draft', action: 'activate', to: 'active', eventType: 'HabitActivated' },
-        { from: 'active', action: 'suspend', to: 'suspended', eventType: 'HabitSuspended' },
-        { from: 'suspended', action: 'reactivate', to: 'active', eventType: 'HabitActivated' },
-        { from: 'suspended', action: 'archive', to: 'archived', eventType: 'HabitArchived' },
-      ],
-      objective: [
-        { from: null, action: 'create', to: 'draft', eventType: 'ObjectiveCreated' },
-        { from: 'draft', action: 'activate', to: 'active', eventType: 'ObjectiveActivated' },
-        { from: 'active', action: 'pause', to: 'paused', eventType: 'ObjectivePaused' },
-        { from: 'paused', action: 'resume', to: 'active', eventType: 'ObjectiveResumed' },
-        { from: 'active', action: 'complete', to: 'completed', eventType: 'ObjectiveCompleted' },
-        { from: 'draft', action: 'discard', to: 'discarded', eventType: 'ObjectiveDiscarded' },
-        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ObjectiveArchived' },
-      ],
-      task: [
-        { from: null, action: 'create', to: 'draft', eventType: 'TaskCreated' },
-        { from: 'draft', action: 'activate', to: 'active', eventType: 'TaskActivated' },
-        { from: 'active', action: 'complete', to: 'completed', eventType: 'TaskCompleted' },
-        { from: 'active', action: 'archive', to: 'archived', eventType: 'TaskArchived' },
-      ],
-      thread: [
-        { from: null, action: 'create', to: 'active', eventType: 'ThreadCreated' },
-        { from: 'active', action: 'pause', to: 'paused', eventType: 'ThreadPaused' },
-        { from: 'paused', action: 'resume', to: 'active', eventType: 'ThreadResumed' },
-        { from: 'active', action: 'complete', to: 'completed', eventType: 'ThreadCompleted' },
-        { from: 'completed', action: 'archive', to: 'archived', eventType: 'ThreadArchived' },
-      ],
-    }
-    const transitions = lifecycles[objectType] ?? []
-    return transitions.find(t => {
-      const fromMatch = t.from === null ? fromState === null : Array.isArray(t.from) ? t.from.includes(fromState!) : t.from === fromState
-      return fromMatch && t.action === action
-    })
-  },
-}))
+vi.mock('../lifecycle-configs', () => {
+  const lifecycles: Record<string, Array<{ from: string | string[] | null; action: string; to: string; eventType: string }>> = {
+    habit: [
+      { from: null, action: 'create', to: 'draft', eventType: 'HabitCreated' },
+      { from: 'draft', action: 'activate', to: 'active', eventType: 'HabitActivated' },
+      { from: 'active', action: 'suspend', to: 'suspended', eventType: 'HabitSuspended' },
+      { from: 'suspended', action: 'reactivate', to: 'active', eventType: 'HabitActivated' },
+      { from: 'suspended', action: 'archive', to: 'archived', eventType: 'HabitArchived' },
+    ],
+    objective: [
+      { from: null, action: 'create', to: 'draft', eventType: 'ObjectiveCreated' },
+      { from: 'draft', action: 'activate', to: 'active', eventType: 'ObjectiveActivated' },
+      { from: 'active', action: 'pause', to: 'paused', eventType: 'ObjectivePaused' },
+      { from: 'paused', action: 'resume', to: 'active', eventType: 'ObjectiveResumed' },
+      { from: 'active', action: 'complete', to: 'completed', eventType: 'ObjectiveCompleted' },
+      { from: 'draft', action: 'discard', to: 'discarded', eventType: 'ObjectiveDiscarded' },
+      { from: 'completed', action: 'archive', to: 'archived', eventType: 'ObjectiveArchived' },
+    ],
+    task: [
+      { from: null, action: 'create', to: 'todo', eventType: 'TaskCreated' },
+      { from: 'todo', action: 'activate', to: 'active', eventType: 'TaskActivated' },
+      { from: 'active', action: 'complete', to: 'completed', eventType: 'TaskCompleted' },
+      { from: 'active', action: 'archive', to: 'archived', eventType: 'TaskArchived' },
+    ],
+    thread: [
+      { from: null, action: 'create', to: 'active', eventType: 'ThreadCreated' },
+      { from: 'active', action: 'pause', to: 'paused', eventType: 'ThreadPaused' },
+      { from: 'paused', action: 'resume', to: 'active', eventType: 'ThreadResumed' },
+      { from: 'active', action: 'complete', to: 'completed', eventType: 'ThreadCompleted' },
+      { from: 'completed', action: 'archive', to: 'archived', eventType: 'ThreadArchived' },
+    ],
+  }
+
+  const terminalStates: Record<string, string[]> = {
+    habit: ['archived'],
+    objective: ['archived', 'discarded'],
+    task: ['archived'],
+    thread: ['archived'],
+  }
+
+  return {
+    buildActionMap: () => ({
+      createTimebox: 'create', startTimebox: 'start', endTimebox: 'end', overtimeTimebox: 'overtime', cancelTimebox: 'cancel', logTimebox: 'log',
+      create_timebox: 'create', start_timebox: 'start', end_timebox: 'end', overtime_timebox: 'overtime', cancel_timebox: 'cancel', log_timebox: 'log',
+      createHabit: 'create', activateHabit: 'activate', suspendHabit: 'suspend', archiveHabit: 'archive', reactivateHabit: 'reactivate', logHabit: 'log',
+      createObjective: 'create', updateObjective: 'update', activateObjective: 'activate', pauseObjective: 'pause', resumeObjective: 'resume',
+      completeObjective: 'complete', discardObjective: 'discard', archiveObjective: 'archive',
+      createKeyResult: 'create', updateKeyResult: 'update', updateKeyResultProgress: 'updateProgress', deleteKeyResult: 'deleteDraft',
+      create_objective: 'create', create_key_result: 'create',
+      createTask: 'create', updateTask: 'update', completeTask: 'complete', archiveTask: 'archive', activateTask: 'activate',
+      createThread: 'create', updateThread: 'update', pauseThread: 'pause', resumeThread: 'resume',
+      completeThread: 'complete', archiveThread: 'archive',
+      create_task: 'create', create_thread: 'create',
+    }),
+    resolveObjectType: (domainId: string, action: string) => {
+      // 线程类操作返回 thread
+      if (domainId === 'tasks' && (action.endsWith('Thread') || action.includes('thread'))) return 'thread'
+      const map: Record<string, string> = { timebox: 'timebox', habits: 'habit', okrs: 'objective', tasks: 'task' }
+      return map[domainId] ?? domainId
+    },
+    getTransitionFromManifest: (_domainId: string, objectType: string, fromState: string | null, action: string) => {
+      const transitions = lifecycles[objectType] ?? []
+      return transitions.find(t => {
+        const fromMatch = t.from === null ? fromState === null : Array.isArray(t.from) ? t.from.includes(fromState!) : t.from === fromState
+        return fromMatch && t.action === action
+      })
+    },
+    getLifecycleFromManifest: (_domainId: string, objectType: string) => {
+      const transitions = lifecycles[objectType] ?? []
+      if (transitions.length === 0) return undefined
+      const states = [...new Set(transitions.flatMap(t => [t.from, t.to]).filter((s): s is string => s !== null))]
+      const initialState = transitions.find(t => t.from === null)?.to ?? states[0]
+      return {
+        states,
+        initial_state: initialState,
+        transitions: transitions.map(t => ({
+          from: t.from,
+          action: t.action,
+          to: t.to,
+          event_type: t.eventType,
+        })),
+        terminal_states: terminalStates[objectType] ?? [],
+      }
+    },
+  }
+})
 
 import { createOrchestrator } from '../index'
+import type { GenericRepo } from '@/nexus/core/state-machine'
 
 // ─── 测试用 mock 工厂 ─────────────────────────────────────────
 
@@ -525,12 +555,23 @@ describe('createOrchestrator — Habit 意图分发', () => {
     const habitRepo = createMockHabitRepo()
     const eventRepo = createMockEventRepo()
 
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     // Act
@@ -538,10 +579,10 @@ describe('createOrchestrator — Habit 意图分发', () => {
 
     // Assert: 成功
     expect(result.success).toBe(true)
-    expect(result.habit).toBeDefined()
-    expect(result.habit!.title).toBe('晨跑')
-    expect(result.habit!.status).toBe('draft')
-    expect(result.habit!.trackable).toBe(true)
+    expect(result.object).toBeDefined()
+    expect((result.object as any)?.title).toBe('晨跑')
+    expect((result.object as any)?.status).toBe('draft')
+    expect((result.object as any)?.trackable).toBe(true)
 
     // Assert: HabitRepository.create 被调用
     expect(habitRepo.create).toHaveBeenCalledWith(
@@ -564,12 +605,23 @@ describe('createOrchestrator — Habit 意图分发', () => {
     const habitRepo = createMockHabitRepo()
     const eventRepo = createMockEventRepo()
 
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     // Act
@@ -616,12 +668,23 @@ describe('createOrchestrator — Habit 意图分发', () => {
     const timeboxRepo = createMockTimeboxRepo()
     const eventRepo = createMockEventRepo()
 
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const activateIntent: StructuredIntent = {
@@ -640,8 +703,8 @@ describe('createOrchestrator — Habit 意图分发', () => {
 
     // Assert
     expect(result.success).toBe(true)
-    expect(result.habit).toBeDefined()
-    expect(result.habit!.status).toBe('active')
+    expect(result.object).toBeDefined()
+    expect((result.object as any)?.status).toBe('active')
     expect(habitRepo.findById).toHaveBeenCalledWith('habit-001', userId)
     expect(habitRepo.updateStatus).toHaveBeenCalledWith('habit-001', 'active', userId)
     expect(eventRepo.append).toHaveBeenCalledWith(
@@ -659,12 +722,23 @@ describe('createOrchestrator — Habit 意图分发', () => {
     const timeboxRepo = createMockTimeboxRepo()
     const eventRepo = createMockEventRepo()
 
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const intent: StructuredIntent = {
@@ -716,12 +790,23 @@ describe('createOrchestrator — Habit 意图分发', () => {
     const timeboxRepo = createMockTimeboxRepo()
     const eventRepo = createMockEventRepo()
 
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo,
       eventRepo,
       intentEngine: createMockIntentEngine(),
       ruleEngine,
       habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const intent: StructuredIntent = {
@@ -740,7 +825,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
 
     // Assert
     expect(result.success).toBe(false)
-    expect(result.error).toContain('非法状态转换')
+    expect(result.error).toContain('非法')
   })
 })
 
@@ -1036,6 +1121,14 @@ describe('Orchestrator — executeIntent 统一入口', () => {
     const eventRepo = createMockEventRepo()
     const intentEngine = createMockIntentEngine()
     const ruleEngine = createMockRuleEngine('pass')
+    const habitRepo = createMockHabitRepo()
+
+    const habitGenericRepo: GenericRepo = {
+      findById: habitRepo.findById,
+      save: habitRepo.save,
+      create: habitRepo.create,
+      updateStatus: habitRepo.updateStatus,
+    }
 
     const habitIntent: StructuredIntent = {
       id: 'intent-h-001' as USOM_ID,
@@ -1063,7 +1156,11 @@ describe('Orchestrator — executeIntent 统一入口', () => {
       eventRepo,
       intentEngine,
       ruleEngine,
-      habitRepo: createMockHabitRepo(),
+      habitRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'habits' && objectType === 'habit') return habitGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(habitIntent, userId)
@@ -1219,6 +1316,19 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const ruleEngine = createMockRuleEngine('pass')
     const eventRepo = createMockEventRepo()
 
+    const taskGenericRepo: GenericRepo = {
+      findById: taskRepo.findById,
+      save: taskRepo.save,
+      create: taskRepo.create,
+      updateStatus: taskRepo.updateStatus,
+    }
+    const threadGenericRepo: GenericRepo = {
+      findById: threadRepo.findById,
+      save: threadRepo.save,
+      create: threadRepo.create,
+      updateStatus: threadRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo: createMockTimeboxRepo(),
       eventRepo,
@@ -1226,6 +1336,11 @@ describe('Orchestrator — Tasks 意图分发', () => {
       ruleEngine,
       taskRepo,
       threadRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'tasks' && objectType === 'task') return taskGenericRepo
+        if (domainId === 'tasks' && objectType === 'thread') return threadGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(taskIntent, userId)
@@ -1268,12 +1383,23 @@ describe('Orchestrator — Tasks 意图分发', () => {
       createdAt: '2026-05-15T09:00:00Z',
     }
 
+    const taskGenericRepo: GenericRepo = {
+      findById: taskRepo.findById,
+      save: taskRepo.save,
+      create: taskRepo.create,
+      updateStatus: taskRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo: createMockTimeboxRepo(),
       eventRepo: createMockEventRepo(),
       intentEngine: createMockIntentEngine(),
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'tasks' && objectType === 'task') return taskGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(intent, userId)
@@ -1303,6 +1429,13 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const threadRepo = createMockThreadRepo()
     const eventRepo = createMockEventRepo()
 
+    const threadGenericRepo: GenericRepo = {
+      findById: threadRepo.findById,
+      save: threadRepo.save,
+      create: threadRepo.create,
+      updateStatus: threadRepo.updateStatus,
+    }
+
     const orchestrator = createOrchestrator({
       timeboxRepo: createMockTimeboxRepo(),
       eventRepo,
@@ -1310,6 +1443,10 @@ describe('Orchestrator — Tasks 意图分发', () => {
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo,
       threadRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'tasks' && objectType === 'thread') return threadGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(threadIntent, userId)
@@ -1339,6 +1476,13 @@ describe('Orchestrator — Tasks 意图分发', () => {
     threadRepo.updateStatus.mockResolvedValue({ ...existingThread, status: 'archived' })
     const eventRepo = createMockEventRepo()
 
+    const threadGenericRepo: GenericRepo = {
+      findById: threadRepo.findById,
+      save: threadRepo.save,
+      create: threadRepo.create,
+      updateStatus: threadRepo.updateStatus,
+    }
+
     const intent: StructuredIntent = {
       id: 'intent-arch-t-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
@@ -1357,6 +1501,10 @@ describe('Orchestrator — Tasks 意图分发', () => {
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo: createMockTaskRepo(),
       threadRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'tasks' && objectType === 'thread') return threadGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(intent, userId)
@@ -1385,6 +1533,13 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const taskRepo = createMockTaskRepo()
     taskRepo.findById.mockResolvedValue(draftTask)
 
+    const taskGenericRepo: GenericRepo = {
+      findById: taskRepo.findById,
+      save: taskRepo.save,
+      create: taskRepo.create,
+      updateStatus: taskRepo.updateStatus,
+    }
+
     const intent: StructuredIntent = {
       id: 'intent-bad-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
@@ -1402,6 +1557,10 @@ describe('Orchestrator — Tasks 意图分发', () => {
       intentEngine: createMockIntentEngine(),
       ruleEngine: createMockRuleEngine('pass'),
       taskRepo,
+      getRepo: (domainId: string, objectType: string) => {
+        if (domainId === 'tasks' && objectType === 'task') return taskGenericRepo
+        throw new Error(`未知的 repo: ${domainId}/${objectType}`)
+      },
     })
 
     const result = await orchestrator.executeIntent(intent, userId)
@@ -1411,7 +1570,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
     expect(taskRepo.updateStatus).not.toHaveBeenCalled()
   })
 
-  it('taskRepo 未配置 → 返回错误', async () => {
+  it('getRepo 未配置 → 返回错误', async () => {
     const intent: StructuredIntent = {
       id: 'intent-task-001' as USOM_ID,
       intentionId: 'intention-001' as USOM_ID,
@@ -1433,6 +1592,6 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const result = await orchestrator.executeIntent(intent, userId)
 
     expect(result.success).toBe(false)
-    expect(result.error).toContain('TaskRepository')
+    expect(result.error).toContain('未知的域')
   })
 })

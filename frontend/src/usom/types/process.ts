@@ -92,7 +92,7 @@ export interface DomainPlugin {
   onEvent(
     event: SystemEvent,
     snapshot: USOMSnapshot,
-  ): { metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }
+  ): Promise<{ metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }> | { metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }
 
   onActionSurfaceRequest(
     snapshot: USOMSnapshot,
