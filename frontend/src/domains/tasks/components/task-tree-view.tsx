@@ -18,6 +18,7 @@ import {
   Sparkles,
   ListTodo,
   Check,
+  GripVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { TaskRepository } from '../repository/task'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
@@ -116,6 +131,40 @@ export function TaskTreeView({
   const [isCreating, setIsCreating] = useState(false)
 
   const repo = useMemo(() => new TaskRepository(), [])
+
+  // ─── 键盘快捷键 ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'Escape') {
+        onOpenTaskDetail?.('') // 关闭抽屉或取消操作
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onOpenTaskDetail])
+
+  // ─── 拖拽排序传感器 ──────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
+
+  /** 拖拽结束处理 — 重新排序根级任务 */
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setRootNodes(prev => {
+      const oldIndex = prev.findIndex(n => n.task.id === active.id)
+      const newIndex = prev.findIndex(n => n.task.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+
+      const updated = [...prev]
+      const [moved] = updated.splice(oldIndex, 1)
+      updated.splice(newIndex, 0, moved)
+      return updated
+    })
+  }, [])
 
   // ─── 加载根节点 ──────────────────────────────────────────────
 
@@ -262,22 +311,30 @@ export function TaskTreeView({
           </p>
         </div>
       ) : (
-        /* ═══ 任务列表 ═══════════════════════════════════════ */
-        <div className="flex flex-col">
-          {rootNodes.map(node => (
-            <TaskTreeRow
-              key={node.task.id}
-              node={node}
-              expandedIds={expandedIds}
-              childData={childData}
-              onToggle={handleToggle}
-              onOpenTaskDetail={onOpenTaskDetail}
-              onStatusChange={handleStatusChange}
-              onPromoteToThread={onPromoteToThread}
-              repo={repo}
-            />
-          ))}
-        </div>
+        /* ═══ 任务列表（根节点支持拖拽排序） ═══════════════ */
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={rootNodes.map(n => n.task.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col">
+              {rootNodes.map(node => (
+                <SortableTaskRow
+                  key={node.task.id}
+                  id={node.task.id}
+                  node={node}
+                  expandedIds={expandedIds}
+                  childData={childData}
+                  onToggle={handleToggle}
+                  onOpenTaskDetail={onOpenTaskDetail}
+                  onStatusChange={handleStatusChange}
+                  onPromoteToThread={onPromoteToThread}
+                  repo={repo}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* ═══ 行内快速创建 ═══════════════════════════════════════ */}
@@ -316,6 +373,65 @@ interface TaskTreeRowProps {
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
   onPromoteToThread?: (taskId: string) => void
   repo: TaskRepository
+}
+
+/**
+ * 可排序任务行 — 包裹 TaskTreeRow 并添加拖拽手柄
+ * @description 用于根级节点的拖拽排序，内部渲染标准 TaskTreeRow
+ */
+function SortableTaskRow({
+  id,
+  node,
+  expandedIds,
+  childData,
+  onToggle,
+  onOpenTaskDetail,
+  onStatusChange,
+  onPromoteToThread,
+  repo,
+}: { id: string } & TaskTreeRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="group flex items-center">
+      {/* 拖拽手柄 */}
+      <button
+        type="button"
+        className="shrink-0 px-1 text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+        aria-label="拖拽排序"
+      >
+        <GripVertical className="size-3.5" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <TaskTreeRow
+          node={node}
+          expandedIds={expandedIds}
+          childData={childData}
+          onToggle={onToggle}
+          onOpenTaskDetail={onOpenTaskDetail}
+          onStatusChange={onStatusChange}
+          onPromoteToThread={onPromoteToThread}
+          repo={repo}
+        />
+      </div>
+    </div>
+  )
 }
 
 /**
