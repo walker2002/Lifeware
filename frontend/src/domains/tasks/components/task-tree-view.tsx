@@ -480,17 +480,43 @@ function TaskTreeRow({
         )}
 
         {/* 更多菜单（悬停显示） */}
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation()
-            // TODO: 打开更多操作菜单
-          }}
-          className="flex-shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-soft transition-all"
-          aria-label="更多操作"
-        >
-          <MoreHorizontal className="size-4 text-muted" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button onClick={(e) => e.stopPropagation()}
+              className="shrink-0 size-5 flex items-center justify-center text-muted opacity-0 group-hover:opacity-100 transition-opacity">
+              <MoreHorizontal className="size-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+              在此下方新建子任务
+            </DropdownMenuItem>
+            {!task.parentId && !task.threadId && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+                提升为主线
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+              关联到主线...
+            </DropdownMenuItem>
+            {task.threadId && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+                移出主线
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenTaskDetail?.(task.id) }}>
+              编辑任务
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+              复制任务
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'archived') }}>
+              归档任务
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* ═══ 子节点（展开时递归渲染） ════════════════════════ */}
