@@ -15,7 +15,7 @@
 import { useState, useCallback } from 'react'
 import { CheckCircle2, Clock, FileText, Save, Send, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { updateTask, updateTaskStatus } from '@/app/actions/tasks'
+import { updateTask, completeTask } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 
@@ -110,13 +110,10 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
     setSaving(true)
     try {
       const dur = parseInt(actualDuration, 10)
-      const updated = await updateTaskStatus(task.id, 'completed')
-      if (dur && !isNaN(dur)) {
-        const updated2 = await updateTask(task.id, { actualDuration: dur } as any)
-        onTaskUpdate(updated2)
-      } else {
-        onTaskUpdate(updated)
-      }
+      const extraFields: Record<string, unknown> = {}
+      if (dur && !isNaN(dur)) extraFields.actualDuration = dur
+      const updated = await completeTask(task.id, Object.keys(extraFields).length > 0 ? extraFields : undefined)
+      onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
@@ -201,16 +198,11 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
     setSaving(true)
     try {
       const dur = parseInt(actualDuration, 10)
-      const updated = await updateTaskStatus(task.id, 'completed')
       const patch: Record<string, unknown> = {}
       if (dur && !isNaN(dur)) patch.actualDuration = dur
       if (output.trim()) patch.notes = output.trim()
-      if (Object.keys(patch).length > 0) {
-        const updated2 = await updateTask(task.id, patch as any)
-        onTaskUpdate(updated2)
-      } else {
-        onTaskUpdate(updated)
-      }
+      const updated = await completeTask(task.id, Object.keys(patch).length > 0 ? patch : undefined)
+      onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
@@ -327,9 +319,8 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
     setSaving('complete')
     try {
       const notes = buildReviewNotes(form)
-      await updateTaskStatus(task.id, 'completed')
-      const updated2 = await updateTask(task.id, { notes } as any)
-      onTaskUpdate(updated2)
+      const updated = await completeTask(task.id, notes ? { notes } : undefined)
+      onTaskUpdate(updated)
     } finally {
       setSaving(null)
     }

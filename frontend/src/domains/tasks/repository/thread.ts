@@ -55,6 +55,34 @@ export class ThreadRepository implements IThreadRepository {
   }
 
   /**
+   * 根据 ID 查找单个主线并附带任务计数
+   * @param id - 主线 ID
+   * @param userId - 用户 ID
+   * @returns 带计数的 Thread 或 null
+   */
+  async findByIdWithCount(id: USOM_ID, userId: USOM_ID): Promise<ThreadWithCount | null> {
+    const rows = await db.select({
+      thread: s.threads,
+      taskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} != 'archived')::int`,
+      completedTaskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} = 'completed')::int`,
+    })
+      .from(s.threads)
+      .leftJoin(s.tasks, and(
+        eq(s.tasks.threadId, s.threads.id),
+        sql`${s.tasks.status} != 'archived'`,
+      ))
+      .where(and(eq(s.threads.id, id), eq(s.threads.userId, userId)))
+      .groupBy(s.threads.id)
+
+    if (rows.length === 0) return null
+    return {
+      thread: threadRowToUSOM(rows[0].thread as any),
+      taskCount: rows[0].taskCount,
+      completedTaskCount: rows[0].completedTaskCount,
+    }
+  }
+
+  /**
    * 查找所有主线并附带任务计数，按 status > priority > updatedAt 排序
    * @param userId - 用户 ID
    * @returns 带计数的 Thread 列表

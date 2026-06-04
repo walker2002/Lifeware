@@ -111,6 +111,21 @@ export async function archiveTask(taskId: string): Promise<void> {
   return repo.archive(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
 }
 
+/**
+ * 完成任务：先保存额外字段，再变更状态（避免部分失败导致数据丢失）
+ * @param taskId - 任务 ID
+ * @param extraFields - 额外字段（actualDuration, notes 等）
+ * @returns 更新后的任务
+ */
+export async function completeTask(taskId: string, extraFields?: Record<string, unknown>): Promise<Task> {
+  const repo = new TaskRepository()
+  // 先保存非破坏性字段，再变更状态——若状态变更失败，数据至少已持久化
+  if (extraFields && Object.keys(extraFields).length > 0) {
+    await repo.update(taskId as USOM_ID, extraFields as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+  }
+  return repo.updateStatus(taskId as USOM_ID, 'completed', MVP_USER_ID as USOM_ID)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Thread 操作
 // ═══════════════════════════════════════════════════════════════════════════
@@ -141,8 +156,7 @@ export async function getThreadById(threadId: string): Promise<Thread | null> {
  */
 export async function getThreadWithCount(threadId: string): Promise<ThreadWithCount | null> {
   const repo = new ThreadRepository()
-  const all = await repo.findAllWithCount(MVP_USER_ID as USOM_ID)
-  return all.find(wc => wc.thread.id === threadId) ?? null
+  return repo.findByIdWithCount(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
 }
 
 /**
