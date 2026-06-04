@@ -10,9 +10,26 @@ import { createGenericStateMachine, type GenericRepo } from '../index'
 
 // ─── 通用 Mock Repository ──────────────────────────────────────
 function makeMockRepo(existing?: Record<string, unknown> | null): GenericRepo {
+  const store = new Map<string, Record<string, unknown>>()
+  if (existing) {
+    store.set(existing.id as string, existing)
+  }
   return {
-    findById: vi.fn<(id: string, userId: string) => Promise<Record<string, unknown> | null>>().mockResolvedValue(existing ?? null),
-    save: vi.fn<(obj: Record<string, unknown>, userId: string) => Promise<void>>().mockResolvedValue(undefined),
+    findById: vi.fn(async (id: string) => store.get(id) ?? null),
+    save: vi.fn(async (obj: Record<string, unknown>) => { store.set(obj.id as string, obj) }),
+    create: vi.fn(async (fields: Record<string, unknown>, _userId: string) => {
+      const id = crypto.randomUUID()
+      const obj = { id, ...fields }
+      store.set(id, obj)
+      return obj
+    }),
+    updateStatus: vi.fn(async (id: string, toStatus: string, _userId: string) => {
+      const obj = store.get(id)
+      if (!obj) throw new Error('对象不存在')
+      const updated = { ...obj, status: toStatus }
+      store.set(id, updated)
+      return updated
+    }),
   }
 }
 
@@ -369,5 +386,54 @@ describe('Generic SM — create 路径 payload spread', () => {
     expect(result.object!.status).toBe('draft')
     expect(result.object!.id).toBeTruthy()
     expect(result.object!.createdAt).toBeTruthy()
+  })
+})
+
+// ─── 测试：create/updateStatus 方法路径 ──────────────────────
+describe('Generic SM — create/updateStatus 方法路径', () => {
+  it('create 时应通过 repo.create 创建对象', async () => {
+    const repo = makeMockRepo()
+    const { repo: eventRepo } = makeEventRepo()
+    const { bus } = makeEventBus()
+
+    const sm = createGenericStateMachine({
+      getRepository: () => repo,
+      eventRepo,
+      getLifecycle: () => taskLifecycle,
+    })
+
+    const result = await sm.execute(makeProposal({
+      targetObject: { type: 'task' },
+      action: 'create',
+      payload: { title: '测试任务', priority: 'high' },
+    }), bus, userId)
+
+    expect(result.success).toBe(true)
+    expect(result.object!.id).toBeTruthy()
+    expect(result.object!.title).toBe('测试任务')
+    expect(result.object!.status).toBe('draft')
+    expect(repo.create).toHaveBeenCalled()
+  })
+
+  it('状态转换时应通过 repo.updateStatus 更新状态', async () => {
+    const existing = { id: 't-001', status: 'draft', title: '测试' }
+    const repo = makeMockRepo(existing)
+    const { repo: eventRepo } = makeEventRepo()
+    const { bus } = makeEventBus()
+
+    const sm = createGenericStateMachine({
+      getRepository: () => repo,
+      eventRepo,
+      getLifecycle: () => taskLifecycle,
+    })
+
+    const result = await sm.execute(makeProposal({
+      targetObject: { type: 'task', id: 't-001' as USOM_ID },
+      action: 'activate',
+    }), bus, userId)
+
+    expect(result.success).toBe(true)
+    expect(result.object!.status).toBe('active')
+    expect(repo.updateStatus).toHaveBeenCalledWith('t-001', 'active', userId)
   })
 })
