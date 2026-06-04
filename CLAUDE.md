@@ -107,14 +107,17 @@ definitions and rationale live in the constitution:
 
 ## Database Schema
 
-Located in `frontend/src/lib/db/schema/` with core tables:
-- `users`, `user_calibration` - User and calibration
-- `tasks`, `habits`, `habit_logs`, `timeboxes` - Domain objects
+Located in `frontend/src/lib/db/schema.ts` with core tables:
+- `users`, `user_calibration`, `user_settings` - User data
+- `tasks`, `habits`, `habit_logs`, `task_execution_logs`, `timeboxes` - Domain objects
+- `threads` - Thread/project objects
 - `objectives`, `key_results` - OKR objects
 - `reviews` - Review objects
-- `timebox_tasks`, `timebox_habits` - Junction tables
+- `timebox_tasks`, `timebox_habits`, `habit_templates`, `template_habits` - Junction/template tables
+- `intentions`, `structured_intents`, `state_proposals` - System processing tables
 - `context_snapshots`, `system_events`, `action_surfaces`, `derived_signals` - System tables
-- `energy_logs` - Energy calibration logs
+- `ai_sessions`, `l1_messages`, `memory_episodes` - AI/memory tables
+- `energy_logs`, `user_activities` - Analytics tables
 
 ---
 
@@ -132,7 +135,6 @@ Located in `frontend/src/lib/db/schema/` with core tables:
 ## Project Status
 
 **Current Phase**: MVP Development (Stage 1 of 6)
-- Target: Complete planning and MVP by 2026-03-31
 - Key metrics: Daily usage, 2+ meaningful tasks/day, 85% AI accuracy, 60% weekly closure rate
 
 ---

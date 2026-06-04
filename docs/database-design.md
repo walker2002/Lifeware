@@ -124,6 +124,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 核心业务表（Core Objects）
 ├── objectives             ← OKR 目标
 ├── key_results            ← OKR 关键结果
+├── threads                ← 主线（任务组织容器）
 ├── tasks                  ← 任务
 ├── habits                 ← 习惯
 ├── habit_logs             ← 习惯打卡记录（独立表）
@@ -386,7 +387,7 @@ CREATE TABLE tasks (
   schema_version    integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status            text not null check (status in ('todo', 'planned', 'in_progress', 'completed', 'archived')),
+  status            text not null check (status in ('draft', 'active', 'in_progress', 'on_hold', 'completed', 'archived')),
   title             text not null,
   description       text,
   priority          text not null check (priority in ('critical', 'high', 'medium', 'low')),
@@ -1225,7 +1226,7 @@ SELECT
   estimated_duration, due_date, key_result_id, timebox_id,
   tags, created_at, updated_at
 FROM tasks
-WHERE status IN ('active', 'scheduled')
+WHERE status IN ('active', 'in_progress')
   AND archived_at IS NULL;
 
 -- 今日待打卡习惯视图
@@ -1233,7 +1234,7 @@ CREATE VIEW v_today_pending_habits AS
 SELECT
   h.id, h.user_id, h.title, h.default_time, h.trackable, h.streak,
   h.completion_rate_7d, h.key_result_id,
-  COALESCE(hl.status, 'pending') as log_status
+  COALESCE(hl.completion_status, 'pending') as log_status
 FROM habits h
 LEFT JOIN habit_logs hl
   ON h.id = hl.habit_id AND hl.date = CURRENT_DATE
@@ -1462,5 +1463,5 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_05_30*
+*文档版本：2026_06_04*
 *关联上游文档：LW_USOM_详细设计_2026_03_20.md*

@@ -522,11 +522,6 @@ interface Thread {
 
 > **注意**：`ProjectTemplate` 和 `TaskTemplate` 已在 Task Domain 重构中移除（MVP 不实现模板功能）。
 > 原有 `3.7b ProjectTemplate` 和 `3.7c TaskTemplate` 定义已废弃。
-  frequencyType?:      'once' | 'daily' | 'weekly' | 'custom'
-  sortOrder:           number
-  createdAt:           Timestamp
-}
-```
 
 ---
 
@@ -1573,6 +1568,6 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_05_25*
+*文档版本：2026_06_04*
 *关联上级文档：LW_overall_总体设计_2026_03_18.md*
 *关联数据库文档：LW_database_数据库设计_2026_03_21.md*
