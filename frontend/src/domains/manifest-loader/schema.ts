@@ -183,16 +183,43 @@ const QueryActionSchema = z.object({
 })
 
 /**
+ * 级联子规则模式 — 定义父动作到子对象状态变更的映射
+ * @property parent_action - 父对象触发的动作
+ * @property child_filter - 子对象过滤表达式（如 `status == 'draft'`）
+ * @property child_to_status - 子对象目标状态
+ * @property event_type - 触发的事件类型
+ */
+const CascadeChildRuleSchema = z.object({
+  parent_action: z.string(),
+  child_filter: z.string(),
+  child_to_status: z.string(),
+  event_type: z.string(),
+})
+
+/**
  * 级联规则模式
+ *
+ * 支持两种类型：
+ * - parent_child_status: 父对象状态变更级联到子对象
  */
 const CascadeRuleSchema = z.object({
-  /** 事件名称 */
-  on_event: z.string(),
-  /** 条件 */
+  /** 规则类型（parent_child_status 等） */
+  type: z.string().optional(),
+  /** 父对象类型名 */
+  parent_object: z.string().optional(),
+  /** 子对象类型名 */
+  child_object: z.string().optional(),
+  /** GenericRepo 上的查询方法名 */
+  child_query: z.string().optional(),
+  /** 父 action → 子对象过滤 → 子目标状态的映射规则 */
+  rules: z.array(CascadeChildRuleSchema).optional(),
+  /** 事件名称（旧格式兼容） */
+  on_event: z.string().optional(),
+  /** 条件（旧格式兼容） */
   condition: z.string().optional(),
-  /** 动作 */
-  action: z.string(),
-  /** 是否自动执行 */
+  /** 动作（旧格式兼容） */
+  action: z.string().optional(),
+  /** 是否自动执行（旧格式兼容） */
   auto_execute: z.boolean().default(false),
 })
 

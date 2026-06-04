@@ -1,7 +1,7 @@
 /**
  * @file hooks
  * @brief OKR 域钩子函数工厂
- * 
+ *
  * 工厂函数模式，遵循 Constitution Principle VI: 无副作用、无数据库调用
  * 提供意图验证、事件响应和动作表面请求处理能力
  */
@@ -19,26 +19,40 @@ import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 
 /**
+ * OKR 域钩子可选仓储依赖
+ * @property objectiveRepo - 目标仓储
+ * @property keyResultRepo - 关键结果仓储
+ */
+interface OkrsHookRepos {
+  objectiveRepo: any
+  keyResultRepo: any
+}
+
+/**
  * 创建 OKR 域钩子函数
  * @param manifest - 域 manifest
+ * @param repos - 可选仓储实例（激活校验需要查询 DB）
  * @returns 钩子函数对象
  */
-export function createOkrsHooks(manifest: DomainManifest) {
+export function createOkrsHooks(
+  manifest: DomainManifest,
+  repos?: OkrsHookRepos,
+) {
   const subscribedEvents = new Set(manifest.subscribed_events)
   const validOkrTypes = new Set(
     manifest.field_metadata.okrType?.options ?? ['visionary', 'committed']
   )
 
   /**
-   * 验证意图
+   * 验证意图（异步，支持激活前置校验）
    * @param intent - 结构化意图
    * @param _snapshot - USOM 快照
    * @returns 验证结果
    */
-  function onValidate(
+  async function onValidate(
     intent: StructuredIntent,
     _snapshot: USOMSnapshot,
-  ): { valid: boolean; errors: string[] } {
+  ): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = []
     const { fields } = intent
     const action = intent.action
@@ -62,6 +76,23 @@ export function createOkrsHooks(manifest: DomainManifest) {
       const objectiveId = fields['objectiveId']
       if (!objectiveId || typeof objectiveId !== 'string') {
         errors.push('objectiveId 必填')
+      }
+      // 激活前置校验：需要 >= 1 个 draft KR + 周期日期
+      if (repos?.keyResultRepo && repos?.objectiveRepo && objectiveId) {
+        const userId = fields['userId'] as string
+        if (userId) {
+          const objective = await repos.objectiveRepo.findById(objectiveId, userId)
+          if (objective) {
+            if (!objective.period?.start || !objective.period?.end) {
+              errors.push('激活失败: 必须设置周期起止日期')
+            }
+            const krs = await repos.keyResultRepo.findByObjective(objectiveId, userId)
+            const draftKRs = krs.filter((kr: any) => kr.status === 'draft')
+            if (draftKRs.length === 0) {
+              errors.push('激活失败: 至少需要 1 个草稿关键结果')
+            }
+          }
+        }
       }
     }
 

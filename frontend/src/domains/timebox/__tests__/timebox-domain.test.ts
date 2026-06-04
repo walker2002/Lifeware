@@ -135,17 +135,17 @@ function makeSignals(overrides: Partial<DerivedSignals> = {}): DerivedSignals {
 
 // ─── onValidate 测试 ─────────────────────────────────────────
 describe('Timebox Domain Plugin — onValidate', () => {
-  it('合法的 create_timebox intent 应返回 valid=true', () => {
+  it('合法的 create_timebox intent 应返回 valid=true', async () => {
     const intent = makeIntent()
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(true)
     expect(result.errors).toHaveLength(0)
   })
 
-  it('缺少 title 应返回 valid=false，错误信息包含 title', () => {
+  it('缺少 title 应返回 valid=false，错误信息包含 title', async () => {
     const intent = makeIntent({
       fields: {
         startTime: '2026-05-03T09:00:00Z',
@@ -154,13 +154,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('title'))).toBe(true)
   })
 
-  it('title 为空字符串应返回 valid=false', () => {
+  it('title 为空字符串应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '',
@@ -170,13 +170,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('title'))).toBe(true)
   })
 
-  it('缺少 startTime 应返回 valid=false', () => {
+  it('缺少 startTime 应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
@@ -185,13 +185,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('startTime'))).toBe(true)
   })
 
-  it('startTime 格式非法应返回 valid=false', () => {
+  it('startTime 格式非法应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
@@ -201,13 +201,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('startTime'))).toBe(true)
   })
 
-  it('duration 为 0 应返回 valid=false', () => {
+  it('duration 为 0 应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
@@ -217,13 +217,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('duration'))).toBe(true)
   })
 
-  it('duration 超过 480 分钟应返回 valid=false', () => {
+  it('duration 超过 480 分钟应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
@@ -233,13 +233,13 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('duration'))).toBe(true)
   })
 
-  it('duration 小于 5 分钟应返回 valid=false', () => {
+  it('duration 小于 5 分钟应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
@@ -249,7 +249,7 @@ describe('Timebox Domain Plugin — onValidate', () => {
     })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onValidate(intent, snapshot)
+    const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('duration'))).toBe(true)
@@ -258,11 +258,11 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
 // ─── onEvent 测试 ────────────────────────────────────────────
 describe('Timebox Domain Plugin — onEvent', () => {
-  it('TimeboxCreated 应返回 tile 类型的建议', () => {
+  it('TimeboxCreated 应返回 tile 类型的建议', async () => {
     const event = makeEvent({ type: 'TimeboxCreated', payload: { title: '专注写作' } })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onEvent(event, snapshot)
+    const result = await timeboxPlugin.onEvent(event, snapshot)
 
     expect(result.metrics).toHaveLength(0)
     expect(result.suggestions).toHaveLength(1)
@@ -270,44 +270,44 @@ describe('Timebox Domain Plugin — onEvent', () => {
     expect(result.suggestions[0].weight).toBeGreaterThan(0)
   })
 
-  it('TimeboxStarted 应返回 cue 类型的建议', () => {
+  it('TimeboxStarted 应返回 cue 类型的建议', async () => {
     const event = makeEvent({ type: 'TimeboxStarted', payload: { title: '专注写作' } })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onEvent(event, snapshot)
+    const result = await timeboxPlugin.onEvent(event, snapshot)
 
     expect(result.metrics).toHaveLength(0)
     expect(result.suggestions).toHaveLength(1)
     expect(result.suggestions[0].label).toContain('专注写作')
   })
 
-  it('TimeboxEnded 应返回 cue 类型的建议（提示记录执行结果）', () => {
+  it('TimeboxEnded 应返回 cue 类型的建议（提示记录执行结果）', async () => {
     const event = makeEvent({ type: 'TimeboxEnded', payload: { title: '专注写作' } })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onEvent(event, snapshot)
+    const result = await timeboxPlugin.onEvent(event, snapshot)
 
     expect(result.metrics).toHaveLength(0)
     expect(result.suggestions).toHaveLength(1)
     expect(result.suggestions[0].label).toContain('记录')
   })
 
-  it('TimeboxLogged 应返回 tile 类型的建议', () => {
+  it('TimeboxLogged 应返回 tile 类型的建议', async () => {
     const event = makeEvent({ type: 'TimeboxLogged', payload: { title: '专注写作' } })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onEvent(event, snapshot)
+    const result = await timeboxPlugin.onEvent(event, snapshot)
 
     expect(result.metrics).toHaveLength(0)
     expect(result.suggestions).toHaveLength(1)
     expect(result.suggestions[0].label).toContain('专注写作')
   })
 
-  it('未订阅的事件应返回空结果', () => {
+  it('未订阅的事件应返回空结果', async () => {
     const event = makeEvent({ type: 'TaskCreated', payload: {} })
     const snapshot = makeSnapshot()
 
-    const result = timeboxPlugin.onEvent(event, snapshot)
+    const result = await timeboxPlugin.onEvent(event, snapshot)
 
     expect(result.metrics).toHaveLength(0)
     expect(result.suggestions).toHaveLength(0)
@@ -316,7 +316,7 @@ describe('Timebox Domain Plugin — onEvent', () => {
 
 // ─── onActionSurfaceRequest 测试 ─────────────────────────────
 describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
-  it('有 planned 时间盒且距 startTime < 15min 应返回 cue 候选', () => {
+  it('有 planned 时间盒且距 startTime < 15min 应返回 cue 候选', async () => {
     // currentTime = 08:55, startTime = 09:00 → 距离 5 分钟 < 15 分钟
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T08:55:00Z',
@@ -340,7 +340,7 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
     expect(result.weight).toBe(80)
   })
 
-  it('有 running 时间盒应返回 tile 候选', () => {
+  it('有 running 时间盒应返回 tile 候选', async () => {
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T09:30:00Z',
       currentTimebox: makeTimeboxSummary({
@@ -362,7 +362,7 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
     expect(result.weight).toBe(90)
   })
 
-  it('有 ended 时间盒应返回 cue 候选（提示记录）', () => {
+  it('有 ended 时间盒应返回 cue 候选（提示记录）', async () => {
     // 用 upcomingTimeboxes 中 status=ended 的条目模拟
     // 但 USOMSnapshot 没有直接的 endedTimeboxes 字段
     // 根据 snapshot 结构，ended timebox 会出现在 currentTimebox 为 ended 状态
@@ -386,7 +386,7 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
     expect(result.weight).toBe(70)
   })
 
-  it('没有任何相关时间盒时应返回空 actions', () => {
+  it('没有任何相关时间盒时应返回空 actions', async () => {
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T08:00:00Z',
       upcomingTimeboxes: [],
@@ -401,11 +401,11 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
 
 // ─── Manifest 测试 ───────────────────────────────────────────
 describe('Timebox Domain Plugin — manifest', () => {
-  it('manifest 的 domainId 应为 timebox', () => {
+  it('manifest 的 domainId 应为 timebox', async () => {
     expect(timeboxPlugin.manifest.domainId).toBe('timebox')
   })
 
-  it('manifest 应包含正确的事件订阅列表', () => {
+  it('manifest 应包含正确的事件订阅列表', async () => {
     const events = timeboxPlugin.manifest.subscribedEvents
     expect(events).toContain('TimeboxCreated')
     expect(events).toContain('TimeboxStarted')
@@ -414,7 +414,7 @@ describe('Timebox Domain Plugin — manifest', () => {
     expect(events).toContain('TimeboxLogged')
   })
 
-  it('onOutboundRequest 应返回 undefined', () => {
+  it('onOutboundRequest 应返回 undefined', async () => {
     const event = makeEvent()
     const snapshot = makeSnapshot()
 

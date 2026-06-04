@@ -87,7 +87,7 @@ export interface DomainPlugin {
   onValidate(
     intent: StructuredIntent,
     snapshot: USOMSnapshot,
-  ): { valid: boolean; errors: string[] }
+  ): Promise<{ valid: boolean; errors: string[] }> | { valid: boolean; errors: string[] }
 
   onEvent(
     event: SystemEvent,

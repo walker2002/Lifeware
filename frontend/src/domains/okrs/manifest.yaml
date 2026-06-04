@@ -312,3 +312,35 @@ view_routes:
   view_detail:
     component: domains/okrs/pages/ObjectiveDetailPage
     url: /okrs/:id
+
+# ─── 区块 H: cascade_rules ─────────────────────────────────────────
+cascade_rules:
+  - type: parent_child_status
+    parent_object: objective
+    child_object: key_result
+    child_query: findByParent
+    rules:
+      - parent_action: activate
+        child_filter: "status == 'draft'"
+        child_to_status: active
+        event_type: KeyResultActivated
+      - parent_action: pause
+        child_filter: "status == 'active'"
+        child_to_status: paused
+        event_type: KeyResultPaused
+      - parent_action: resume
+        child_filter: "status == 'paused'"
+        child_to_status: active
+        event_type: KeyResultResumed
+      - parent_action: complete
+        child_filter: "status in ['active','paused']"
+        child_to_status: completed
+        event_type: KeyResultCompleted
+      - parent_action: discard
+        child_filter: "status not in ['discarded','archived']"
+        child_to_status: discarded
+        event_type: KeyResultDiscarded
+      - parent_action: archive
+        child_filter: "status != 'archived'"
+        child_to_status: archived
+        event_type: KeyResultArchived

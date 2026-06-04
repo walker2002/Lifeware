@@ -114,6 +114,7 @@ describe('habitCnuiHandler', () => {
       vi.mocked(validateHabitFields).mockReturnValue({
         valid: false,
         errors: ['标题不能为空'],
+        warnings: [],
       })
 
       const result = await habitCnuiHandler.submit('createHabit', {})

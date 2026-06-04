@@ -60,11 +60,11 @@ function makeIntent(action: string, fields: Record<string, unknown>): Structured
 
 describe('OKR Domain Plugin', () => {
   describe('manifest', () => {
-    it('应包含正确的 domainId', () => {
+    it('应包含正确的 domainId', async () => {
       expect(okrsPlugin.manifest.domainId).toBe('okrs')
     })
 
-    it('应订阅 OKR 和外部事件', () => {
+    it('应订阅 OKR 和外部事件', async () => {
       const events = okrsPlugin.manifest.subscribedEvents
       expect(events).toContain('ObjectiveCreated')
       expect(events).toContain('ObjectiveActivated')
@@ -74,56 +74,56 @@ describe('OKR Domain Plugin', () => {
   })
 
   describe('onValidate', () => {
-    it('createObjective 缺少 title 应校验失败', () => {
-      const result = okrsPlugin.onValidate(makeIntent('createObjective', { title: '' }), mockSnapshot())
+    it('createObjective 缺少 title 应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: '' }), mockSnapshot())
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
     })
 
-    it('createObjective 有 title 应校验通过', () => {
-      const result = okrsPlugin.onValidate(makeIntent('createObjective', { title: '提升产品质量' }), mockSnapshot())
+    it('createObjective 有 title 应校验通过', async () => {
+      const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: '提升产品质量' }), mockSnapshot())
       expect(result.valid).toBe(true)
     })
 
-    it('createObjective title 超过 200 字符应校验失败', () => {
-      const result = okrsPlugin.onValidate(makeIntent('createObjective', { title: 'x'.repeat(201) }), mockSnapshot())
+    it('createObjective title 超过 200 字符应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: 'x'.repeat(201) }), mockSnapshot())
       expect(result.valid).toBe(false)
     })
 
-    it('createKeyResult targetValue <= 0 应校验失败', () => {
-      const result = okrsPlugin.onValidate(
+    it('createKeyResult targetValue <= 0 应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 0, unit: '%' }),
         mockSnapshot(),
       )
       expect(result.valid).toBe(false)
     })
 
-    it('createKeyResult 缺少 unit 应校验失败', () => {
-      const result = okrsPlugin.onValidate(
+    it('createKeyResult 缺少 unit 应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 100 }),
         mockSnapshot(),
       )
       expect(result.valid).toBe(false)
     })
 
-    it('createKeyResult 有效输入应校验通过', () => {
-      const result = okrsPlugin.onValidate(
+    it('createKeyResult 有效输入应校验通过', async () => {
+      const result = await okrsPlugin.onValidate(
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 100, unit: '%' }),
         mockSnapshot(),
       )
       expect(result.valid).toBe(true)
     })
 
-    it('updateKeyResultProgress currentValue < 0 应校验失败', () => {
-      const result = okrsPlugin.onValidate(
+    it('updateKeyResultProgress currentValue < 0 应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(
         makeIntent('updateKeyResultProgress', { keyResultId: 'kr-1', currentValue: -1 }),
         mockSnapshot(),
       )
       expect(result.valid).toBe(false)
     })
 
-    it('activateObjective 缺少 objectiveId 应校验失败', () => {
-      const result = okrsPlugin.onValidate(
+    it('activateObjective 缺少 objectiveId 应校验失败', async () => {
+      const result = await okrsPlugin.onValidate(
         makeIntent('activateObjective', {}),
         mockSnapshot(),
       )
@@ -132,7 +132,7 @@ describe('OKR Domain Plugin', () => {
   })
 
   describe('onEvent', () => {
-    it('ObjectiveCreated 应返回创建建议', () => {
+    it('ObjectiveCreated 应返回创建建议', async () => {
       const event: SystemEvent = {
         id: 'e1' as any,
         type: 'ObjectiveCreated',
@@ -141,12 +141,12 @@ describe('OKR Domain Plugin', () => {
         payload: { title: '新目标' },
         snapshotId: 'snap' as any,
       }
-      const result = okrsPlugin.onEvent(event, mockSnapshot())
+      const result = await okrsPlugin.onEvent(event, mockSnapshot())
       expect(result.suggestions.length).toBeGreaterThan(0)
       expect(result.suggestions[0].actionType).toBe('review_okr')
     })
 
-    it('ObjectiveCompleted 应返回完成指标', () => {
+    it('ObjectiveCompleted 应返回完成指标', async () => {
       const event: SystemEvent = {
         id: 'e2' as any,
         type: 'ObjectiveCompleted',
@@ -155,12 +155,12 @@ describe('OKR Domain Plugin', () => {
         payload: { title: '已完成的目标' },
         snapshotId: 'snap' as any,
       }
-      const result = okrsPlugin.onEvent(event, mockSnapshot())
+      const result = await okrsPlugin.onEvent(event, mockSnapshot())
       expect(result.metrics.length).toBeGreaterThan(0)
       expect(result.metrics[0].metricKey).toBe('objective_completed')
     })
 
-    it('未订阅事件应返回空', () => {
+    it('未订阅事件应返回空', async () => {
       const event: SystemEvent = {
         id: 'e3' as any,
         type: 'TaskCreated',
@@ -169,7 +169,7 @@ describe('OKR Domain Plugin', () => {
         payload: {},
         snapshotId: 'snap' as any,
       }
-      const result = okrsPlugin.onEvent(event, mockSnapshot())
+      const result = await okrsPlugin.onEvent(event, mockSnapshot())
       expect(result.metrics).toEqual([])
       expect(result.suggestions).toEqual([])
     })

@@ -12,6 +12,7 @@ import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
 import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
+import { createOkrsGenericRepo } from "@/domains/okrs/repository/generic-repo-adapter";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { TimeboxRepository } from "@/domains/timebox/repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
@@ -105,6 +106,11 @@ async function createOKROrchestrator() {
   const timeboxRepo = new TimeboxRepository();
   const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
+  const okrsRepos = createOkrsGenericRepo({
+    objectiveRepo: objectiveRepo as any,
+    keyResultRepo: keyResultRepo as any,
+  });
+
   return createOrchestrator({
     timeboxRepo,
     eventRepo,
@@ -121,6 +127,14 @@ async function createOKROrchestrator() {
     },
     objectiveRepo,
     keyResultRepo,
+    getRepo: (domainId: string, objectType: string) => {
+      if (domainId === 'okrs') {
+        const repo = okrsRepos[objectType]
+        if (!repo) throw new Error(`未找到 OKR repo: ${objectType}`)
+        return repo
+      }
+      throw new Error(`getRepo: 不支持的域 ${domainId}`)
+    },
   });
 }
 

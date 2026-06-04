@@ -9,12 +9,10 @@
  */
 
 import type { USOM_ID, Timestamp, USOMObjectType } from '@/usom/types/primitives'
-import type { Timebox, Habit, Objective, KeyResult } from '@/usom/types/objects'
-import type { ObjectiveStatus } from '@/usom/types/primitives'
+import type { Timebox, Habit } from '@/usom/types/objects'
 import type {
   StateProposal,
   SystemEvent,
-  SystemEventType,
   ActionSurface,
   ContextSnapshot,
   GenerationResult,
@@ -40,7 +38,7 @@ import type { USOMSnapshot } from '@/usom/types/process'
 import { createTimeboxStateMachine, createGenericStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain, findHandler } from '@/domains/registry'
-import { buildActionMap, resolveObjectType, getTransitionFromManifest, getLifecycleFromManifest } from './lifecycle-configs'
+import { buildActionMap, resolveObjectType, getLifecycleFromManifest } from './lifecycle-configs'
 import { assembleContext } from '@/nexus/context-engine'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { evaluateProposals } from '@/nexus/core/rule-engine'
@@ -492,7 +490,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
       // 1. Domain plugin validation
       if (domain) {
-        const validation = domain.onValidate(intent, usomSnapshot)
+        const validation = await domain.onValidate(intent, usomSnapshot)
         if (!validation.valid) {
           return { success: false, error: validation.errors.join('; ') }
         }
@@ -565,222 +563,17 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // ─── OKR 域 ──────────────────────────────────────
-      if (domainId === 'okrs') {
-        if (!deps.objectiveRepo || !deps.keyResultRepo) {
-          return { success: false, error: 'ObjectiveRepository 或 KeyResultRepository 未配置' }
-        }
-
-        const now = new Date().toISOString() as Timestamp
-        const target = getObjectType(intent)
-
-        if (target === 'objective') {
-          if (action === 'create') {
-            const transition = getTransitionFromManifest('okrs', 'objective', null, 'create')
-            if (!transition) {
-              return { success: false, error: '非法状态转换: 目标创建失败' }
-            }
-
-            const objId = crypto.randomUUID() as USOM_ID
-            const objective: Objective = {
-              id: objId,
-              status: 'draft',
-              title: intent.fields.title as string,
-              description: intent.fields.description as string | undefined,
-              period: {
-                type: (intent.fields.periodType ?? 'quarterly') as Objective['period']['type'],
-                start: (intent.fields.periodStart ?? '') as unknown as import('@/usom/types/primitives').DateOnly,
-                end: (intent.fields.periodEnd ?? '') as unknown as import('@/usom/types/primitives').DateOnly,
-              },
-              keyResultIds: [],
-              okrType: (intent.fields.okrType ?? 'committed') as 'visionary' | 'committed',
-              objectiveNumber: '',
-              priority: (intent.fields.priority ?? 'P1') as 'P0' | 'P1' | 'P2',
-              tags: (intent.fields.tags ?? []) as string[],
-              createdAt: now,
-              updatedAt: now,
-            }
-
-            await deps.objectiveRepo.save(objective, userId)
-
-            const event: SystemEvent = {
-              id: crypto.randomUUID() as USOM_ID,
-              type: transition.eventType as SystemEventType,
-              occurredAt: now,
-              triggeredBy: 'state_machine',
-              payload: { objectiveId: objId, title: objective.title, toStatus: 'draft' },
-              snapshotId: '' as USOM_ID,
-            }
-            await deps.eventRepo.append(event, userId)
-            eventBus.publish(event)
-
-            return { success: true, warnings: ruleResult.warnings }
-          }
-
-          // 非创建路径
-          const objectiveId = intent.fields.objectiveId as USOM_ID
-          const existing = await deps.objectiveRepo.findById(objectiveId, userId)
-          if (!existing) {
-            return { success: false, error: '目标不存在' }
-          }
-
-          const transition = getTransitionFromManifest('okrs', 'objective', existing.status, action)
-          if (!transition) {
-            return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
-          }
-
-          if (action === 'activate') {
-            const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
-            const draftKRs = krs.filter(kr => kr.status === 'draft')
-            if (draftKRs.length === 0) {
-              return { success: false, error: '激活失败: 至少需要 1 个草稿关键结果' }
-            }
-            if (!existing.period.start || !existing.period.end) {
-              return { success: false, error: '激活失败: 必须设置周期起止日期' }
-            }
-          }
-
-          const updated: Objective = {
-            ...existing,
-            status: transition.to as ObjectiveStatus,
-            updatedAt: now,
-            ...(transition.to === 'discarded' ? { discardedAt: now } : {}),
-            ...(transition.to === 'completed' ? { completedAt: now } : {}),
-            ...(transition.to === 'archived' ? { archivedAt: now } : {}),
-          }
-          await deps.objectiveRepo.save(updated, userId)
-
-          // KR 联动
-          if (action === 'activate') {
-            await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'draft', 'active', userId)
-          } else if (action === 'pause') {
-            await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'active', 'paused', userId)
-          } else if (action === 'resume') {
-            await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'paused', 'active', userId)
-          } else if (action === 'complete') {
-            await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'active', 'completed', userId)
-            await deps.keyResultRepo.batchUpdateStatus(objectiveId, 'paused', 'completed', userId)
-          } else if (action === 'discard') {
-            const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
-            for (const kr of krs) {
-              if (kr.status !== 'discarded' && kr.status !== 'archived') {
-                const krUpdated: KeyResult = { ...kr, status: 'discarded', discardedAt: now, updatedAt: now }
-                await deps.keyResultRepo.save(krUpdated, userId)
-              }
-            }
-          } else if (action === 'archive') {
-            const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
-            for (const kr of krs) {
-              if (kr.status !== 'archived') {
-                const krUpdated: KeyResult = { ...kr, status: 'archived', updatedAt: now }
-                await deps.keyResultRepo.save(krUpdated, userId)
-              }
-            }
-          }
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: { objectiveId, title: existing.title, fromStatus: existing.status, toStatus: transition.to as string },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, warnings: ruleResult.warnings }
-        }
-
-        // KeyResult 操作
-        if (target === 'key_result') {
-          if (action === 'create') {
-            const objectiveId = intent.fields.objectiveId as USOM_ID
-            const krId = crypto.randomUUID() as USOM_ID
-            const kr: KeyResult = {
-              id: krId,
-              objectiveId,
-              title: intent.fields.title as string,
-              description: intent.fields.description as string | undefined,
-              targetValue: intent.fields.targetValue as number,
-              currentValue: 0,
-              unit: intent.fields.unit as string,
-              progressRate: 0,
-              status: 'draft',
-              createdAt: now,
-              updatedAt: now,
-            }
-            await deps.keyResultRepo.save(kr, userId)
-
-            const obj = await deps.objectiveRepo.findById(objectiveId, userId)
-            if (obj) {
-              await deps.objectiveRepo.save({ ...obj, keyResultIds: [...obj.keyResultIds, krId], updatedAt: now }, userId)
-            }
-
-            const event: SystemEvent = {
-              id: crypto.randomUUID() as USOM_ID,
-              type: 'KeyResultUpdated',
-              occurredAt: now,
-              triggeredBy: 'state_machine',
-              payload: { keyResultId: krId, objectiveId, title: kr.title },
-              snapshotId: '' as USOM_ID,
-            }
-            await deps.eventRepo.append(event, userId)
-            eventBus.publish(event)
-
-            return { success: true, warnings: ruleResult.warnings }
-          }
-
-          if (action === 'updateProgress') {
-            const krId = intent.fields.keyResultId as USOM_ID
-            const currentValue = intent.fields.currentValue as number
-            const kr = await deps.keyResultRepo.updateProgress(krId, currentValue, userId)
-
-            const eventType = kr.status === 'completed' ? 'KeyResultCompleted' as const : 'KeyResultProgressUpdated' as const
-            const event: SystemEvent = {
-              id: crypto.randomUUID() as USOM_ID,
-              type: eventType,
-              occurredAt: now,
-              triggeredBy: 'state_machine',
-              payload: { keyResultId: krId, currentValue, progressRate: kr.progressRate, krTitle: kr.title },
-              snapshotId: '' as USOM_ID,
-            }
-            await deps.eventRepo.append(event, userId)
-            eventBus.publish(event)
-
-            return { success: true, warnings: ruleResult.warnings }
-          }
-
-          if (action === 'deleteDraft') {
-            const krId = intent.fields.keyResultId as USOM_ID
-            await deps.keyResultRepo.deleteDraft(krId, userId)
-            return { success: true, warnings: ruleResult.warnings }
-          }
-
-          if (action === 'update') {
-            const krId = intent.fields.keyResultId as USOM_ID
-            const existing = await deps.keyResultRepo.findById(krId, userId)
-            if (!existing) {
-              return { success: false, error: '关键结果不存在' }
-            }
-            const updatedKR: KeyResult = {
-              ...existing,
-              ...(intent.fields.title != null ? { title: intent.fields.title as string } : {}),
-              ...(intent.fields.description != null ? { description: intent.fields.description as string | undefined } : {}),
-              ...(intent.fields.targetValue != null ? { targetValue: intent.fields.targetValue as number } : {}),
-              ...(intent.fields.unit != null ? { unit: intent.fields.unit as string } : {}),
-              updatedAt: now,
-            }
-            await deps.keyResultRepo.save(updatedKR, userId)
-            return { success: true, warnings: ruleResult.warnings }
-          }
-        }
-      }
-
       // ─── 通用 SM 路径（已迁移的域） ─────────────────────
       if (deps.getRepo) {
         const smObjectType = getObjectType(intent)
         const repo = deps.getRepo(domainId, smObjectType)
+
+        // 加载 cascade 规则（从 manifest cascade_rules 中筛选 parent_child_status 类型）
+        const manifestResult = loadDomainManifest(domainId)
+        const cascadeRules = manifestResult.success
+          ? (manifestResult.manifest.cascade_rules?.filter((r: any) => r.type === 'parent_child_status') ?? [])
+          : []
+
         const sm = createGenericStateMachine({
           getRepository: () => repo,
           eventRepo: deps.eventRepo,
@@ -790,6 +583,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             return lc
           },
           domainId,
+          getCascadeRules: cascadeRules.length > 0 ? () => cascadeRules as any : undefined,
         })
 
         const proposal: StateProposal = {
@@ -797,12 +591,30 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           intentId: intent.id,
           targetObject: {
             type: smObjectType as USOMObjectType,
-            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : smObjectType === 'habit' ? 'habitId' : 'objectId'] as USOM_ID | undefined),
+            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : smObjectType === 'habit' ? 'habitId' : smObjectType === 'objective' ? 'objectiveId' : smObjectType === 'key_result' ? 'keyResultId' : 'objectId'] as USOM_ID | undefined),
           },
           action,
           payload: intent.fields,
           approvedAt: new Date().toISOString() as Timestamp,
           approvedBy: 'rule_engine',
+        }
+
+        // OKR 域激活前置校验：需要 >= 1 draft KR + 周期日期
+        if (domainId === 'okrs' && action === 'activate' && deps.objectiveRepo && deps.keyResultRepo) {
+          const objectiveId = intent.fields.objectiveId as USOM_ID | undefined
+          if (objectiveId) {
+            const existing = await deps.objectiveRepo.findById(objectiveId, userId)
+            if (existing) {
+              if (!(existing as any).period?.start || !(existing as any).period?.end) {
+                return { success: false, error: '激活失败: 必须设置周期起止日期' }
+              }
+              const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
+              const draftKRs = krs.filter((kr: any) => kr.status === 'draft')
+              if (draftKRs.length === 0) {
+                return { success: false, error: '激活失败: 至少需要 1 个草稿关键结果' }
+              }
+            }
+          }
         }
 
         const smResult = await sm.execute(proposal, eventBus, userId)
