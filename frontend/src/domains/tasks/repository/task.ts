@@ -5,7 +5,7 @@
  * 实现 ITaskRepository 接口，支持嵌套任务、主线关联、标签查询
  */
 
-import { eq, and, isNull, inArray, gte, lte } from 'drizzle-orm'
+import { eq, and, isNull, inArray, gte, lte, sql } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { ITaskRepository, CreateTaskInput, UpdateTaskInput, TaskFilters } from '../../../usom/interfaces/irepository'
@@ -77,6 +77,47 @@ export class TaskRepository implements ITaskRepository {
 
   async findAll(userId: USOM_ID): Promise<Task[]> {
     return this.findByUserId(userId)
+  }
+
+  /**
+   * 获取子任务数量
+   * @param parentId - 父任务 ID
+   * @param userId - 用户 ID
+   * @returns 子任务数量
+   */
+  async getChildCount(parentId: USOM_ID, userId: USOM_ID): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(s.tasks)
+      .where(and(
+        eq(s.tasks.parentId, parentId),
+        eq(s.tasks.userId, userId),
+      ))
+    return result[0]?.count ?? 0
+  }
+
+  /**
+   * 批量获取子任务数量（用于任务树展开箭头）
+   * @param parentIds - 父任务 ID 列表
+   * @param userId - 用户 ID
+   * @returns Map<parentId, count>
+   */
+  async getChildCounts(parentIds: USOM_ID[], userId: USOM_ID): Promise<Map<string, number>> {
+    if (parentIds.length === 0) return new Map()
+    const rows = await db.select({
+      parentId: s.tasks.parentId,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(s.tasks)
+      .where(and(
+        inArray(s.tasks.parentId, parentIds),
+        eq(s.tasks.userId, userId),
+      ))
+      .groupBy(s.tasks.parentId)
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      if (row.parentId) map.set(row.parentId, row.count)
+    }
+    return map
   }
 
   // ─── 写入方法 ──────────────────────────────────────────────────
