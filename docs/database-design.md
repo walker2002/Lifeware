@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_06_03 (refactor)**：Task Domain 重构 — `projects` → `threads` 表（`project_id` → `thread_id`，移除 `planning` 状态）；删除 `project_templates`/`task_templates` 表（MVP 不实现模板）；`tasks` 表新增双轴标签列（AI 维护：`clarity`/`complexity`/`decomposition`，用户管理：`capture_mode`/`energy_profile`/`scheduling_constraint`/`tracking`）+ `ai_tags` 扩展数据列；新增 8 个相关索引
 - **2026_05_30 (enhancement)**：新增 `user_activities` 用户行为埋点表（统一分析入口，append-only，不走 Nexus 管道）；表结构总览新增"用户行为分析"分类
 - **2026_05_28 (refactor)**：执行记录模型统一化 —— `habit_logs` 字段对齐 ExecutionRecord（`status` → `completion_status`，新增 `planned_duration`/`deviation_minutes`/`completion_rating`/`energy_level`，source 扩展 `'timebox_sync'`）；新增 `task_execution_logs` 表
 - 2026_05_25 (sync)：同步代码变更 — 移除 tasks/projects/project_templates/task_templates 时间字段；更新 ai_sessions 表（新增 domain_id/action/session_mode，扩展状态枚举为 6 值）；新增 memory_episodes 表；system_events.triggered_by 新增 context_engine/handler；reviews.type 新增 semi_annual
@@ -385,17 +386,17 @@ CREATE TABLE tasks (
   schema_version    integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status            text not null check (status in ('draft', 'active', 'scheduled', 'in_progress', 'on_hold', 'completed', 'archived')),
+  status            text not null check (status in ('todo', 'planned', 'in_progress', 'completed', 'archived')),
   title             text not null,
   description       text,
   priority          text not null check (priority in ('critical', 'high', 'medium', 'low')),
   energy_required   text not null check (energy_required in ('high', 'medium', 'low')),
-  estimated_duration integer not null,
+  estimated_duration integer,
   actual_duration   integer,
 
   -- 关联字段（查询关键）
   parent_id         uuid references tasks(id) on delete set null,  -- 父任务
-  project_id        uuid references projects(id) on delete set null,  -- 归属项目
+  thread_id         uuid references threads(id) on delete set null,  -- 归属主线
   key_result_id     uuid references key_results(id) on delete set null,
   -- timebox_id 使用软引用，通过 timebox_tasks 关联表维护多对多关系
   -- 此字段仅表示"当前激活的 Timebox"，是派生的便利字段
@@ -421,30 +422,48 @@ CREATE TABLE tasks (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   completed_at      timestamptz,
-  archived_at       timestamptz
+  archived_at       timestamptz,
+
+  -- ── AI 维护标签（认知轴）──
+  clarity           text not null default 'fuzzy' check (clarity in ('fuzzy', 'scoped', 'actionable')),
+  complexity        jsonb not null default '[]',  -- ComplexityTag[]
+  decomposition     text check (decomposition in ('atomic', 'splittable', 'splitting_in_progress', 'decomposed')),
+
+  -- ── 用户管理标签（执行轴）──
+  capture_mode      text not null default 'ad_hoc' check (capture_mode in ('scheduled', 'ad_hoc', 'retrospective')),
+  energy_profile    text check (energy_profile in ('light', 'deep', 'admin', 'creative', 'reactive')),
+  scheduling_constraint text check (scheduling_constraint in ('hard_deadline', 'soft_target', 'opportunistic', 'recurring')),
+  tracking          text not null default 'check_in' check (tracking in ('none', 'check_in', 'log', 'review')),
+
+  -- ── AI 辅助扩展数据 ──
+  ai_tags           jsonb not null default '{}',
+
+  -- 约束
+  constraint check_tasks_dates check (end_date is null or end_date >= start_date)
 );
 
 -- 索引
-CREATE INDEX idx_tasks_user_status ON tasks(user_id, status) where archived_at is null;
-CREATE INDEX idx_tasks_priority ON tasks(user_id, priority) where status in ('active', 'scheduled');
-CREATE INDEX idx_tasks_due_date ON tasks(user_id, due_date) where due_date is not null and archived_at is null;
-CREATE INDEX idx_tasks_key_result ON tasks(key_result_id) where key_result_id is not null;
-CREATE INDEX idx_tasks_timebox ON tasks(timebox_id) where timebox_id is not null;
-CREATE INDEX idx_tasks_user_project ON tasks(user_id, project_id);
+CREATE INDEX idx_tasks_user_status ON tasks(user_id, status);
+CREATE INDEX idx_tasks_user_clarity ON tasks(user_id, clarity);
+CREATE INDEX idx_tasks_user_thread ON tasks(user_id, thread_id);
 CREATE INDEX idx_tasks_user_parent ON tasks(user_id, parent_id);
-CREATE INDEX idx_tasks_project_status ON tasks(project_id, status);
+CREATE INDEX idx_tasks_user_priority ON tasks(user_id, priority);
+CREATE INDEX idx_tasks_user_energy ON tasks(user_id, energy_profile);
+CREATE INDEX idx_tasks_user_constraint ON tasks(user_id, scheduling_constraint);
+CREATE INDEX idx_tasks_user_tracking ON tasks(user_id, tracking);
+CREATE INDEX idx_tasks_due_date ON tasks(user_id, due_date);
 ```
 
 > **设计说明**：`tasks.timebox_id` 使用软引用（不设 FK constraint）。原因：`timeboxes` 和 `tasks` 之间是多对多关系（通过 `timebox_tasks` 关联表），`tasks.timebox_id` 只表示"当前激活的 Timebox"，是一个派生的便利字段。
 
 ---
 
-### 4.3a projects
+### 4.3a threads（主线表）
 
-对应 USOM `Project`。
+对应 USOM `Thread`（替代原 `projects`）。
 
 ```sql
-CREATE TABLE projects (
+CREATE TABLE threads (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references users(id) on delete cascade,
   schema_version integer not null default 1,
@@ -452,7 +471,7 @@ CREATE TABLE projects (
   -- 查询关键字段（独立列）
   name        text not null,
   description text,
-  status      text not null check (status in ('planning', 'active', 'paused', 'completed', 'archived')),
+  status      text not null check (status in ('active', 'paused', 'completed', 'archived')),
 
   -- 时间字段（查询关键）
   start_date  date,
@@ -466,7 +485,6 @@ CREATE TABLE projects (
   tags        jsonb not null default '[]',
 
   -- 审计字段
-  notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   completed_at  timestamptz,
@@ -474,74 +492,11 @@ CREATE TABLE projects (
 );
 
 -- 索引
-CREATE INDEX idx_projects_user_status ON projects(user_id, status);
-CREATE INDEX idx_projects_user_start_date ON projects(user_id, start_date);
+CREATE INDEX idx_threads_user_status ON threads(user_id, status);
+CREATE INDEX idx_threads_user_start ON threads(user_id, start_date);
 ```
 
----
-
-### 4.3b project_templates
-
-对应 USOM `ProjectTemplate`。
-
-```sql
-CREATE TABLE project_templates (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references users(id) on delete cascade,
-
-  -- 查询关键字段（独立列）
-  name        text not null,
-  description text,
-
-  -- 其他
-  priority    text check (priority in ('critical', 'high', 'medium', 'low')),
-  color       text,
-
-  -- JSONB 允许：tags 不参与 WHERE 过滤
-  tags        jsonb not null default '[]',
-
-  -- 审计字段
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-
--- 索引
-CREATE INDEX idx_project_templates_user ON project_templates(user_id);
-```
-
----
-
-### 4.3c task_templates
-
-对应 USOM `TaskTemplate`。
-
-```sql
-CREATE TABLE task_templates (
-  id                   uuid primary key default gen_random_uuid(),
-  project_template_id  uuid references project_templates(id) on delete cascade,
-  parent_template_id   uuid references task_templates(id) on delete set null,
-
-  -- 查询关键字段（独立列）
-  title        text not null,
-  description  text,
-  priority     text check (priority in ('critical', 'high', 'medium', 'low')),
-  energy_required text check (energy_required in ('high', 'medium', 'low')),
-  estimated_duration integer,  -- 分钟
-
-  -- 频率
-  frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
-
-  -- 排序
-  sort_order   integer not null default 0,
-
-  -- 审计字段
-  created_at   timestamptz not null default now()
-);
-
--- 索引
-CREATE INDEX idx_task_templates_project ON task_templates(project_template_id);
-CREATE INDEX idx_task_templates_parent ON task_templates(parent_template_id);
-```
+> **注意**：`project_templates` 和 `task_templates` 表已在 Task Domain 重构中移除（MVP 不实现模板功能）。
 
 ---
 
@@ -1406,9 +1361,7 @@ interface DerivedSignalsRepository {
 | `ai_sessions` | AI 会话表 |
 | `user_settings` | 用户设置表 |
 | `memory_episodes` | 记忆片段表 |
-| `projects` | 项目表 |
-| `project_templates` | 项目模板表 |
-| `task_templates` | 任务模板表 |
+| `threads` | 主线表（替代原 projects） |
 | `energy_logs` | 能量日志表 |
 
 ### 可选 / 推迟

@@ -298,7 +298,7 @@ required_fields:
       required: false
     - name: color
       label: 颜色
-      type: color
+      type: text
       required: false
     - name: priority
       label: 优先级
@@ -337,6 +337,8 @@ cnui_surfaces:
   thread-creation-card:
     handler: ./cnui/handlers
   thread-promote-card:
+    handler: ./cnui/handlers
+  thread-action-panel:
     handler: ./cnui/handlers
   task-creation-card:
     handler: ./cnui/handlers

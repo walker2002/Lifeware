@@ -231,5 +231,6 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'task-action-panel': taskCnuiHandler,
   'thread-creation-card': taskCnuiHandler,
   'thread-promote-card': taskCnuiHandler,
+  'thread-action-panel': taskCnuiHandler,
   'task-split-card': taskCnuiHandler,
 }

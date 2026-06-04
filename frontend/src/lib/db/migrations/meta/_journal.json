@@ -92,6 +92,13 @@
       "when": 1780700000000,
       "tag": "0012_add_user_activities",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0013_task_domain_refactor",
+      "breakpoints": true
     }
   ]
 }
