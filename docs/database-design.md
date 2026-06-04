@@ -419,6 +419,8 @@ CREATE TABLE tasks (
 
   -- 审计字段
   notes             text,
+  acceptance_criteria text,    -- 验收标准（占位）
+  expected_output     text,    -- 预期产出物描述（占位）
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   completed_at      timestamptz,

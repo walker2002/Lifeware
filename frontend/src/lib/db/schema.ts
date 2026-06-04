@@ -200,6 +200,10 @@ export const tasks = pgTable('tasks', {
 
   // AI 辅助扩展数据
   aiTags: jsonb('ai_tags').notNull().$type<Record<string, unknown>>().default({}),
+
+  // AI 辅助占位字段（未来功能）
+  acceptanceCriteria: text('acceptance_criteria'),
+  expectedOutput: text('expected_output'),
 }, (table) => [
   index('idx_tasks_user_status').on(table.userId, table.status),
   index('idx_tasks_user_clarity').on(table.userId, table.clarity),

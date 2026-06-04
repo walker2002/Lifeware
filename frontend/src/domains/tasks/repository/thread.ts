@@ -5,13 +5,22 @@
  * 实现 IThreadRepository 接口，提供主线数据的数据库操作
  */
 
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { db } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IThreadRepository, CreateThreadInput, UpdateThreadInput } from '../../../usom/interfaces/irepository'
 import type { Thread } from '../../../usom/types/objects'
 import type { USOM_ID, Timestamp } from '../../../usom/types/primitives'
 import { threadRowToUSOM, threadUSOMToRow } from '../../../lib/db/repositories/mappers'
+
+/**
+ * 带任务计数的 Thread 查询结果
+ */
+export interface ThreadWithCount {
+  thread: Thread
+  taskCount: number
+  completedTaskCount: number
+}
 
 /**
  * 主线仓储
@@ -43,6 +52,74 @@ export class ThreadRepository implements IThreadRepository {
     const rows = await db.select().from(s.threads)
       .where(and(eq(s.threads.userId, userId), eq(s.threads.status, status)))
     return rows.map(r => threadRowToUSOM(r as any))
+  }
+
+  /**
+   * 根据 ID 查找单个主线并附带任务计数
+   * @param id - 主线 ID
+   * @param userId - 用户 ID
+   * @returns 带计数的 Thread 或 null
+   */
+  async findByIdWithCount(id: USOM_ID, userId: USOM_ID): Promise<ThreadWithCount | null> {
+    const rows = await db.select({
+      thread: s.threads,
+      taskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} != 'archived')::int`,
+      completedTaskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} = 'completed')::int`,
+    })
+      .from(s.threads)
+      .leftJoin(s.tasks, and(
+        eq(s.tasks.threadId, s.threads.id),
+        sql`${s.tasks.status} != 'archived'`,
+      ))
+      .where(and(eq(s.threads.id, id), eq(s.threads.userId, userId)))
+      .groupBy(s.threads.id)
+
+    if (rows.length === 0) return null
+    return {
+      thread: threadRowToUSOM(rows[0].thread as any),
+      taskCount: rows[0].taskCount,
+      completedTaskCount: rows[0].completedTaskCount,
+    }
+  }
+
+  /**
+   * 查找所有主线并附带任务计数，按 status > priority > updatedAt 排序
+   * @param userId - 用户 ID
+   * @returns 带计数的 Thread 列表
+   */
+  async findAllWithCount(userId: USOM_ID): Promise<ThreadWithCount[]> {
+    const rows = await db.select({
+      thread: s.threads,
+      taskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} != 'archived')::int`,
+      completedTaskCount: sql<number>`count(${s.tasks.id}) filter (where ${s.tasks.status} = 'completed')::int`,
+    })
+      .from(s.threads)
+      .leftJoin(s.tasks, and(
+        eq(s.tasks.threadId, s.threads.id),
+        sql`${s.tasks.status} != 'archived'`,
+      ))
+      .where(eq(s.threads.userId, userId))
+      .groupBy(s.threads.id)
+      .orderBy(
+        sql`CASE ${s.threads.status}
+        WHEN 'active' THEN 0
+        WHEN 'paused' THEN 1
+        WHEN 'completed' THEN 2
+        ELSE 3 END`,
+        sql`CASE ${s.threads.priority}
+        WHEN 'critical' THEN 0
+        WHEN 'high' THEN 1
+        WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3
+        ELSE 4 END`,
+        s.threads.updatedAt,
+      )
+
+    return rows.map(r => ({
+      thread: threadRowToUSOM(r.thread as any),
+      taskCount: r.taskCount,
+      completedTaskCount: r.completedTaskCount,
+    }))
   }
 
   // ─── 写入方法 ──────────────────────────────────────────────────
