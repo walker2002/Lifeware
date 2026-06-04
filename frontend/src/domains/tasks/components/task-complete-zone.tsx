@@ -147,6 +147,33 @@ function CheckInForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps
           </div>
         </div>
 
+        {/* 事后补录：额外时间字段 */}
+        {task.captureMode === 'retrospective' && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">实际执行日期</label>
+              <input
+                type="date"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">开始时间</label>
+              <input
+                type="time"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">结束时间</label>
+              <input
+                type="time"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handleComplete}
@@ -213,6 +240,33 @@ function LogForm({ task, userId, repo, onTaskUpdate }: TaskCompleteZoneProps) {
             <span className="text-xs text-muted-soft">分钟</span>
           </div>
         </div>
+
+        {/* 事后补录：额外时间字段 */}
+        {task.captureMode === 'retrospective' && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">实际执行日期</label>
+              <input
+                type="date"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">开始时间</label>
+              <input
+                type="time"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">结束时间</label>
+              <input
+                type="time"
+                className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-soft">本次产出</label>

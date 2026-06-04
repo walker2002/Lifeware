@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft } from 'lucide-react'
+import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
 import { TaskRepository } from '../repository/task'
@@ -222,6 +222,14 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
           {/* 任务内容 */}
           {!loading && task && (
             <div className="p-5 flex flex-col gap-5">
+              {/* ── 事后补录横幅 ── */}
+              {task.captureMode === 'retrospective' && (
+                <div className="mx-0 flex items-center gap-2 rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+                  <Zap className="size-4 shrink-0" />
+                  <span>事后补录模式 — 此任务为事后追加，请填写实际执行信息</span>
+                </div>
+              )}
+
               {/* ── A 区：任务编辑 ── */}
               <TaskEditZone task={task} repo={repo} onTaskUpdate={handleTaskUpdate} />
 
