@@ -8,9 +8,9 @@
  * @see docs/usom-design.md Section 4.2
  */
 
-import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
+import type { USOM_ID, Timestamp, USOMObjectType } from '@/usom/types/primitives'
 import type { Timebox, Habit, HabitFrequency, Objective, KeyResult } from '@/usom/types/objects'
-import type { HabitStatus, ObjectiveStatus, TaskStatus, ThreadStatus } from '@/usom/types/primitives'
+import type { HabitStatus, ObjectiveStatus } from '@/usom/types/primitives'
 import type {
   StateProposal,
   SystemEvent,
@@ -35,11 +35,12 @@ import type {
   IHabitLogRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
+import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOMSnapshot } from '@/usom/types/process'
 import { createTimeboxStateMachine, createGenericStateMachine } from '../core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain, findHandler } from '@/domains/registry'
-import { buildActionMap, resolveObjectType, getTransitionFromManifest } from './lifecycle-configs'
+import { buildActionMap, resolveObjectType, getTransitionFromManifest, getLifecycleFromManifest } from './lifecycle-configs'
 import { assembleContext } from '@/nexus/context-engine'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { evaluateProposals } from '@/nexus/core/rule-engine'
@@ -130,6 +131,10 @@ export interface OrchestratorResult {
   success: boolean
   timebox?: Timebox
   habit?: Habit
+  /** 通用 SM 路径返回的对象（Record 形式） */
+  object?: Record<string, unknown>
+  /** 通用 SM 路径返回的对象类型 */
+  objectType?: string
   actionSurface?: ActionSurface
   error?: string
   warnings?: string[]
@@ -168,6 +173,8 @@ export interface OrchestratorDeps {
   keyResultRepo?: IKeyResultRepository
   taskRepo?: ITaskRepository
   threadRepo?: IThreadRepository
+  /** 通用仓储获取工厂（用于通用 SM 路径） */
+  getRepo?: (domainId: string, objectType: string) => GenericRepo
   onTrace?: (step: TraceStep) => void
 }
 
@@ -928,145 +935,50 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // ─── Tasks 域 ──────────────────────────────────────
-      if (domainId === 'tasks') {
-        if (!deps.taskRepo) {
-          return { success: false, error: 'TaskRepository 未配置' }
-        }
+      // ─── 通用 SM 路径（已迁移的域） ─────────────────────
+      if (deps.getRepo) {
+        const smObjectType = getObjectType(intent)
+        const repo = deps.getRepo(domainId, smObjectType)
+        const sm = createGenericStateMachine({
+          getRepository: () => repo,
+          eventRepo: deps.eventRepo,
+          getLifecycle: (dId, objType) => {
+            const lc = getLifecycleFromManifest(dId, objType)
+            if (!lc) throw new Error(`未找到 lifecycle: ${dId}/${objType}`)
+            return lc
+          },
+          domainId,
+        })
 
-        const now = new Date().toISOString() as Timestamp
-        const isThreadAction = intent.action.toLowerCase().includes('thread')
-
-        if (isThreadAction) {
-          // 主线操作
-          if (!deps.threadRepo) {
-            return { success: false, error: 'ThreadRepository 未配置' }
-          }
-
-          if (action === 'create') {
-            const transition = getTransitionFromManifest('tasks', 'thread', null, 'create')
-            if (!transition) {
-              return { success: false, error: '非法状态转换: 主线创建失败' }
-            }
-
-            const thread = await deps.threadRepo.create(
-              {
-                name: intent.fields.name as string,
-                description: intent.fields.description as string | undefined,
-                priority: intent.fields.priority as import('@/usom/types/primitives').Priority | undefined,
-                startDate: intent.fields.startDate as import('@/usom/types/primitives').DateOnly | undefined,
-                endDate: intent.fields.endDate as import('@/usom/types/primitives').DateOnly | undefined,
-                color: intent.fields.color as string | undefined,
-              },
-              userId,
-            )
-
-            const event: SystemEvent = {
-              id: crypto.randomUUID() as USOM_ID,
-              type: transition.eventType as SystemEventType,
-              occurredAt: now,
-              triggeredBy: 'state_machine',
-              payload: { threadId: thread.id, name: thread.name, toStatus: transition.to },
-              snapshotId: '' as USOM_ID,
-            }
-            await deps.eventRepo.append(event, userId)
-            eventBus.publish(event)
-
-            return { success: true, warnings: ruleResult.warnings }
-          }
-
-          // 非 create: 状态转换
-          const threadId = intent.fields.threadId as USOM_ID
-          const existing = await deps.threadRepo.findById(threadId, userId)
-          if (!existing) {
-            return { success: false, error: '主线不存在' }
-          }
-
-          const transition = getTransitionFromManifest('tasks', 'thread', existing.status, action)
-          if (!transition) {
-            return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
-          }
-
-          await deps.threadRepo.updateStatus(threadId, transition.to as ThreadStatus, userId)
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: { threadId, name: existing.name, fromStatus: existing.status, toStatus: transition.to },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, warnings: ruleResult.warnings }
-        }
-
-        // Task 操作
-        if (action === 'create') {
-          const transition = getTransitionFromManifest('tasks', 'task', null, 'create')
-          if (!transition) {
-            return { success: false, error: '非法状态转换: 任务创建失败' }
-          }
-
-          const created = await deps.taskRepo.create({
-            title: intent.fields.title as string,
-            description: intent.fields.description as string | undefined,
-            priority: (intent.fields.priority ?? 'medium') as import('@/usom/types/primitives').Priority,
-            energyRequired: (intent.fields.energyRequired ?? 'medium') as import('@/usom/types/primitives').EnergyLevel,
-            estimatedDuration: (intent.fields.estimatedDuration ?? 60) as number,
-            threadId: intent.fields.threadId as USOM_ID | undefined,
-            parentId: intent.fields.parentId as USOM_ID | undefined,
-            startDate: intent.fields.startDate as import('@/usom/types/primitives').DateOnly | undefined,
-            endDate: intent.fields.endDate as import('@/usom/types/primitives').DateOnly | undefined,
-            clarity: (intent.fields.clarity as import('@/usom/types/primitives').ClarityLevel) ?? 'scoped',
-            complexity: (intent.fields.complexity as import('@/usom/types/primitives').ComplexityTag[]) ?? ['routine'],
-            captureMode: 'ad_hoc',
-            tracking: 'none',
-          }, userId)
-          if (!created) {
-            return { success: false, error: '任务创建失败' }
-          }
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'state_machine',
-            payload: { taskId: created.id, title: created.title, toStatus: transition.to as string },
-            snapshotId: '' as USOM_ID,
-          }
-          await deps.eventRepo.append(event, userId)
-          eventBus.publish(event)
-
-          return { success: true, warnings: ruleResult.warnings }
-        }
-
-        // 非 create: 状态转换
-        const taskId = intent.fields.taskId as USOM_ID
-        const existing = await deps.taskRepo.findById(taskId, userId)
-        if (!existing) {
-          return { success: false, error: '任务不存在' }
-        }
-
-        const transition = getTransitionFromManifest('tasks', 'task', existing.status, action)
-        if (!transition) {
-          return { success: false, error: `非法状态转换: action="${action}", fromState="${existing.status}"` }
-        }
-
-        await deps.taskRepo.updateStatus(taskId, transition.to as TaskStatus, userId)
-        const event: SystemEvent = {
+        const proposal: StateProposal = {
           id: crypto.randomUUID() as USOM_ID,
-          type: transition.eventType as SystemEventType,
-          occurredAt: now,
-          triggeredBy: 'state_machine',
-          payload: { taskId, title: existing.title, fromStatus: existing.status, toStatus: transition.to },
-          snapshotId: '' as USOM_ID,
+          intentId: intent.id,
+          targetObject: {
+            type: smObjectType as USOMObjectType,
+            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : 'objectId'] as USOM_ID | undefined),
+          },
+          action,
+          payload: intent.fields,
+          approvedAt: new Date().toISOString() as Timestamp,
+          approvedBy: 'rule_engine',
         }
-        await deps.eventRepo.append(event, userId)
-        eventBus.publish(event)
 
-        return { success: true, warnings: ruleResult.warnings }
+        const smResult = await sm.execute(proposal, eventBus, userId)
+
+        if (!smResult.success) {
+          return { success: false, error: smResult.error }
+        }
+
+        if (domain && smResult.event) {
+          domain.onEvent(smResult.event, usomSnapshot)
+        }
+
+        return {
+          success: true,
+          object: smResult.object,
+          objectType: smObjectType,
+          warnings: ruleResult.warnings,
+        }
       }
 
       return { success: false, error: `未知的域: ${domainId}` }
