@@ -9,7 +9,6 @@
  */
 
 import type { USOM_ID, Timestamp, USOMObjectType } from '@/usom/types/primitives'
-import type { Timebox, Habit } from '@/usom/types/objects'
 import type {
   StateProposal,
   SystemEvent,
@@ -22,15 +21,7 @@ import type {
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type {
-  ITimeboxRepository,
   ISystemEventRepository,
-  IHabitRepository,
-  IHabitTemplateRepository,
-  IObjectiveRepository,
-  IKeyResultRepository,
-  ITaskRepository,
-  IThreadRepository,
-  IHabitLogRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -101,22 +92,10 @@ interface ActionSurfaceEngine {
 }
 
 /**
- * 应用模板结果接口
- * @property success - 是否成功
- * @property generatedTimeboxes - 生成的时间盒列表
- * @property error - 错误信息
- */
-export interface ApplyTemplateResult {
-  success: boolean
-  generatedTimeboxes?: Timebox[]
-  error?: string
-}
-
-/**
  * 协调器执行结果接口
  * @property success - 是否成功
- * @property timebox - 生成/更新的时间盒
- * @property habit - 生成/更新的习惯
+ * @property object - 通用 SM 路径返回的对象（Record 形式）
+ * @property objectType - 通用 SM 路径返回的对象类型
  * @property actionSurface - 动作表面
  * @property error - 错误信息
  * @property warnings - 警告信息列表
@@ -127,8 +106,6 @@ export interface ApplyTemplateResult {
  */
 export interface OrchestratorResult {
   success: boolean
-  timebox?: Timebox
-  habit?: Habit
   /** 通用 SM 路径返回的对象（Record 形式） */
   object?: Record<string, unknown>
   /** 通用 SM 路径返回的对象类型 */
@@ -144,35 +121,20 @@ export interface OrchestratorResult {
 
 /**
  * 协调器依赖接口
- * @property timeboxRepo - 时间盒仓储
  * @property eventRepo - 系统事件仓储
  * @property intentEngine - 意图引擎
  * @property ruleEngine - 规则引擎
  * @property actionSurfaceEngine - 动作表面引擎（可选）
- * @property habitRepo - 习惯仓储（可选）
- * @property habitLogRepo - 习惯日志仓储（可选）
- * @property templateRepo - 模板仓储（可选）
- * @property objectiveRepo - 目标仓储（可选）
- * @property keyResultRepo - 关键结果仓储（可选）
- * @property taskRepo - 任务仓储（可选）
- * @property threadRepo - 主线仓储（可选）
+ * @property getRepo - 通用仓储获取工厂
  * @property onTrace - 追踪回调函数（可选）
  */
 export interface OrchestratorDeps {
-  timeboxRepo: ITimeboxRepository
   eventRepo: ISystemEventRepository
   intentEngine: IntentEngine
   ruleEngine: RuleEngine
   actionSurfaceEngine?: ActionSurfaceEngine
-  habitRepo?: IHabitRepository
-  habitLogRepo?: IHabitLogRepository
-  templateRepo?: IHabitTemplateRepository
-  objectiveRepo?: IObjectiveRepository
-  keyResultRepo?: IKeyResultRepository
-  taskRepo?: ITaskRepository
-  threadRepo?: IThreadRepository
-  /** 通用仓储获取工厂（用于通用 SM 路径） */
-  getRepo?: (domainId: string, objectType: string) => GenericRepo
+  /** 通用仓储获取工厂 */
+  getRepo: (domainId: string, objectType: string) => GenericRepo
   onTrace?: (step: TraceStep) => void
 }
 
@@ -340,11 +302,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // 委托给 executeIntent（统一走通用 SM 路径）
       const result = await orchestrator.executeIntent(intent, userId, confirmed)
 
-      // 兼容：通用 SM 路径返回 object，旧调用方读取 timebox
-      if (result.success && result.object && result.objectType === 'timebox') {
-        result.timebox = result.object as unknown as Timebox
-      }
-
       // ActionSurface 生成（executeIntent 不处理，由 execute 补充）
       if (result.success) {
         const snapshot = createStubSnapshot(userId)
@@ -388,11 +345,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       const result = await orchestrator.executeIntent(stubIntent, userId, confirmed)
-
-      // 兼容：通用 SM 路径返回 object，旧调用方读取 timebox
-      if (result.success && result.object && result.objectType === 'timebox') {
-        result.timebox = result.object as unknown as Timebox
-      }
 
       return result
     },
@@ -461,7 +413,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const action = toStateMachineAction(intent.action)
 
       // ─── 通用 SM 路径（所有已迁移的域） ─────────────────────
-      if (deps.getRepo) {
+      {
         const smObjectType = getObjectType(intent)
         const repo = deps.getRepo(domainId, smObjectType)
 
@@ -496,24 +448,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           approvedBy: 'rule_engine',
         }
 
-        // OKR 域激活前置校验：需要 >= 1 draft KR + 周期日期
-        if (domainId === 'okrs' && action === 'activate' && deps.objectiveRepo && deps.keyResultRepo) {
-          const objectiveId = intent.fields.objectiveId as USOM_ID | undefined
-          if (objectiveId) {
-            const existing = await deps.objectiveRepo.findById(objectiveId, userId)
-            if (existing) {
-              if (!(existing as any).period?.start || !(existing as any).period?.end) {
-                return { success: false, error: '激活失败: 必须设置周期起止日期' }
-              }
-              const krs = await deps.keyResultRepo.findByObjective(objectiveId, userId)
-              const draftKRs = krs.filter((kr: any) => kr.status === 'draft')
-              if (draftKRs.length === 0) {
-                return { success: false, error: '激活失败: 至少需要 1 个草稿关键结果' }
-              }
-            }
-          }
-        }
-
         const smResult = await sm.execute(proposal, eventBus, userId)
 
         if (!smResult.success) {
@@ -531,8 +465,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           warnings: ruleResult.warnings,
         }
       }
-
-      return { success: false, error: `未知的域: ${domainId}` }
     },
 
     /** 生成型路径 — 从 executeIntent 提取的独立方法 */
@@ -772,104 +704,6 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
     },
 
-    /** 重新计算习惯打卡指标并持久化 */
-    async recalculateHabitMetrics(habitId: USOM_ID, userId: USOM_ID): Promise<void> {
-      if (!deps.habitRepo) return
-      const streak = await deps.habitRepo.calculateStreak(habitId, userId)
-      const longestStreak = await deps.habitRepo.calculateLongestStreak(habitId, userId)
-      const completionRate7d = await deps.habitRepo.calculateCompletion7d(habitId, userId)
-      await deps.habitRepo.updateMetrics(habitId, userId, { streak, longestStreak, completionRate7d })
-    },
-
-    /** 应用模板生成每日时间盒计划 */
-    async applyTemplate(
-      templateId: USOM_ID,
-      date: string,
-      userId: USOM_ID,
-    ): Promise<ApplyTemplateResult> {
-      if (!deps.templateRepo || !deps.habitRepo) {
-        return { success: false, error: 'TemplateRepository 或 HabitRepository 未配置' }
-      }
-
-      const template = await deps.templateRepo.findById(templateId, userId)
-      if (!template) {
-        return { success: false, error: '模板不存在' }
-      }
-
-      if (template.habits.length === 0) {
-        return { success: false, error: '模板中没有习惯' }
-      }
-
-      const dayStart = `${date}T00:00:00+08:00` as Timestamp
-      const dayEnd = `${date}T23:59:59+08:00` as Timestamp
-      const existingTimeboxes = await deps.timeboxRepo.findByDateRange(dayStart, dayEnd, userId)
-
-      const templateHabitIds = new Set(template.habits.map(h => h.habitId))
-      const coveredHabits = new Set<string>()
-      for (const tb of existingTimeboxes) {
-        for (const hid of tb.habitIds) {
-          if (templateHabitIds.has(hid)) {
-            coveredHabits.add(hid)
-          }
-        }
-      }
-      if (coveredHabits.size === templateHabitIds.size && templateHabitIds.size > 0) {
-        return {
-          success: false,
-          error: '今日已使用该模板生成计划，如需调整请直接编辑时间盒',
-        }
-      }
-
-      const now = new Date().toISOString() as Timestamp
-      const generated: Timebox[] = []
-
-      for (const item of template.habits) {
-        const habit = await deps.habitRepo.findById(item.habitId, userId)
-        if (!habit) continue
-
-        const startTime = item.timeOverride ?? habit.defaultTime
-        const duration = item.durationOverride ?? habit.defaultDuration
-
-        const [sh, sm] = startTime.split(':').map(Number)
-        const totalMin = sh * 60 + sm + duration
-        const eh = Math.floor(totalMin / 60) % 24
-        const em = totalMin % 60
-        const endTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`
-
-        const timeboxId = crypto.randomUUID() as USOM_ID
-        const timebox: Timebox = {
-          id: timeboxId,
-          status: 'planned',
-          title: habit.title,
-          startTime: `${date}T${startTime}:00+08:00` as Timestamp,
-          endTime: `${date}T${endTime}:00+08:00` as Timestamp,
-          taskIds: [],
-          habitIds: [habit.id],
-          isRecurring: false,
-          tags: [],
-          createdAt: now,
-          updatedAt: now,
-        }
-
-        await deps.timeboxRepo.save(timebox, userId)
-
-        const event: SystemEvent = {
-          id: crypto.randomUUID() as USOM_ID,
-          type: 'TimeboxCreated',
-          occurredAt: now,
-          triggeredBy: 'template_apply',
-          payload: { timeboxId, templateId, habitId: habit.id, date },
-          snapshotId: '' as USOM_ID,
-        }
-
-        await deps.eventRepo.append(event, userId)
-        eventBus.publish(event)
-
-        generated.push(timebox)
-      }
-
-      return { success: true, generatedTimeboxes: generated }
-    },
   }
 
   return orchestrator
