@@ -13,6 +13,7 @@ import type { StateProposal, SystemEvent } from '@/usom/types/process'
 import type { ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import type { LifecycleDefinition, FieldMetadata, LifecycleTransition } from '@/usom/types/domain-types'
+import type { ParentChildStatusRule, CascadeResult } from './cascade'
 import { findTransition, timeboxTransitions } from '@/domains/timebox/transitions'
 
 // ─── 旧版接口（向后兼容，Phase 7 移除） ─────────────────────────
@@ -28,6 +29,8 @@ export interface StateMachineResult {
   object?: Record<string, unknown>
   event?: SystemEvent
   error?: string
+  /** Cascade 执行结果 */
+  cascadeResults?: CascadeResult[]
 }
 
 /**
@@ -214,6 +217,10 @@ export interface GenericStateMachineDeps {
   eventRepo: ISystemEventRepository
   getLifecycle: (domainId: string, objectType: string) => LifecycleDefinition
   getFieldMetadata?: (domainId: string, objectType: string) => Record<string, FieldMetadata>
+  /** 获取 cascade 规则（可选，从 manifest cascade_rules 读取） */
+  getCascadeRules?: (domainId: string) => ParentChildStatusRule[]
+  /** 域 ID（用于 cascade 规则查找） */
+  domainId?: string
 }
 
 /**
@@ -404,7 +411,25 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
         }
       }
 
-      return { success: true, object, event }
+      // 6. Cascade 处理
+      let cascadeResults: CascadeResult[] = []
+      if (deps.getCascadeRules && deps.domainId) {
+        const cascadeRules = deps.getCascadeRules(deps.domainId)
+        for (const rule of cascadeRules) {
+          const { executeCascade } = await import('./cascade')
+          const cascadeResult = await executeCascade({
+            rule,
+            parentObjectType: objectType,
+            parentAction: proposal.action,
+            parentId: object.id as USOM_ID,
+            userId,
+            getRepo: (_domainId: string, objType: string) => deps.getRepository(objType),
+          })
+          cascadeResults.push(...cascadeResult)
+        }
+      }
+
+      return { success: true, object, event, cascadeResults }
     },
   }
 }
