@@ -17,8 +17,16 @@ import {
   ClipboardList,
   Sparkles,
   ListTodo,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { TaskRepository } from '../repository/task'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
@@ -214,6 +222,14 @@ export function TaskTreeView({
     setIsCreating(false)
   }, [quickAddText, isCreating, repo, threadId])
 
+  // ─── 状态变更 ──────────────────────────────────────────────
+
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: Task['status']) => {
+    const userId = 'placeholder' as any
+    await repo.updateStatus(taskId as any, newStatus, userId)
+    setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
+  }, [repo])
+
   // ─── 渲染 ────────────────────────────────────────────────────
 
   return (
@@ -241,6 +257,7 @@ export function TaskTreeView({
               childData={childData}
               onToggle={handleToggle}
               onOpenTaskDetail={onOpenTaskDetail}
+              onStatusChange={handleStatusChange}
               repo={repo}
             />
           ))}
@@ -280,6 +297,7 @@ interface TaskTreeRowProps {
   childData: Map<string, Task[]>
   onToggle: (node: TreeNode) => void
   onOpenTaskDetail?: (taskId: string) => void
+  onStatusChange: (taskId: string, newStatus: Task['status']) => void
   repo: TaskRepository
 }
 
@@ -293,6 +311,7 @@ function TaskTreeRow({
   childData,
   onToggle,
   onOpenTaskDetail,
+  onStatusChange,
   repo,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
@@ -348,14 +367,6 @@ function TaskTreeRow({
     : null
   const FinalIcon = EnergyIcon || isMore
 
-  // ─── 状态图标 ──────────────────────────────────────────────
-
-  const statusIcon = task.status === 'completed' ? (
-    <svg className="size-3 text-success" viewBox="0 0 12 12" fill="none">
-      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ) : null
-
   return (
     <>
       {/* ═══ 当前节点行 ═══════════════════════════════════════ */}
@@ -392,17 +403,38 @@ function TaskTreeRow({
           ) : null}
         </div>
 
-        {/* 状态圆点 */}
-        <div className="flex-shrink-0 flex items-center justify-center size-4 rounded-full overflow-hidden">
-          {statusIcon || (
-            <div
-              className={cn(
-                'size-3 rounded-full',
-                STATUS_DOT_CLASS[task.status] || 'border border-muted bg-transparent',
-              )}
-            />
-          )}
-        </div>
+        {/* 状态变更快捷菜单 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button onClick={(e) => e.stopPropagation()}
+              className={cn('shrink-0 size-4 rounded-full flex items-center justify-center', STATUS_DOT_CLASS[task.status] || 'border border-muted bg-transparent')}>
+              {task.status === 'completed' && <Check className="size-2.5 text-white" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-36">
+            {task.status === 'todo' && (<>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'planned') }}>计划中</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in_progress') }}>开始执行</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'archived') }}>归档</DropdownMenuItem>
+            </>)}
+            {task.status === 'planned' && (<>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in_progress') }}>开始执行</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo') }}>回到待办</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'archived') }}>归档</DropdownMenuItem>
+            </>)}
+            {task.status === 'in_progress' && (<>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'completed') }}>标记完成</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo') }}>暂停回待办</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'archived') }}>归档</DropdownMenuItem>
+            </>)}
+            {task.status === 'completed' && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'archived') }}>归档</DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* 清晰度圆点 */}
         <div
@@ -470,6 +502,7 @@ function TaskTreeRow({
           childData={childData}
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
+          onStatusChange={onStatusChange}
           repo={repo}
         />
       ))}
