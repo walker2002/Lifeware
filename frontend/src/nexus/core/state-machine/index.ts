@@ -149,22 +149,57 @@ export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateM
 
 /**
  * 通用仓储接口
+ *
+ * 提供 SM 所需的最小 CRUD 能力，每个 Domain 通过
+ * GenericRepoAdapter 将具体 Repository 映射到此接口。
  */
 export interface GenericRepo {
   /**
-   * 根据ID查找对象
-   * @param id - 对象ID
-   * @param userId - 用户ID
-   * @returns 对象或null
+   * 根据 ID 查找对象
+   * @param id - 对象 ID
+   * @param userId - 用户 ID
+   * @returns 对象或 null
    */
   findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
-  
+
   /**
-   * 保存对象
-   * @param obj - 对象数据
-   * @param userId - 用户ID
+   * 保存对象（创建或全量更新）
+   * @param obj - 对象数据（必须含 id 字段）
+   * @param userId - 用户 ID
    */
   save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
+
+  /**
+   * 创建新对象，内部生成 ID，返回含 ID 的完整对象
+   * @param fields - 对象字段（不含 id、createdAt、updatedAt、status）
+   * @param userId - 用户 ID
+   * @returns 含生成 ID 和默认字段的完整对象
+   */
+  create(fields: Record<string, unknown>, userId: USOM_ID): Promise<Record<string, unknown>>
+
+  /**
+   * 更新对象状态
+   * @param id - 对象 ID
+   * @param toStatus - 目标状态
+   * @param userId - 用户 ID
+   * @returns 更新后的完整对象
+   */
+  updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID): Promise<Record<string, unknown>>
+
+  /**
+   * 删除草稿对象（可选，仅支持草稿状态删除的 Domain）
+   * @param id - 对象 ID
+   * @param userId - 用户 ID
+   */
+  deleteDraft?(id: USOM_ID, userId: USOM_ID): Promise<void>
+
+  /**
+   * 根据父对象 ID 查询子对象列表（用于 cascade）
+   * @param parentId - 父对象 ID
+   * @param userId - 用户 ID
+   * @returns 子对象列表
+   */
+  findByParent?(parentId: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown>[]>
 }
 
 /**
