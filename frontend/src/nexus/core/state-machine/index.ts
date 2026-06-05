@@ -242,14 +242,9 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
           await repo.save(object, userId)
         }
       } else {
-        // 创建：使用 repo.create，由 Repository 负责 ID 生成和字段映射
-        object = await repo.create(proposal.payload, userId)
-
-        // 确保 status 正确（Repository 可能不知道目标 status）
-        if (object.status !== transition.to) {
-          object = { ...object, status: transition.to }
-          await repo.save(object, userId)
-        }
+        // 创建：注入目标 status，由 Repository 一次写入
+        const createPayload = { ...proposal.payload, status: transition.to }
+        object = await repo.create(createPayload, userId)
       }
 
       // 5. 构造并持久化 SystemEvent

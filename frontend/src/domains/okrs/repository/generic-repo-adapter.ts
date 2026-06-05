@@ -43,13 +43,12 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       async save(obj, userId) {
         await repos.objectiveRepo.save(obj, userId)
       },
-      async create(fields, _userId) {
-        // Objective 创建由 ObjectiveRepository.save 处理 ID 生成
+      async create(fields, userId) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const objective = {
           id,
-          status: 'draft',
+          status: fields.status ?? 'draft',
           title: fields.title ?? '',
           description: fields.description,
           okrType: fields.okrType ?? 'committed',
@@ -65,6 +64,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           createdAt: now,
           updatedAt: now,
         }
+        await repos.objectiveRepo.save(objective, userId)
         return objective
       },
       async updateStatus(id, toStatus, userId) {
@@ -90,7 +90,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       async save(obj, userId) {
         await repos.keyResultRepo.save(obj, userId)
       },
-      async create(fields, _userId) {
+      async create(fields, userId) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const kr = {
@@ -102,10 +102,11 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           currentValue: 0,
           unit: fields.unit ?? '',
           progressRate: 0,
-          status: 'draft',
+          status: fields.status ?? 'draft',
           createdAt: now,
           updatedAt: now,
         }
+        await repos.keyResultRepo.save(kr, userId)
         return kr
       },
       async updateStatus(id, toStatus, userId) {
