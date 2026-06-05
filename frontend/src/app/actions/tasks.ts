@@ -112,6 +112,15 @@ export async function archiveTask(taskId: string): Promise<void> {
 }
 
 /**
+ * 彻底删除任务（不可恢复）
+ * @param taskId - 任务 ID
+ */
+export async function deleteTask(taskId: string): Promise<void> {
+  const repo = new TaskRepository()
+  return repo.delete(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+}
+
+/**
  * 完成任务：先保存额外字段，再变更状态（避免部分失败导致数据丢失）
  * @param taskId - 任务 ID
  * @param extraFields - 额外字段（actualDuration, notes 等）

@@ -235,4 +235,14 @@ export class TaskRepository implements ITaskRepository {
       .set({ status: 'archived', archivedAt: new Date() })
       .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
   }
+
+  /**
+   * 彻底删除任务（不可恢复）
+   * @param id - 任务 ID
+   * @param userId - 用户 ID
+   */
+  async delete(id: USOM_ID, userId: USOM_ID): Promise<void> {
+    await db.delete(s.tasks)
+      .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
+  }
 }
