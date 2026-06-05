@@ -253,6 +253,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
             value={task.priority}
             onChange={e => saveField('priority', e.target.value)}
             disabled={savingField === 'priority'}
+            onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
             {Object.entries(PRIORITY_LABELS).map(([v, l]) => (
@@ -268,6 +269,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
             value={task.energyRequired}
             onChange={e => saveField('energyRequired', e.target.value)}
             disabled={savingField === 'energyRequired'}
+            onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
             {Object.entries(ENERGY_LABELS).map(([v, l]) => (
@@ -283,6 +285,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
             value={task.tracking}
             onChange={e => saveField('tracking', e.target.value)}
             disabled={savingField === 'tracking'}
+            onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
             {Object.entries(TRACKING_LABELS).map(([v, l]) => (
@@ -309,6 +312,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
             value={task.dueDate ?? ''}
             onChange={e => saveField('dueDate', e.target.value || undefined)}
             disabled={savingField === 'dueDate'}
+            onClick={e => e.stopPropagation()}
             className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>

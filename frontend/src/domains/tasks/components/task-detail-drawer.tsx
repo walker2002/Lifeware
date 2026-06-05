@@ -167,6 +167,7 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
         role="dialog"
         aria-modal="true"
         aria-label="任务详情"
+        onClick={e => e.stopPropagation()}
       >
         {/* ── 拖拽手柄（左边缘）── */}
         <div
