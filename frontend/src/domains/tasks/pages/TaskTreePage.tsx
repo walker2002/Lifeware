@@ -85,13 +85,9 @@ export default function TaskTreePage() {
             管理项目主线，组织和分解任务，保持清晰的行动路径。
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => openThreadDetail('__new__')}>
               <Plus className="size-4" />
               创建主线
-            </Button>
-            <Button size="sm">
-              <Plus className="size-4" />
-              快速添加任务
             </Button>
           </div>
         </div>
