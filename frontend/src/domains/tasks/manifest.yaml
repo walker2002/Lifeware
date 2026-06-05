@@ -325,12 +325,6 @@ view_routes:
   viewTaskTree:
     component: domains/tasks/pages/TaskTreePage
     url: /tasks
-  viewTaskDetail:
-    component: domains/tasks/pages/TaskDetailPage
-    url: /tasks/[id]
-  viewThreadDetail:
-    component: domains/tasks/pages/ThreadDetailPage
-    url: /threads/[id]
 
 # ─── 区块 H: cnui_surfaces ───────────────────────────────────────
 cnui_surfaces:
