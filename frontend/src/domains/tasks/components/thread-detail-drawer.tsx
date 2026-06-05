@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ExternalLink, Pause, Play } from 'lucide-react'
+import { X, ExternalLink, Pause, Play, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getThreadById, getThreadWithCount, createThread, updateThreadStatus } from '@/app/actions/tasks'
@@ -223,6 +223,24 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
                   onClick={() => handleStatusChange('active')}
                 >
                   <Play className="size-3.5 mr-1" />恢复
+                </Button>
+              )}
+              {(thread.status === 'active' || thread.status === 'paused') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await updateThreadStatus(thread!.id, 'archived')
+                      onClose()
+                      toast.success('主线已归档')
+                    } catch {
+                      toast.error('归档失败，请重试')
+                    }
+                  }}
+                >
+                  <Archive className="size-3.5 mr-1" />
+                  归档主线
                 </Button>
               )}
             </div>
