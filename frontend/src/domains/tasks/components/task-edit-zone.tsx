@@ -248,7 +248,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {/* 优先级 */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-16 shrink-0">优先级</label>
+          <label className="text-xs text-muted w-16 shrink-0">优先级</label>
           <select
             value={task.priority}
             onChange={e => saveField('priority', e.target.value)}
@@ -263,7 +263,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
 
         {/* 能量需求 */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-16 shrink-0">能量需求</label>
+          <label className="text-xs text-muted w-16 shrink-0">能量需求</label>
           <select
             value={task.energyRequired}
             onChange={e => saveField('energyRequired', e.target.value)}
@@ -278,7 +278,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
 
         {/* 追踪模式 */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-16 shrink-0">追踪模式</label>
+          <label className="text-xs text-muted w-16 shrink-0">追踪模式</label>
           <select
             value={task.tracking}
             onChange={e => saveField('tracking', e.target.value)}
@@ -293,7 +293,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
 
         {/* 预估时长 */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-16 shrink-0">预估时长</label>
+          <label className="text-xs text-muted w-16 shrink-0">预估时长</label>
           <DurationEdit
             value={task.estimatedDuration}
             onSave={val => saveField('estimatedDuration', val)}
@@ -303,7 +303,7 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
 
         {/* 截止日期 */}
         <div className="flex items-center gap-2 col-span-2">
-          <label className="text-xs text-muted-soft w-16 shrink-0">截止日期</label>
+          <label className="text-xs text-muted w-16 shrink-0">截止日期</label>
           <input
             type="date"
             value={task.dueDate ?? ''}
@@ -316,8 +316,8 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
 
       {/* ── 占位字段 ── */}
       <div className="flex flex-col gap-1 pt-1 border-t border-hairline-soft">
-        <span className="text-xs text-muted-soft">验收标准 — 即将支持</span>
-        <span className="text-xs text-muted-soft">预期产出 — 即将支持</span>
+        <span className="text-xs text-muted">验收标准 — 即将支持</span>
+        <span className="text-xs text-muted">预期产出 — 即将支持</span>
       </div>
     </div>
   )

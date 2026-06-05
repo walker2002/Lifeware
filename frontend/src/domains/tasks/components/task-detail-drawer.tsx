@@ -180,7 +180,7 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
             <button
               type="button"
               onClick={handleOpenFullPage}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-soft hover:text-ink hover:bg-hover-overlay transition-colors"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
               title="在新页面打开"
             >
               <ExternalLink className="size-3.5" />
@@ -190,7 +190,7 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-muted-soft hover:text-ink hover:bg-hover-overlay transition-colors"
+            className="rounded-md p-1 text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
             aria-label="关闭"
           >
             <X className="size-4" />
