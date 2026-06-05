@@ -12,16 +12,28 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap } from 'lucide-react'
+import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
-import { getTaskById } from '@/app/actions/tasks'
+import { getTaskById, deleteTask, archiveTask } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
 import { SubtaskList } from './subtask-list'
 import { TaskCompleteZone } from './task-complete-zone'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
 
@@ -33,6 +45,10 @@ interface TaskDetailDrawerProps {
   userId: USOM_ID
   /** 关闭回调 */
   onClose: () => void
+  /** 进入全屏模式回调 */
+  onEnterFullscreen?: (taskId: string) => void
+  /** 任务变更通知回调 */
+  onTaskChanged?: () => void
 }
 
 /** 抽屉宽度约束 */
@@ -68,8 +84,13 @@ function DrawerSkeleton() {
  * 任务详情抽屉组件
  * @param props - 组件属性
  */
-export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerProps) {
-  const router = useRouter()
+export function TaskDetailDrawer({
+  taskId,
+  userId,
+  onClose,
+  onEnterFullscreen,
+  onTaskChanged,
+}: TaskDetailDrawerProps) {
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -134,12 +155,8 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
   // ─── 任务更新处理 ───
   const handleTaskUpdate = useCallback((updated: Task) => {
     setTask(updated)
-  }, [])
-
-  // ─── 打开新页面 ───
-  const handleOpenFullPage = useCallback(() => {
-    router.push(`/tasks/${taskId}`)
-  }, [router, taskId])
+    onTaskChanged?.()
+  }, [onTaskChanged])
 
   // ─── 关闭 ESC 快捷键 ───
   useEffect(() => {
@@ -178,15 +195,16 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
         {/* ── 顶部操作栏 ── */}
         <div className="flex items-center justify-between shrink-0 px-5 py-3 border-b border-hairline-soft">
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleOpenFullPage}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
-              title="在新页面打开"
-            >
-              <ExternalLink className="size-3.5" />
-              在新页面打开
-            </button>
+            {onEnterFullscreen && (
+              <button
+                type="button"
+                onClick={() => onEnterFullscreen(taskId)}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
+                title="全屏模式"
+              >
+                <Maximize2 className="size-3.5" />
+              </button>
+            )}
           </div>
           <button
             type="button"
@@ -279,6 +297,67 @@ export function TaskDetailDrawer({ taskId, userId, onClose }: TaskDetailDrawerPr
                   onTaskUpdate={handleTaskUpdate}
                 />
               </div>
+            </div>
+          )}
+
+          {/* ── 底部操作栏 ── */}
+          {!loading && task && (
+            <div className="shrink-0 border-t border-hairline px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await archiveTask(taskId)
+                      onTaskChanged?.()
+                      onClose()
+                      toast.success('任务已归档')
+                    } catch {
+                      toast.error('归档失败，请重试')
+                    }
+                  }}
+                >
+                  <Archive className="size-3.5 mr-1" />
+                  归档
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-error hover:text-error">
+                      <Trash2 className="size-3.5 mr-1" />
+                      彻底删除
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>确认彻底删除</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        此操作不可撤销，任务将被永久删除。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async () => {
+                          try {
+                            await deleteTask(taskId)
+                            onTaskChanged?.()
+                            onClose()
+                            toast.success('任务已删除')
+                          } catch {
+                            toast.error('删除失败，请重试')
+                          }
+                        }}
+                      >
+                        确认删除
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+              <Button variant="secondary" onClick={onClose}>
+                关闭
+              </Button>
             </div>
           )}
         </div>

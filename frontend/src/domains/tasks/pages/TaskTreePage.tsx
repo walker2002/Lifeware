@@ -16,6 +16,7 @@ import { ThreadListPanel } from '../components/thread-list-panel'
 import { TaskTreeView } from '../components/task-tree-view'
 import { TaskDetailDrawer } from '../components/task-detail-drawer'
 import { ThreadDetailDrawer } from '../components/thread-detail-drawer'
+import { TaskFullscreenView } from '../components/task-fullscreen-view'
 
 // ─── 状态类型 ──────────────────────────────────────────────────
 
@@ -24,11 +25,13 @@ import { ThreadDetailDrawer } from '../components/thread-detail-drawer'
  * - closed: 无抽屉
  * - task: 任务详情抽屉（携带 taskId）
  * - thread: 主线详情抽屉（携带 threadId）
+ * - fullscreen: 任务全屏视图（携带 taskId）
  */
 type DrawerState =
   | { type: 'closed' }
   | { type: 'task'; taskId: string }
   | { type: 'thread'; threadId: string }
+  | { type: 'fullscreen'; taskId: string }
 
 // ─── 页面组件 ──────────────────────────────────────────────────
 
@@ -61,6 +64,16 @@ export default function TaskTreePage() {
   /** 将任务提升为主线（打开 __new__ 模式主线详情抽屉） */
   const promoteToThread = useCallback((taskId: string) => {
     setDrawer({ type: 'thread', threadId: '__new__' })
+  }, [])
+
+  /** 进入全屏模式 */
+  const enterFullscreen = useCallback((taskId: string) => {
+    setDrawer({ type: 'fullscreen', taskId })
+  }, [])
+
+  /** 退出全屏模式 */
+  const exitFullscreen = useCallback(() => {
+    setDrawer({ type: 'closed' })
   }, [])
 
   // ─── 主线选择 ────────────────────────────────────────────────
@@ -157,12 +170,22 @@ export default function TaskTreePage() {
           taskId={drawer.taskId}
           userId={'placeholder' as any}
           onClose={closeDrawer}
+          onEnterFullscreen={enterFullscreen}
+          onTaskChanged={() => {}}
         />
       )}
       {drawer.type === 'thread' && (
         <ThreadDetailDrawer
           threadId={drawer.threadId}
           onClose={closeDrawer}
+        />
+      )}
+      {drawer.type === 'fullscreen' && (
+        <TaskFullscreenView
+          taskId={drawer.taskId}
+          userId={'placeholder' as any}
+          onBack={exitFullscreen}
+          onTaskChanged={() => {}}
         />
       )}
     </div>
