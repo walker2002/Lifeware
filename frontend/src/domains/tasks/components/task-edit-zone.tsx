@@ -220,6 +220,40 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
     }
   }, [task.id, onTaskUpdate])
 
+  /** 解析 notes JSON 字段中的特定部分 */
+  const parseNotesField = (notes: string | null | undefined, key: 'acceptance' | 'output'): string => {
+    if (!notes) return ''
+    try {
+      const parsed = JSON.parse(notes)
+      if (typeof parsed === 'object' && parsed !== null) {
+        return (parsed as Record<string, string>)[key] || ''
+      }
+    } catch {
+      // 非 JSON 格式（旧数据），整体作为验收标准显示
+      if (key === 'acceptance') return notes
+    }
+    return ''
+  }
+
+  /** 保存 notes JSON 字段中的特定部分 */
+  const saveNotesField = async (key: 'acceptance' | 'output', value: string) => {
+    let current: Record<string, string> = {}
+    if (task.notes) {
+      try {
+        const parsed = JSON.parse(task.notes)
+        if (typeof parsed === 'object' && parsed !== null) {
+          current = parsed as Record<string, string>
+        } else {
+          current = { acceptance: task.notes }
+        }
+      } catch {
+        current = { acceptance: task.notes }
+      }
+    }
+    current[key] = value
+    await saveField('notes', JSON.stringify(current))
+  }
+
   const EnergyIcon = task.energyProfile ? ENERGY_ICONS[task.energyProfile] : null
 
   return (
@@ -318,10 +352,24 @@ export function TaskEditZone({ task, onTaskUpdate }: TaskEditZoneProps) {
         </div>
       </div>
 
-      {/* ── 占位字段 ── */}
-      <div className="flex flex-col gap-1 pt-1 border-t border-hairline-soft">
-        <span className="text-xs text-muted">验收标准 — 即将支持</span>
-        <span className="text-xs text-muted">预期产出 — 即将支持</span>
+      {/* ── 验收标准 & 预期产出 ── */}
+      <div className="flex flex-col gap-3 pt-1 border-t border-hairline-soft">
+        <div>
+          <label className="text-xs text-muted mb-1 block">验收标准</label>
+          <InlineTextarea
+            value={parseNotesField(task.notes, 'acceptance')}
+            onSave={val => saveNotesField('acceptance', val)}
+            placeholder="定义任务完成的判断标准..."
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted mb-1 block">预期产出</label>
+          <InlineTextarea
+            value={parseNotesField(task.notes, 'output')}
+            onSave={val => saveNotesField('output', val)}
+            placeholder="描述任务完成后的交付物..."
+          />
+        </div>
       </div>
     </div>
   )
