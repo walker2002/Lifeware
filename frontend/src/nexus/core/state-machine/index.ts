@@ -14,15 +14,16 @@ import type { ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import type { LifecycleDefinition, FieldMetadata, LifecycleTransition } from '@/usom/types/domain-types'
 import type { ParentChildStatusRule, CascadeResult } from './cascade'
-import { findTransition, timeboxTransitions } from '@/domains/timebox/transitions'
 
-// ─── 旧版接口（向后兼容，Phase 7 移除） ─────────────────────────
+// ─── 通用 State Machine ────────────────────────────────────────
+
 /**
  * 状态机执行结果接口
  * @property success - 是否成功
  * @property object - 操作后的对象
  * @property event - 生成的系统事件
  * @property error - 错误信息
+ * @property cascadeResults - Cascade 执行结果
  */
 export interface StateMachineResult {
   success: boolean
@@ -32,123 +33,6 @@ export interface StateMachineResult {
   /** Cascade 执行结果 */
   cascadeResults?: CascadeResult[]
 }
-
-/**
- * 状态机依赖接口（旧版，向后兼容）
- * @property timeboxRepo - 时间盒仓储
- * @property eventRepo - 系统事件仓储
- */
-export interface StateMachineDeps {
-  timeboxRepo: { findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>; save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void> }
-  eventRepo: ISystemEventRepository
-}
-
-/**
- * 时间盒状态机接口
- */
-export interface TimeboxStateMachine {
-  /**
-   * 执行状态转换
-   * @param proposal - 状态提案
-   * @param eventBus - 事件总线
-   * @param userId - 用户ID
-   * @returns 执行结果
-   */
-  execute(proposal: StateProposal, eventBus: EventBus, userId: USOM_ID): Promise<StateMachineResult>
-}
-
-/**
- * 创建时间盒状态机实例（旧版，向后兼容）
- * @param deps - 依赖项
- * @returns 时间盒状态机实例
- */
-export function createTimeboxStateMachine(deps: StateMachineDeps): TimeboxStateMachine {
-  const { timeboxRepo, eventRepo } = deps
-
-  return {
-    /**
-     * 执行时间盒状态转换
-     * @param proposal - 状态提案
-     * @param eventBus - 事件总线
-     * @param userId - 用户ID
-     * @returns 执行结果
-     */
-    async execute(proposal, eventBus, userId): Promise<StateMachineResult> {
-      const now = new Date().toISOString() as Timestamp
-
-      let fromState: string | null = null
-      let existingObject: Record<string, unknown> | null = null
-      const objectId = proposal.targetObject.id
-
-      if (objectId) {
-        existingObject = await timeboxRepo.findById(objectId, userId)
-        if (!existingObject) {
-          return { success: false, error: '时间盒不存在' }
-        }
-        fromState = existingObject.status as string
-      }
-
-      const transition = findTransition(timeboxTransitions, fromState, proposal.action)
-      if (!transition) {
-        return {
-          success: false,
-          error: `非法状态转换: action="${proposal.action}", fromState="${fromState}"`,
-        }
-      }
-
-      let object: Record<string, unknown>
-
-      if (existingObject) {
-        object = {
-          ...existingObject,
-          status: transition.to,
-          updatedAt: now,
-        }
-
-        if (proposal.action === 'start') {
-          object.startedAt = now
-        } else if (proposal.action === 'end') {
-          object.endedAt = now
-        } else if (proposal.action === 'overtime') {
-          object.overtimeAt = now
-        }
-      } else {
-        const id = crypto.randomUUID() as USOM_ID
-        object = {
-          id,
-          status: transition.to,
-          createdAt: now,
-          updatedAt: now,
-          ...proposal.payload,
-        }
-      }
-
-      await timeboxRepo.save(object, userId)
-
-      const event: SystemEvent = {
-        id: crypto.randomUUID() as USOM_ID,
-        type: transition.eventType,
-        occurredAt: now,
-        triggeredBy: 'state_machine',
-        payload: {
-          timeboxId: object.id,
-          intentId: proposal.intentId,
-          proposalId: proposal.id,
-          fromStatus: fromState,
-          toStatus: transition.to,
-        },
-        snapshotId: '' as USOM_ID,
-      }
-
-      await eventRepo.append(event, userId)
-      eventBus.publish(event)
-
-      return { success: true, object, event }
-    },
-  }
-}
-
-// ─── 通用 State Machine ────────────────────────────────────────
 
 /**
  * 通用仓储接口

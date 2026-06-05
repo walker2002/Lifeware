@@ -241,6 +241,18 @@ function getObjectType(intent: StructuredIntent): string {
 }
 
 /**
+ * 从意图字段提取目标对象 ID（基于命名约定，无域特定知识）
+ * 查找顺序：objectId → {camelCase objectType}Id
+ * @param fields - 意图字段
+ * @param objectType - 对象类型（如 'habit', 'key_result'）
+ * @returns 对象 ID，未找到返回 undefined
+ */
+function resolveObjectId(fields: Record<string, unknown>, objectType: string): USOM_ID | undefined {
+  const camelType = objectType.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+  return (fields.objectId ?? fields[`${camelType}Id`]) as USOM_ID | undefined
+}
+
+/**
  * 构建查询结果摘要
  * @param intent - 结构化意图
  * @param result - 查询结果
@@ -317,6 +329,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
     /**
      * 直接执行状态转换（非创建路径：start/end/cancel/log/overtime）
+     *
+     * NOTE: 当前仅服务 timebox 域（targetDomain 硬编码为 'timebox'）。
+     * 其他域如有类似需求，应扩展参数签名或走 executeIntent。
+     *
      * @param objectId - 对象ID
      * @param action - 动作类型
      * @param userId - 用户ID
@@ -412,13 +428,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       // 3. 路由到通用 SM 处理
       const action = toStateMachineAction(intent.action)
 
-      // ─── 通用 SM 路径（所有已迁移的域） ─────────────────────
+      // ─── 通用 SM 路径（contract path — 所有已迁移的域） ──────
+      // 块作用域隔离 smObjectType/repo 等局部变量，避免与外层冲突
       {
         const smObjectType = getObjectType(intent)
         const repo = deps.getRepo(domainId, smObjectType)
 
-        // 加载 cascade 规则（从 manifest cascade_rules 中筛选 parent_child_status 类型）
-        const manifestResult = loadDomainManifest(domainId)
+        // 复用上方已加载的 manifest，提取 cascade 规则
         const cascadeRules = manifestResult.success
           ? (manifestResult.manifest.cascade_rules?.filter((r: any) => r.type === 'parent_child_status') ?? [])
           : []
@@ -440,7 +456,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           intentId: intent.id,
           targetObject: {
             type: smObjectType as USOMObjectType,
-            id: (intent.fields[smObjectType === 'task' ? 'taskId' : smObjectType === 'thread' ? 'threadId' : smObjectType === 'habit' ? 'habitId' : smObjectType === 'objective' ? 'objectiveId' : smObjectType === 'key_result' ? 'keyResultId' : 'objectId'] as USOM_ID | undefined),
+            id: resolveObjectId(intent.fields, smObjectType),
           },
           action,
           payload: intent.fields,
