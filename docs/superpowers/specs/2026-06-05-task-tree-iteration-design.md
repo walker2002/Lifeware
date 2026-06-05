@@ -126,14 +126,14 @@
 
 ### B-1：任务详情页改进
 
-#### 取消/保存按钮
+#### 关闭按钮
 
 在 `TaskDetailDrawer` 底部添加固定 footer：
 
-- **取消**按钮：`variant="secondary"`，点击关闭抽屉
-- **保存**按钮：`variant="primary"`，仅在字段有修改时激活
-- 实现 dirty 检测：将初始 task 快照与当前 task 比较
+- **关闭**按钮：`variant="secondary"`，点击关闭抽屉
+- 说明：当前 `TaskEditZone` 采用逐字段自动保存（`saveField`），不存在批量编辑模式，因此无需"保存"按钮。footer 仅提供关闭操作。
 - Footer 使用 `border-t border-hairline` 分隔，固定在抽屉底部
+- Footer 同时承载归档/删除操作（见 B-2）
 
 #### 全屏模式
 
@@ -164,8 +164,10 @@
 
 在 `TaskEditZone` 的占位区域实现两个 `InlineTextarea` 字段：
 
-- **验收标准**：映射到 Task.notes 字段（复用现有字段承载，不新增数据库列）
-- **预期产出**：同上，以分隔符区分两个部分
+- **验收标准**：映射到 Task.notes 字段，以 JSON 格式 `{ "acceptance": "...", "output": "..." }` 存储
+- **预期产出**：同上，与验收标准共存在 notes 字段中
+- 渲染时解析 JSON，编辑时回填到对应 textarea
+- 若 notes 内容不是 JSON 格式（旧数据），整体显示在验收标准区域
 
 移除原有的"即将支持"占位文字。
 
@@ -233,7 +235,10 @@ async delete(id: USOM_ID, userId: USOM_ID): Promise<void> {
 
 #### 归档任务
 
-同 B-2 中的归档操作，在任务树行上也提供归档操作入口（右键菜单或操作图标）。
+在任务树行（`TaskTreeRow`）的操作图标区域新增归档按钮：
+- 使用 `Archive` 图标，hover 时显示 tooltip "归档任务"
+- 点击后直接调用 `archiveTask` action（无需二次确认，归档可恢复）
+- 成功后从当前视图中移除该行（刷新树数据）
 
 ---
 
