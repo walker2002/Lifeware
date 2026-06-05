@@ -111,13 +111,13 @@ intent_triggers:
   # 查看
   - action: viewTaskTree
     shortcut: /tasks
-    description: 查看任务树
+    description: 任务树管理
     response_type: page
     view_route: /tasks
     examples:
-      - 查看所有任务
-      - 显示任务列表
-    keywords: [任务列表, 查看, 任务树]
+      - 管理任务
+      - 任务树管理
+    keywords: [任务列表, 任务树, 管理]
 
   - action: viewTaskDetail
     shortcut: /taskDetail
