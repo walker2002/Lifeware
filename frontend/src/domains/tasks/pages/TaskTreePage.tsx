@@ -2,15 +2,16 @@
  * @file TaskTreePage
  * @brief 任务树页面 — Sprint 1 完整布局
  *
- * 可折叠横幅 + 左侧主线列表 + 右侧任务树 + 任务/主线详情抽屉 + 响应式移动端。
+ * 图片横幅 + 左侧主线列表 + 右侧任务树 + 任务/主线详情抽屉 + 响应式移动端。
  */
 
 'use client'
 
 import { useState, useCallback } from 'react'
-import { ChevronDown, ChevronUp, Plus, PanelLeft } from 'lucide-react'
+import { ChevronUp, Plus, PanelLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { PageBanner } from '@/components/layout/page-banner'
 import { ThreadListPanel } from '../components/thread-list-panel'
 import { TaskTreeView } from '../components/task-tree-view'
 import { TaskDetailDrawer } from '../components/task-detail-drawer'
@@ -36,7 +37,6 @@ type DrawerState =
  * @description 横幅 + 左（主线列表）右（任务树）布局 + 详情抽屉 + 响应式
  */
 export default function TaskTreePage() {
-  const [bannerOpen, setBannerOpen] = useState(true)
   const [selectedThreadId, setSelectedThreadId] = useState<string>('__all__')
   const [drawer, setDrawer] = useState<DrawerState>({ type: 'closed' })
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
@@ -75,49 +75,26 @@ export default function TaskTreePage() {
 
   return (
     <div className="flex flex-col h-full bg-canvas">
-      {/* ═══ 可折叠横幅 ══════════════════════════════════════════ */}
-      <header
-        className={cn(
-          'border-b border-hairline bg-surface-soft transition-all',
-          bannerOpen ? 'px-6 py-4' : 'px-6 py-2',
-        )}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setBannerOpen(v => !v)}
-              className="flex items-center gap-2 text-ink hover:text-ink/80 transition-colors"
-              aria-label={bannerOpen ? '折叠横幅' : '展开横幅'}
-            >
-              <h1 className="text-xl font-semibold text-ink">任务</h1>
-              {bannerOpen ? (
-                <ChevronUp className="size-4 text-muted" />
-              ) : (
-                <ChevronDown className="size-4 text-muted" />
-              )}
-            </button>
-          </div>
+      {/* ═══ 图片横幅 + 操作工具栏 ════════════════════════════════ */}
+      <header className="border-b border-hairline">
+        <PageBanner domainId="tasks" title="任务" />
 
-          {bannerOpen && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Plus className="size-4" />
-                创建主线
-              </Button>
-              <Button size="sm">
-                <Plus className="size-4" />
-                快速添加任务
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {bannerOpen && (
-          <p className="mt-2 text-sm text-muted">
+        {/* 操作工具栏 */}
+        <div className="flex items-center justify-between border-t border-hairline px-4 py-2">
+          <p className="text-xs text-muted">
             管理项目主线，组织和分解任务，保持清晰的行动路径。
           </p>
-        )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Plus className="size-4" />
+              创建主线
+            </Button>
+            <Button size="sm">
+              <Plus className="size-4" />
+              快速添加任务
+            </Button>
+          </div>
+        </div>
       </header>
 
       {/* ═══ 主内容区（左面板 + 右任务树） ══════════════════════ */}

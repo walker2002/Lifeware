@@ -104,8 +104,6 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
 
   const isCompleted = task.status === 'completed'
 
-  if (isCompleted) return <CompletedSummary task={task} />
-
   const handleComplete = useCallback(async () => {
     setSaving(true)
     try {
@@ -118,6 +116,8 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
       setSaving(false)
     }
   }, [actualDuration, task.id, onTaskUpdate])
+
+  if (isCompleted) return <CompletedSummary task={task} />
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">
@@ -192,8 +192,6 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
 
   const isCompleted = task.status === 'completed'
 
-  if (isCompleted) return <CompletedSummary task={task} />
-
   const handleComplete = useCallback(async () => {
     setSaving(true)
     try {
@@ -207,6 +205,8 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
       setSaving(false)
     }
   }, [actualDuration, output, task.id, onTaskUpdate])
+
+  if (isCompleted) return <CompletedSummary task={task} />
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">
@@ -296,8 +296,6 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
 
   const isCompleted = task.status === 'completed'
 
-  if (isCompleted) return <CompletedSummary task={task} />
-
   const updateField = (field: keyof ReviewFormData, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -325,6 +323,8 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
       setSaving(null)
     }
   }, [form, task.id, onTaskUpdate])
+
+  if (isCompleted) return <CompletedSummary task={task} />
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-soft p-4">
