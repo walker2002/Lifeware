@@ -12,7 +12,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, ExternalLink, ChevronDown, Loader2, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
+import { X, ChevronDown, Loader2, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
 import { getTaskById, deleteTask, archiveTask } from '@/app/actions/tasks'
@@ -332,7 +332,7 @@ export function TaskDetailDrawer({
                     <AlertDialogHeader>
                       <AlertDialogTitle>确认彻底删除</AlertDialogTitle>
                       <AlertDialogDescription>
-                        此操作不可撤销，任务将被永久删除。
+                        此操作不可撤销，任务将被永久删除。如有子任务，子任务将变为独立任务。
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

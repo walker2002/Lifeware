@@ -58,6 +58,8 @@ import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 export interface TaskTreeViewProps {
   /** 主线 ID 筛选（__all__=全部, __orphan__=无主线, 其他=具体主线） */
   threadId?: string
+  /** 刷新计数器，变化时重新加载数据 */
+  refreshKey?: number
   /** 打开任务详情回调 */
   onOpenTaskDetail?: (taskId: string) => void
   /** 将任务提升为主线回调 */
@@ -120,6 +122,7 @@ const ENERGY_ICON: Record<string, React.ComponentType<{ className?: string }>> =
  */
 export function TaskTreeView({
   threadId = '__all__',
+  refreshKey = 0,
   onOpenTaskDetail,
   onPromoteToThread,
 }: TaskTreeViewProps) {
@@ -217,7 +220,7 @@ export function TaskTreeView({
 
     load()
     return () => { cancelled = true }
-  }, [threadId])
+  }, [threadId, refreshKey])
 
   // ─── 展开/折叠 ───────────────────────────────────────────────
 

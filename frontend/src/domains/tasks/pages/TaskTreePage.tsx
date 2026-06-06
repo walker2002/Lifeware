@@ -43,6 +43,7 @@ export default function TaskTreePage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string>('__all__')
   const [drawer, setDrawer] = useState<DrawerState>({ type: 'closed' })
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // ─── 抽屉控制 ────────────────────────────────────────────────
 
@@ -59,6 +60,11 @@ export default function TaskTreePage() {
   /** 关闭所有抽屉 */
   const closeDrawer = useCallback(() => {
     setDrawer({ type: 'closed' })
+  }, [])
+
+  /** 数据变更回调 — 递增 refreshKey 触发树刷新 */
+  const handleDataChanged = useCallback(() => {
+    setRefreshKey(k => k + 1)
   }, [])
 
   /** 将任务提升为主线（打开 __new__ 模式主线详情抽屉） */
@@ -158,6 +164,7 @@ export default function TaskTreePage() {
         <main className="flex-1 overflow-y-auto">
           <TaskTreeView
             threadId={selectedThreadId}
+            refreshKey={refreshKey}
             onOpenTaskDetail={openTaskDetail}
             onPromoteToThread={promoteToThread}
           />
@@ -171,13 +178,14 @@ export default function TaskTreePage() {
           userId={'placeholder' as any}
           onClose={closeDrawer}
           onEnterFullscreen={enterFullscreen}
-          onTaskChanged={() => {}}
+          onTaskChanged={handleDataChanged}
         />
       )}
       {drawer.type === 'thread' && (
         <ThreadDetailDrawer
           threadId={drawer.threadId}
           onClose={closeDrawer}
+          onThreadChanged={handleDataChanged}
         />
       )}
       {drawer.type === 'fullscreen' && (
@@ -185,7 +193,7 @@ export default function TaskTreePage() {
           taskId={drawer.taskId}
           userId={'placeholder' as any}
           onBack={exitFullscreen}
-          onTaskChanged={() => {}}
+          onTaskChanged={handleDataChanged}
         />
       )}
     </div>

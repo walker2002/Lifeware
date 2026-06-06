@@ -238,6 +238,11 @@ export class TaskRepository implements ITaskRepository {
 
   /**
    * 彻底删除任务（不可恢复）
+   *
+   * 注意：数据库 schema 定义 parentId 的 onDelete 为 'set null'，
+   * 因此删除后子任务会自动变为根任务（parentId = null），
+   * 子任务仍保留原 threadId 归属。
+   *
    * @param id - 任务 ID
    * @param userId - 用户 ID
    */

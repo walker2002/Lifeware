@@ -119,26 +119,6 @@ intent_triggers:
       - 任务树管理
     keywords: [任务列表, 任务树, 管理]
 
-  - action: viewTaskDetail
-    shortcut: /taskDetail
-    description: 查看任务详情
-    response_type: page
-    view_route: /tasks/[id]
-    examples:
-      - 查看任务详情
-      - 打开任务
-    keywords: [详情, detail]
-
-  - action: viewThreadDetail
-    shortcut: /threadDetail
-    description: 查看主线详情
-    response_type: page
-    view_route: /threads/[id]
-    examples:
-      - 查看主线详情
-      - 打开主线
-    keywords: [主线, 详情]
-
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
   task:

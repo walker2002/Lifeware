@@ -31,6 +31,8 @@ const PRESET_COLORS = ['#E74C3C', '#E67E22', '#F1C40F', '#2ECC71', '#1ABC9C', '#
 interface ThreadDetailDrawerProps {
   threadId: string
   onClose: () => void
+  /** 数据变更回调（归档等操作后通知父组件刷新） */
+  onThreadChanged?: () => void
 }
 
 // ─── 主组件 ──────────────────────────────────────────────────────────────
@@ -39,7 +41,7 @@ interface ThreadDetailDrawerProps {
  * 主线创建/详情 Drawer 组件
  * @param props - 组件属性
  */
-export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProps) {
+export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: ThreadDetailDrawerProps) {
   const isCreate = threadId === '__new__'
 
   // 详情模式状态
@@ -110,6 +112,7 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
         endDate: endDate as any || undefined,
         description: description || undefined,
       })
+      onThreadChanged?.()
       onClose()
     } catch (e) {
       setSaving(false)
@@ -232,6 +235,7 @@ export function ThreadDetailDrawer({ threadId, onClose }: ThreadDetailDrawerProp
                   onClick={async () => {
                     try {
                       await updateThreadStatus(thread!.id, 'archived')
+                      onThreadChanged?.()
                       onClose()
                       toast.success('主线已归档')
                     } catch {
