@@ -142,6 +142,28 @@ export async function completeTask(taskId: string, extraFields?: Record<string, 
   return repo.updateStatus(taskId as USOM_ID, 'completed', MVP_USER_ID as USOM_ID)
 }
 
+/**
+ * 获取任务的祖先链（沿 parentId 向上递归）
+ * @param taskId - 任务 ID
+ * @returns 祖先数组（从最近父级到最远根级）
+ */
+export async function getTaskAncestors(taskId: string): Promise<Array<{ id: string; title: string }>> {
+  const repo = new TaskRepository()
+  const ancestors: Array<{ id: string; title: string }> = []
+  let currentId: string | undefined = taskId
+
+  for (let i = 0; i < 10; i++) {
+    const task = await repo.findById(currentId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!task || !task.parentId) break
+    const parent = await repo.findById(task.parentId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!parent) break
+    ancestors.push({ id: parent.id, title: parent.title })
+    currentId = parent.id
+  }
+
+  return ancestors
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Thread 操作
 // ═══════════════════════════════════════════════════════════════════════════
