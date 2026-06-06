@@ -16,6 +16,7 @@ import { useState, useCallback } from 'react'
 import { CheckCircle2, Clock, FileText, Save, Send, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { updateTask, completeTask } from '@/app/actions/tasks'
+import { formatDuration, parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 
@@ -78,12 +79,12 @@ function CompletedSummary({ task }: { task: Task }) {
           完成时间：{new Date(task.completedAt).toLocaleString('zh-CN')}
         </div>
       )}
-      {task.actualDuration && (
+      {task.actualDuration ? (
         <div className="flex items-center gap-1.5 text-xs text-ink mb-1">
           <Clock className="size-3 text-muted-soft" />
-          实际用时：{task.actualDuration} 分钟
+          实际用时：{formatDuration(task.actualDuration)}
         </div>
-      )}
+      ) : null}
       {task.notes && (
         <div className="mt-2 pt-2 border-t border-success/20">
           <p className="text-xs text-ink whitespace-pre-wrap">{task.notes}</p>
@@ -99,7 +100,8 @@ function CompletedSummary({ task }: { task: Task }) {
  * Check-in 追踪模式：实际用时 + 标记完成
  */
 function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task) => void }) {
-  const [actualDuration, setActualDuration] = useState(task.estimatedDuration != null ? String(task.estimatedDuration) : '')
+  const [durHours, setDurHours] = useState(() => durationHours(task.estimatedDuration))
+  const [durMinutes, setDurMinutes] = useState(() => durationMinutes(task.estimatedDuration))
   const [saving, setSaving] = useState(false)
 
   const isCompleted = task.status === 'completed'
@@ -107,15 +109,15 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
   const handleComplete = useCallback(async () => {
     setSaving(true)
     try {
-      const dur = parseInt(actualDuration, 10)
+      const total = parseDurationToMinutes(durHours, durMinutes)
       const extraFields: Record<string, unknown> = {}
-      if (dur && !isNaN(dur)) extraFields.actualDuration = dur
+      if (total > 0) extraFields.actualDuration = total
       const updated = await completeTask(task.id, Object.keys(extraFields).length > 0 ? extraFields : undefined)
       onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
-  }, [actualDuration, task.id, onTaskUpdate])
+  }, [durHours, durMinutes, task.id, onTaskUpdate])
 
   if (isCompleted) return <CompletedSummary task={task} />
 
@@ -129,11 +131,21 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
           <div className="flex items-center gap-1">
             <input
               type="number"
-              min={1}
-              value={actualDuration}
-              onChange={e => setActualDuration(e.target.value)}
-              className="h-8 w-20 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
-              placeholder="分钟"
+              min={0}
+              value={durHours}
+              onChange={e => setDurHours(e.target.value)}
+              className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              placeholder="0"
+            />
+            <span className="text-xs text-muted-soft">小时</span>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={durMinutes}
+              onChange={e => setDurMinutes(e.target.value)}
+              className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              placeholder="0"
             />
             <span className="text-xs text-muted-soft">分钟</span>
           </div>
