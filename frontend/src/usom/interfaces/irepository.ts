@@ -86,8 +86,8 @@ export interface TaskFilters {
   threadId?: USOM_ID
   /** 父任务 ID */
   parentId?: USOM_ID | null
-  /** 清晰度等级 */
-  clarity?: ClarityLevel
+  /** 清晰度等级（支持单值或多值筛选） */
+  clarity?: ClarityLevel | ClarityLevel[]
   /** 复杂度标签 */
   complexity?: ComplexityTag
   /** 能量画像 */

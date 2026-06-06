@@ -35,7 +35,13 @@ export class TaskRepository implements ITaskRepository {
         conditions.push(eq(s.tasks.status, filters.status))
       }
     }
-    if (filters?.clarity) conditions.push(eq(s.tasks.clarity, filters.clarity))
+    if (filters?.clarity) {
+      if (Array.isArray(filters.clarity)) {
+        conditions.push(inArray(s.tasks.clarity, filters.clarity))
+      } else {
+        conditions.push(eq(s.tasks.clarity, filters.clarity))
+      }
+    }
     if (filters?.threadId) conditions.push(eq(s.tasks.threadId, filters.threadId))
     if (filters?.parentId === null) {
       conditions.push(isNull(s.tasks.parentId))
