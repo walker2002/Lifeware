@@ -171,7 +171,7 @@ export function TaskDetailDrawer({
     <>
       {/* ── 遮罩层 ── */}
       <div
-        className="fixed inset-0 z-30 bg-scrim animate-in fade-in duration-200"
+        className="fixed inset-0 md:left-[260px] z-30 bg-scrim animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />

@@ -77,7 +77,12 @@ export async function getSubtasks(parentId: string): Promise<Task[]> {
  */
 export async function createTask(input: CreateTaskInput & { title: string }): Promise<Task> {
   const repo = new TaskRepository()
-  return repo.create(input, MVP_USER_ID as USOM_ID)
+  try {
+    return await repo.create(input, MVP_USER_ID as USOM_ID)
+  } catch (err) {
+    console.error('[createTask] Repository create 失败:', err)
+    throw err
+  }
 }
 
 /**

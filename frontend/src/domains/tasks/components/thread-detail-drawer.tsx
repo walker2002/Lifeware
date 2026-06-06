@@ -267,7 +267,7 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 z-30 bg-scrim" onClick={onClose} />
+      <div className="fixed inset-0 md:left-[260px] z-30 bg-scrim" onClick={onClose} />
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 z-40 h-full w-[480px] bg-canvas shadow-lg border-l border-hairline flex flex-col">

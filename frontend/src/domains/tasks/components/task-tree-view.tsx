@@ -90,7 +90,7 @@ const INDENT_PX = 20
 
 /** 任务状态 → 圆点样式 */
 const STATUS_DOT_CLASS: Record<string, string> = {
-  todo: 'border border-muted bg-transparent',
+  todo: 'border border-body bg-transparent',
   planned: 'border border-info bg-transparent',
   in_progress: 'bg-info animate-pulse',
   completed: 'bg-success',
@@ -99,7 +99,7 @@ const STATUS_DOT_CLASS: Record<string, string> = {
 
 /** 清晰度 → 圆点样式 */
 const CLARITY_DOT_CLASS: Record<string, string> = {
-  fuzzy: 'border border-dashed border-muted',
+  fuzzy: 'border border-dashed border-body',
   scoped: 'bg-warning',
   actionable: 'bg-success',
 }
@@ -261,21 +261,13 @@ export function TaskTreeView({
     try {
       const newTask = await createTask({
         title: quickAddText.trim(),
-        captureMode: 'ad_hoc',
         threadId: threadId !== '__all__' && threadId !== '__orphan__'
           ? threadId as any : undefined,
       })
-      setRootNodes(prev => [...prev, {
-        task: newTask,
-        depth: 0,
-        children: [],
-        childCount: 0,
-        expanded: false,
-        loaded: false,
-      }])
       setQuickAddText('')
       toast.success('任务已创建')
-    } catch {
+    } catch (err) {
+      console.error('[QuickAdd] 创建任务失败:', err)
       toast.error('创建任务失败，请重试')
     } finally {
       setIsCreating(false)
@@ -520,13 +512,13 @@ function TaskTreeRow({
             >
               <ChevronRight
                 className={cn(
-                  'size-3.5 text-muted transition-transform',
+                  'size-3.5 text-body transition-transform',
                   isExpanded && 'rotate-90',
                 )}
               />
             </button>
           ) : hasChildren && !canExpand ? (
-            <span className="text-[10px] text-muted select-none" title="展开更深层级">
+            <span className="text-[10px] text-body select-none" title="展开更深层级">
               ···
             </span>
           ) : null}
@@ -606,7 +598,7 @@ function TaskTreeRow({
 
         {/* 精力图标 */}
         {FinalIcon && (
-          <FinalIcon className="flex-shrink-0 size-3.5 text-muted" />
+          <FinalIcon className="flex-shrink-0 size-3.5 text-body" />
         )}
 
         {/* 更多菜单（悬停显示） */}

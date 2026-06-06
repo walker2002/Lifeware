@@ -112,7 +112,7 @@ export default function TaskTreePage() {
         </div>
       </header>
 
-      {/* ═══ 主内容区（左面板 + 右任务树） ══════════════════════ */}
+      {/* ═══ 主内容区（左面板 + 右内容区） ══════════════════════ */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* ─── 移动端面板切换按钮 ─────────────────────────────── */}
         <button
@@ -160,18 +160,27 @@ export default function TaskTreePage() {
           />
         </aside>
 
-        {/* ─── 右侧：任务树 ────────────────────────────────────── */}
+        {/* ─── 右侧：任务树 / 全屏详情（互斥渲染） ──────────── */}
         <main className="flex-1 overflow-y-auto">
-          <TaskTreeView
-            threadId={selectedThreadId}
-            refreshKey={refreshKey}
-            onOpenTaskDetail={openTaskDetail}
-            onPromoteToThread={promoteToThread}
-          />
+          {drawer.type === 'fullscreen' ? (
+            <TaskFullscreenView
+              taskId={drawer.taskId}
+              userId={'placeholder' as any}
+              onBack={exitFullscreen}
+              onTaskChanged={handleDataChanged}
+            />
+          ) : (
+            <TaskTreeView
+              threadId={selectedThreadId}
+              refreshKey={refreshKey}
+              onOpenTaskDetail={openTaskDetail}
+              onPromoteToThread={promoteToThread}
+            />
+          )}
         </main>
       </div>
 
-      {/* ═══ 详情抽屉 ─══════════════════════════════════════════ */}
+      {/* ═══ 详情抽屉（仅 task / thread，fullscreen 在 main 内渲染） ═══ */}
       {drawer.type === 'task' && (
         <TaskDetailDrawer
           taskId={drawer.taskId}
@@ -186,14 +195,6 @@ export default function TaskTreePage() {
           threadId={drawer.threadId}
           onClose={closeDrawer}
           onThreadChanged={handleDataChanged}
-        />
-      )}
-      {drawer.type === 'fullscreen' && (
-        <TaskFullscreenView
-          taskId={drawer.taskId}
-          userId={'placeholder' as any}
-          onBack={exitFullscreen}
-          onTaskChanged={handleDataChanged}
         />
       )}
     </div>

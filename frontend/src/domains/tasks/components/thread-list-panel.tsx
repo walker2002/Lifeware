@@ -209,7 +209,7 @@ export function ThreadListPanel({
       {/* ═══ 底部筛选区域 ═══════════════════════════════════ */}
       <footer className="border-t border-hairline-soft px-3 py-3 space-y-2">
         <div>
-          <p className="text-[10px] text-muted mb-1">clarity</p>
+          <p className="text-[10px] text-body mb-1">clarity</p>
           <div className="flex flex-wrap gap-1">
             {['', 'fuzzy', 'scoped', 'actionable'].map(v => (
               <button
@@ -220,7 +220,7 @@ export function ThreadListPanel({
                   'rounded px-2 py-0.5 text-[11px] transition-colors',
                   curClarity === v
                     ? 'bg-surface-cream-strong text-ink font-medium'
-                    : 'text-muted hover:bg-surface-soft',
+                    : 'text-body hover:bg-surface-soft',
                 )}
               >
                 {v || '全部'}
@@ -229,7 +229,7 @@ export function ThreadListPanel({
           </div>
         </div>
         <div>
-          <p className="text-[10px] text-muted mb-1">status</p>
+          <p className="text-[10px] text-body mb-1">status</p>
           <div className="flex flex-wrap gap-1">
             {['', 'todo', 'planned', 'in_progress', 'completed'].map(v => (
               <button
@@ -240,7 +240,7 @@ export function ThreadListPanel({
                   'rounded px-2 py-0.5 text-[11px] transition-colors',
                   curStatus === v
                     ? 'bg-surface-cream-strong text-ink font-medium'
-                    : 'text-muted hover:bg-surface-soft',
+                    : 'text-body hover:bg-surface-soft',
                 )}
               >
                 {v || '全部'}
