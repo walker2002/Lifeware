@@ -10,7 +10,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ListTodo, FolderOpen } from 'lucide-react'
+import { ListTodo, FolderOpen, Folder } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getThreads } from '@/app/actions/tasks'
@@ -176,13 +176,13 @@ export function ThreadListPanel({
           <div className="flex-shrink-0">
             <FolderOpen className={cn(
               'size-4',
-              selectedThreadId === ORPHAN_ID ? 'text-ink' : 'text-muted',
+              selectedThreadId === ORPHAN_ID ? 'text-ink' : 'text-body',
             )} />
           </div>
           <span className={cn(
             'flex-1 text-sm',
             selectedThreadId === ORPHAN_ID ? 'text-ink font-medium' : 'text-body',
-          )}>无主线任务</span>
+          )}>普通任务</span>
           <span className="text-xs text-muted-soft">—</span>
         </button>
 
@@ -210,12 +210,10 @@ export function ThreadListPanel({
                     selectedThreadId === thread.id && SELECTED_CLASS,
                   )}
                 >
-                  {/* 颜色条 */}
-                  <div
-                    className="flex-shrink-0 w-1 h-6 rounded-full border-l-4"
-                    style={{
-                      borderColor: thread.color || 'var(--color-border)',
-                    }}
+                  {/* 文件夹图标 */}
+                  <Folder
+                    className="size-4 flex-shrink-0"
+                    style={{ color: thread.color || 'var(--color-text-muted)' }}
                   />
 
                   {/* 名称 + 徽章 */}

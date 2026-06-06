@@ -121,7 +121,7 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
     <div className="flex flex-col h-full bg-canvas">
       {/* ═══ 图片横幅 + 操作工具栏 ════════════════════════════════ */}
       <header className="border-b border-hairline">
-        <PageBanner domainId="tasks" title={title} />
+        <PageBanner domainId="tasks" title="任务树管理" />
 
         {/* 操作工具栏 */}
         <div className="flex items-center justify-between border-t border-hairline px-4 py-2">
