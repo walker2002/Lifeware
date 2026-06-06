@@ -150,15 +150,17 @@ export async function completeTask(taskId: string, extraFields?: Record<string, 
 export async function getTaskAncestors(taskId: string): Promise<Array<{ id: string; title: string }>> {
   const repo = new TaskRepository()
   const ancestors: Array<{ id: string; title: string }> = []
-  let currentId: string | undefined = taskId
 
-  for (let i = 0; i < 10; i++) {
-    const task = await repo.findById(currentId as USOM_ID, MVP_USER_ID as USOM_ID)
-    if (!task || !task.parentId) break
-    const parent = await repo.findById(task.parentId as USOM_ID, MVP_USER_ID as USOM_ID)
+  // 首次查询：获取起始任务以确定 parentId
+  let current = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!current?.parentId) return ancestors
+
+  // 后续每步只查一次：当前 parentId 的父任务
+  for (let i = 0; i < 10 && current?.parentId; i++) {
+    const parent = await repo.findById(current.parentId as USOM_ID, MVP_USER_ID as USOM_ID)
     if (!parent) break
     ancestors.push({ id: parent.id, title: parent.title })
-    currentId = parent.id
+    current = parent
   }
 
   return ancestors

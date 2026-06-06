@@ -11,7 +11,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react'
 import { X, ChevronDown, ChevronRight, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
 import { getTaskById, deleteTask, archiveTask, getChildCounts, getTaskAncestors } from '@/app/actions/tasks'
@@ -206,10 +206,62 @@ export function TaskDetailDrawer({
     ))
   }, [])
 
-  /** 导航到子任务（push） */
+  /** 导航栈最大深度 */
+  const MAX_NAV_DEPTH = 10
+
+  /** 导航到子任务（push），超出深度时裁剪最早条目 */
   const navigateToTask = useCallback((targetId: string) => {
-    setNavStack(prev => [...prev, { taskId: targetId, task: null, hasUnsavedChanges: false }])
+    setNavStack(prev => {
+      const next = [...prev, { taskId: targetId, task: null, hasUnsavedChanges: false }]
+      return next.length > MAX_NAV_DEPTH ? next.slice(next.length - MAX_NAV_DEPTH) : next
+    })
   }, [])
+
+  /** 导航到面包屑祖先（pop 到栈中已有位置，避免重复加载） */
+  const navigateToBreadcrumb = useCallback((targetId: string) => {
+    setNavStack(prev => {
+      const idx = prev.findIndex(e => e.taskId === targetId)
+      // 栈中已有 → 截断到该位置
+      if (idx >= 0) return prev.slice(0, idx + 1)
+      // 栈中无此 ID（祖先链来自 getTaskAncestors）→ push
+      const next = [...prev, { taskId: targetId, task: null, hasUnsavedChanges: false }]
+      return next.length > MAX_NAV_DEPTH ? next.slice(next.length - MAX_NAV_DEPTH) : next
+    })
+  }, [])
+
+  /** 面包屑元素（useMemo 避免内联 IIFE） */
+  const breadcrumbItems = useMemo(() => {
+    if (!currentTask) return []
+    const reversed = [...ancestors].reverse()
+    const items: React.ReactNode[] = [
+      <button
+        key="__root"
+        type="button"
+        onClick={onClose}
+        className="text-muted hover:text-ink transition-colors shrink-0"
+      >
+        任务树
+      </button>,
+    ]
+    reversed.forEach((anc) => {
+      items.push(
+        <ChevronRight key={`sep-${anc.id}`} className="size-3 text-muted-soft shrink-0" />,
+        <button
+          key={anc.id}
+          type="button"
+          onClick={() => navigateToBreadcrumb(anc.id)}
+          className="text-muted hover:text-ink transition-colors truncate max-w-[120px]"
+        >
+          {anc.title}
+        </button>,
+      )
+    })
+    items.push(
+      <ChevronRight key="sep-current" className="size-3 text-muted-soft shrink-0" />,
+      <span key="current" className="text-ink font-medium truncate max-w-[120px]">{currentTask.title}</span>,
+    )
+    return items
+  }, [ancestors, currentTask, onClose, navigateToBreadcrumb])
 
   /** 关闭拦截 */
   const handleCloseAttempt = useCallback(() => {
@@ -297,34 +349,11 @@ export function TaskDetailDrawer({
         </div>
 
         {/* ── 面包屑路径 ── */}
-        {!loading && currentTask && (() => {
-          const breadcrumbAncestors = [...ancestors].reverse()
-          return (
+        {!loading && currentTask && breadcrumbItems.length > 0 && (
             <div className="flex items-center gap-1 shrink-0 px-5 py-2 border-b border-hairline-soft text-xs overflow-x-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-muted hover:text-ink transition-colors shrink-0"
-              >
-                任务树
-              </button>
-              {breadcrumbAncestors.map((anc) => (
-                <Fragment key={anc.id}>
-                  <ChevronRight className="size-3 text-muted-soft shrink-0" />
-                  <button
-                    type="button"
-                    onClick={() => navigateToTask(anc.id)}
-                    className="text-muted hover:text-ink transition-colors truncate max-w-[120px]"
-                  >
-                    {anc.title}
-                  </button>
-                </Fragment>
-              ))}
-              <ChevronRight className="size-3 text-muted-soft shrink-0" />
-              <span className="text-ink font-medium truncate max-w-[120px]">{currentTask.title}</span>
+              {breadcrumbItems}
             </div>
-          )
-        })()}
+        )}
 
         {/* ── 内容区域 ── */}
         <div className="flex-1 overflow-y-auto">
