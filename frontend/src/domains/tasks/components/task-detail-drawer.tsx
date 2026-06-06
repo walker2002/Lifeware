@@ -238,26 +238,26 @@ export function TaskDetailDrawer({
         key="__root"
         type="button"
         onClick={onClose}
-        className="text-muted hover:text-ink transition-colors shrink-0"
+        className="text-body hover:text-ink transition-colors shrink-0"
       >
         任务树
       </button>,
     ]
     reversed.forEach((anc) => {
       items.push(
-        <ChevronRight key={`sep-${anc.id}`} className="size-3 text-muted-soft shrink-0" />,
+        <ChevronRight key={`sep-${anc.id}`} className="size-3 text-muted shrink-0" />,
         <button
           key={anc.id}
           type="button"
           onClick={() => navigateToBreadcrumb(anc.id)}
-          className="text-muted hover:text-ink transition-colors truncate max-w-[120px]"
+          className="text-body hover:text-ink transition-colors truncate max-w-[120px]"
         >
           {anc.title}
         </button>,
       )
     })
     items.push(
-      <ChevronRight key="sep-current" className="size-3 text-muted-soft shrink-0" />,
+      <ChevronRight key="sep-current" className="size-3 text-muted shrink-0" />,
       <span key="current" className="text-ink font-medium truncate max-w-[120px]">{currentTask.title}</span>,
     )
     return items
