@@ -75,10 +75,11 @@ const STATUS_LABELS: Record<string, string> = {
   planned: '计划中',
   in_progress: '进行中',
   completed: '已完成',
+  archived: '已归档',
 }
 
 /** 状态选项 */
-const STATUS_OPTIONS = ['', 'todo', 'planned', 'in_progress', 'completed']
+const STATUS_OPTIONS = ['', 'todo', 'planned', 'in_progress', 'completed', 'archived']
 
 // ─── 选中态样式 ────────────────────────────────────────────────
 
@@ -245,45 +246,37 @@ export function ThreadListPanel({
         )}
       </nav>
 
-      {/* ═══ 底部筛选区域 ═══════════════════════════════════ */}
-      <footer className="border-t border-hairline-soft px-3 py-3 space-y-2">
+      {/* ═══ 底部筛选区域（复选框多选） ═══════════════════════ */}
+      <footer className="border-t border-hairline-soft px-3 py-3 space-y-2.5">
         <div>
-          <p className="text-[10px] text-body mb-1">清晰度</p>
-          <div className="flex flex-wrap gap-1">
-            {CLARITY_OPTIONS.map(v => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onFilterChange?.('clarity', v)}
-                className={cn(
-                  'rounded px-2 py-0.5 text-[11px] transition-colors',
-                  filterClarity === v
-                    ? 'bg-surface-cream-strong text-ink font-medium'
-                    : 'text-body hover:bg-surface-soft',
-                )}
-              >
-                {CLARITY_LABELS[v]}
-              </button>
+          <p className="text-[10px] text-body mb-1.5">清晰度</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {CLARITY_OPTIONS.filter(v => v !== '').map(v => (
+              <label key={v} className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterClarity.includes(v)}
+                  onChange={() => onFilterChange?.('clarity', v)}
+                  className="size-3.5 rounded accent-primary"
+                />
+                <span className="text-[11px] text-body">{CLARITY_LABELS[v]}</span>
+              </label>
             ))}
           </div>
         </div>
         <div>
-          <p className="text-[10px] text-body mb-1">状态</p>
-          <div className="flex flex-wrap gap-1">
-            {STATUS_OPTIONS.map(v => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onFilterChange?.('status', v)}
-                className={cn(
-                  'rounded px-2 py-0.5 text-[11px] transition-colors',
-                  filterStatus === v
-                    ? 'bg-surface-cream-strong text-ink font-medium'
-                    : 'text-body hover:bg-surface-soft',
-                )}
-              >
-                {STATUS_LABELS[v]}
-              </button>
+          <p className="text-[10px] text-body mb-1.5">状态</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {STATUS_OPTIONS.filter(v => v !== '').map(v => (
+              <label key={v} className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterStatus.includes(v)}
+                  onChange={() => onFilterChange?.('status', v)}
+                  className="size-3.5 rounded accent-primary"
+                />
+                <span className="text-[11px] text-body">{STATUS_LABELS[v]}</span>
+              </label>
             ))}
           </div>
         </div>

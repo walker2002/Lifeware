@@ -199,8 +199,12 @@ export function TaskTreeView({
           // 无主线任务：threadId 为 null
           filters.threadId = undefined
         }
-        if (filterClarity) filters.clarity = filterClarity
-        if (filterStatus) filters.status = filterStatus
+        if (filterClarity && filterClarity.length > 0) {
+          filters.clarity = filterClarity.length === 1 ? filterClarity[0] : filterClarity
+        }
+        if (filterStatus && filterStatus.length > 0) {
+          filters.status = filterStatus.length === 1 ? filterStatus[0] : filterStatus
+        }
 
         const tasks = await getTasks(filters)
 
