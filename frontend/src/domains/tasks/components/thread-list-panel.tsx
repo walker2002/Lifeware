@@ -40,9 +40,9 @@ export interface ThreadListPanelProps {
   /** 数据刷新计数器，变化时重新加载 */
   refreshKey?: number
   /** 当前清晰度筛选值 */
-  filterClarity?: string
+  filterClarity?: string[]
   /** 当前状态筛选值 */
-  filterStatus?: string
+  filterStatus?: string[]
   /** 筛选变更回调 */
   onFilterChange?: (key: 'clarity' | 'status', value: string) => void
 }
@@ -97,8 +97,8 @@ export function ThreadListPanel({
   onSelectThread,
   onOpenThreadDetail,
   refreshKey = 0,
-  filterClarity = '',
-  filterStatus = '',
+  filterClarity = [],
+  filterStatus = [],
   onFilterChange,
 }: ThreadListPanelProps) {
   const [threads, setThreads] = useState<ThreadWithCount[]>([])

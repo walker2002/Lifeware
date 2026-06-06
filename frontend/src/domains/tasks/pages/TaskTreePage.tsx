@@ -55,13 +55,19 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
 
   // ─── 筛选状态 ──────────────────────────────────────────────
 
-  const [filterClarity, setFilterClarity] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterClarity, setFilterClarity] = useState<string[]>(['fuzzy', 'scoped', 'actionable'])
+  const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress', 'completed'])
 
-  /** 筛选变更回调 */
+  /** 筛选变更回调（复选框切换） */
   const handleFilterChange = useCallback((key: 'clarity' | 'status', value: string) => {
-    if (key === 'clarity') setFilterClarity(value)
-    else setFilterStatus(value)
+    const setter = key === 'clarity' ? setFilterClarity : setFilterStatus
+    setter(prev => {
+      if (prev.includes(value)) {
+        const next = prev.filter(v => v !== value)
+        return next.length === 0 ? prev : next
+      }
+      return [...prev, value]
+    })
   }, [])
 
   // ─── 抽屉控制 ────────────────────────────────────────────────

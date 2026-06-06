@@ -67,9 +67,9 @@ export interface TaskTreeViewProps {
   /** 数据变更回调，创建/状态变更后通知父组件刷新 */
   onDataChanged?: () => void
   /** 清晰度筛选 */
-  filterClarity?: string
+  filterClarity?: string[]
   /** 状态筛选 */
-  filterStatus?: string
+  filterStatus?: string[]
 }
 
 // ─── 本地树节点类型 ────────────────────────────────────────────
