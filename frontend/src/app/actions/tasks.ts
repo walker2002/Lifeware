@@ -79,9 +79,11 @@ export async function createTask(input: CreateTaskInput & { title: string }): Pr
   const repo = new TaskRepository()
   try {
     return await repo.create(input, MVP_USER_ID as USOM_ID)
-  } catch (err) {
-    console.error('[createTask] Repository create 失败:', err)
-    throw err
+  } catch (err: any) {
+    // 提取 PostgreSQL 原始错误信息（Drizzle 包装在 err.cause 中）
+    const pgMsg = err?.cause?.message ?? err?.cause?.code ?? err?.message ?? String(err)
+    console.error(`[createTask] 失败 [${err?.cause?.code ?? 'unknown'}]: ${pgMsg}`)
+    throw new Error(`创建任务失败: ${pgMsg}`)
   }
 }
 
