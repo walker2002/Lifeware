@@ -11,11 +11,10 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, ChevronDown, Loader2, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { X, ChevronDown, ChevronRight, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
-import { getTaskById, deleteTask, archiveTask, getChildCounts } from '@/app/actions/tasks'
+import { getTaskById, deleteTask, archiveTask, getChildCounts, getTaskAncestors } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
@@ -56,6 +55,13 @@ const MIN_WIDTH = 400
 const MAX_WIDTH = 800
 const DEFAULT_WIDTH = 560
 
+/** 导航栈条目 */
+interface NavEntry {
+  taskId: string
+  task: Task | null
+  hasUnsavedChanges: boolean
+}
+
 // ─── 骨架屏 ─────────────────────────────────────────────────────────────
 
 /** 加载中骨架屏 */
@@ -91,9 +97,18 @@ export function TaskDetailDrawer({
   onEnterFullscreen,
   onTaskChanged,
 }: TaskDetailDrawerProps) {
-  const [task, setTask] = useState<Task | null>(null)
+  // ─── 导航栈 ──────────────────────────────────────────────────
+  const [navStack, setNavStack] = useState<NavEntry[]>([{ taskId, task: null, hasUnsavedChanges: false }])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [ancestors, setAncestors] = useState<Array<{ id: string; title: string }>>([])
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+
+  /** 当前导航条目 */
+  const currentEntry = navStack[navStack.length - 1]
+  const currentTask = currentEntry?.task
+  const currentTaskId = currentEntry?.taskId ?? taskId
+
   const [expanded, setExpanded] = useState(false) // 小屏展开完整详情
   const [childCount, setChildCount] = useState<number>(0)
 
@@ -105,35 +120,41 @@ export function TaskDetailDrawer({
   const drawerRef = useRef<HTMLDivElement>(null)
 
   // ─── 加载任务 ───
-  const loadTask = useCallback(async () => {
+  const loadTask = useCallback(async (targetId: string) => {
     setLoading(true)
     setNotFound(false)
     try {
-      const t = await getTaskById(taskId)
-      if (!t) { setNotFound(true); setTask(null) }
-      else {
-        setTask(t)
-        const c = await getChildCounts([taskId])
-        setChildCount(c[taskId] ?? 0)
+      const t = await getTaskById(targetId)
+      if (!t) {
+        setNotFound(true)
+        setNavStack(prev => prev.map((e, i) => i === prev.length - 1 ? { ...e, task: null } : e))
+      } else {
+        setNavStack(prev => prev.map((e, i) => i === prev.length - 1 ? { ...e, task: t } : e))
+        // 加载面包屑祖先
+        const ancs = await getTaskAncestors(targetId)
+        setAncestors(ancs)
+        // 获取子任务计数（用于删除校验）
+        const c = await getChildCounts([targetId])
+        setChildCount(c[targetId] ?? 0)
       }
     } catch {
       setNotFound(true)
-      setTask(null)
+      setNavStack(prev => prev.map((e, i) => i === prev.length - 1 ? { ...e, task: null } : e))
     } finally {
       setLoading(false)
     }
-  }, [taskId])
+  }, [])
 
-  useEffect(() => { loadTask() }, [loadTask])
+  useEffect(() => { loadTask(currentTaskId) }, [currentTaskId, loadTask])
 
   /** 删除条件：todo 或 archived 且无子任务 */
-  const canDelete = task
-    ? (task.status === 'todo' || task.status === 'archived') && childCount === 0
+  const canDelete = currentTask
+    ? (currentTask.status === 'todo' || currentTask.status === 'archived') && childCount === 0
     : false
 
   /** 删除按钮禁用原因提示 */
-  const deleteDisabledReason = !task ? ''
-    : task.status !== 'todo' && task.status !== 'archived'
+  const deleteDisabledReason = !currentTask ? ''
+    : currentTask.status !== 'todo' && currentTask.status !== 'archived'
       ? '仅待办/已归档任务可删除'
       : childCount > 0
         ? '存在子任务，无法删除'
@@ -172,25 +193,66 @@ export function TaskDetailDrawer({
 
   // ─── 任务更新处理 ───
   const handleTaskUpdate = useCallback((updated: Task) => {
-    setTask(updated)
+    setNavStack(prev => prev.map((e, i) =>
+      i === prev.length - 1 ? { ...e, task: updated } : e
+    ))
     onTaskChanged?.()
   }, [onTaskChanged])
+
+  /** 脏状态变更回调 */
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    setNavStack(prev => prev.map((e, i) =>
+      i === prev.length - 1 ? { ...e, hasUnsavedChanges: dirty } : e
+    ))
+  }, [])
+
+  /** 导航到子任务（push） */
+  const navigateToTask = useCallback((targetId: string) => {
+    setNavStack(prev => [...prev, { taskId: targetId, task: null, hasUnsavedChanges: false }])
+  }, [])
+
+  /** 关闭拦截 */
+  const handleCloseAttempt = useCallback(() => {
+    if (currentEntry?.hasUnsavedChanges) {
+      setShowUnsavedDialog(true)
+    } else {
+      onClose()
+    }
+  }, [currentEntry, onClose])
 
   // ─── 关闭 ESC 快捷键 ───
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleCloseAttempt()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [handleCloseAttempt])
 
   return (
     <>
+      {/* ── 未保存修改确认 ── */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>未保存的修改</AlertDialogTitle>
+            <AlertDialogDescription>
+              关闭将丢失当前编辑内容，确认关闭？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>继续编辑</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowUnsavedDialog(false); onClose() }}>
+              放弃修改
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── 遮罩层 ── */}
       <div
         className="fixed inset-0 md:left-[260px] z-30 bg-scrim animate-in fade-in duration-200"
-        onClick={onClose}
+        onClick={handleCloseAttempt}
         aria-hidden="true"
       />
 
@@ -216,7 +278,7 @@ export function TaskDetailDrawer({
             {onEnterFullscreen && (
               <button
                 type="button"
-                onClick={() => onEnterFullscreen(taskId)}
+                onClick={() => onEnterFullscreen(currentTaskId)}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
                 title="全屏模式"
               >
@@ -226,13 +288,43 @@ export function TaskDetailDrawer({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseAttempt}
             className="rounded-md p-1 text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
             aria-label="关闭"
           >
             <X className="size-4" />
           </button>
         </div>
+
+        {/* ── 面包屑路径 ── */}
+        {!loading && currentTask && (() => {
+          const breadcrumbAncestors = [...ancestors].reverse()
+          return (
+            <div className="flex items-center gap-1 shrink-0 px-5 py-2 border-b border-hairline-soft text-xs overflow-x-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-muted hover:text-ink transition-colors shrink-0"
+              >
+                任务树
+              </button>
+              {breadcrumbAncestors.map((anc) => (
+                <Fragment key={anc.id}>
+                  <ChevronRight className="size-3 text-muted-soft shrink-0" />
+                  <button
+                    type="button"
+                    onClick={() => navigateToTask(anc.id)}
+                    className="text-muted hover:text-ink transition-colors truncate max-w-[120px]"
+                  >
+                    {anc.title}
+                  </button>
+                </Fragment>
+              ))}
+              <ChevronRight className="size-3 text-muted-soft shrink-0" />
+              <span className="text-ink font-medium truncate max-w-[120px]">{currentTask.title}</span>
+            </div>
+          )
+        })()}
 
         {/* ── 内容区域 ── */}
         <div className="flex-1 overflow-y-auto">
@@ -255,10 +347,10 @@ export function TaskDetailDrawer({
           )}
 
           {/* 任务内容 */}
-          {!loading && task && (
+          {!loading && currentTask && (
             <div className="p-5 flex flex-col gap-5">
               {/* ── 事后补录横幅 ── */}
-              {task.captureMode === 'retrospective' && (
+              {currentTask.captureMode === 'retrospective' && (
                 <div className="mx-0 flex items-center gap-2 rounded-md bg-info-soft px-3 py-2 text-sm text-info">
                   <Zap className="size-4 shrink-0" />
                   <span>事后补录模式 — 此任务为事后追加，请填写实际执行信息</span>
@@ -266,7 +358,7 @@ export function TaskDetailDrawer({
               )}
 
               {/* ── A 区：任务编辑 ── */}
-              <TaskEditZone task={task} onTaskUpdate={handleTaskUpdate} />
+              <TaskEditZone task={currentTask} onTaskUpdate={handleTaskUpdate} onDirtyChange={handleDirtyChange} />
 
               {/* ── 小屏：展开按钮 ── */}
               <div className="block sm:hidden">
@@ -281,14 +373,14 @@ export function TaskDetailDrawer({
                   </button>
                 ) : (
                   <div className="flex flex-col gap-5">
-                    <SystemCognitionPanel task={task} />
+                    <SystemCognitionPanel task={currentTask} />
                     <SubtaskList
-                      taskId={task.id}
+                      taskId={currentTask.id}
                       userId={userId}
-                      onOpenTask={(id) => { /* 在小屏中替换当前抽屉内容 */ }}
+                      onOpenTask={(id) => navigateToTask(id)}
                     />
                     <TaskCompleteZone
-                      task={task}
+                      task={currentTask}
                       userId={userId}
                       onTaskUpdate={handleTaskUpdate}
                     />
@@ -299,18 +391,18 @@ export function TaskDetailDrawer({
               {/* ── 大屏：B/C/D 区完整展示 ── */}
               <div className="hidden sm:flex sm:flex-col sm:gap-5">
                 {/* B 区：系统认知 */}
-                <SystemCognitionPanel task={task} />
+                <SystemCognitionPanel task={currentTask} />
 
                 {/* C 区：子任务列表 */}
                 <SubtaskList
-                  taskId={task.id}
+                  taskId={currentTask.id}
                   userId={userId}
-                  onOpenTask={() => {}}
+                  onOpenTask={(id) => navigateToTask(id)}
                 />
 
                 {/* D 区：完成追踪 */}
                 <TaskCompleteZone
-                  task={task}
+                  task={currentTask}
                   userId={userId}
                   onTaskUpdate={handleTaskUpdate}
                 />
@@ -319,7 +411,7 @@ export function TaskDetailDrawer({
           )}
 
           {/* ── 底部操作栏 ── */}
-          {!loading && task && (
+          {!loading && currentTask && (
             <div className="shrink-0 border-t border-hairline px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Button
@@ -327,7 +419,7 @@ export function TaskDetailDrawer({
                   size="sm"
                   onClick={async () => {
                     try {
-                      await archiveTask(taskId)
+                      await archiveTask(currentTaskId)
                       onTaskChanged?.()
                       onClose()
                       toast.success('任务已归档')
@@ -364,7 +456,7 @@ export function TaskDetailDrawer({
                       <AlertDialogAction
                         onClick={async () => {
                           try {
-                            await deleteTask(taskId)
+                            await deleteTask(currentTaskId)
                             onTaskChanged?.()
                             onClose()
                             toast.success('任务已删除')
@@ -379,7 +471,7 @@ export function TaskDetailDrawer({
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-              <Button variant="secondary" onClick={onClose}>
+              <Button variant="secondary" onClick={handleCloseAttempt}>
                 关闭
               </Button>
             </div>
