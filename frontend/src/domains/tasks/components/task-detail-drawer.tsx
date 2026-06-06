@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, ChevronDown, Loader2, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
-import { getTaskById, deleteTask, archiveTask } from '@/app/actions/tasks'
+import { getTaskById, deleteTask, archiveTask, getChildCounts } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
@@ -95,6 +95,7 @@ export function TaskDetailDrawer({
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [expanded, setExpanded] = useState(false) // 小屏展开完整详情
+  const [childCount, setChildCount] = useState<number>(0)
 
   // 拖拽宽度状态
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_WIDTH)
@@ -110,7 +111,11 @@ export function TaskDetailDrawer({
     try {
       const t = await getTaskById(taskId)
       if (!t) { setNotFound(true); setTask(null) }
-      else setTask(t)
+      else {
+        setTask(t)
+        const c = await getChildCounts([taskId])
+        setChildCount(c[taskId] ?? 0)
+      }
     } catch {
       setNotFound(true)
       setTask(null)
@@ -120,6 +125,19 @@ export function TaskDetailDrawer({
   }, [taskId])
 
   useEffect(() => { loadTask() }, [loadTask])
+
+  /** 删除条件：todo 或 archived 且无子任务 */
+  const canDelete = task
+    ? (task.status === 'todo' || task.status === 'archived') && childCount === 0
+    : false
+
+  /** 删除按钮禁用原因提示 */
+  const deleteDisabledReason = !task ? ''
+    : task.status !== 'todo' && task.status !== 'archived'
+      ? '仅待办/已归档任务可删除'
+      : childCount > 0
+        ? '存在子任务，无法删除'
+        : ''
 
   // ─── 拖拽调整宽度 ───
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -323,7 +341,13 @@ export function TaskDetailDrawer({
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-error hover:text-error">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-error hover:text-error"
+                      disabled={!canDelete}
+                      title={deleteDisabledReason}
+                    >
                       <Trash2 className="size-3.5 mr-1" />
                       彻底删除
                     </Button>
@@ -332,7 +356,7 @@ export function TaskDetailDrawer({
                     <AlertDialogHeader>
                       <AlertDialogTitle>确认彻底删除</AlertDialogTitle>
                       <AlertDialogDescription>
-                        此操作不可撤销，任务将被永久删除。如有子任务，子任务将变为独立任务。
+                        此操作不可撤销，任务将被永久删除。
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
