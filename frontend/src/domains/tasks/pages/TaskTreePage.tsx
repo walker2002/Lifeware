@@ -53,6 +53,17 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // ─── 筛选状态 ──────────────────────────────────────────────
+
+  const [filterClarity, setFilterClarity] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+
+  /** 筛选变更回调 */
+  const handleFilterChange = useCallback((key: 'clarity' | 'status', value: string) => {
+    if (key === 'clarity') setFilterClarity(value)
+    else setFilterStatus(value)
+  }, [])
+
   // ─── 抽屉控制 ────────────────────────────────────────────────
 
   /** 打开任务详情抽屉 */
@@ -70,7 +81,7 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
     setDrawer({ type: 'closed' })
   }, [])
 
-  /** 数据变更回调 — 递增 refreshKey 触发树刷新 */
+  /** 数据变更回调 — 递增 refreshKey 触发树和主线列表刷新 */
   const handleDataChanged = useCallback(() => {
     setRefreshKey(k => k + 1)
   }, [])
@@ -165,6 +176,10 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
             selectedThreadId={selectedThreadId}
             onSelectThread={handleSelectThread}
             onOpenThreadDetail={openThreadDetail}
+            refreshKey={refreshKey}
+            filterClarity={filterClarity}
+            filterStatus={filterStatus}
+            onFilterChange={handleFilterChange}
           />
         </aside>
 
@@ -183,6 +198,9 @@ export default function TaskTreePage({ title }: TaskTreePageProps) {
               refreshKey={refreshKey}
               onOpenTaskDetail={openTaskDetail}
               onPromoteToThread={promoteToThread}
+              onDataChanged={handleDataChanged}
+              filterClarity={filterClarity}
+              filterStatus={filterStatus}
             />
           )}
         </main>

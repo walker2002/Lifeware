@@ -64,6 +64,12 @@ export interface TaskTreeViewProps {
   onOpenTaskDetail?: (taskId: string) => void
   /** 将任务提升为主线回调 */
   onPromoteToThread?: (taskId: string) => void
+  /** 数据变更回调，创建/状态变更后通知父组件刷新 */
+  onDataChanged?: () => void
+  /** 清晰度筛选 */
+  filterClarity?: string
+  /** 状态筛选 */
+  filterStatus?: string
 }
 
 // ─── 本地树节点类型 ────────────────────────────────────────────
@@ -125,6 +131,9 @@ export function TaskTreeView({
   refreshKey = 0,
   onOpenTaskDetail,
   onPromoteToThread,
+  onDataChanged,
+  filterClarity,
+  filterStatus,
 }: TaskTreeViewProps) {
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -187,6 +196,8 @@ export function TaskTreeView({
           // 无主线任务：threadId 为 null
           filters.threadId = undefined
         }
+        if (filterClarity) filters.clarity = filterClarity
+        if (filterStatus) filters.status = filterStatus
 
         const tasks = await getTasks(filters)
 
@@ -220,7 +231,7 @@ export function TaskTreeView({
 
     load()
     return () => { cancelled = true }
-  }, [threadId, refreshKey])
+  }, [threadId, refreshKey, filterClarity, filterStatus])
 
   // ─── 展开/折叠 ───────────────────────────────────────────────
 
@@ -266,13 +277,14 @@ export function TaskTreeView({
       })
       setQuickAddText('')
       toast.success('任务已创建')
+      onDataChanged?.()
     } catch (err) {
       console.error('[QuickAdd] 创建任务失败:', err)
       toast.error('创建任务失败，请重试')
     } finally {
       setIsCreating(false)
     }
-  }, [quickAddText, isCreating, threadId])
+  }, [quickAddText, isCreating, threadId, onDataChanged])
 
   // ─── 状态变更 ──────────────────────────────────────────────
 
@@ -473,7 +485,7 @@ function TaskTreeRow({
     const diffMs = due.getTime() - today.getTime()
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
 
-    let colorClass = 'text-muted'
+    let colorClass = 'text-body'
     if (diffDays < 0) colorClass = 'text-error'
     else if (diffDays <= 3) colorClass = 'text-warning'
 

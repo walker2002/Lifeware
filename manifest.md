@@ -102,4 +102,5 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 | 代码注释规范 | 2026_06_01 | 无 | 创建。规范 TS/JS 文件注释格式：文件头 @file/@brief、模块分隔、JSDoc、TODO/FIXME 标记、简体中文要求 |
 | 数据库设计 | 2026_06_03 | 2026_05_30 | projects→threads 表（移除 planning 状态）；删除 project_templates/task_templates 表；tasks 表新增双轴标签列 + ai_tags 列 + 8 个索引；迁移 0013 |
 | USOM 详细设计 | 2026_06_04 | 2026_06_03 | 清理残留文本（废弃的 ProjectTemplate/TaskTemplate 代码片段）；更新文档版本号 |
-| 数据库设计 | 2026_06_04 | 2026_06_03 | tasks 状态枚举与 USOM 对齐（todo/planned→draft/active，新增 on_hold）；视图 v_today_pending_habits 修复（hl.status→hl.completion_status）；v_active_tasks 状态值更新；表结构总览补充 threads
+| 数据库设计 | 2026_06_04 | 2026_06_03 | 视图 v_today_pending_habits 修复（hl.status→hl.completion_status）；表结构总览补充 threads |
+| 数据库设计 | 2026_06_06 | 2026_06_04 | tasks 表状态枚举回退对齐代码实际值（todo/planned/in_progress/completed/archived）；移除已废弃列（key_result_id/timebox_id/frequency_type/days_of_week）；v_active_tasks 视图修复（列名+状态值） |

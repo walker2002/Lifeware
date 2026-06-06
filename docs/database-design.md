@@ -387,7 +387,7 @@ CREATE TABLE tasks (
   schema_version    integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status            text not null check (status in ('draft', 'active', 'in_progress', 'on_hold', 'completed', 'archived')),
+  status            text not null check (status in ('todo', 'planned', 'in_progress', 'completed', 'archived')),
   title             text not null,
   description       text,
   priority          text not null check (priority in ('critical', 'high', 'medium', 'low')),
@@ -398,24 +398,16 @@ CREATE TABLE tasks (
   -- 关联字段（查询关键）
   parent_id         uuid references tasks(id) on delete set null,  -- 父任务
   thread_id         uuid references threads(id) on delete set null,  -- 归属主线
-  key_result_id     uuid references key_results(id) on delete set null,
-  -- timebox_id 使用软引用，通过 timebox_tasks 关联表维护多对多关系
-  -- 此字段仅表示"当前激活的 Timebox"，是派生的便利字段
-  timebox_id        uuid,  -- 软引用，不设 FK constraint
 
   -- 时间字段（查询关键）
   due_date          date,
-
-  -- 频率字段
-  frequency_type text check (frequency_type in ('once', 'daily', 'weekly', 'custom')),
 
   -- 日期范围
   start_date date,  -- 周期性任务开始日期
   end_date   date,  -- 周期性任务结束日期
 
-  -- JSONB 允许：tags/days_of_week 不参与 WHERE 过滤；recurrence MVP 不实现
+  -- JSONB 允许：tags 不参与 WHERE 过滤；recurrence MVP 不实现
   tags              jsonb not null default '[]',
-  days_of_week      jsonb,  -- number[]，custom 频率时使用
   recurrence        jsonb,  -- RecurrenceRule，预留字段
 
   -- 审计字段
@@ -456,8 +448,6 @@ CREATE INDEX idx_tasks_user_constraint ON tasks(user_id, scheduling_constraint);
 CREATE INDEX idx_tasks_user_tracking ON tasks(user_id, tracking);
 CREATE INDEX idx_tasks_due_date ON tasks(user_id, due_date);
 ```
-
-> **设计说明**：`tasks.timebox_id` 使用软引用（不设 FK constraint）。原因：`timeboxes` 和 `tasks` 之间是多对多关系（通过 `timebox_tasks` 关联表），`tasks.timebox_id` 只表示"当前激活的 Timebox"，是一个派生的便利字段。
 
 ---
 
@@ -1223,10 +1213,10 @@ CREATE TRIGGER trg_key_results_update_progress
 CREATE VIEW v_active_tasks AS
 SELECT
   id, user_id, title, status, priority, energy_required,
-  estimated_duration, due_date, key_result_id, timebox_id,
+  estimated_duration, due_date, thread_id, parent_id,
   tags, created_at, updated_at
 FROM tasks
-WHERE status IN ('active', 'in_progress')
+WHERE status IN ('todo', 'planned', 'in_progress')
   AND archived_at IS NULL;
 
 -- 今日待打卡习惯视图

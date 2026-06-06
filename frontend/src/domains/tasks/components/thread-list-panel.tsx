@@ -4,12 +4,12 @@
  *
  * 展示用户所有主线及任务计数，支持选中切换和筛选。
  * 顶部固定两个虚拟入口："全部任务"和"无主线任务"。
+ * 底部提供清晰度和状态筛选（中文标签，本地状态管理）。
  */
 
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { ListTodo, FolderOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -37,6 +37,14 @@ export interface ThreadListPanelProps {
   onSelectThread: (threadId: string) => void
   /** 打开主线详情回调 */
   onOpenThreadDetail?: (threadId: string) => void
+  /** 数据刷新计数器，变化时重新加载 */
+  refreshKey?: number
+  /** 当前清晰度筛选值 */
+  filterClarity?: string
+  /** 当前状态筛选值 */
+  filterStatus?: string
+  /** 筛选变更回调 */
+  onFilterChange?: (key: 'clarity' | 'status', value: string) => void
 }
 
 // ─── 虚拟入口常量 ──────────────────────────────────────────────
@@ -46,6 +54,36 @@ const ALL_ID = '__all__'
 
 /** "无主线任务"虚拟主线 ID */
 const ORPHAN_ID = '__orphan__'
+
+// ─── 筛选标签映射 ──────────────────────────────────────────────
+
+/** 清晰度 → 中文标签 */
+const CLARITY_LABELS: Record<string, string> = {
+  '': '全部',
+  fuzzy: '模糊',
+  scoped: '有范围',
+  actionable: '可执行',
+}
+
+/** 清晰度选项 */
+const CLARITY_OPTIONS = ['', 'fuzzy', 'scoped', 'actionable']
+
+/** 状态 → 中文标签 */
+const STATUS_LABELS: Record<string, string> = {
+  '': '全部',
+  todo: '待办',
+  planned: '计划中',
+  in_progress: '进行中',
+  completed: '已完成',
+}
+
+/** 状态选项 */
+const STATUS_OPTIONS = ['', 'todo', 'planned', 'in_progress', 'completed']
+
+// ─── 选中态样式 ────────────────────────────────────────────────
+
+/** 选中主线项的高亮样式 */
+const SELECTED_CLASS = 'bg-primary/8 border-l-2 border-l-primary'
 
 // ─── 组件 ──────────────────────────────────────────────────────
 
@@ -58,23 +96,13 @@ export function ThreadListPanel({
   selectedThreadId,
   onSelectThread,
   onOpenThreadDetail,
+  refreshKey = 0,
+  filterClarity = '',
+  filterStatus = '',
+  onFilterChange,
 }: ThreadListPanelProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const curClarity = searchParams.get('clarity') ?? ''
-  const curStatus = searchParams.get('status') ?? ''
-
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
-
-  // ─── 筛选参数更新 ────────────────────────────────────────────
-
-  const updateFilter = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) params.set(key, value)
-    else params.delete(key)
-    router.push(`/tasks?${params.toString()}`, { scroll: false })
-  }
 
   // ─── 数据加载 ────────────────────────────────────────────────
 
@@ -96,14 +124,13 @@ export function ThreadListPanel({
 
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [refreshKey])
 
   // ─── 合计计数 ────────────────────────────────────────────────
 
   const totalCount = threads.reduce((sum, t) => sum + t.taskCount, 0)
-  // TODO: 单独查询无主线的任务数量，当前显示为占位符
 
-  // IItem 点击处理
+  // 点击处理
   const handleClick = useCallback((threadId: string) => {
     onSelectThread(threadId)
   }, [onSelectThread])
@@ -120,15 +147,18 @@ export function ThreadListPanel({
           type="button"
           onClick={() => handleClick(ALL_ID)}
           className={cn(
-            'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors',
+            'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors border-l-2 border-l-transparent',
             'hover:bg-surface-soft',
-            selectedThreadId === ALL_ID && 'bg-surface-soft',
+            selectedThreadId === ALL_ID && SELECTED_CLASS,
           )}
         >
-          <div className="flex-shrink-0 rounded border-l-4 border-transparent">
+          <div className="flex-shrink-0">
             <ListTodo className="size-4 text-ink" />
           </div>
-          <span className="flex-1 text-sm font-medium text-ink">全部任务</span>
+          <span className={cn(
+            'flex-1 text-sm',
+            selectedThreadId === ALL_ID ? 'text-ink font-medium' : 'text-body',
+          )}>全部任务</span>
           <span className="text-xs text-muted">{totalCount}</span>
         </button>
 
@@ -137,15 +167,21 @@ export function ThreadListPanel({
           type="button"
           onClick={() => handleClick(ORPHAN_ID)}
           className={cn(
-            'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors',
+            'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors border-l-2 border-l-transparent',
             'hover:bg-surface-soft',
-            selectedThreadId === ORPHAN_ID && 'bg-surface-soft',
+            selectedThreadId === ORPHAN_ID && SELECTED_CLASS,
           )}
         >
-          <div className="flex-shrink-0 rounded">
-            <FolderOpen className="size-4 text-muted" />
+          <div className="flex-shrink-0">
+            <FolderOpen className={cn(
+              'size-4',
+              selectedThreadId === ORPHAN_ID ? 'text-ink' : 'text-muted',
+            )} />
           </div>
-          <span className="flex-1 text-sm font-medium text-ink">无主线任务</span>
+          <span className={cn(
+            'flex-1 text-sm',
+            selectedThreadId === ORPHAN_ID ? 'text-ink font-medium' : 'text-body',
+          )}>无主线任务</span>
           <span className="text-xs text-muted-soft">—</span>
         </button>
 
@@ -168,9 +204,9 @@ export function ThreadListPanel({
                   onClick={() => handleClick(thread.id)}
                   onDoubleClick={() => onOpenThreadDetail?.(thread.id)}
                   className={cn(
-                    'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors group',
+                    'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors group border-l-2 border-l-transparent',
                     'hover:bg-surface-soft',
-                    selectedThreadId === thread.id && 'bg-surface-soft',
+                    selectedThreadId === thread.id && SELECTED_CLASS,
                   )}
                 >
                   {/* 颜色条 */}
@@ -184,7 +220,10 @@ export function ThreadListPanel({
                   {/* 名称 + 徽章 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-ink truncate block">
+                      <span className={cn(
+                        'text-sm truncate block',
+                        selectedThreadId === thread.id ? 'text-ink font-medium' : 'text-body',
+                      )}>
                         {thread.name}
                       </span>
                       {thread.status === 'paused' && (
@@ -209,41 +248,41 @@ export function ThreadListPanel({
       {/* ═══ 底部筛选区域 ═══════════════════════════════════ */}
       <footer className="border-t border-hairline-soft px-3 py-3 space-y-2">
         <div>
-          <p className="text-[10px] text-body mb-1">clarity</p>
+          <p className="text-[10px] text-body mb-1">清晰度</p>
           <div className="flex flex-wrap gap-1">
-            {['', 'fuzzy', 'scoped', 'actionable'].map(v => (
+            {CLARITY_OPTIONS.map(v => (
               <button
                 key={v}
                 type="button"
-                onClick={() => updateFilter('clarity', v)}
+                onClick={() => onFilterChange?.('clarity', v)}
                 className={cn(
                   'rounded px-2 py-0.5 text-[11px] transition-colors',
-                  curClarity === v
+                  filterClarity === v
                     ? 'bg-surface-cream-strong text-ink font-medium'
                     : 'text-body hover:bg-surface-soft',
                 )}
               >
-                {v || '全部'}
+                {CLARITY_LABELS[v]}
               </button>
             ))}
           </div>
         </div>
         <div>
-          <p className="text-[10px] text-body mb-1">status</p>
+          <p className="text-[10px] text-body mb-1">状态</p>
           <div className="flex flex-wrap gap-1">
-            {['', 'todo', 'planned', 'in_progress', 'completed'].map(v => (
+            {STATUS_OPTIONS.map(v => (
               <button
                 key={v}
                 type="button"
-                onClick={() => updateFilter('status', v)}
+                onClick={() => onFilterChange?.('status', v)}
                 className={cn(
                   'rounded px-2 py-0.5 text-[11px] transition-colors',
-                  curStatus === v
+                  filterStatus === v
                     ? 'bg-surface-cream-strong text-ink font-medium'
                     : 'text-body hover:bg-surface-soft',
                 )}
               >
-                {v || '全部'}
+                {STATUS_LABELS[v]}
               </button>
             ))}
           </div>
