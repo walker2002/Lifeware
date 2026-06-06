@@ -36,10 +36,18 @@ type DrawerState =
 // ─── 页面组件 ──────────────────────────────────────────────────
 
 /**
+ * 任务树页面组件属性
+ */
+interface TaskTreePageProps {
+  /** 页面标题（从 manifest 获取） */
+  title: string
+}
+
+/**
  * 任务树页面组件
  * @description 横幅 + 左（主线列表）右（任务树）布局 + 详情抽屉 + 响应式
  */
-export default function TaskTreePage() {
+export default function TaskTreePage({ title }: TaskTreePageProps) {
   const [selectedThreadId, setSelectedThreadId] = useState<string>('__all__')
   const [drawer, setDrawer] = useState<DrawerState>({ type: 'closed' })
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
@@ -96,11 +104,11 @@ export default function TaskTreePage() {
     <div className="flex flex-col h-full bg-canvas">
       {/* ═══ 图片横幅 + 操作工具栏 ════════════════════════════════ */}
       <header className="border-b border-hairline">
-        <PageBanner domainId="tasks" title="任务" />
+        <PageBanner domainId="tasks" title={title} />
 
         {/* 操作工具栏 */}
         <div className="flex items-center justify-between border-t border-hairline px-4 py-2">
-          <p className="text-xs text-muted">
+          <p className="text-xs text-body">
             管理项目主线，组织和分解任务，保持清晰的行动路径。
           </p>
           <div className="flex items-center gap-2">

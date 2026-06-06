@@ -90,7 +90,7 @@ const INDENT_PX = 20
 
 /** 任务状态 → 圆点样式 */
 const STATUS_DOT_CLASS: Record<string, string> = {
-  todo: 'border border-body bg-transparent',
+  todo: 'border-2 border-body bg-transparent',
   planned: 'border border-info bg-transparent',
   in_progress: 'bg-info animate-pulse',
   completed: 'bg-success',
@@ -570,7 +570,7 @@ function TaskTreeRow({
         {/* 标题 */}
         <span className={cn(
           'flex-1 text-sm text-ink truncate',
-          task.status === 'completed' && 'line-through text-muted',
+          task.status === 'completed' && 'line-through text-body opacity-60',
         )}>
           {task.title}
         </span>
