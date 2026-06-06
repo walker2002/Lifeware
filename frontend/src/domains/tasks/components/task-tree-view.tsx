@@ -43,7 +43,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction } from '@/app/actions/tasks'
+import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -141,6 +141,8 @@ export function TaskTreeView({
   const [childData, setChildData] = useState<Map<string, Task[]>>(new Map())
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set())
   const [childCountMap, setChildCountMap] = useState<Map<string, number>>(new Map())
+  /** 主线映射表：threadId → { name, color } */
+  const [threadMap, setThreadMap] = useState<Map<string, { name: string; color: string }>>(new Map())
   const [quickAddText, setQuickAddText] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -233,6 +235,27 @@ export function TaskTreeView({
     load()
     return () => { cancelled = true }
   }, [threadId, refreshKey, filterClarity, filterStatus])
+
+  // ─── 加载主线映射 ──────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadThreads() {
+      try {
+        const threads = await getThreads()
+        if (cancelled) return
+        const map = new Map<string, { name: string; color: string }>()
+        for (const twc of threads) {
+          map.set(twc.thread.id, { name: twc.thread.name, color: twc.thread.color ?? '#3498DB' })
+        }
+        setThreadMap(map)
+      } catch {
+        // 主线加载失败不影响任务树显示
+      }
+    }
+    loadThreads()
+    return () => { cancelled = true }
+  }, [])
 
   // ─── 展开/折叠 ───────────────────────────────────────────────
 
@@ -342,6 +365,8 @@ export function TaskTreeView({
                   expandedIds={expandedIds}
                   childData={childData}
                   childCountMap={childCountMap}
+                  threadMap={threadMap}
+                  currentThreadId={threadId}
                   onToggle={handleToggle}
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
@@ -385,6 +410,10 @@ interface TaskTreeRowProps {
   expandedIds: Set<string>
   childData: Map<string, Task[]>
   childCountMap: Map<string, number>
+  /** 主线映射表 */
+  threadMap: Map<string, { name: string; color: string }>
+  /** 当前筛选的主线 ID（用于判断是否隐藏标签） */
+  currentThreadId?: string
   onToggle: (node: TreeNode) => void
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
@@ -401,6 +430,8 @@ function SortableTaskRow({
   expandedIds,
   childData,
   childCountMap,
+  threadMap,
+  currentThreadId,
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
@@ -440,6 +471,8 @@ function SortableTaskRow({
           expandedIds={expandedIds}
           childData={childData}
           childCountMap={childCountMap}
+          threadMap={threadMap}
+          currentThreadId={currentThreadId}
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
@@ -459,6 +492,8 @@ function TaskTreeRow({
   expandedIds,
   childData,
   childCountMap,
+  threadMap,
+  currentThreadId,
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
@@ -630,6 +665,21 @@ function TaskTreeRow({
           <FinalIcon className="flex-shrink-0 size-3.5 text-body" />
         )}
 
+        {/* 主线标签（非主线筛选模式下显示） */}
+        {task.threadId && currentThreadId === '__all__' && (() => {
+          const thread = threadMap.get(task.threadId)
+          if (!thread) return null
+          return (
+            <span className="flex-shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-muted bg-surface-soft">
+              <span
+                className="size-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: thread.color }}
+              />
+              {thread.name}
+            </span>
+          )
+        })()}
+
         {/* 更多菜单（悬停显示） */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -679,6 +729,8 @@ function TaskTreeRow({
           expandedIds={expandedIds}
           childData={childData}
           childCountMap={childCountMap}
+          threadMap={threadMap}
+          currentThreadId={currentThreadId}
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
