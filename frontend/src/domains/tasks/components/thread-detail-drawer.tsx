@@ -10,10 +10,21 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ExternalLink, Pause, Play, Archive } from 'lucide-react'
+import { X, ExternalLink, Pause, Play, Archive, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { getThreadById, getThreadWithCount, createThread, updateThreadStatus } from '@/app/actions/tasks'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { getThreadById, getThreadWithCount, createThread, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
 import { TaskTreeView } from './task-tree-view'
 import type { Thread } from '../../../usom/types/objects'
 
@@ -247,6 +258,46 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
                   归档主线
                 </Button>
               )}
+              {/* 彻底删除（仅无下级任务时可用） */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-error hover:text-error"
+                    disabled={counts ? counts.taskCount > 0 : false}
+                    title={counts && counts.taskCount > 0 ? '存在下级任务，无法删除' : ''}
+                  >
+                    <Trash2 className="size-3.5 mr-1" />
+                    彻底删除
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>确认彻底删除主线</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      此操作不可撤销，主线将被永久删除。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        try {
+                          await deleteThread(threadId)
+                          onThreadChanged?.()
+                          onClose()
+                          toast.success('主线已删除')
+                        } catch {
+                          toast.error('删除失败，请重试')
+                        }
+                      }}
+                    >
+                      确认删除
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
 

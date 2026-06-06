@@ -195,3 +195,12 @@ export async function updateThreadStatus(threadId: string, status: Thread['statu
   const repo = new ThreadRepository()
   return repo.updateStatus(threadId as USOM_ID, status, MVP_USER_ID as USOM_ID)
 }
+
+/**
+ * 彻底删除主线（不可恢复）
+ * @param threadId - 主线 ID
+ */
+export async function deleteThread(threadId: string): Promise<void> {
+  const repo = new ThreadRepository()
+  return repo.delete(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+}
