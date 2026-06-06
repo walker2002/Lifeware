@@ -140,6 +140,7 @@ export function TaskTreeView({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [childData, setChildData] = useState<Map<string, Task[]>>(new Map())
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set())
+  const [childCountMap, setChildCountMap] = useState<Map<string, number>>(new Map())
   const [quickAddText, setQuickAddText] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -258,6 +259,17 @@ export function TaskTreeView({
           return next
         })
         setLoadedIds(prev => new Set(prev).add(id))
+
+        // 获取子节点的子任务计数（修复第三层及以下无法展开的问题）
+        const childrenIds = children.map(c => c.id)
+        if (childrenIds.length > 0) {
+          const subCounts = await getChildCounts(childrenIds)
+          setChildCountMap(prev => {
+            const next = new Map(prev)
+            childrenIds.forEach(cid => next.set(cid, subCounts[cid] ?? 0))
+            return next
+          })
+        }
       } catch {
         toast.error('加载子任务失败')
       }
@@ -329,6 +341,7 @@ export function TaskTreeView({
                   node={node}
                   expandedIds={expandedIds}
                   childData={childData}
+                  childCountMap={childCountMap}
                   onToggle={handleToggle}
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
@@ -371,6 +384,7 @@ interface TaskTreeRowProps {
   node: TreeNode
   expandedIds: Set<string>
   childData: Map<string, Task[]>
+  childCountMap: Map<string, number>
   onToggle: (node: TreeNode) => void
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
@@ -386,6 +400,7 @@ function SortableTaskRow({
   node,
   expandedIds,
   childData,
+  childCountMap,
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
@@ -424,6 +439,7 @@ function SortableTaskRow({
           node={node}
           expandedIds={expandedIds}
           childData={childData}
+          childCountMap={childCountMap}
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
@@ -442,6 +458,7 @@ function TaskTreeRow({
   node,
   expandedIds,
   childData,
+  childCountMap,
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
@@ -457,7 +474,7 @@ function TaskTreeRow({
     const tasks = childData.get(task.id)
     if (!tasks || tasks.length === 0) return []
     return tasks.map(t => {
-      const cnt = 0 // 子节点的计数在加载时获取
+      const cnt = childCountMap.get(t.id) ?? 0
       return {
         task: t,
         depth: depth + 1,
@@ -467,7 +484,7 @@ function TaskTreeRow({
         loaded: false,
       }
     })
-  }, [childData, task.id, depth])
+  }, [childData, childCountMap, task.id, depth])
 
   // ─── 截止日期计算 ─────────────────────────────────────────
 
@@ -661,6 +678,7 @@ function TaskTreeRow({
           node={child}
           expandedIds={expandedIds}
           childData={childData}
+          childCountMap={childCountMap}
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
