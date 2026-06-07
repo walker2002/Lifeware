@@ -47,6 +47,7 @@ import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as 
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
+import type { SortField } from './task-filter-bar'
 
 // ═══════════════════════════════════════════════════════════════
 // 类型定义
@@ -70,6 +71,10 @@ export interface TaskTreeViewProps {
   filterClarity?: string[]
   /** 状态筛选 */
   filterStatus?: string[]
+  /** 搜索查询 */
+  searchQuery?: string
+  /** 排序字段 */
+  sortBy?: SortField
 }
 
 // ─── 本地树节点类型 ────────────────────────────────────────────
@@ -134,6 +139,8 @@ export function TaskTreeView({
   onDataChanged,
   filterClarity,
   filterStatus,
+  searchQuery = '',
+  sortBy = 'title',
 }: TaskTreeViewProps) {
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(true)

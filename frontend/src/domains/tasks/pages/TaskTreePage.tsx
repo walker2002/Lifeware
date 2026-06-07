@@ -17,6 +17,8 @@ import { TaskTreeView } from '../components/task-tree-view'
 import { TaskDetailDrawer } from '../components/task-detail-drawer'
 import { ThreadDetailDrawer } from '../components/thread-detail-drawer'
 import { TaskFullscreenView } from '../components/task-fullscreen-view'
+import { TaskFilterBar } from '../components/task-filter-bar'
+import type { SortField } from '../components/task-filter-bar'
 
 // ─── 状态类型 ──────────────────────────────────────────────────
 
@@ -47,6 +49,8 @@ export default function TaskTreePage() {
 
   // ─── 筛选状态 ──────────────────────────────────────────────
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<SortField>('title')
   const [filterClarity, setFilterClarity] = useState<string[]>(['fuzzy', 'scoped', 'actionable'])
   const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress', 'completed'])
 
@@ -129,6 +133,17 @@ export default function TaskTreePage() {
         </div>
       </header>
 
+      {/* ═══ 筛选工具栏 ══════════════════════════════════════════════ */}
+      <TaskFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filterClarity={filterClarity}
+        filterStatus={filterStatus}
+        onFilterChange={handleFilterChange}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+      />
+
       {/* ═══ 主内容区（左面板 + 右内容区） ══════════════════════ */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* ─── 移动端面板切换按钮 ─────────────────────────────── */}
@@ -175,9 +190,6 @@ export default function TaskTreePage() {
             onSelectThread={handleSelectThread}
             onOpenThreadDetail={openThreadDetail}
             refreshKey={refreshKey}
-            filterClarity={filterClarity}
-            filterStatus={filterStatus}
-            onFilterChange={handleFilterChange}
           />
         </aside>
 
@@ -199,6 +211,8 @@ export default function TaskTreePage() {
               onDataChanged={handleDataChanged}
               filterClarity={filterClarity}
               filterStatus={filterStatus}
+              searchQuery={searchQuery}
+              sortBy={sortBy}
             />
           )}
         </main>

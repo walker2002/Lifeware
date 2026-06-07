@@ -2,9 +2,8 @@
  * @file thread-list-panel
  * @brief 主线列表面板组件
  *
- * 展示用户所有主线及任务计数，支持选中切换和筛选。
- * 顶部固定两个虚拟入口："全部任务"和"无主线任务"。
- * 底部提供清晰度和状态筛选（中文标签，本地状态管理）。
+ * 展示用户所有主线及任务计数，支持选中切换。
+ * 顶部固定两个虚拟入口："全部任务"和"普通任务"。
  */
 
 'use client'
@@ -39,12 +38,6 @@ export interface ThreadListPanelProps {
   onOpenThreadDetail?: (threadId: string) => void
   /** 数据刷新计数器，变化时重新加载 */
   refreshKey?: number
-  /** 当前清晰度筛选值 */
-  filterClarity?: string[]
-  /** 当前状态筛选值 */
-  filterStatus?: string[]
-  /** 筛选变更回调 */
-  onFilterChange?: (key: 'clarity' | 'status', value: string) => void
 }
 
 // ─── 虚拟入口常量 ──────────────────────────────────────────────
@@ -54,32 +47,6 @@ const ALL_ID = '__all__'
 
 /** "无主线任务"虚拟主线 ID */
 const ORPHAN_ID = '__orphan__'
-
-// ─── 筛选标签映射 ──────────────────────────────────────────────
-
-/** 清晰度 → 中文标签 */
-const CLARITY_LABELS: Record<string, string> = {
-  '': '全部',
-  fuzzy: '模糊',
-  scoped: '有范围',
-  actionable: '可执行',
-}
-
-/** 清晰度选项 */
-const CLARITY_OPTIONS = ['', 'fuzzy', 'scoped', 'actionable']
-
-/** 状态 → 中文标签 */
-const STATUS_LABELS: Record<string, string> = {
-  '': '全部',
-  todo: '待办',
-  planned: '计划中',
-  in_progress: '进行中',
-  completed: '已完成',
-  archived: '已归档',
-}
-
-/** 状态选项 */
-const STATUS_OPTIONS = ['', 'todo', 'planned', 'in_progress', 'completed', 'archived']
 
 // ─── 选中态样式 ────────────────────────────────────────────────
 
@@ -98,9 +65,6 @@ export function ThreadListPanel({
   onSelectThread,
   onOpenThreadDetail,
   refreshKey = 0,
-  filterClarity = [],
-  filterStatus = [],
-  onFilterChange,
 }: ThreadListPanelProps) {
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
@@ -243,42 +207,6 @@ export function ThreadListPanel({
           </ul>
         )}
       </nav>
-
-      {/* ═══ 底部筛选区域（复选框多选） ═══════════════════════ */}
-      <footer className="border-t border-hairline-soft px-3 py-3 space-y-2.5">
-        <div>
-          <p className="text-[10px] text-body mb-1.5">清晰度</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {CLARITY_OPTIONS.filter(v => v !== '').map(v => (
-              <label key={v} className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filterClarity.includes(v)}
-                  onChange={() => onFilterChange?.('clarity', v)}
-                  className="size-3.5 rounded accent-primary"
-                />
-                <span className="text-[11px] text-body">{CLARITY_LABELS[v]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="text-[10px] text-body mb-1.5">状态</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {STATUS_OPTIONS.filter(v => v !== '').map(v => (
-              <label key={v} className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filterStatus.includes(v)}
-                  onChange={() => onFilterChange?.('status', v)}
-                  className="size-3.5 rounded accent-primary"
-                />
-                <span className="text-[11px] text-body">{STATUS_LABELS[v]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
