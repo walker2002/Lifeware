@@ -19,6 +19,8 @@ import {
   ListTodo,
   Check,
   GripVertical,
+  Pencil,
+  Archive,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -43,7 +45,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads } from '@/app/actions/tasks'
+import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads, archiveTask } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -428,6 +430,7 @@ export function TaskTreeView({
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
                   onPromoteToThread={onPromoteToThread}
+                  onDataChanged={onDataChanged}
                 />
               ))}
             </div>
@@ -475,6 +478,8 @@ interface TaskTreeRowProps {
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
   onPromoteToThread?: (taskId: string) => void
+  /** 数据变更回调（行内归档后刷新） */
+  onDataChanged?: () => void
 }
 
 /**
@@ -493,6 +498,7 @@ function SortableTaskRow({
   onOpenTaskDetail,
   onStatusChange,
   onPromoteToThread,
+  onDataChanged,
 }: { id: string } & TaskTreeRowProps) {
   const {
     attributes,
@@ -534,6 +540,7 @@ function SortableTaskRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onPromoteToThread={onPromoteToThread}
+          onDataChanged={onDataChanged}
         />
       </div>
     </div>
@@ -555,6 +562,7 @@ function TaskTreeRow({
   onOpenTaskDetail,
   onStatusChange,
   onPromoteToThread,
+  onDataChanged,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
   const isExpanded = expandedIds.has(task.id)
@@ -737,6 +745,37 @@ function TaskTreeRow({
           )
         })()}
 
+        {/* 行内操作图标（悬停显示） */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onOpenTaskDetail?.(task.id) }}
+            className="p-1 rounded text-muted hover:text-ink transition-colors"
+            title="编辑详情"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          {task.status !== 'completed' && task.status !== 'archived' && (
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation()
+                try {
+                  await archiveTask(task.id)
+                  toast.success('任务已归档')
+                  onDataChanged?.()
+                } catch {
+                  toast.error('归档失败')
+                }
+              }}
+              className="p-1 rounded text-muted hover:text-ink transition-colors"
+              title="归档"
+            >
+              <Archive className="size-3.5" />
+            </button>
+          )}
+        </div>
+
         {/* 更多菜单（悬停显示） */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -792,6 +831,7 @@ function TaskTreeRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onPromoteToThread={onPromoteToThread}
+          onDataChanged={onDataChanged}
         />
       ))}
     </>
