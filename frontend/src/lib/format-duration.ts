@@ -13,8 +13,9 @@
  */
 export function formatDuration(minutes: number | null | undefined): string {
   if (minutes == null || minutes <= 0) return ''
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
+  const total = Math.floor(minutes)
+  const h = Math.floor(total / 60)
+  const m = total % 60
   if (h === 0) return `${m}分钟`
   if (m === 0) return `${h}小时`
   return `${h}小时${m}分钟`

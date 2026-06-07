@@ -6,5 +6,5 @@
 import TaskTreePage from '@/domains/tasks/pages/TaskTreePage'
 
 export default function TasksPage() {
-  return <TaskTreePage title="任务树管理" />
+  return <TaskTreePage />
 }

@@ -293,7 +293,7 @@ function ThreadListSkeleton() {
     <div className="flex flex-col gap-1 px-4 animate-pulse">
       {[1, 2, 3, 4].map(i => (
         <div key={i} className="flex items-center gap-3 py-2.5">
-          <div className="w-1 h-6 rounded-full bg-surface-soft" />
+          <div className="size-4 rounded-sm bg-surface-soft" />
           <div className="flex-1 h-4 rounded bg-surface-soft" />
           <div className="w-6 h-3 rounded bg-surface-soft" />
         </div>

@@ -36,18 +36,10 @@ type DrawerState =
 // ─── 页面组件 ──────────────────────────────────────────────────
 
 /**
- * 任务树页面组件属性
- */
-interface TaskTreePageProps {
-  /** 页面标题（从 manifest 获取） */
-  title: string
-}
-
-/**
  * 任务树页面组件
  * @description 横幅 + 左（主线列表）右（任务树）布局 + 详情抽屉 + 响应式
  */
-export default function TaskTreePage({ title }: TaskTreePageProps) {
+export default function TaskTreePage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string>('__all__')
   const [drawer, setDrawer] = useState<DrawerState>({ type: 'closed' })
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)

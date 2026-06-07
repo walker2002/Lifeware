@@ -198,7 +198,8 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
  * Log 追踪模式：实际用时 + 本次产出 + 标记完成
  */
 function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task) => void }) {
-  const [actualDuration, setActualDuration] = useState(task.estimatedDuration != null ? String(task.estimatedDuration) : '')
+  const [durHours, setDurHours] = useState(() => durationHours(task.estimatedDuration))
+  const [durMinutes, setDurMinutes] = useState(() => durationMinutes(task.estimatedDuration))
   const [output, setOutput] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -207,16 +208,16 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
   const handleComplete = useCallback(async () => {
     setSaving(true)
     try {
-      const dur = parseInt(actualDuration, 10)
+      const dur = parseDurationToMinutes(durHours, durMinutes)
       const patch: Record<string, unknown> = {}
-      if (dur && !isNaN(dur)) patch.actualDuration = dur
+      if (dur > 0) patch.actualDuration = dur
       if (output.trim()) patch.notes = output.trim()
       const updated = await completeTask(task.id, Object.keys(patch).length > 0 ? patch : undefined)
       onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
-  }, [actualDuration, output, task.id, onTaskUpdate])
+  }, [durHours, durMinutes, output, task.id, onTaskUpdate])
 
   if (isCompleted) return <CompletedSummary task={task} />
 
@@ -230,11 +231,21 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
           <div className="flex items-center gap-1">
             <input
               type="number"
-              min={1}
-              value={actualDuration}
-              onChange={e => setActualDuration(e.target.value)}
-              className="h-8 w-20 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
-              placeholder="分钟"
+              min={0}
+              value={durHours}
+              onChange={e => setDurHours(e.target.value)}
+              className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              placeholder="0"
+            />
+            <span className="text-xs text-muted-soft">小时</span>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={durMinutes}
+              onChange={e => setDurMinutes(e.target.value)}
+              className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              placeholder="0"
             />
             <span className="text-xs text-muted-soft">分钟</span>
           </div>

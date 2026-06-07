@@ -3,7 +3,7 @@
  * @brief A 区 — 任务信息 inline 编辑区域
  *
  * 支持字段：title、description、priority、energyRequired、tracking、
- * estimatedDuration（含快捷按钮）、dueDate。每个字段独立保存。
+ * estimatedDuration（双输入框即改即存）、dueDate。每个字段独立保存。
  */
 
 'use client'
@@ -15,7 +15,7 @@ import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 import type { TrackingMode } from '../../../usom/types/primitives'
 import { cn } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
-import { formatDuration, parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
+import { parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
 
@@ -62,9 +62,6 @@ const TRACKING_LABELS: Record<string, string> = {
   log: '日志',
   review: '复盘',
 }
-
-/** 预估时长快捷选项（分钟） */
-const DURATION_QUICK_PICKS = [30, 60, 90, 120]
 
 // ─── InlineEdit 辅助组件 ───────────────────────────────────────────────
 
@@ -383,7 +380,7 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
 // ─── 预估时长子组件 ─────────────────────────────────────────────────────
 
 /**
- * 预估时长编辑器（小时+分钟双输入框 + 快捷按钮）
+ * 预估时长编辑器（小时+分钟双输入框，失焦自动保存）
  */
 function DurationEdit({
   value,
@@ -394,99 +391,55 @@ function DurationEdit({
   onSave: (val: number | undefined) => Promise<void>
   saving: boolean
 }) {
-  const [editing, setEditing] = useState(false)
   const [draftHours, setDraftHours] = useState(() => durationHours(value))
   const [draftMinutes, setDraftMinutes] = useState(() => durationMinutes(value))
 
-  const handleSave = useCallback(async (overrideH?: string, overrideM?: string) => {
-    const h = overrideH ?? draftHours
-    const m = overrideM ?? draftMinutes
-    const total = parseDurationToMinutes(h, m)
-    if (total === (value ?? 0)) { setEditing(false); return }
-    await onSave(total > 0 ? total : undefined)
-    setEditing(false)
+  /** 失焦保存：值变化时调用 onSave */
+  const handleBlur = useCallback(() => {
+    const total = parseDurationToMinutes(draftHours, draftMinutes)
+    if (total === (value ?? 0)) return
+    onSave(total > 0 ? total : undefined)
   }, [draftHours, draftMinutes, value, onSave])
 
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setDraftHours(durationHours(value))
-          setDraftMinutes(durationMinutes(value))
-          setEditing(true)
-        }}
-        disabled={saving}
-        className="text-xs text-ink cursor-pointer rounded-sm px-1 hover:bg-hover-overlay transition-colors"
-        title="点击编辑"
-      >
-        {value != null ? formatDuration(value) : <span className="text-muted-soft">未设置</span>}
-      </button>
-    )
-  }
-
-  /** 点击快捷选项 */
-  const handleQuickPick = (minutes: number) => {
-    const h = durationHours(minutes)
-    const m = durationMinutes(minutes)
-    setDraftHours(h)
-    setDraftMinutes(m)
-    handleSave(h, m)
+  /** 同步外部 value 变更（如其他地方修改了时长） */
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
+    setDraftHours(durationHours(value))
+    setDraftMinutes(durationMinutes(value))
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1">
-        <input
-          autoFocus
-          type="number"
-          min={0}
-          value={draftHours}
-          onChange={e => setDraftHours(e.target.value)}
-          onBlur={() => handleSave()}
-          onKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); handleSave() }
-            if (e.key === 'Escape') { setEditing(false) }
-          }}
-          disabled={saving}
-          className="h-7 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
-          placeholder="0"
-        />
-        <span className="text-xs text-muted-soft">小时</span>
-        <input
-          type="number"
-          min={0}
-          max={59}
-          value={draftMinutes}
-          onChange={e => setDraftMinutes(e.target.value)}
-          onBlur={() => handleSave()}
-          onKeyDown={e => {
-            if (e.key === 'Enter') { e.preventDefault(); handleSave() }
-            if (e.key === 'Escape') { setEditing(false) }
-          }}
-          disabled={saving}
-          className="h-7 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
-          placeholder="0"
-        />
-        <span className="text-xs text-muted-soft">分钟</span>
-      </div>
-      <div className="flex gap-1 flex-wrap">
-        {DURATION_QUICK_PICKS.map(n => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => handleQuickPick(n)}
-            disabled={saving}
-            className={cn(
-              'rounded-md border border-hairline px-2 py-0.5 text-xs transition-colors',
-              'hover:border-primary/40 hover:bg-primary/10',
-              value === n && 'border-primary bg-primary/10 text-primary',
-            )}
-          >
-            {formatDuration(n)}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min={0}
+        value={draftHours}
+        onChange={e => setDraftHours(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); handleBlur() }
+        }}
+        disabled={saving}
+        className="h-7 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+        placeholder="0"
+      />
+      <span className="text-xs text-muted-soft">小时</span>
+      <input
+        type="number"
+        min={0}
+        max={59}
+        value={draftMinutes}
+        onChange={e => setDraftMinutes(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); handleBlur() }
+        }}
+        disabled={saving}
+        className="h-7 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+        placeholder="0"
+      />
+      <span className="text-xs text-muted-soft">分钟</span>
     </div>
   )
 }
