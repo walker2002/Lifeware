@@ -97,6 +97,47 @@ const MAX_DEPTH = 5
 /** 每层缩进像素 */
 const INDENT_PX = 20
 
+/**
+ * 递归过滤树节点：保留匹配搜索词的节点及其祖先
+ * @param nodes - 树节点数组
+ * @param query - 搜索关键词（小写）
+ * @returns 过滤后的节点数组
+ */
+function filterTreeBySearch(nodes: TreeNode[], query: string): TreeNode[] {
+  if (!query) return nodes
+  const q = query.toLowerCase()
+  return nodes.reduce<TreeNode[]>((acc, node) => {
+    const titleMatch = node.task.title.toLowerCase().includes(q)
+    const descMatch = !!node.task.description?.toLowerCase().includes(q)
+    const selfMatch = titleMatch || descMatch
+    const filteredChildren = filterTreeBySearch(node.children, query)
+    if (selfMatch || filteredChildren.length > 0) {
+      acc.push({ ...node, children: filteredChildren })
+    }
+    return acc
+  }, [])
+}
+
+/**
+ * 排序树节点数组
+ * @param nodes - 树节点数组
+ * @param field - 排序字段
+ * @returns 排序后的新数组
+ */
+function sortTreeNodes(nodes: TreeNode[], field: SortField): TreeNode[] {
+  if (field === 'title') {
+    return [...nodes].sort((a, b) => a.task.title.localeCompare(b.task.title, 'zh-CN'))
+  }
+  return [...nodes].sort((a, b) => {
+    const aVal = (field === 'startDate' ? a.task.startDate : a.task.endDate) ?? ''
+    const bVal = (field === 'startDate' ? b.task.startDate : b.task.endDate) ?? ''
+    if (!aVal && !bVal) return 0
+    if (!aVal) return 1
+    if (!bVal) return -1
+    return aVal.localeCompare(bVal)
+  })
+}
+
 // ─── 状态 → 颜色映射 ──────────────────────────────────────────
 
 /** 任务状态 → 圆点样式 */
@@ -234,7 +275,12 @@ export function TaskTreeView({
           loaded: false,
         }))
 
-        if (!cancelled) setRootNodes(nodes)
+        // 搜索过滤
+        let result = filterTreeBySearch(nodes, searchQuery ?? '')
+        // 排序
+        result = sortTreeNodes(result, sortBy ?? 'title')
+
+        if (!cancelled) setRootNodes(result)
       } catch {
         if (!cancelled) setRootNodes([])
         toast.error('加载任务失败，请刷新重试')
@@ -245,7 +291,7 @@ export function TaskTreeView({
 
     load()
     return () => { cancelled = true }
-  }, [threadId, refreshKey, filterClarity, filterStatus])
+  }, [threadId, refreshKey, filterClarity, filterStatus, searchQuery, sortBy])
 
   // ─── 加载主线映射 ──────────────────────────────────────────────
 
