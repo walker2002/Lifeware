@@ -12,9 +12,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react'
-import { X, ChevronDown, ChevronRight, ArrowLeft, Zap, Maximize2, Archive, Trash2 } from 'lucide-react'
+import { X, ChevronDown, ChevronRight, ArrowLeft, Zap, Maximize2 } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
-import { getTaskById, deleteTask, archiveTask, getChildCounts, getTaskAncestors } from '@/app/actions/tasks'
+import { getTaskById, getTaskAncestors } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
@@ -110,7 +110,6 @@ export function TaskDetailDrawer({
   const currentTaskId = currentEntry?.taskId ?? taskId
 
   const [expanded, setExpanded] = useState(false) // 小屏展开完整详情
-  const [childCount, setChildCount] = useState<number>(0)
 
   // 拖拽宽度状态
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_WIDTH)
@@ -133,9 +132,6 @@ export function TaskDetailDrawer({
         // 加载面包屑祖先
         const ancs = await getTaskAncestors(targetId)
         setAncestors(ancs)
-        // 获取子任务计数（用于删除校验）
-        const c = await getChildCounts([targetId])
-        setChildCount(c[targetId] ?? 0)
       }
     } catch {
       setNotFound(true)
@@ -146,19 +142,6 @@ export function TaskDetailDrawer({
   }, [])
 
   useEffect(() => { loadTask(currentTaskId) }, [currentTaskId, loadTask])
-
-  /** 删除条件：todo 或 archived 且无子任务 */
-  const canDelete = currentTask
-    ? (currentTask.status === 'todo' || currentTask.status === 'archived') && childCount === 0
-    : false
-
-  /** 删除按钮禁用原因提示 */
-  const deleteDisabledReason = !currentTask ? ''
-    : currentTask.status !== 'todo' && currentTask.status !== 'archived'
-      ? '仅待办/已归档任务可删除'
-      : childCount > 0
-        ? '存在子任务，无法删除'
-        : ''
 
   // ─── 拖拽调整宽度 ───
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -441,65 +424,7 @@ export function TaskDetailDrawer({
 
           {/* ── 底部操作栏 ── */}
           {!loading && currentTask && (
-            <div className="shrink-0 border-t border-hairline px-5 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await archiveTask(currentTaskId)
-                      onTaskChanged?.()
-                      onClose()
-                      toast.success('任务已归档')
-                    } catch {
-                      toast.error('归档失败，请重试')
-                    }
-                  }}
-                >
-                  <Archive className="size-3.5 mr-1" />
-                  归档
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-error hover:text-error"
-                      disabled={!canDelete}
-                      title={deleteDisabledReason}
-                    >
-                      <Trash2 className="size-3.5 mr-1" />
-                      彻底删除
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>确认彻底删除</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        此操作不可撤销，任务将被永久删除。
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>取消</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={async () => {
-                          try {
-                            await deleteTask(currentTaskId)
-                            onTaskChanged?.()
-                            onClose()
-                            toast.success('任务已删除')
-                          } catch {
-                            toast.error('删除失败，请重试')
-                          }
-                        }}
-                      >
-                        确认删除
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+            <div className="shrink-0 border-t border-hairline px-5 py-3 flex items-center justify-end">
               <Button variant="secondary" onClick={handleCloseAttempt}>
                 关闭
               </Button>
