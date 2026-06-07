@@ -93,6 +93,7 @@ export async function createTask(input: CreateTaskInput & { title: string }): Pr
  * @param input - 更新数据
  * @returns 更新后的任务
  */
+// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
   const repo = new TaskRepository()
   return repo.update(taskId as USOM_ID, input, MVP_USER_ID as USOM_ID)
@@ -113,6 +114,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']): 
  * 归档任务
  * @param taskId - 任务 ID
  */
+// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function archiveTask(taskId: string): Promise<void> {
   const repo = new TaskRepository()
   return repo.archive(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
@@ -122,6 +124,7 @@ export async function archiveTask(taskId: string): Promise<void> {
  * 彻底删除任务（不可恢复）
  * @param taskId - 任务 ID
  */
+// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function deleteTask(taskId: string): Promise<void> {
   const repo = new TaskRepository()
   return repo.delete(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
