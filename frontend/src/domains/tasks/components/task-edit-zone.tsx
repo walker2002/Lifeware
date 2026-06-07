@@ -340,6 +340,19 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           />
         </div>
 
+        {/* 开始时间 */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-body w-16 shrink-0">开始时间</label>
+          <input
+            type="date"
+            value={task.startDate ?? ''}
+            onChange={e => saveField('startDate', e.target.value || undefined)}
+            disabled={savingField === 'startDate'}
+            onClick={e => e.stopPropagation()}
+            className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+          />
+        </div>
+
         {/* 截止日期 */}
         <div className="flex items-center gap-2 col-span-2">
           <label className="text-xs text-body w-16 shrink-0">截止日期</label>
