@@ -9,10 +9,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ListTodo, FolderOpen, Folder } from 'lucide-react'
+import { ListTodo, FolderOpen, Folder, Pencil, Archive, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getThreads } from '@/app/actions/tasks'
+import { getThreads, deleteThread, updateThreadStatus } from '@/app/actions/tasks'
 import type { Thread } from '../../../usom/types/objects'
 
 /** 带任务计数的 Thread 查询结果 */
@@ -201,6 +201,51 @@ export function ThreadListPanel({
                   <span className="flex-shrink-0 text-xs text-muted">
                     {taskCount}
                   </span>
+
+                  {/* 行内操作图标（悬停显示） */}
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onOpenThreadDetail?.(thread.id) }}
+                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      title="编辑主线"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          await updateThreadStatus(thread.id, 'archived')
+                          toast.success('主线已归档')
+                        } catch {
+                          toast.error('归档失败')
+                        }
+                      }}
+                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      title="归档主线"
+                    >
+                      <Archive className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!confirm('确认删除此主线？')) return
+                        try {
+                          await deleteThread(thread.id)
+                          toast.success('主线已删除')
+                        } catch {
+                          toast.error('删除失败')
+                        }
+                      }}
+                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      title="删除主线"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
                 </button>
               </li>
             ))}
