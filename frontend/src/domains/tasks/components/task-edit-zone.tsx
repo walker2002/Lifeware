@@ -3,7 +3,7 @@
  * @brief A 区 — 任务信息 inline 编辑区域
  *
  * 支持字段：title、description、priority、energyRequired、tracking、
- * estimatedDuration（双输入框即改即存）、dueDate。每个字段独立保存。
+ * estimatedDuration（双输入框）、dueDate。字段变更暂存 draft，统一保存。
  */
 
 'use client'
@@ -206,21 +206,32 @@ function InlineTextarea({
  * @param props - 组件属性
  */
 export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZoneProps) {
-  const [savingField, setSavingField] = useState<string | null>(null)
+  /** 变更字段草稿（key=字段名, value=新值） */
+  const [draft, setDraft] = useState<Record<string, unknown>>({})
+  const [saving, setSaving] = useState(false)
 
-  /** 通用字段保存 */
-  const saveField = useCallback(async (field: string, value: unknown) => {
+  /** 是否有未保存变更 */
+  const hasChanges = Object.keys(draft).length > 0
+
+  /** 字段变更回调 — 更新 draft 而非直接保存 */
+  const updateDraft = useCallback((field: string, value: unknown) => {
+    setDraft(prev => ({ ...prev, [field]: value }))
     onDirtyChange?.(true)
-    setSavingField(field)
+  }, [onDirtyChange])
+
+  /** 批量保存 — 合并所有变更字段到一次 updateTask 调用 */
+  const saveAll = useCallback(async () => {
+    if (Object.keys(draft).length === 0) return
+    setSaving(true)
     try {
-      // TODO: title 修改后应触发后端 clarity 重新计算，B 区认知面板需同步刷新
-      const updated = await updateTask(task.id, { [field]: value })
+      const updated = await updateTask(task.id, draft)
+      setDraft({})
       onTaskUpdate(updated)
-    } finally {
       onDirtyChange?.(false)
-      setSavingField(null)
+    } finally {
+      setSaving(false)
     }
-  }, [task.id, onTaskUpdate, onDirtyChange])
+  }, [draft, task.id, onTaskUpdate, onDirtyChange])
 
   /** 解析 notes JSON 字段中的特定部分 */
   const parseNotesField = (notes: string | null | undefined, key: 'acceptance' | 'output'): string => {
@@ -253,7 +264,7 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
       }
     }
     current[key] = value
-    await saveField('notes', JSON.stringify(current))
+    updateDraft('notes', JSON.stringify(current))
   }
 
   const EnergyIcon = task.energyProfile ? ENERGY_ICONS[task.energyProfile] : null
@@ -264,8 +275,8 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
       <div className="flex items-start gap-2">
         {EnergyIcon && <EnergyIcon className="size-5 mt-1 text-muted-soft shrink-0" />}
         <InlineEdit
-          value={task.title}
-          onSave={val => saveField('title', val)}
+          value={(draft.title as string) ?? task.title}
+          onSave={async val => updateDraft('title', val)}
           className="text-2xl font-display font-semibold text-ink leading-tight"
           inputClassName="text-2xl font-display font-semibold w-full"
         />
@@ -274,8 +285,8 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
       {/* ── 描述 ── */}
       <div>
         <InlineTextarea
-          value={task.description ?? ''}
-          onSave={val => saveField('description', val)}
+          value={(draft.description as string) ?? task.description ?? ''}
+          onSave={async val => updateDraft('description', val)}
           placeholder="点击添加描述..."
         />
       </div>
@@ -286,9 +297,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
         <div className="flex items-center gap-2">
           <label className="text-xs text-body w-16 shrink-0">优先级</label>
           <select
-            value={task.priority}
-            onChange={e => saveField('priority', e.target.value)}
-            disabled={savingField === 'priority'}
+            value={(draft.priority as string) ?? task.priority}
+            onChange={e => { updateDraft('priority', e.target.value) }}
+            disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
@@ -302,9 +313,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
         <div className="flex items-center gap-2">
           <label className="text-xs text-body w-16 shrink-0">能量需求</label>
           <select
-            value={task.energyRequired}
-            onChange={e => saveField('energyRequired', e.target.value)}
-            disabled={savingField === 'energyRequired'}
+            value={(draft.energyRequired as string) ?? task.energyRequired}
+            onChange={e => updateDraft('energyRequired', e.target.value)}
+            disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
@@ -318,9 +329,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
         <div className="flex items-center gap-2">
           <label className="text-xs text-body w-16 shrink-0">追踪模式</label>
           <select
-            value={task.tracking}
-            onChange={e => saveField('tracking', e.target.value)}
-            disabled={savingField === 'tracking'}
+            value={(draft.tracking as string) ?? task.tracking}
+            onChange={e => updateDraft('tracking', e.target.value)}
+            disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
@@ -335,8 +346,8 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           <label className="text-xs text-body w-16 shrink-0">预估时长</label>
           <DurationEdit
             value={task.estimatedDuration}
-            onSave={val => saveField('estimatedDuration', val)}
-            saving={savingField === 'estimatedDuration'}
+            onSave={async val => updateDraft('estimatedDuration', val)}
+            saving={saving}
           />
         </div>
 
@@ -345,9 +356,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           <label className="text-xs text-body w-16 shrink-0">开始时间</label>
           <input
             type="date"
-            value={task.startDate ?? ''}
-            onChange={e => saveField('startDate', e.target.value || undefined)}
-            disabled={savingField === 'startDate'}
+            value={(draft.startDate as string) ?? task.startDate ?? ''}
+            onChange={e => updateDraft('startDate', e.target.value || undefined)}
+            disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
@@ -358,14 +369,26 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           <label className="text-xs text-body w-16 shrink-0">截止日期</label>
           <input
             type="date"
-            value={task.dueDate ?? ''}
-            onChange={e => saveField('dueDate', e.target.value || undefined)}
-            disabled={savingField === 'dueDate'}
+            value={(draft.dueDate as string) ?? task.dueDate ?? ''}
+            onChange={e => updateDraft('dueDate', e.target.value || undefined)}
+            disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
       </div>
+
+      {/* ── 保存按钮 ── */}
+      {hasChanges && (
+        <button
+          type="button"
+          onClick={saveAll}
+          disabled={saving}
+          className="h-9 w-full rounded-md bg-primary text-on-primary text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
+        >
+          {saving ? '保存中…' : '保存修改'}
+        </button>
+      )}
 
       {/* ── 验收标准 & 预期产出 ── */}
       <div className="flex flex-col gap-3 pt-1 border-t border-hairline-soft">
