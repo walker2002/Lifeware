@@ -521,7 +521,7 @@ function SortableTaskRow({
       {/* 拖拽手柄 */}
       <button
         type="button"
-        className="shrink-0 px-1 text-muted opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        className="shrink-0 px-1 text-body hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label="拖拽排序"
@@ -745,12 +745,12 @@ function TaskTreeRow({
           )
         })()}
 
-        {/* 行内操作图标（悬停显示） */}
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* 行内操作图标（始终可见，悬停加深） */}
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpenTaskDetail?.(task.id) }}
-            className="p-1 rounded text-muted hover:text-ink transition-colors"
+            className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
             title="编辑详情"
           >
             <Pencil className="size-3.5" />
@@ -768,7 +768,7 @@ function TaskTreeRow({
                   toast.error('归档失败')
                 }
               }}
-              className="p-1 rounded text-muted hover:text-ink transition-colors"
+              className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
               title="归档"
             >
               <Archive className="size-3.5" />
@@ -776,12 +776,12 @@ function TaskTreeRow({
           )}
         </div>
 
-        {/* 更多菜单（悬停显示） */}
+        {/* 更多菜单（悬停加深） */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
               aria-label="更多操作"
-              className="shrink-0 size-5 flex items-center justify-center text-muted opacity-0 group-hover:opacity-100 transition-opacity">
+              className="shrink-0 size-5 flex items-center justify-center text-body hover:text-ink hover:bg-hover-overlay transition-colors">
               <MoreHorizontal className="size-3.5" />
             </button>
           </DropdownMenuTrigger>

@@ -85,7 +85,7 @@ export function TaskFilterBar({
       {/* 第一行：搜索框 + 排序 */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-body" />
           <input
             type="text"
             value={searchQuery}
@@ -95,7 +95,7 @@ export function TaskFilterBar({
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted">排序</span>
+          <span className="text-xs text-body">排序</span>
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value as SortField)}
@@ -110,7 +110,7 @@ export function TaskFilterBar({
 
       {/* 第二行：清晰度标签 */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted shrink-0">清晰度</span>
+        <span className="text-xs text-body shrink-0">清晰度</span>
         <div className="flex flex-wrap gap-1.5">
           {CLARITY_OPTIONS.map(opt => (
             <button
@@ -127,7 +127,7 @@ export function TaskFilterBar({
 
       {/* 第三行：状态标签 */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted shrink-0">状态</span>
+        <span className="text-xs text-body shrink-0">状态</span>
         <div className="flex flex-wrap gap-1.5">
           {STATUS_OPTIONS.map(opt => (
             <button

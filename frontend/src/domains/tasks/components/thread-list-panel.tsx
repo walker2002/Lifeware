@@ -202,12 +202,12 @@ export function ThreadListPanel({
                     {taskCount}
                   </span>
 
-                  {/* 行内操作图标（悬停显示） */}
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* 行内操作图标（始终可见，悬停加深） */}
+                  <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onOpenThreadDetail?.(thread.id) }}
-                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
                       title="编辑主线"
                     >
                       <Pencil className="size-3.5" />
@@ -223,7 +223,7 @@ export function ThreadListPanel({
                           toast.error('归档失败')
                         }
                       }}
-                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
                       title="归档主线"
                     >
                       <Archive className="size-3.5" />
@@ -240,7 +240,7 @@ export function ThreadListPanel({
                           toast.error('删除失败')
                         }
                       }}
-                      className="p-1 rounded text-muted hover:text-ink transition-colors"
+                      className="p-1 rounded text-body hover:text-error hover:bg-error-soft transition-colors"
                       title="删除主线"
                     >
                       <Trash2 className="size-3.5" />
