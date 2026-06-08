@@ -207,6 +207,33 @@ export async function getTaskAncestors(taskId: string): Promise<Array<{ id: stri
   return ancestors
 }
 
+/**
+ * 搜索任务并返回祖先路径（支持搜索深层子任务）
+ * @param query - 搜索关键词
+ * @param filters - 额外筛选条件
+ * @returns 匹配任务 + 祖先映射（可序列化的 Record 格式）
+ */
+export async function searchTasks(
+  query: string,
+  filters?: { threadId?: string; clarity?: string[]; status?: string[] },
+): Promise<{
+  matches: Task[]
+  ancestorMap: Record<string, Array<{ id: string; title: string }>>
+}> {
+  const repo = new TaskRepository()
+  const { matches, ancestorMap } = await repo.findMatchingWithAncestors(
+    query,
+    MVP_USER_ID as USOM_ID,
+    filters,
+  )
+  // 将 Map<Task[]> 转换为可序列化的 Record<string, {id, title}[]>
+  const serializableAncestorMap: Record<string, Array<{ id: string; title: string }>> = {}
+  for (const [taskId, ancestors] of ancestorMap.entries()) {
+    serializableAncestorMap[taskId] = ancestors.map(a => ({ id: a.id, title: a.title }))
+  }
+  return { matches, ancestorMap: serializableAncestorMap }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Thread 操作
 // ═══════════════════════════════════════════════════════════════════════════
