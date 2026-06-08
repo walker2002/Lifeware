@@ -15,8 +15,13 @@ const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 const TASK_LIFECYCLE_STATUS_MAP: Record<string, string> = {
   completeTask: 'active',
   archiveTask: 'completed',
-  deleteTask: 'todo',
 }
+
+/**
+ * 可删除的任务状态列表（manifest lifecycle: from [todo, planned, in_progress, completed] → deleted）
+ * deleteTask 不用单状态查询，需查多个状态
+ */
+const DELETABLE_TASK_STATUSES = ['todo', 'planned', 'in_progress', 'completed']
 
 /** 任务生命周期状态机动作映射 */
 const TASK_LIFECYCLE_SM_ACTION: Record<string, string> = {
@@ -194,11 +199,35 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
     // ── 任务生命周期操作 ──
 
+    if (action === 'deleteTask') {
+      // deleteTask 需查询多个可删除状态（非单状态映射）
+      try {
+        const repo = new TaskRepository()
+        const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+        const items = allTasks
+          .filter(t => (DELETABLE_TASK_STATUSES as string[]).includes(t.status))
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            priority: t.priority,
+            estimatedDuration: t.estimatedDuration,
+            status: t.status,
+          }))
+        return {
+          content: '请选择要删除的任务',
+          dataSnapshot: { action: 'delete', items },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询可删除任务失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
     if (action in TASK_LIFECYCLE_STATUS_MAP) {
       const status = TASK_LIFECYCLE_STATUS_MAP[action]
       const items = await getTasksByStatus(status)
       const smAction = TASK_LIFECYCLE_SM_ACTION[action]
-      const labels: Record<string, string> = { complete: '完成', archive: '归档', delete: '删除' }
+      const labels: Record<string, string> = { complete: '完成', archive: '归档' }
       return {
         content: `请选择要${labels[smAction] ?? smAction}的任务`,
         dataSnapshot: { action: smAction, items },
@@ -230,29 +259,25 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
       const { submitDynamicIntent } = await import('@/app/actions/intent')
 
-      // 线程批量操作：selectedIds 存在时逐个执行
-      const threadActions = ['pauseThread', 'resumeThread', 'completeThread', 'archiveThread']
+      // 线程批量操作：selectedIds 存在时逐个执行（遇错即停）
+      const threadActions = Object.keys(THREAD_LIFECYCLE_STATUS_MAP)
       if (threadActions.includes(action) && fields.selectedIds) {
         const ids = fields.selectedIds as string[]
-        const errors: string[] = []
         for (const id of ids) {
           const r = await submitDynamicIntent('tasks', action, { threadId: id })
-          if (!r.success) errors.push(r.error ?? `${id} 操作失败`)
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
         }
-        if (errors.length > 0) return { success: false, error: errors[0] }
-        return { success: true }
+        return { success: true, data: { selectedIds: ids } }
       }
 
-      // 任务批量操作：selectedIds 存在时逐个执行
+      // 任务批量操作：selectedIds 存在时逐个执行（遇错即停）
       if (fields.selectedIds && (action in TASK_LIFECYCLE_SM_ACTION)) {
         const ids = fields.selectedIds as string[]
-        const errors: string[] = []
         for (const id of ids) {
           const r = await submitDynamicIntent('tasks', action, { taskId: id })
-          if (!r.success) errors.push(r.error ?? `${id} 操作失败`)
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
         }
-        if (errors.length > 0) return { success: false, error: errors[0] }
-        return { success: true }
+        return { success: true, data: { selectedIds: ids } }
       }
 
       const result = await submitDynamicIntent('tasks', action, fields)

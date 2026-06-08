@@ -126,7 +126,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => toggleOne(thread.id)}
-                  className="size-4 rounded accent-blue-500"
+                  className="size-4 rounded"
                 />
                 {/* 颜色圆点 */}
                 <span
