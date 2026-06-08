@@ -104,3 +104,5 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 | USOM 详细设计 | 2026_06_04 | 2026_06_03 | 清理残留文本（废弃的 ProjectTemplate/TaskTemplate 代码片段）；更新文档版本号 |
 | 数据库设计 | 2026_06_04 | 2026_06_03 | 视图 v_today_pending_habits 修复（hl.status→hl.completion_status）；表结构总览补充 threads |
 | 数据库设计 | 2026_06_06 | 2026_06_04 | tasks 表状态枚举回退对齐代码实际值（todo/planned/in_progress/completed/archived）；移除已废弃列（key_result_id/timebox_id/frequency_type/days_of_week）；v_active_tasks 视图修复（列名+状态值） |
+| 界面设计规范 | 2026_06_08 | 2026_05_31 | v1.1→v1.2：新增颜色对比度铁律（WCAG AA 阈值表）；primary/on-primary 可访问性警告及替代方案（primary-active）；C-01/C-06 检查项新增对比度验证 |
+| USOM 详细设计 | 2026_06_08 | 2026_06_04 | TaskStatus 枚举对齐代码与数据库（draft|active|on_hold → todo|planned，移除 deprecated scheduled）；状态转换图同步更新；清理 USOMSnapshot 旧状态注释 |

@@ -4,11 +4,15 @@
  *
  * 包含搜索框、清晰度/状态文字按钮筛选、排序下拉。
  * 替代原 ThreadListPanel 底部复选框筛选区。
+ *
+ * 视觉风格参照 OKR 时段筛选栏设计：
+ * - 选中态使用品牌暖色 bg-primary，未选中态白底+细边框
+ * - 两行紧凑布局：搜索+排序 → 筛选标签组
  */
 
 'use client'
 
-import { Search } from 'lucide-react'
+import { Search, ArrowUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
@@ -59,11 +63,26 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'endDate', label: '结束时间' },
 ]
 
-/** 文字按钮 — 未选中样式 */
-const TAG_UNSELECTED = 'bg-canvas text-body border border-hairline rounded px-2.5 py-1 text-xs cursor-pointer hover:bg-hover-overlay transition-colors'
+/** 筛选标签 — 未选中样式（白底 + 浅边框 + 正文色文字） */
+const TAG_UNSELECTED = cn(
+  'bg-canvas text-body border border-hairline rounded-md',
+  'px-2.5 py-1 text-xs cursor-pointer',
+  'hover:bg-hover-overlay transition-colors duration-150',
+)
 
-/** 文字按钮 — 选中样式 */
-const TAG_SELECTED = 'bg-ink text-on-primary rounded px-2.5 py-1 text-xs cursor-pointer transition-colors'
+/**
+ * 筛选标签 — 选中样式
+ * 使用 primary-active（#a9583e）而非 primary（#cc785c）以确保白字对比度 ≥ 4.5:1
+ * @see UI-DESIGN-SPEC.md §1.1 注释：primary + on-primary 对比度 3.3:1，仅限大文本使用
+ */
+const TAG_SELECTED = cn(
+  'bg-primary-active text-on-primary border border-primary-active rounded-md',
+  'px-2.5 py-1 text-xs font-medium cursor-pointer',
+  'transition-colors duration-150',
+)
+
+/** 分组标签文字样式 */
+const GROUP_LABEL = 'text-xs text-body shrink-0 w-10'
 
 // ─── 组件 ──────────────────────────────────────────────────────────
 
@@ -81,25 +100,28 @@ export function TaskFilterBar({
   onSortByChange,
 }: TaskFilterBarProps) {
   return (
-    <div className="px-4 py-3 border-b border-hairline bg-surface-soft space-y-2">
+    <div className="px-4 py-2.5 border-b border-hairline bg-canvas space-y-2">
       {/* 第一行：搜索框 + 排序 */}
       <div className="flex items-center gap-3">
+        {/* 搜索框 */}
         <div className="flex-1 relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-body" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             placeholder="搜索任务..."
-            className="w-full h-8 pl-8 pr-3 rounded-md border border-hairline bg-canvas text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            className="w-full h-8 pl-8 pr-3 rounded-md border border-hairline bg-canvas text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring focus:border-primary"
           />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-body">排序</span>
+
+        {/* 排序 */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <ArrowUpDown className="size-3 text-muted" />
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value as SortField)}
-            className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            className="h-8 rounded-md border border-hairline bg-canvas px-2 pr-6 text-xs text-ink appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-focus-ring hover:border-muted-soft transition-colors"
           >
             {SORT_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -108,33 +130,32 @@ export function TaskFilterBar({
         </div>
       </div>
 
-      {/* 第二行：清晰度标签 */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-body shrink-0">清晰度</span>
-        <div className="flex flex-wrap gap-1.5">
+      {/* 第二行：清晰度 + 状态筛选标签 */}
+      <div className="flex items-center gap-6 flex-wrap">
+        {/* 清晰度 */}
+        <div className="flex items-center gap-1.5">
+          <span className={GROUP_LABEL}>清晰度</span>
           {CLARITY_OPTIONS.map(opt => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onFilterChange('clarity', opt.value)}
-              className={cn(filterClarity.includes(opt.value) ? TAG_SELECTED : TAG_UNSELECTED)}
+              className={filterClarity.includes(opt.value) ? TAG_SELECTED : TAG_UNSELECTED}
             >
               {opt.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* 第三行：状态标签 */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-body shrink-0">状态</span>
-        <div className="flex flex-wrap gap-1.5">
+        {/* 状态 */}
+        <div className="flex items-center gap-1.5">
+          <span className={GROUP_LABEL}>状态</span>
           {STATUS_OPTIONS.map(opt => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onFilterChange('status', opt.value)}
-              className={cn(filterStatus.includes(opt.value) ? TAG_SELECTED : TAG_UNSELECTED)}
+              className={filterStatus.includes(opt.value) ? TAG_SELECTED : TAG_UNSELECTED}
             >
               {opt.label}
             </button>
