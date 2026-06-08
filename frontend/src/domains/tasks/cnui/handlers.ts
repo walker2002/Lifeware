@@ -175,6 +175,14 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
     try {
+      // promoteToThread 是多阶段编排操作（创建主线 + 关联任务），
+      // 不走 SM 单步转换路径，直接调用专用服务端操作
+      if (action === 'promoteToThread') {
+        const { promoteToThread } = await import('@/app/actions/tasks')
+        const thread = await promoteToThread(fields.taskId as string, fields as Partial<import('@/usom/interfaces/irepository').CreateThreadInput>)
+        return { success: true, data: { object: thread } }
+      }
+
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const result = await submitDynamicIntent('tasks', action, fields)
       return { success: result.success, error: result.error, data: result.object ? { object: result.object } : undefined }
