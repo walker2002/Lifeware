@@ -162,7 +162,7 @@ export const tasks = pgTable('tasks', {
   threadId: uuid('thread_id').references(() => threads.id, { onDelete: 'set null' }),
 
   // 执行轴状态
-  status: text('status', { enum: ['todo', 'planned', 'in_progress', 'completed', 'archived'] }).notNull(),
+  status: text('status', { enum: ['todo', 'planned', 'in_progress', 'completed', 'archived', 'deleted'] }).notNull(),
 
   // 核心字段
   title: text('title').notNull(),
@@ -223,7 +223,7 @@ export const habits = pgTable('habits', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'suspended', 'archived'] }).notNull(),
+  status: text('status', { enum: ['draft', 'active', 'suspended', 'archived', 'deleted'] }).notNull(),
   title: text('title').notNull(),
   description: text('description'),
   frequencyType: text('frequency_type', { enum: ['daily', 'weekly', 'custom'] }).notNull(),

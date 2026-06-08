@@ -32,6 +32,10 @@ export const taskTransitions: Transition<TaskStatus>[] = [
   { from: 'todo',    to: 'in_progress', action: 'start',    eventType: 'TaskStarted' },
   { from: 'in_progress', to: 'completed', action: 'complete', eventType: 'TaskCompleted' },
   { from: 'completed', to: 'archived',  action: 'archive',  eventType: 'TaskArchived' },
+  { from: 'todo',        to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
+  { from: 'planned',     to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
+  { from: 'in_progress', to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
+  { from: 'completed',   to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
 ]
 
 // ─── Thread 状态转换 ─────────────────────────────────────────────

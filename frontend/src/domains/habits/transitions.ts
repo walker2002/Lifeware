@@ -29,6 +29,9 @@ export const habitTransitions: Transition<HabitStatus>[] = [
   { from: 'active',    to: 'suspended', action: 'suspend',    eventType: 'HabitSuspended' },
   { from: 'suspended', to: 'active',    action: 'reactivate', eventType: 'HabitActivated' },
   { from: 'suspended', to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
+  { from: 'draft',     to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
+  { from: 'active',    to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
+  { from: 'suspended', to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
 ]
 
 /**

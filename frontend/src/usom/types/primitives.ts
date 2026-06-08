@@ -190,7 +190,7 @@ export type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'dis
  * - completed: 已完成
  * - archived: 已归档
  */
-export type TaskStatus = 'todo' | 'planned' | 'in_progress' | 'completed' | 'archived'
+export type TaskStatus = 'todo' | 'planned' | 'in_progress' | 'completed' | 'archived' | 'deleted'
 
 /**
  * 线索状态
@@ -208,7 +208,7 @@ export type ThreadStatus = 'active' | 'paused' | 'completed' | 'archived'
  * - suspended: 已暂停
  * - archived: 已归档
  */
-export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived'
+export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived' | 'deleted'
 
 /**
  * 时间盒状态

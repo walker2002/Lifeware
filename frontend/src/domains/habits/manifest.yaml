@@ -61,6 +61,14 @@ intent_triggers:
       - 打卡晨跑
       - 今天冥想完成
     keywords: [打卡, log, 完成]
+  - action: deleteHabit
+    shortcut: /deleteHabit
+    description: 删除习惯（不可恢复）
+    response_type: cnui
+    cnui_surface: habit-action-panel
+    examples:
+      - 删除这个习惯
+    keywords: [删除, delete]
   - action: view_list
     shortcut: /habits
     description: 习惯管理
@@ -89,7 +97,7 @@ intent_triggers:
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
   habit:
-    states: [draft, active, suspended, archived]
+    states: [draft, active, suspended, archived, deleted]
     initial_state: draft
     transitions:
       - from: null
@@ -117,7 +125,12 @@ lifecycle:
         trigger: intent
         action: archive
         event_type: HabitArchived
-    terminal_states: [archived]
+      - from: [draft, active, suspended]
+        to: deleted
+        trigger: intent
+        action: delete
+        event_type: HabitDeleted
+    terminal_states: [archived, deleted]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 field_metadata:
@@ -195,6 +208,7 @@ subscribed_events:
   - HabitActivated
   - HabitSuspended
   - HabitArchived
+  - HabitDeleted
   - HabitLogged
   - HabitSkipped
   - HabitStreakMilestone
