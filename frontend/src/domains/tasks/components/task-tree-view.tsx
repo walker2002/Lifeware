@@ -437,10 +437,10 @@ export function TaskTreeView({
         /* ═══ 搜索模式 ═══════════════════════════════════════ */
         <div className="space-y-1">
           {isSearching && (
-            <div className="text-sm text-[var(--text-muted)] px-3 py-2">搜索中...</div>
+            <div className="text-sm text-muted-foreground px-3 py-2">搜索中...</div>
           )}
           {!isSearching && searchResults.matches.length === 0 && (
-            <div className="text-sm text-[var(--text-muted)] px-3 py-2">未找到匹配的任务</div>
+            <div className="text-sm text-muted-foreground px-3 py-2">未找到匹配的任务</div>
           )}
           {searchResults.matches.map(task => {
             const ancestors = searchResults.ancestorMap[task.id] ?? []
@@ -453,9 +453,9 @@ export function TaskTreeView({
               today.setHours(0, 0, 0, 0)
               const diffMs = due.getTime() - today.getTime()
               const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-              let colorClass = 'text-[var(--text-body)]'
-              if (diffDays < 0) colorClass = 'text-[var(--text-error)]'
-              else if (diffDays <= 3) colorClass = 'text-[var(--text-warning)]'
+              let colorClass = 'text-body'
+              if (diffDays < 0) colorClass = 'text-error'
+              else if (diffDays <= 3) colorClass = 'text-warning'
               return { text: mmdd, colorClass }
             })()
             const EnergyIcon = ENERGY_ICON[task.energyRequired]
@@ -464,12 +464,12 @@ export function TaskTreeView({
             return (
               <div
                 key={task.id}
-                className="px-2 py-1.5 rounded-md hover:bg-[var(--bg-subtle)] cursor-pointer"
+                className="px-2 py-1.5 rounded-md hover:bg-surface-soft cursor-pointer"
                 onClick={() => onOpenTaskDetail?.(task.id)}
               >
                 {/* 祖先路径面包屑 */}
                 {ancestors.length > 0 && (
-                  <div className="text-xs text-[var(--text-muted)] mb-0.5 truncate">
+                  <div className="text-xs text-muted-foreground mb-0.5 truncate">
                     {ancestors.reverse().map(a => a.title).join(' > ')}
                   </div>
                 )}
@@ -479,22 +479,22 @@ export function TaskTreeView({
                   <div
                     className={cn(
                       'shrink-0 size-3.5 rounded-full flex items-center justify-center',
-                      STATUS_DOT_CLASS[task.status] || 'border border-[var(--text-muted)] bg-transparent',
+                      STATUS_DOT_CLASS[task.status] || 'border border-muted-foreground bg-transparent',
                     )}
                   >
-                    {task.status === 'completed' && <Check className="size-2 text-[var(--text-on-primary)]" />}
+                    {task.status === 'completed' && <Check className="size-2 text-on-primary" />}
                   </div>
                   {/* 清晰度圆点 */}
                   <div
                     className={cn(
                       'shrink-0 size-2 rounded-full',
-                      CLARITY_DOT_CLASS[task.clarity] || 'border border-dashed border-[var(--text-muted)]',
+                      CLARITY_DOT_CLASS[task.clarity] || 'border border-dashed border-muted-foreground',
                     )}
                     title={`清晰度: ${task.clarity}`}
                   />
                   {/* 标题 */}
                   <span className={cn(
-                    'flex-1 text-sm text-[var(--text-ink)] truncate',
+                    'flex-1 text-sm text-ink truncate',
                     task.status === 'completed' && 'line-through opacity-60',
                   )}>
                     {task.title}
@@ -505,8 +505,8 @@ export function TaskTreeView({
                       className={cn(
                         'shrink-0 rounded px-1.5 py-0.5 text-[10px] leading-none',
                         task.priority === Priority.Critical
-                          ? 'bg-[var(--bg-error-soft)] text-[var(--text-error)]'
-                          : 'bg-[var(--bg-warning-soft)] text-[var(--text-warning)]',
+                          ? 'bg-error-soft text-error'
+                          : 'bg-warning-soft text-warning',
                       )}
                     >
                       {task.priority === Priority.Critical ? '紧急' : '高'}
@@ -520,10 +520,10 @@ export function TaskTreeView({
                   )}
                   {/* 精力图标 */}
                   {FinalIcon && (
-                    <FinalIcon className="shrink-0 size-3.5 text-[var(--text-body)]" />
+                    <FinalIcon className="shrink-0 size-3.5 text-body" />
                   )}
                   {/* 任务 ID 片段 */}
-                  <span className="text-xs text-[var(--text-muted)] shrink-0">#{task.id.slice(0, 8)}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">#{task.id.slice(0, 8)}</span>
                 </div>
               </div>
             )
