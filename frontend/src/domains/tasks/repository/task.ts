@@ -126,6 +126,72 @@ export class TaskRepository implements ITaskRepository {
     return map
   }
 
+  /**
+   * 搜索匹配查询的任务，并构建祖先链
+   *
+   * 对 title/description 做 ILIKE 匹配，返回匹配结果及其完整祖先路径。
+   * 用于任务树搜索模式，可搜索到未展开的深层子任务。
+   *
+   * @param query - 搜索关键词
+   * @param userId - 用户 ID
+   * @param filters - 额外筛选条件
+   * @returns 匹配任务列表 + 祖先映射（taskId → 祖先链，从最近父级到根级）
+   */
+  async findMatchingWithAncestors(
+    query: string,
+    userId: USOM_ID,
+    filters?: { threadId?: string; clarity?: string[]; status?: string[] },
+  ): Promise<{
+    matches: Task[]
+    ancestorMap: Map<string, Task[]>
+  }> {
+    const conditions = [
+      eq(s.tasks.userId, userId),
+      sql`(${s.tasks.title} ILIKE ${`%${query}%`} OR ${s.tasks.description} ILIKE ${`%${query}%`})`,
+    ]
+
+    if (filters?.threadId) {
+      conditions.push(eq(s.tasks.threadId, filters.threadId))
+    }
+    if (filters?.clarity && filters.clarity.length > 0) {
+      conditions.push(inArray(s.tasks.clarity, filters.clarity as any[]))
+    }
+    if (filters?.status && filters.status.length > 0) {
+      conditions.push(inArray(s.tasks.status, filters.status as any[]))
+    }
+
+    const rows = await db.select().from(s.tasks)
+      .where(and(...conditions))
+    const matches = rows.map(r => taskRowToUSOM(r as any))
+
+    // 构建祖先映射
+    const ancestorMap = new Map<string, Task[]>()
+    const loadedTasks = new Map<string, Task>()
+
+    for (const match of matches) {
+      const ancestors: Task[] = []
+      let currentParentId = match.parentId
+
+      for (let i = 0; i < 10 && currentParentId; i++) {
+        let parent = loadedTasks.get(currentParentId)
+        if (!parent) {
+          const found = await this.findById(currentParentId as USOM_ID, userId)
+          if (found) {
+            parent = found
+            loadedTasks.set(currentParentId, found)
+          }
+        }
+        if (!parent) break
+        ancestors.push(parent)
+        currentParentId = parent.parentId
+      }
+
+      ancestorMap.set(match.id, ancestors)
+    }
+
+    return { matches, ancestorMap }
+  }
+
   // ─── 写入方法 ──────────────────────────────────────────────────
 
   async create(data: CreateTaskInput, userId: USOM_ID): Promise<Task> {
