@@ -687,55 +687,11 @@ export async function submitHabitIntent(
   input: CreateHabitInput,
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const intentionId = crypto.randomUUID();
-    const now = new Date().toISOString() as Timestamp;
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId,
-      targetDomain: "habits",
-      action: "createHabit",
-      fields: { ...input },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      pathType: "contract",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
+    const result = await submitDynamicIntent('habits', 'createHabit', { ...input })
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: result.error }
     }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.CREATE_FAILED;
     return { success: false, error: message };
@@ -748,73 +704,33 @@ export async function updateHabitStatus(
   action: "activate" | "suspend" | "reactivate" | "archive",
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const now = new Date().toISOString() as Timestamp;
     const actionMap: Record<string, string> = {
       activate: "activateHabit",
       suspend: "suspendHabit",
       reactivate: "reactivateHabit",
       archive: "archiveHabit",
-    };
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: "habits",
-      action: actionMap[action],
-      fields: { habitId },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
-    if (!result.success) {
-      return { success: false, error: result.error };
     }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    const result = await submitDynamicIntent('habits', actionMap[action], { habitId })
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+    return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.STATUS_UPDATE_FAILED;
     return { success: false, error: message };
   }
 }
 
-/** 删除习惯 */
+/** 删除习惯（软删除 → status = 'deleted'） */
 export async function deleteHabit(
   habitId: string,
 ): Promise<HabitActionResult> {
   try {
-    const repo = await getHabitRepo();
-    await repo.delete(habitId, MVP_USER_ID);
-    return { success: true };
+    const result = await submitDynamicIntent('habits', 'deleteHabit', { habitId })
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+    return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.DELETE_FAILED;
     return { success: false, error: message };
@@ -846,53 +762,10 @@ export async function logHabit(
   },
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo()
-    const eventRepo = new SystemEventRepository()
-    const { HabitLogRepository } = await import('@/domains/habits/repository/habit-log')
-    const habitLogRepo = new HabitLogRepository()
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: habitLogRepo as any,
-    })
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error('not used') } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: 'pass' as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    })
-
-    const now = new Date().toISOString() as Timestamp
-    const intent: import('@/usom/types/objects').StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: 'habits',
-      action: 'logHabit',
-      fields: { habitId, ...fields },
-      confidence: 1.0,
-      resolvedBy: 'template_form',
-      pathType: 'contract',
-      createdAt: now,
-    }
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID)
+    const result = await submitDynamicIntent('habits', 'logHabit', { habitId, ...fields })
     if (!result.success) {
       return { success: false, error: result.error }
     }
-
     return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : '打卡失败' }
@@ -921,7 +794,16 @@ export async function batchLogHabits(
   return { success: !lastError, error: lastError }
 }
 
-/** 更新习惯信息 */
+/**
+ * 更新习惯信息
+ *
+ * 注意：SM 只支持 create/updateStatus，不支持字段更新。
+ * 保留独立 Orchestrator 构造。待 SM 扩展字段更新能力后可迁移至 submitDynamicIntent。
+ *
+ * @param habitId - 习惯 ID
+ * @param input - 更新数据
+ * @returns 操作结果
+ */
 export async function updateHabit(
   habitId: string,
   input: UpdateHabitInput,
