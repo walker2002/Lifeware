@@ -23,6 +23,8 @@ interface TaskActionPanelProps {
 const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   complete: { title: '完成任务', button: '完成所选' },
   archive: { title: '归档任务', button: '归档所选' },
+  delete: { title: '删除任务', button: '删除所选' },
+  refine: { title: '细化任务', button: '细化所选' },
 }
 
 const PRIORITY_LABELS: Record<string, string> = {

@@ -2,14 +2,15 @@
  * @file TaskSplitCard
  * @brief 任务拆分卡片 CNUI Surface
  *
- * CNUI 表面 — 用于 AI 建议拆分可拆分任务
+ * CNUI 表面 — 用于 AI 建议拆分可拆分任务。
+ * MVP 阶段为占位 UI，展示任务列表 + "AI 拆分功能开发中" 提示。
  */
 
 'use client'
 
-/**
- * TaskSplitCard 组件属性
- */
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+/** TaskSplitCard 组件属性 */
 interface TaskSplitCardProps {
   surfaceType: string
   dataModel: Record<string, unknown>
@@ -22,9 +23,58 @@ interface TaskSplitCardProps {
 
 /**
  * 任务拆分卡片组件
- * @description AI 对话内展示的任务拆分建议
+ * @description AI 对话内展示的任务拆分建议（MVP 占位）
  */
-export function TaskSplitCard(_props: TaskSplitCardProps) {
-  // TODO: 实现任务拆分卡片 UI — AI 分析任务复杂度，建议拆分为多个子任务
-  return null
+export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProps) {
+  const items = (dataModel.items as Array<Record<string, unknown>>) ?? []
+
+  if (isDone) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-4 text-center">
+          <p className="text-sm text-ink">✅ 拆分请求已提交</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>任务拆分</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.length > 0 ? (
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {items.map(item => (
+              <div
+                key={item.id as string}
+                className="rounded-md border border-hairline bg-canvas px-3 py-1.5 text-sm text-ink truncate"
+              >
+                {item.title as string}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted text-center py-2">暂无可拆分的任务</p>
+        )}
+
+        <p className="text-xs text-muted text-center">
+          🚧 AI 拆分功能正在开发中，敬请期待
+        </p>
+
+        {onCancel && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-md px-3 py-1.5 text-xs text-muted hover:text-ink transition-colors"
+            >
+              关闭
+            </button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
