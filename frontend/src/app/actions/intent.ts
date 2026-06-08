@@ -34,7 +34,12 @@ import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTr
 import { FormRegistry } from "@/lib/form-registry";
 import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
+import { TaskRepository } from "@/domains/tasks/repository/task";
+import { ThreadRepository } from "@/domains/tasks/repository/thread";
+import { createTasksGenericRepo } from "@/domains/tasks/repository/generic-repo-adapter";
 import { timeboxPlugin } from "../../domains/timebox";
+import { tasksPlugin } from "../../domains/tasks";
+import { habitsPlugin } from "../../domains/habits";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
 import { getTraceConfig } from "../../lib/config/trace-config";
 import { eq, desc } from "drizzle-orm";
@@ -65,6 +70,8 @@ const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
 export interface IntentSubmissionResult {
   /** 提交是否成功 */
   success: boolean;
+  /** State Machine 返回的操作对象（Task/Habit/Timebox 等） */
+  object?: unknown;
   /** 最新的时间盒列表（供前端刷新） */
   timeboxes: TimeboxSummary[];
   /** 动作面（Action Surface Engine 生成） */
@@ -197,11 +204,38 @@ async function executePipeline(
           };
         },
       },
-      actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
+      actionSurfaceEngine: (() => {
+        const targetDomain = parseResult.intent?.targetDomain ?? 'timebox'
+        const plugin = targetDomain === 'tasks' ? tasksPlugin
+          : targetDomain === 'habits' ? habitsPlugin
+          : timeboxPlugin
+        return createActionSurfaceEngine(plugin)
+      })(),
       getRepo: (domainId: string, objectType: string) => {
+        // Timebox 域
         if (domainId === 'timebox') {
           const repo = timeboxRepos[objectType]
           if (!repo) throw new Error(`未找到 Timebox repo: ${objectType}`)
+          return repo
+        }
+        // Tasks 域
+        if (domainId === 'tasks') {
+          const tasksRepos = createTasksGenericRepo({
+            taskRepo: new TaskRepository() as any,
+            threadRepo: new ThreadRepository() as any,
+          })
+          const repo = tasksRepos[objectType]
+          if (!repo) throw new Error(`未找到 Tasks repo: ${objectType}`)
+          return repo
+        }
+        // Habits 域
+        if (domainId === 'habits') {
+          const habitsRepos = createHabitsGenericRepo({
+            habitRepo: new HabitRepository() as any,
+            habitLogRepo: undefined as any,
+          })
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
           return repo
         }
         throw new Error(`getRepo: 不支持的域 ${domainId}`)
@@ -236,6 +270,7 @@ async function executePipeline(
 
     return {
       success: true,
+      object: result.object,
       timeboxes,
       actionSurface: result.actionSurface,
       warnings: result.warnings,
