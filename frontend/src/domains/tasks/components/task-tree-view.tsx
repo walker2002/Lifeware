@@ -45,7 +45,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads, archiveTask } from '@/app/actions/tasks'
+import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads, archiveTask, searchTasks } from '@/app/actions/tasks'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -195,6 +195,12 @@ export function TaskTreeView({
   const [threadMap, setThreadMap] = useState<Map<string, { name: string; color: string }>>(new Map())
   const [quickAddText, setQuickAddText] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  /** 服务端搜索结果（非 null 时进入搜索模式） */
+  const [searchResults, setSearchResults] = useState<{
+    matches: Task[]
+    ancestorMap: Record<string, Array<{ id: string; title: string }>>
+  } | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
 
   // ─── 键盘快捷键 ──────────────────────────────────────────────────
   useEffect(() => {
@@ -294,6 +300,34 @@ export function TaskTreeView({
     load()
     return () => { cancelled = true }
   }, [threadId, refreshKey, filterClarity, filterStatus, searchQuery, sortBy])
+
+  // ─── 搜索模式：当 searchQuery 非空时触发服务端搜索 ──────────────
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const result = await searchTasks(searchQuery.trim(), {
+          threadId: threadId === '__all__' ? undefined : threadId === '__orphan__' ? undefined : threadId,
+          status: filterStatus?.length ? filterStatus : undefined,
+          clarity: filterClarity?.length ? filterClarity : undefined,
+        })
+        setSearchResults(result)
+      } catch (err) {
+        console.error('[TaskTreeView] 搜索失败:', err)
+        setSearchResults(null)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300) // 300ms 防抖
+
+    return () => clearTimeout(timer)
+  }, [searchQuery, threadId, filterStatus, filterClarity])
 
   // ─── 加载主线映射 ──────────────────────────────────────────────
 
@@ -399,6 +433,102 @@ export function TaskTreeView({
       {/* ═══ 加载状态 ═══════════════════════════════════════════ */}
       {loading ? (
         <TaskTreeSkeleton />
+      ) : searchResults && searchQuery.trim() ? (
+        /* ═══ 搜索模式 ═══════════════════════════════════════ */
+        <div className="space-y-1">
+          {isSearching && (
+            <div className="text-sm text-muted-foreground px-3 py-2">搜索中...</div>
+          )}
+          {!isSearching && searchResults.matches.length === 0 && (
+            <div className="text-sm text-muted-foreground px-3 py-2">未找到匹配的任务</div>
+          )}
+          {searchResults.matches.map(task => {
+            const ancestors = searchResults.ancestorMap[task.id] ?? []
+            const dueDisplay = (() => {
+              if (!task.dueDate) return null
+              const parts = task.dueDate.split('-')
+              const mmdd = parts.length >= 3 ? `${parts[1]}-${parts[2]}` : task.dueDate
+              const due = new Date(task.dueDate)
+              const today = new Date()
+              today.setHours(0, 0, 0, 0)
+              const diffMs = due.getTime() - today.getTime()
+              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+              let colorClass = 'text-body'
+              if (diffDays < 0) colorClass = 'text-error'
+              else if (diffDays <= 3) colorClass = 'text-warning'
+              return { text: mmdd, colorClass }
+            })()
+            const EnergyIcon = ENERGY_ICON[task.energyRequired]
+            const isMoreIcon = task.energyRequired && !EnergyIcon ? Sparkles : null
+            const FinalIcon = EnergyIcon || isMoreIcon
+            return (
+              <div
+                key={task.id}
+                className="px-2 py-1.5 rounded-md hover:bg-surface-soft cursor-pointer"
+                onClick={() => onOpenTaskDetail?.(task.id)}
+              >
+                {/* 祖先路径面包屑 */}
+                {ancestors.length > 0 && (
+                  <div className="text-xs text-muted-foreground mb-0.5 truncate">
+                    {ancestors.reverse().map(a => a.title).join(' > ')}
+                  </div>
+                )}
+                {/* 任务行 */}
+                <div className="flex items-center gap-2">
+                  {/* 状态圆点 */}
+                  <div
+                    className={cn(
+                      'shrink-0 size-3.5 rounded-full flex items-center justify-center',
+                      STATUS_DOT_CLASS[task.status] || 'border border-muted-foreground bg-transparent',
+                    )}
+                  >
+                    {task.status === 'completed' && <Check className="size-2 text-on-primary" />}
+                  </div>
+                  {/* 清晰度圆点 */}
+                  <div
+                    className={cn(
+                      'shrink-0 size-2 rounded-full',
+                      CLARITY_DOT_CLASS[task.clarity] || 'border border-dashed border-muted-foreground',
+                    )}
+                    title={`清晰度: ${task.clarity}`}
+                  />
+                  {/* 标题 */}
+                  <span className={cn(
+                    'flex-1 text-sm text-ink truncate',
+                    task.status === 'completed' && 'line-through opacity-60',
+                  )}>
+                    {task.title}
+                  </span>
+                  {/* 优先级徽章 */}
+                  {(task.priority === Priority.Critical || task.priority === Priority.High) && (
+                    <span
+                      className={cn(
+                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] leading-none',
+                        task.priority === Priority.Critical
+                          ? 'bg-error-soft text-error'
+                          : 'bg-warning-soft text-warning',
+                      )}
+                    >
+                      {task.priority === Priority.Critical ? '紧急' : '高'}
+                    </span>
+                  )}
+                  {/* 截止日期 */}
+                  {dueDisplay && (
+                    <span className={cn('shrink-0 text-xs', dueDisplay.colorClass)}>
+                      {dueDisplay.text}
+                    </span>
+                  )}
+                  {/* 精力图标 */}
+                  {FinalIcon && (
+                    <FinalIcon className="shrink-0 size-3.5 text-body" />
+                  )}
+                  {/* 任务 ID 片段 */}
+                  <span className="text-xs text-muted-foreground shrink-0">#{task.id.slice(0, 8)}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       ) : rootNodes.length === 0 ? (
         /* ═══ 空状态 ═════════════════════════════════════════ */
         <div className="flex flex-col items-center justify-center h-64 text-muted">

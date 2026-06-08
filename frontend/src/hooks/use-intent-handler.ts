@@ -299,6 +299,27 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
     [deps.saveCurrentConversation, deps.ensureConversationView]
   )
 
+  /** CNUI 操作成功消息映射（模块级，避免每次 render 重建） */
+  const cnuiActionMessages: Record<string, (d: Record<string, unknown>) => string> = {
+    createHabit: (d) => {
+      const title = (d as any)?.habit?.title
+      return title ? `习惯"${title}"创建成功！` : '习惯创建成功！'
+    },
+    createTask: () => '任务创建成功！',
+    updateTask: () => '任务更新成功！',
+    completeTask: (d) => `已完成 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
+    archiveTask: (d) => `已归档 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
+    deleteTask: (d) => `已删除 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
+    createThread: () => '主线创建成功！',
+    promoteToThread: () => '任务已提升为主线！',
+    pauseThread: (d) => `已暂停 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
+    resumeThread: (d) => `已恢复 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
+    completeThread: (d) => `已完成 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
+    archiveThread: (d) => `已归档 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
+    refineTask: () => '细化请求已提交，AI 将分析任务并给出建议',
+    splitTask: () => '拆分请求已提交，AI 将分析任务并给出建议',
+  }
+
   /** 处理 CN-UI 表面提交 */
   const handleCnuiConfirm = useCallback(
     async (
@@ -315,10 +336,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           data
         )
         if (result.success) {
-          const content =
-            action === "createHabit" && result.habit?.title
-              ? `习惯"${result.habit.title}"创建成功！`
-              : "操作成功！"
+          const content = cnuiActionMessages[action]?.(result as unknown as Record<string, unknown>) ?? '操作成功！'
           const msg: ChatMessage = {
             role: "assistant",
             content,

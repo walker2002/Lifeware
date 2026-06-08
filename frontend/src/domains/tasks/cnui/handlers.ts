@@ -7,23 +7,43 @@
 
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 import { TaskRepository } from '@/domains/tasks/repository/task'
-import { SystemEventRepository } from '@/lib/db/repositories/system-event.repository'
-import { taskTransitions, findTransition } from '@/domains/tasks/transitions'
-import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
-import type { SystemEvent, SystemEventType } from '@/usom/types/process'
+import type { USOM_ID } from '@/usom/types/primitives'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
-/** 生命周期状态映射 */
-const LIFECYCLE_STATUS_MAP: Record<string, string> = {
+/** 任务生命周期状态映射 — 用于查询对应状态的任务列表 */
+const TASK_LIFECYCLE_STATUS_MAP: Record<string, string> = {
   completeTask: 'active',
   archiveTask: 'completed',
 }
 
-/** 生命周期状态机动作映射 */
-const LIFECYCLE_SM_ACTION: Record<string, string> = {
+/**
+ * 可删除的任务状态列表（manifest lifecycle: from [todo, planned, in_progress, completed] → deleted）
+ * deleteTask 不用单状态查询，需查多个状态
+ */
+const DELETABLE_TASK_STATUSES = ['todo', 'planned', 'in_progress', 'completed']
+
+/** 任务生命周期状态机动作映射 */
+const TASK_LIFECYCLE_SM_ACTION: Record<string, string> = {
   completeTask: 'complete',
   archiveTask: 'archive',
+  deleteTask: 'delete',
+}
+
+/** 主线生命周期状态映射 — 用于查询对应状态的主线列表 */
+const THREAD_LIFECYCLE_STATUS_MAP: Record<string, string> = {
+  pauseThread: 'active',
+  resumeThread: 'paused',
+  completeThread: 'active',
+  archiveThread: 'completed',
+}
+
+/** 主线生命周期状态机动作映射 */
+const THREAD_LIFECYCLE_SM_ACTION: Record<string, string> = {
+  pauseThread: 'pause',
+  resumeThread: 'resume',
+  completeThread: 'complete',
+  archiveThread: 'archive',
 }
 
 /**
@@ -77,10 +97,136 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       return { content: '请选择要修改的任务', dataSnapshot: { tasks } }
     }
 
-    if (action in LIFECYCLE_STATUS_MAP) {
-      const status = LIFECYCLE_STATUS_MAP[action]
+    // ── 主线操作 ──
+
+    if (action === 'createThread') {
+      return { content: '请填写主线信息', dataSnapshot: {} }
+    }
+
+    if (action === 'updateThread') {
+      try {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const repo = new ThreadRepository()
+        const threads = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+        return {
+          content: '请选择要修改的主线',
+          dataSnapshot: {
+            threads: threads.map(t => ({
+              id: t.id,
+              name: t.name,
+              color: t.color,
+              status: t.status,
+            })),
+          },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询 threads 失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    if (action === 'promoteToThread') {
+      const tasks = await getActiveTasks()
+      return {
+        content: '请选择要提升为主线的任务',
+        dataSnapshot: { tasks },
+      }
+    }
+
+    // ── AI 辅助操作 ──
+
+    if (action === 'refineTask') {
+      try {
+        const repo = new TaskRepository()
+        const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+        const fuzzyTasks = allTasks
+          .filter(t => t.clarity === 'fuzzy' || t.clarity === 'scoped')
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            priority: t.priority,
+            estimatedDuration: t.estimatedDuration,
+            status: t.status,
+          }))
+        return {
+          content: '请选择要细化的任务',
+          dataSnapshot: { action: 'refine', items: fuzzyTasks },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询模糊任务失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    if (action === 'splitTask') {
+      const tasks = await getActiveTasks()
+      return {
+        content: '请选择要拆分的任务',
+        dataSnapshot: { items: tasks },
+      }
+    }
+
+    if (action in THREAD_LIFECYCLE_STATUS_MAP) {
+      try {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const repo = new ThreadRepository()
+        const status = THREAD_LIFECYCLE_STATUS_MAP[action]
+        const threads = await repo.findByStatus(status as any, MVP_USER_ID as USOM_ID)
+        const items = threads.map(t => ({
+          id: t.id,
+          name: t.name,
+          color: t.color,
+          priority: t.priority,
+          status: t.status,
+          description: t.description,
+        }))
+        const smAction = THREAD_LIFECYCLE_SM_ACTION[action]
+        const labels: Record<string, string> = {
+          pause: '暂停',
+          resume: '恢复',
+          complete: '完成',
+          archive: '归档',
+        }
+        return {
+          content: `请选择要${labels[smAction] ?? smAction}的主线`,
+          dataSnapshot: { action: smAction, items },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询线程生命周期列表失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    // ── 任务生命周期操作 ──
+
+    if (action === 'deleteTask') {
+      // deleteTask 需查询多个可删除状态（非单状态映射）
+      try {
+        const repo = new TaskRepository()
+        const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+        const items = allTasks
+          .filter(t => (DELETABLE_TASK_STATUSES as string[]).includes(t.status))
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            priority: t.priority,
+            estimatedDuration: t.estimatedDuration,
+            status: t.status,
+          }))
+        return {
+          content: '请选择要删除的任务',
+          dataSnapshot: { action: 'delete', items },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询可删除任务失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    if (action in TASK_LIFECYCLE_STATUS_MAP) {
+      const status = TASK_LIFECYCLE_STATUS_MAP[action]
       const items = await getTasksByStatus(status)
-      const smAction = LIFECYCLE_SM_ACTION[action]
+      const smAction = TASK_LIFECYCLE_SM_ACTION[action]
       const labels: Record<string, string> = { complete: '完成', archive: '归档' }
       return {
         content: `请选择要${labels[smAction] ?? smAction}的任务`,
@@ -92,135 +238,54 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
-    if (action === 'createTask') {
-      const title = fields['title'] as string
-      if (!title || title.trim() === '') {
-        return { success: false, error: '任务标题不能为空' }
+    try {
+      // promoteToThread 是多阶段编排操作（创建主线 + 关联任务），
+      // 不走 SM 单步转换路径，直接调用专用服务端操作
+      if (action === 'promoteToThread') {
+        const { promoteToThread } = await import('@/app/actions/tasks')
+        const thread = await promoteToThread(fields.taskId as string, fields as Partial<import('@/usom/interfaces/irepository').CreateThreadInput>)
+        return { success: true, data: { object: thread } }
       }
 
-      try {
-        const taskRepo = new TaskRepository()
-        const eventRepo = new SystemEventRepository()
-        const now = new Date().toISOString() as Timestamp
+      // refineTask: MVP 阶段仅确认收到（AI 细化管道待实现）
+      if (action === 'refineTask') {
+        return { success: true, data: { message: '细化请求已提交，AI 将分析任务并给出建议' } }
+      }
 
-        const taskId = crypto.randomUUID() as USOM_ID
-        await taskRepo.save({
-          id: taskId,
-          title: title.trim(),
-          description: (fields['description'] as string) || undefined,
-          status: 'todo',
-          priority: (fields['priority'] as any) || 'medium',
-          energyRequired: (fields['energyRequired'] as any) || 'medium',
-          estimatedDuration: (fields['estimatedDuration'] as number) || 30,
-          tags: [],
-          clarity: (fields['clarity'] as any) ?? 'scoped',
-          complexity: (fields['complexity'] as any) ?? ['routine'],
-          captureMode: 'ad_hoc',
-          tracking: 'none',
-          aiTags: {},
-          createdAt: now,
-          updatedAt: now,
-        } as any, MVP_USER_ID as USOM_ID)
+      // splitTask: MVP 阶段仅确认收到（AI 拆分管道待实现）
+      if (action === 'splitTask') {
+        return { success: true, data: { message: '拆分请求已提交，AI 将分析任务并给出建议' } }
+      }
 
-        const transition = findTransition(taskTransitions, null, 'create')
-        if (transition) {
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'handler',
-            payload: { taskId, toStatus: transition.to },
-            snapshotId: '' as USOM_ID,
-          }
-          await eventRepo.append(event, MVP_USER_ID as USOM_ID)
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+
+      // 线程批量操作：selectedIds 存在时逐个执行（遇错即停）
+      const threadActions = Object.keys(THREAD_LIFECYCLE_STATUS_MAP)
+      if (threadActions.includes(action) && fields.selectedIds) {
+        const ids = fields.selectedIds as string[]
+        for (const id of ids) {
+          const r = await submitDynamicIntent('tasks', action, { threadId: id })
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
         }
-
-        return { success: true }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '创建任务失败'
-        return { success: false, error: msg }
+        return { success: true, data: { selectedIds: ids } }
       }
+
+      // 任务批量操作：selectedIds 存在时逐个执行（遇错即停）
+      if (fields.selectedIds && (action in TASK_LIFECYCLE_SM_ACTION)) {
+        const ids = fields.selectedIds as string[]
+        for (const id of ids) {
+          const r = await submitDynamicIntent('tasks', action, { taskId: id })
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
+        }
+        return { success: true, data: { selectedIds: ids } }
+      }
+
+      const result = await submitDynamicIntent('tasks', action, fields)
+      return { success: result.success, error: result.error, data: result.object ? { object: result.object } : undefined }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '操作失败'
+      return { success: false, error: msg }
     }
-
-    if (action === 'updateTask') {
-      const taskId = fields['taskId'] as string
-      if (!taskId) {
-        return { success: false, error: '未选择任务' }
-      }
-
-      try {
-        const taskRepo = new TaskRepository()
-        const existing = await taskRepo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
-        if (!existing) {
-          return { success: false, error: '任务不存在' }
-        }
-
-        const updates: Record<string, unknown> = {
-          ...existing,
-          updatedAt: new Date().toISOString(),
-        }
-        if (fields['title']) updates.title = fields['title']
-        if (fields['description']) updates.description = fields['description']
-        if (fields['priority']) updates.priority = fields['priority']
-        if (fields['estimatedDuration']) updates.estimatedDuration = fields['estimatedDuration']
-
-        await taskRepo.save(updates as any, MVP_USER_ID as USOM_ID)
-        return { success: true }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '更新任务失败'
-        return { success: false, error: msg }
-      }
-    }
-
-    if (action in LIFECYCLE_SM_ACTION) {
-      const selectedIds = fields['selectedIds'] as string[]
-      if (!selectedIds || selectedIds.length === 0) {
-        return { success: false, error: '未选择任何任务' }
-      }
-
-      const smAction = (fields['action'] as string ?? LIFECYCLE_SM_ACTION[action]) as 'complete' | 'archive'
-
-      try {
-        const taskRepo = new TaskRepository()
-        const eventRepo = new SystemEventRepository()
-        const now = new Date().toISOString() as Timestamp
-        let lastError: string | undefined
-
-        for (const taskId of selectedIds) {
-          const existing = await taskRepo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
-          if (!existing) {
-            lastError = `任务不存在: ${taskId}`
-            continue
-          }
-
-          const transition = findTransition(taskTransitions, existing.status as any, smAction)
-          if (!transition) {
-            lastError = `非法状态转换: action="${smAction}", fromState="${existing.status}"`
-            continue
-          }
-
-          await taskRepo.updateStatus(taskId as USOM_ID, transition.to, MVP_USER_ID as USOM_ID)
-
-          const event: SystemEvent = {
-            id: crypto.randomUUID() as USOM_ID,
-            type: transition.eventType as SystemEventType,
-            occurredAt: now,
-            triggeredBy: 'handler',
-            payload: { taskId, fromStatus: existing.status, toStatus: transition.to },
-            snapshotId: '' as USOM_ID,
-          }
-          await eventRepo.append(event, MVP_USER_ID as USOM_ID)
-        }
-
-        if (lastError) return { success: false, error: lastError }
-        return { success: true }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '状态更新失败'
-        return { success: false, error: msg }
-      }
-    }
-
-    return { success: false, error: `Unknown CN-UI action: tasks/${action}` }
   },
 }
 

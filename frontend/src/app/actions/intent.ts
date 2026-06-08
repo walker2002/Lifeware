@@ -10,11 +10,9 @@
 
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { Timebox } from "@/usom/types/objects";
-import type { Timestamp } from "@/usom/types/primitives";
+import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import { db } from "@/lib/db";
-import * as schema from "@/lib/db/schema";
 import { TimeboxRepository } from "@/domains/timebox/repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
@@ -30,15 +28,18 @@ export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
-import { getRequiredFields, hasRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, findDomain, getFullManifest } from "@/domains/registry";
+import { getRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, getFullManifest } from "@/domains/registry";
 import { FormRegistry } from "@/lib/form-registry";
 import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
+import { TaskRepository } from "@/domains/tasks/repository/task";
+import { ThreadRepository } from "@/domains/tasks/repository/thread";
+import { createTasksGenericRepo } from "@/domains/tasks/repository/generic-repo-adapter";
 import { timeboxPlugin } from "../../domains/timebox";
+import { tasksPlugin } from "../../domains/tasks";
+import { habitsPlugin } from "../../domains/habits";
 import { createTraceLogger } from "../../nexus/infrastructure/trace-logger";
 import { getTraceConfig } from "../../lib/config/trace-config";
-import { eq, desc } from "drizzle-orm";
-import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry';
 import { surfaceHandlers as habitHandlers } from '@/domains/habits/cnui/handlers';
 import { surfaceHandlers as timeboxHandlers } from '@/domains/timebox/cnui/handlers';
 import { surfaceHandlers as taskHandlers } from '@/domains/tasks/cnui/handlers';
@@ -65,6 +66,8 @@ const CNUI_HANDLERS: Record<string, CnuiSurfaceHandler> = {
 export interface IntentSubmissionResult {
   /** 提交是否成功 */
   success: boolean;
+  /** State Machine 返回的操作对象（Task/Habit/Timebox 等） */
+  object?: unknown;
   /** 最新的时间盒列表（供前端刷新） */
   timeboxes: TimeboxSummary[];
   /** 动作面（Action Surface Engine 生成） */
@@ -197,11 +200,38 @@ async function executePipeline(
           };
         },
       },
-      actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
+      actionSurfaceEngine: (() => {
+        const targetDomain = parseResult.intent?.targetDomain ?? 'timebox'
+        const plugin = targetDomain === 'tasks' ? tasksPlugin
+          : targetDomain === 'habits' ? habitsPlugin
+          : timeboxPlugin
+        return createActionSurfaceEngine(plugin)
+      })(),
       getRepo: (domainId: string, objectType: string) => {
+        // Timebox 域
         if (domainId === 'timebox') {
           const repo = timeboxRepos[objectType]
           if (!repo) throw new Error(`未找到 Timebox repo: ${objectType}`)
+          return repo
+        }
+        // Tasks 域
+        if (domainId === 'tasks') {
+          const tasksRepos = createTasksGenericRepo({
+            taskRepo: new TaskRepository() as any,
+            threadRepo: new ThreadRepository() as any,
+          })
+          const repo = tasksRepos[objectType]
+          if (!repo) throw new Error(`未找到 Tasks repo: ${objectType}`)
+          return repo
+        }
+        // Habits 域
+        if (domainId === 'habits') {
+          const habitsRepos = createHabitsGenericRepo({
+            habitRepo: new HabitRepository() as any,
+            habitLogRepo: undefined as any,
+          })
+          const repo = habitsRepos[objectType]
+          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
           return repo
         }
         throw new Error(`getRepo: 不支持的域 ${domainId}`)
@@ -236,6 +266,7 @@ async function executePipeline(
 
     return {
       success: true,
+      object: result.object,
       timeboxes,
       actionSurface: result.actionSurface,
       warnings: result.warnings,
@@ -652,55 +683,11 @@ export async function submitHabitIntent(
   input: CreateHabitInput,
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const intentionId = crypto.randomUUID();
-    const now = new Date().toISOString() as Timestamp;
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId,
-      targetDomain: "habits",
-      action: "createHabit",
-      fields: { ...input },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      pathType: "contract",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
+    const result = await submitDynamicIntent('habits', 'createHabit', { ...input })
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: result.error }
     }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.CREATE_FAILED;
     return { success: false, error: message };
@@ -713,73 +700,38 @@ export async function updateHabitStatus(
   action: "activate" | "suspend" | "reactivate" | "archive",
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const now = new Date().toISOString() as Timestamp;
     const actionMap: Record<string, string> = {
       activate: "activateHabit",
       suspend: "suspendHabit",
       reactivate: "reactivateHabit",
       archive: "archiveHabit",
-    };
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: "habits",
-      action: actionMap[action],
-      fields: { habitId },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
-    if (!result.success) {
-      return { success: false, error: result.error };
     }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    const result = await submitDynamicIntent('habits', actionMap[action], { habitId })
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+    return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.STATUS_UPDATE_FAILED;
     return { success: false, error: message };
   }
 }
 
-/** 删除习惯 */
+/**
+ * 删除习惯（软删除 → status = 'deleted'）
+ *
+ * 注意：已归档（archived）的习惯不可直接删除，需先取消归档到其他状态后再删除。
+ * suspended 状态的 reactivateHabit intent 会将状态恢复为 active。
+ */
 export async function deleteHabit(
   habitId: string,
 ): Promise<HabitActionResult> {
   try {
-    const repo = await getHabitRepo();
-    await repo.delete(habitId, MVP_USER_ID);
-    return { success: true };
+    const result = await submitDynamicIntent('habits', 'deleteHabit', { habitId })
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+    return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.DELETE_FAILED;
     return { success: false, error: message };
@@ -811,53 +763,10 @@ export async function logHabit(
   },
 ): Promise<HabitActionResult> {
   try {
-    const habitRepo = await getHabitRepo()
-    const eventRepo = new SystemEventRepository()
-    const { HabitLogRepository } = await import('@/domains/habits/repository/habit-log')
-    const habitLogRepo = new HabitLogRepository()
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: habitLogRepo as any,
-    })
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error('not used') } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: 'pass' as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    })
-
-    const now = new Date().toISOString() as Timestamp
-    const intent: import('@/usom/types/objects').StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: 'habits',
-      action: 'logHabit',
-      fields: { habitId, ...fields },
-      confidence: 1.0,
-      resolvedBy: 'template_form',
-      pathType: 'contract',
-      createdAt: now,
-    }
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID)
+    const result = await submitDynamicIntent('habits', 'logHabit', { habitId, ...fields })
     if (!result.success) {
       return { success: false, error: result.error }
     }
-
     return { success: true, habit: result.object as Habit | undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : '打卡失败' }
@@ -886,59 +795,25 @@ export async function batchLogHabits(
   return { success: !lastError, error: lastError }
 }
 
-/** 更新习惯信息 */
+/**
+ * 更新习惯字段（直接 repo 调用）
+ *
+ * 注意：SM 只支持 create/updateStatus，不支持字段更新。
+ * 字段更新不是状态转换，保留直接 repo 调用。
+ * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ *
+ * @param habitId - 习惯 ID
+ * @param input - 更新数据
+ * @returns 操作结果
+ */
 export async function updateHabit(
   habitId: string,
   input: UpdateHabitInput,
 ): Promise<HabitActionResult> {
   try {
     const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const now = new Date().toISOString() as Timestamp;
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: "habits",
-      action: "updateHabit",
-      fields: { habitId, ...input },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
-    if (!result.success) {
-      return { success: false, error: result.error };
-    }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    const habit = await habitRepo.update(habitId as USOM_ID, input, MVP_USER_ID as USOM_ID) as Habit;
+    return { success: true, habit };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.UPDATE_FAILED;
     return { success: false, error: message };

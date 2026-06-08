@@ -1,5 +1,8 @@
 // Timebox 基础规则
 // T017: 字段完整性、时长范围、开始时间验证
+//
+// 所有规则仅在 targetDomain === 'timebox' 时生效，
+// 避免对 tasks/habits 域产生虚假警告。
 
 import type { Rule, RuleResult } from '../evaluator'
 import type { StructuredIntent } from '@/usom/types/objects'
@@ -37,6 +40,8 @@ export const FieldCompletenessRule: Rule = {
   name: 'FieldCompletenessRule',
 
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
+    if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
+
     const missing: string[] = []
 
     for (const field of REQUIRED_FIELDS) {
@@ -80,6 +85,8 @@ export const DurationRangeRule: Rule = {
   name: 'DurationRangeRule',
 
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
+    if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
+
     const duration = getField(intent, 'duration')
 
     if (!isValidNumber(duration)) {
@@ -116,6 +123,8 @@ export const StartTimeInFutureRule: Rule = {
   name: 'StartTimeInFutureRule',
 
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
+    if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
+
     const startTime = getField(intent, 'startTime')
 
     // 缺失由 FieldCompletenessRule 负责

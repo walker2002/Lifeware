@@ -48,6 +48,34 @@ intent_triggers:
       - 归档这条主线
     keywords: [归档, archive]
 
+  - action: pauseThread
+    shortcut: /pauseThread
+    description: 暂停主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 暂停这条主线
+    keywords: [暂停, pause, 主线]
+
+  - action: resumeThread
+    shortcut: /resumeThread
+    description: 恢复主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 恢复这条主线
+    keywords: [恢复, resume, 主线]
+
+  - action: completeThread
+    shortcut: /completeThread
+    description: 完成主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 完成这条主线
+      - 标记主线已完成
+    keywords: [完成, complete, 主线]
+
   # 任务相关
   - action: createTask
     shortcut: /createTask
@@ -108,6 +136,15 @@ intent_triggers:
       - 归档这个任务
     keywords: [归档, archive]
 
+  - action: deleteTask
+    shortcut: /deleteTask
+    description: 删除任务（不可恢复）
+    response_type: cnui
+    cnui_surface: task-action-panel
+    examples:
+      - 删除这个任务
+    keywords: [删除, delete]
+
   # 查看
   - action: viewTaskTree
     shortcut: /tasks
@@ -122,7 +159,7 @@ intent_triggers:
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
   task:
-    states: [todo, planned, in_progress, completed, archived]
+    states: [todo, planned, in_progress, completed, archived, deleted]
     initial_state: todo
     transitions:
       - from: null
@@ -155,7 +192,12 @@ lifecycle:
         trigger: intent
         action: archive
         event_type: TaskArchived
-    terminal_states: [archived]
+      - from: [todo, planned, in_progress, completed]
+        to: deleted
+        trigger: intent
+        action: delete
+        event_type: TaskDeleted
+    terminal_states: [archived, deleted]
 
   thread:
     states: [active, paused, completed, archived]
@@ -298,6 +340,7 @@ subscribed_events:
   - TaskStarted
   - TaskCompleted
   - TaskArchived
+  - TaskDeleted
   - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────

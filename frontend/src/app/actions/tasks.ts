@@ -8,17 +8,19 @@
  *
  * 架构说明：
  * - 读操作：直接调用 Repository（设计规格允许）
- * - 写操作：TODO: 后续通过 createOrchestrator → executeIntent 走完整 Nexus 链
- *   (当前 orchestrator 尚未实现 tasks 域处理，暂时直接调用 Repository)
+ * - 写操作：通过 submitDynamicIntent 走完整 Nexus 链路（SM lifecycle）
+ * - 字段更新（updateTask/updateThread）：保持直接 repo 调用（SM 不支持字段更新）
+ * - deletTthread：硬删除，保持直接 repo 调用（Thread 生命周期不支持 deleted 状态）
  */
 
 'use server'
 
+import { submitDynamicIntent } from './intent'
 import { TaskRepository } from '@/domains/tasks/repository/task'
 import { ThreadRepository, type ThreadWithCount } from '@/domains/tasks/repository/thread'
 import type { Task, Thread } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
-import type { CreateTaskInput, UpdateTaskInput, TaskFilters, CreateThreadInput } from '@/usom/interfaces/irepository'
+import type { CreateTaskInput, UpdateTaskInput, TaskFilters, CreateThreadInput, UpdateThreadInput } from '@/usom/interfaces/irepository'
 
 // ─── MVP 常量 ──────────────────────────────────────────────────────────────
 
@@ -76,73 +78,111 @@ export async function getSubtasks(parentId: string): Promise<Task[]> {
  * @returns 新创建的任务
  */
 export async function createTask(input: CreateTaskInput & { title: string }): Promise<Task> {
-  const repo = new TaskRepository()
-  try {
-    return await repo.create(input, MVP_USER_ID as USOM_ID)
-  } catch (err: any) {
-    // 提取 PostgreSQL 原始错误信息（Drizzle 包装在 err.cause 中）
-    const pgMsg = err?.cause?.message ?? err?.cause?.code ?? err?.message ?? String(err)
-    console.error(`[createTask] 失败 [${err?.cause?.code ?? 'unknown'}]: ${pgMsg}`)
-    throw new Error(`创建任务失败: ${pgMsg}`)
+  const result = await submitDynamicIntent('tasks', 'createTask', input as unknown as Record<string, unknown>)
+  if (!result.success) {
+    throw new Error(result.error ?? '创建任务失败')
   }
+  return result.object as Task
 }
 
 /**
- * 更新任务字段
+ * 更新任务字段（直接 repo 调用）
+ *
+ * 注意：SM 只支持 create/updateStatus，不支持字段更新。
+ * 字段更新不是状态转换，保留直接 repo 调用。
+ * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ *
  * @param taskId - 任务 ID
  * @param input - 更新数据
  * @returns 更新后的任务
  */
-// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
   const repo = new TaskRepository()
   return repo.update(taskId as USOM_ID, input, MVP_USER_ID as USOM_ID)
 }
 
 /**
- * 更新任务状态
+ * 更新任务状态（通过 Nexus 链路）
+ *
+ * 将目标状态映射为 manifest lifecycle action：
+ * - planned → planTask (SM action: plan)
+ * - in_progress → startTask (SM action: start)
+ * - completed → completeTask (SM action: complete)
+ * - archived → archiveTask (SM action: archive)
+ * - deleted → deleteTask (SM action: delete)
+ *
  * @param taskId - 任务 ID
  * @param status - 新状态
  * @returns 更新后的任务
  */
 export async function updateTaskStatus(taskId: string, status: Task['status']): Promise<Task> {
-  const repo = new TaskRepository()
-  return repo.updateStatus(taskId as USOM_ID, status, MVP_USER_ID as USOM_ID)
+  const STATUS_TO_ACTION: Record<string, string> = {
+    planned: 'planTask',
+    in_progress: 'startTask',
+    completed: 'completeTask',
+    archived: 'archiveTask',
+    deleted: 'deleteTask',
+  }
+  const action = STATUS_TO_ACTION[status]
+  if (!action) {
+    throw new Error(`不支持的目标状态: ${status}`)
+  }
+  const result = await submitDynamicIntent('tasks', action, { taskId })
+  if (!result.success) {
+    throw new Error(result.error ?? '状态更新失败')
+  }
+  return result.object as Task
 }
 
 /**
- * 归档任务
+ * 归档任务（通过 Nexus 链路）
  * @param taskId - 任务 ID
  */
-// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function archiveTask(taskId: string): Promise<void> {
-  const repo = new TaskRepository()
-  return repo.archive(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  const result = await submitDynamicIntent('tasks', 'archiveTask', { taskId })
+  if (!result.success) {
+    throw new Error(result.error ?? '归档任务失败')
+  }
 }
 
 /**
- * 彻底删除任务（不可恢复）
+ * 删除任务（通过 Nexus 链路，软删除 → status = 'deleted'）
+ *
+ * 注意：删除操作走 SM lifecycle 转换，将 status 设为 'deleted'（非硬删除）。
+ * deleted 状态的任务不会出现在任何常规查询中。
+ * 已归档（archived）的任务不可直接删除，需先取消归档到其他状态后再删除。
  * @param taskId - 任务 ID
  */
-// TODO: 迁移至 Nexus PrebuiltIntent 链路（宪章 Page component data access rules）
 export async function deleteTask(taskId: string): Promise<void> {
-  const repo = new TaskRepository()
-  return repo.delete(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  const result = await submitDynamicIntent('tasks', 'deleteTask', { taskId })
+  if (!result.success) {
+    throw new Error(result.error ?? '删除任务失败')
+  }
 }
 
 /**
- * 完成任务：先保存额外字段，再变更状态（避免部分失败导致数据丢失）
+ * 完成任务：先保存额外字段，再通过 Nexus 链路执行状态转换
+ *
+ * 两阶段模式：先通过 repo.update() 持久化非破坏性字段，
+ * 再调用 submitDynamicIntent 走 SM 状态转换。
+ * 若状态转换失败，字段数据至少已持久化。
+ *
  * @param taskId - 任务 ID
  * @param extraFields - 额外字段（actualDuration, notes 等）
  * @returns 更新后的任务
  */
 export async function completeTask(taskId: string, extraFields?: Record<string, unknown>): Promise<Task> {
-  const repo = new TaskRepository()
-  // 先保存非破坏性字段，再变更状态——若状态变更失败，数据至少已持久化
+  // 第一阶段：保存额外字段（直接 repo 调用——SM 不支持字段更新）
   if (extraFields && Object.keys(extraFields).length > 0) {
+    const repo = new TaskRepository()
     await repo.update(taskId as USOM_ID, extraFields as UpdateTaskInput, MVP_USER_ID as USOM_ID)
   }
-  return repo.updateStatus(taskId as USOM_ID, 'completed', MVP_USER_ID as USOM_ID)
+  // 第二阶段：状态转换（通过 Nexus SM）
+  const result = await submitDynamicIntent('tasks', 'completeTask', { taskId })
+  if (!result.success) {
+    throw new Error(result.error ?? '完成任务失败')
+  }
+  return result.object as Task
 }
 
 /**
@@ -167,6 +207,39 @@ export async function getTaskAncestors(taskId: string): Promise<Array<{ id: stri
   }
 
   return ancestors
+}
+
+/**
+ * 搜索任务并返回祖先路径（支持搜索深层子任务）
+ * @param query - 搜索关键词
+ * @param filters - 额外筛选条件
+ * @returns 匹配任务 + 祖先映射（可序列化的 Record 格式）
+ */
+export async function searchTasks(
+  query: string,
+  filters?: { threadId?: string; clarity?: string[]; status?: string[] },
+): Promise<{
+  matches: Task[]
+  ancestorMap: Record<string, Array<{ id: string; title: string }>>
+}> {
+  // 输入清理：截断 + 去首尾空白
+  const sanitized = query.trim().slice(0, 200)
+  if (!sanitized) {
+    return { matches: [], ancestorMap: {} }
+  }
+
+  const repo = new TaskRepository()
+  const { matches, ancestorMap } = await repo.findMatchingWithAncestors(
+    sanitized,
+    MVP_USER_ID as USOM_ID,
+    filters,
+  )
+  // 将 Map<Task[]> 转换为可序列化的 Record<string, {id, title}[]>
+  const serializableAncestorMap: Record<string, Array<{ id: string; title: string }>> = {}
+  for (const [taskId, ancestors] of ancestorMap.entries()) {
+    serializableAncestorMap[taskId] = ancestors.map(a => ({ id: a.id, title: a.title }))
+  }
+  return { matches, ancestorMap: serializableAncestorMap }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -203,28 +276,165 @@ export async function getThreadWithCount(threadId: string): Promise<ThreadWithCo
 }
 
 /**
- * 创建新主线
+ * 创建新主线（通过 Nexus 链路）
  * @param input - 创建输入
  * @returns 新创建的主线
  */
-export async function createThread(input: CreateThreadInput): Promise<Thread> {
-  const repo = new ThreadRepository()
-  return repo.create(input, MVP_USER_ID as USOM_ID)
+export async function createThread(input: CreateThreadInput & { name: string }): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'createThread', input as unknown as Record<string, unknown>)
+  if (!result.success) {
+    throw new Error(result.error ?? '创建主线失败')
+  }
+  return result.object as Thread
 }
 
 /**
- * 更新主线状态
+ * 更新主线字段（直接 repo 调用）
+ *
+ * 注意：SM 只支持 create/updateStatus，不支持字段更新。
+ * 字段更新不是状态转换，保留直接 repo 调用。
+ * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ *
+ * @param threadId - 主线 ID
+ * @param input - 更新数据
+ * @returns 更新后的主线
+ */
+export async function updateThread(threadId: string, input: UpdateThreadInput): Promise<Thread> {
+  const repo = new ThreadRepository()
+  return repo.update(threadId as USOM_ID, input, MVP_USER_ID as USOM_ID)
+}
+
+/**
+ * 更新主线状态（通过 Nexus 链路）
+ *
+ * 将目标状态映射为 manifest lifecycle action：
+ * - active → resumeThread (paused → active)
+ * - paused → pauseThread (active → paused)
+ * - completed → completeThread (active → completed)
+ * - archived → archiveThread (completed → archived)
+ *
  * @param threadId - 主线 ID
  * @param status - 新状态
  * @returns 更新后的主线
  */
 export async function updateThreadStatus(threadId: string, status: Thread['status']): Promise<Thread> {
-  const repo = new ThreadRepository()
-  return repo.updateStatus(threadId as USOM_ID, status, MVP_USER_ID as USOM_ID)
+  const THREAD_STATUS_TO_ACTION: Record<string, string> = {
+    active: 'resumeThread',
+    paused: 'pauseThread',
+    completed: 'completeThread',
+    archived: 'archiveThread',
+  }
+  const action = THREAD_STATUS_TO_ACTION[status]
+  if (!action) {
+    throw new Error(`不支持的线程目标状态: ${status}`)
+  }
+  const result = await submitDynamicIntent('tasks', action, { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '线程状态更新失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 暂停主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function pauseThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'pauseThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '暂停主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 恢复主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function resumeThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'resumeThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '恢复主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 完成主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function completeThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'completeThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '完成主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 归档主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function archiveThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'archiveThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '归档主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 将任务提升为主线
+ *
+ * 三阶段操作：
+ * 1. 读取原任务获取名称、描述等上下文
+ * 2. 通过 Nexus 创建新主线（走 SM lifecycle，触发 ThreadCreated 事件）
+ * 3. 将原任务的 threadId 关联到新主线（直接 repo——SM 不支持字段更新）
+ *
+ * @param taskId - 要提升的任务 ID
+ * @param threadFields - 可选的主线字段覆盖
+ * @returns 新创建的主线
+ */
+export async function promoteToThread(
+  taskId: string,
+  threadFields?: Partial<CreateThreadInput>,
+): Promise<Thread> {
+  const taskRepo = new TaskRepository()
+  const task = await taskRepo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!task) throw new Error('任务不存在')
+
+  const threadInput: CreateThreadInput & { name: string } = {
+    name: threadFields?.name ?? task.title,
+    description: threadFields?.description ?? (task.description as string | undefined),
+    color: threadFields?.color,
+    priority: threadFields?.priority ?? (task.priority as CreateThreadInput['priority']),
+    startDate: threadFields?.startDate,
+    endDate: threadFields?.endDate,
+    tags: threadFields?.tags,
+  }
+  const result = await submitDynamicIntent('tasks', 'createThread', threadInput as unknown as Record<string, unknown>)
+  if (!result.success) {
+    throw new Error(result.error ?? '提升为主线失败')
+  }
+  const newThread = result.object as Thread
+
+  // 将原任务关联到新主线
+  await taskRepo.update(taskId as USOM_ID, { threadId: newThread.id } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+
+  return newThread
 }
 
 /**
  * 彻底删除主线（不可恢复）
+ *
+ * 注意：Thread 生命周期不支持 deleted 状态（与 Task/Habit 不同）。
+ * 删除操作保留直接 repo 硬删除。
+ * TODO Phase C: 评估是否需要为 Thread 添加软删除支持。
+ *
  * @param threadId - 主线 ID
  */
 export async function deleteThread(threadId: string): Promise<void> {

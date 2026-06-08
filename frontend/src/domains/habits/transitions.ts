@@ -3,6 +3,7 @@
  * @brief Habits 状态转换表
  * 
  * 状态流转: (none) → draft → active ⇄ suspended → archived
+ * draft | active | suspended → deleted（软删除）
  * suspended → archived（用户归档，需二次确认）
  */
 
@@ -29,6 +30,9 @@ export const habitTransitions: Transition<HabitStatus>[] = [
   { from: 'active',    to: 'suspended', action: 'suspend',    eventType: 'HabitSuspended' },
   { from: 'suspended', to: 'active',    action: 'reactivate', eventType: 'HabitActivated' },
   { from: 'suspended', to: 'archived',  action: 'archive',    eventType: 'HabitArchived' },
+  { from: 'draft',     to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
+  { from: 'active',    to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
+  { from: 'suspended', to: 'deleted', action: 'delete', eventType: 'HabitDeleted' },
 ]
 
 /**

@@ -159,9 +159,9 @@ export interface StateProposal {
 
 // ─── 4.6 SystemEvent ──────────────────────────────────────────
 export type SystemEventType =
-  | 'TaskCreated' | 'TaskActivated' | 'TaskPlanned' | 'TaskStarted' | 'TaskScheduled' | 'TaskCompleted' | 'TaskArchived'
+  | 'TaskCreated' | 'TaskActivated' | 'TaskPlanned' | 'TaskStarted' | 'TaskScheduled' | 'TaskCompleted' | 'TaskArchived' | 'TaskDeleted'
   | 'ThreadCreated' | 'ThreadPaused' | 'ThreadResumed' | 'ThreadCompleted' | 'ThreadArchived'
-  | 'HabitCreated' | 'HabitActivated' | 'HabitSuspended' | 'HabitArchived'
+  | 'HabitCreated' | 'HabitActivated' | 'HabitSuspended' | 'HabitArchived' | 'HabitDeleted'
   | 'HabitLogged' | 'HabitSkipped' | 'HabitStreakMilestone'
   | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged'
   | 'ObjectiveCreated' | 'ObjectiveActivated' | 'ObjectivePaused' | 'ObjectiveResumed'
