@@ -59,7 +59,7 @@ export function ThreadPromoteCard({
     if (!selectedTaskId) return
     onConfirm({
       taskId: selectedTaskId,
-      name: threadName || (selectedTask?.title as string) ?? '新主线',
+      name: (threadName || (selectedTask?.title as string)) ?? '新主线',
       color: threadColor,
     })
   }
