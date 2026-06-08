@@ -180,6 +180,13 @@ async function executePipeline(
       };
     }
 
+    // Step 1.5: 规范化 intent.action
+    // AI parser 的 routing prompt 使用 "domain.action" 格式（如 tasks.createThread），
+    // AI 可能原样返回。剥离 domain 前缀，确保下游 ACTION_MAP / getObjectType 正常工作。
+    if (parseResult.intent.action?.includes('.')) {
+      parseResult.intent.action = parseResult.intent.action.split('.').pop()!
+    }
+
     // Step 2-3: 创建 Orchestrator 并执行管道
     const timeboxRepo = new TimeboxRepository();
     const eventRepo = new SystemEventRepository();

@@ -227,7 +227,12 @@ const ACTION_MAP: Record<string, string> = buildActionMap()
  * @returns 状态机动作名称
  */
 function toStateMachineAction(domainAction: string): string {
-  return ACTION_MAP[domainAction] ?? domainAction
+  // AI 可能返回 "tasks.createThread" 格式（与 routing prompt 一致），
+  // 需剥离 domain 前缀后再查 ACTION_MAP
+  const bareAction = domainAction.includes('.')
+    ? domainAction.split('.').pop()!
+    : domainAction
+  return ACTION_MAP[bareAction] ?? ACTION_MAP[domainAction] ?? bareAction
 }
 
 // 从 targetDomain + action 动态推导 SM targetObject.type（基于 manifest.lifecycle 键）
