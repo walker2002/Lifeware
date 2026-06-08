@@ -192,10 +192,13 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
     ): Promise<StateMachineResult> {
       const now = new Date().toISOString() as Timestamp
       const objectType = proposal.targetObject.type
+      // domainId 与 objectType 可能不同（如 tasks 域下的 thread 对象），
+      // 使用 deps.domainId（由 Orchestrator 传入）作为 domain 参数
+      const domainId = deps.domainId ?? objectType
 
       // 获取该对象类型的 lifecycle
-      const lifecycle = getLifecycle(objectType, objectType)
-      const fieldMeta = getFieldMetadata?.(objectType, objectType)
+      const lifecycle = getLifecycle(domainId, objectType)
+      const fieldMeta = getFieldMetadata?.(domainId, objectType)
 
       // 1. 确定 fromState
       let fromState: string | null = null
