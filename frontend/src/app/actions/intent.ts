@@ -72,6 +72,10 @@ export interface IntentSubmissionResult {
   timeboxes: TimeboxSummary[];
   /** 动作面（Action Surface Engine 生成） */
   actionSurface?: ActionSurface;
+  /** 意图动作名（如 createThread） */
+  action?: string;
+  /** 目标域 ID（如 tasks） */
+  domainId?: string;
   /** 错误信息 */
   error?: string;
   /** 规则引擎的警告 */
@@ -276,6 +280,8 @@ async function executePipeline(
       object: result.object,
       timeboxes,
       actionSurface: result.actionSurface,
+      action: si.action,
+      domainId: si.targetDomain,
       warnings: result.warnings,
       traceSession: logger?.getSessions()[0],
     };

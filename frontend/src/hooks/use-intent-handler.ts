@@ -305,12 +305,18 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
       const title = (d as any)?.habit?.title
       return title ? `习惯"${title}"创建成功！` : '习惯创建成功！'
     },
-    createTask: () => '任务创建成功！',
+    createTask: (d) => {
+      const title = (d as any)?.title ?? (d as any)?.object?.title
+      return title ? `已创建任务「${title}」` : '任务创建成功！'
+    },
     updateTask: () => '任务更新成功！',
     completeTask: (d) => `已完成 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
     archiveTask: (d) => `已归档 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
     deleteTask: (d) => `已删除 ${(d as any)?.selectedIds?.length ?? 1} 个任务`,
-    createThread: () => '主线创建成功！',
+    createThread: (d) => {
+      const name = (d as any)?.name ?? (d as any)?.object?.name
+      return name ? `已创建主线「${name}」` : '主线创建成功！'
+    },
     promoteToThread: () => '任务已提升为主线！',
     pauseThread: (d) => `已暂停 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     resumeThread: (d) => `已恢复 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
@@ -318,6 +324,49 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
     archiveThread: (d) => `已归档 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     refineTask: () => '细化请求已提交，AI 将分析任务并给出建议',
     splitTask: () => '拆分请求已提交，AI 将分析任务并给出建议',
+  }
+
+  /**
+   * 根据 submitIntent 结果格式化成功消息。
+   * 有 action 时尝试从 cnuiActionMessages 获取动作专属消息，并传入 object 数据。
+   * 无 action 时回退通用消息。
+   */
+  function formatResultMessage(result: IntentSubmissionResult): string {
+    if (!result.success) return result.error ?? '处理失败'
+    if (!result.action) return '已处理你的请求。'
+    const formatter = cnuiActionMessages[result.action]
+    if (formatter) return formatter(result.object as Record<string, unknown> ?? {})
+    return '已处理你的请求。'
+  }
+
+  /**
+   * 判断错误是否为必填字段缺失（pipeline 校验失败），
+   * 若是且该 action 支持 CNUI 表面，则打开 CNUI 表面让用户补充字段。
+   */
+  async function tryOpenCnuiOnFieldError(
+    result: IntentSubmissionResult,
+    domainId: string | undefined,
+    action: string | undefined,
+  ): Promise<boolean> {
+    if (result.success || !action || !domainId) return false
+    // 匹配常见字段缺失错误模式
+    const err = result.error ?? ''
+    const isFieldError = /必填|不能为空|required/i.test(err)
+    if (!isFieldError) return false
+
+    try {
+      const cnuiResult = await openCnuiSurface(domainId, action)
+      const msg: ChatMessage = {
+        role: 'assistant',
+        content: `信息不完整，请补充：`,
+        timestamp: new Date().toISOString(),
+        cnuiSurface: cnuiResult.surface,
+      }
+      deps.addChatMessage(msg)
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** 处理 CN-UI 表面提交 */
@@ -458,14 +507,14 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
             const result = await submitIntent(content, false, traceEnabled)
             deps.setTimeboxes(result.timeboxes)
 
-            const aiMsg: ChatMessage = {
-              role: "assistant",
-              content: result.success
-                ? "已处理你的请求。"
-                : result.error ?? "处理失败",
-              timestamp: new Date().toISOString(),
+            if (!result.success) {
+              const redirected = await tryOpenCnuiOnFieldError(result, result.domainId, result.action)
+              if (!redirected) {
+                deps.addChatMessage({ role: "assistant", content: result.error ?? "处理失败", timestamp: new Date().toISOString() })
+              }
+            } else {
+              deps.addChatMessage({ role: "assistant", content: formatResultMessage(result), timestamp: new Date().toISOString() })
             }
-            deps.addChatMessage(aiMsg)
           } catch {
             const errMsg: ChatMessage = {
               role: "assistant",
@@ -512,14 +561,14 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
             const result = await submitIntent(content, false, traceEnabled)
             deps.setTimeboxes(result.timeboxes)
 
-            const aiMsg: ChatMessage = {
-              role: "assistant",
-              content: result.success
-                ? "已处理你的请求。"
-                : result.error ?? "处理失败",
-              timestamp: new Date().toISOString(),
+            if (!result.success) {
+              const redirected = await tryOpenCnuiOnFieldError(result, result.domainId, result.action)
+              if (!redirected) {
+                deps.addChatMessage({ role: "assistant", content: result.error ?? "处理失败", timestamp: new Date().toISOString() })
+              }
+            } else {
+              deps.addChatMessage({ role: "assistant", content: formatResultMessage(result), timestamp: new Date().toISOString() })
             }
-            deps.addChatMessage(aiMsg)
           } catch {
             const errMsg: ChatMessage = {
               role: "assistant",
@@ -621,14 +670,14 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           return
         }
 
-        const aiMsg: ChatMessage = {
-          role: "assistant",
-          content: result.success
-            ? "已处理你的请求。"
-            : result.error ?? "处理失败",
-          timestamp: new Date().toISOString(),
+        if (!result.success) {
+          const redirected = await tryOpenCnuiOnFieldError(result, result.domainId, result.action)
+          if (!redirected) {
+            deps.addChatMessage({ role: "assistant", content: result.error ?? "处理失败", timestamp: new Date().toISOString() })
+          }
+        } else {
+          deps.addChatMessage({ role: "assistant", content: formatResultMessage(result), timestamp: new Date().toISOString() })
         }
-        deps.addChatMessage(aiMsg)
       } catch {
         const errMsg: ChatMessage = {
           role: "assistant",
