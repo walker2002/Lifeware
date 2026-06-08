@@ -164,12 +164,18 @@ export function ThreadListPanel({
           <ul className="flex flex-col">
             {threads.map(({ thread, taskCount }) => (
               <li key={thread.id}>
-                <button
-                  type="button"
+                {/*
+                  外层用 div + role="button" 避免嵌套 <button> 的 hydration 错误。
+                  内层操作按钮通过 stopPropagation 阻止事件冒泡到外层。
+                */}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleClick(thread.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(thread.id) }}
                   onDoubleClick={() => onOpenThreadDetail?.(thread.id)}
                   className={cn(
-                    'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors group border-l-2 border-l-transparent',
+                    'flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors group border-l-2 border-l-transparent cursor-pointer',
                     'hover:bg-surface-soft',
                     selectedThreadId === thread.id && SELECTED_CLASS,
                   )}
@@ -246,7 +252,7 @@ export function ThreadListPanel({
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
