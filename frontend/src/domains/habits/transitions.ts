@@ -3,6 +3,7 @@
  * @brief Habits 状态转换表
  * 
  * 状态流转: (none) → draft → active ⇄ suspended → archived
+ * draft | active | suspended → deleted（软删除）
  * suspended → archived（用户归档，需二次确认）
  */
 

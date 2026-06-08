@@ -3,6 +3,7 @@
  * @brief Tasks Domain 状态转换表（重构后）
  *
  * task: (none) → todo → planned → in_progress → completed → archived
+ *        todo | planned | in_progress | completed → deleted（软删除）
  * thread: (none) → active → paused → completed → archived
  */
 
