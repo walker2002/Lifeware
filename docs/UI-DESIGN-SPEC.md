@@ -39,6 +39,13 @@
 | Muted | `--muted` | `#6c6a64` | `text-muted` | 辅助文字 |
 | Muted Soft | `--muted-soft` | `#8e8b82` | `text-muted-soft` | 极淡辅助文字 |
 
+> **⚠️ `text-muted` 使用限制**：`--muted`（#6c6a64）在 `--hairline`（#e6dfd8）背景上对比度仅 **4.1:1**，接近 AA 边界。在叠加层、图片上方等不确定背景上对比度会进一步骤降。
+>
+> **规则**：
+> - **图标、按钮、交互元素**：禁止使用 `text-muted`，统一使用 `text-body`（对比度 8.3:1+ 在所有表面色上）
+> - **纯装饰性辅助文字（非交互）**：可使用 `text-muted`，但仅限在 `bg-canvas` 或 `bg-surface-soft` 等确定性浅底上
+> - **`text-muted-soft`**：仅用于占位符文字（配合 `placeholder:` 伪类），禁止用于任何可见交互元素
+
 > **⚠️ 可访问性警告**：`--primary`（#cc785c，亮度 58%）作为背景时，`--on-primary`（#ffffff）的对比度仅为 **3.3:1**，不满足 WCAG AA 对正常文本的要求（4.5:1）。
 >
 > **规则**：
