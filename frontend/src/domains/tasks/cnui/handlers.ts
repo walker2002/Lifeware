@@ -92,7 +92,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
     try {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const result = await submitDynamicIntent('tasks', action, fields)
-      return { success: result.success, error: result.error }
+      return { success: result.success, error: result.error, data: result.object ? { object: result.object } : undefined }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '操作失败'
       return { success: false, error: msg }
