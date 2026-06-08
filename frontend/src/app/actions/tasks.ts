@@ -159,17 +159,24 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 /**
- * 完成任务：通过 Nexus 链路执行状态转换
+ * 完成任务：先保存额外字段，再通过 Nexus 链路执行状态转换
+ *
+ * 两阶段模式：先通过 repo.update() 持久化非破坏性字段，
+ * 再调用 submitDynamicIntent 走 SM 状态转换。
+ * 若状态转换失败，字段数据至少已持久化。
+ *
  * @param taskId - 任务 ID
  * @param extraFields - 额外字段（actualDuration, notes 等）
  * @returns 更新后的任务
  */
 export async function completeTask(taskId: string, extraFields?: Record<string, unknown>): Promise<Task> {
-  const fields: Record<string, unknown> = { taskId }
+  // 第一阶段：保存额外字段（直接 repo 调用——SM 不支持字段更新）
   if (extraFields && Object.keys(extraFields).length > 0) {
-    Object.assign(fields, extraFields)
+    const repo = new TaskRepository()
+    await repo.update(taskId as USOM_ID, extraFields as UpdateTaskInput, MVP_USER_ID as USOM_ID)
   }
-  const result = await submitDynamicIntent('tasks', 'completeTask', fields)
+  // 第二阶段：状态转换（通过 Nexus SM）
+  const result = await submitDynamicIntent('tasks', 'completeTask', { taskId })
   if (!result.success) {
     throw new Error(result.error ?? '完成任务失败')
   }
