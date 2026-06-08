@@ -1,13 +1,31 @@
+/**
+ * @file routing-context
+ * @brief AI Intent Parser 的路由上下文构建器
+ *
+ * 从所有 Domain 的 manifest 构建路由上下文和字段 schema，
+ * 供 AI Parser 的 system prompt 使用。
+ */
+
 import { domainRegistry } from '@/domains/registry'
 import { loadDomainManifest } from '@/domains/manifest-loader'
+import type { DomainManifest } from '@/domains/manifest-loader/schema'
 
+/** 动作路由信息 */
 interface ActionRoutingInfo {
+  /** 域 ID */
   domainId: string
+  /** 动作名称 */
   action: string
+  /** 路由类型 */
   type: 'contract' | 'generative' | 'query' | 'view_route'
+  /** 描述 */
   description: string
+  /** 示例 */
   examples: string[]
+  /** 关键词 */
   keywords: string[]
+  /** 字段 schema（从 manifest required_fields 提取） */
+  fields: Array<{ name: string; label: string; type: string; required: boolean }>
 }
 
 /**
@@ -33,6 +51,9 @@ export function buildRoutingContext(): ActionRoutingInfo[] {
         type = 'generative'
       }
 
+      // 提取该 action 的字段 schema
+      const fieldDefs = manifest.required_fields?.[trigger.action] ?? []
+
       actions.push({
         domainId,
         action: trigger.action,
@@ -40,6 +61,12 @@ export function buildRoutingContext(): ActionRoutingInfo[] {
         description: trigger.description,
         examples: trigger.examples ?? [],
         keywords: trigger.keywords ?? [],
+        fields: fieldDefs.map(f => ({
+          name: f.name,
+          label: f.label,
+          type: f.type,
+          required: f.required,
+        })),
       })
     }
   }
@@ -47,7 +74,7 @@ export function buildRoutingContext(): ActionRoutingInfo[] {
   return actions
 }
 
-/** 将路由上下文格式化为 AI prompt 文本。 */
+/** 将路由上下文格式化为 AI prompt 文本（含字段 schema）。 */
 export function formatRoutingContextForPrompt(actions: ActionRoutingInfo[]): string {
   const typeLabel: Record<string, string> = {
     contract: '变更操作',
@@ -58,7 +85,13 @@ export function formatRoutingContextForPrompt(actions: ActionRoutingInfo[]): str
 
   const lines = actions.map(a => {
     const label = typeLabel[a.type] ?? a.type
-    return `- ${a.domainId}.${a.action} [${label}]: ${a.description}
+
+    // 字段 schema 文本：列出字段名、类型、是否必填
+    const fieldHints = a.fields.length > 0
+      ? '\n  字段: ' + a.fields.map(f => `${f.name}(${f.label}, ${f.type}${f.required ? ', 必填' : ''})`).join(', ')
+      : ''
+
+    return `- ${a.domainId}.${a.action} [${label}]: ${a.description}${fieldHints}
   示例: ${a.examples.join('、')}
   关键词: ${a.keywords.join('、')}`
   })
