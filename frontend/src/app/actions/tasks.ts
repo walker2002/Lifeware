@@ -9,7 +9,8 @@
  * 架构说明：
  * - 读操作：直接调用 Repository（设计规格允许）
  * - 写操作：通过 submitDynamicIntent 走完整 Nexus 链路（SM lifecycle）
- * - 字段更新（updateTask）：保持直接 repo 调用（SM 不支持字段更新）
+ * - 字段更新（updateTask/updateThread）：保持直接 repo 调用（SM 不支持字段更新）
+ * - deletTthread：硬删除，保持直接 repo 调用（Thread 生命周期不支持 deleted 状态）
  */
 
 'use server'
@@ -19,7 +20,7 @@ import { TaskRepository } from '@/domains/tasks/repository/task'
 import { ThreadRepository, type ThreadWithCount } from '@/domains/tasks/repository/thread'
 import type { Task, Thread } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
-import type { CreateTaskInput, UpdateTaskInput, TaskFilters, CreateThreadInput } from '@/usom/interfaces/irepository'
+import type { CreateTaskInput, UpdateTaskInput, TaskFilters, CreateThreadInput, UpdateThreadInput } from '@/usom/interfaces/irepository'
 
 // ─── MVP 常量 ──────────────────────────────────────────────────────────────
 
@@ -275,28 +276,165 @@ export async function getThreadWithCount(threadId: string): Promise<ThreadWithCo
 }
 
 /**
- * 创建新主线
+ * 创建新主线（通过 Nexus 链路）
  * @param input - 创建输入
  * @returns 新创建的主线
  */
-export async function createThread(input: CreateThreadInput): Promise<Thread> {
-  const repo = new ThreadRepository()
-  return repo.create(input, MVP_USER_ID as USOM_ID)
+export async function createThread(input: CreateThreadInput & { name: string }): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'createThread', input as unknown as Record<string, unknown>)
+  if (!result.success) {
+    throw new Error(result.error ?? '创建主线失败')
+  }
+  return result.object as Thread
 }
 
 /**
- * 更新主线状态
+ * 更新主线字段（直接 repo 调用）
+ *
+ * 注意：SM 只支持 create/updateStatus，不支持字段更新。
+ * 字段更新不是状态转换，保留直接 repo 调用。
+ * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ *
+ * @param threadId - 主线 ID
+ * @param input - 更新数据
+ * @returns 更新后的主线
+ */
+export async function updateThread(threadId: string, input: UpdateThreadInput): Promise<Thread> {
+  const repo = new ThreadRepository()
+  return repo.update(threadId as USOM_ID, input, MVP_USER_ID as USOM_ID)
+}
+
+/**
+ * 更新主线状态（通过 Nexus 链路）
+ *
+ * 将目标状态映射为 manifest lifecycle action：
+ * - active → resumeThread (paused → active)
+ * - paused → pauseThread (active → paused)
+ * - completed → completeThread (active → completed)
+ * - archived → archiveThread (completed → archived)
+ *
  * @param threadId - 主线 ID
  * @param status - 新状态
  * @returns 更新后的主线
  */
 export async function updateThreadStatus(threadId: string, status: Thread['status']): Promise<Thread> {
-  const repo = new ThreadRepository()
-  return repo.updateStatus(threadId as USOM_ID, status, MVP_USER_ID as USOM_ID)
+  const THREAD_STATUS_TO_ACTION: Record<string, string> = {
+    active: 'resumeThread',
+    paused: 'pauseThread',
+    completed: 'completeThread',
+    archived: 'archiveThread',
+  }
+  const action = THREAD_STATUS_TO_ACTION[status]
+  if (!action) {
+    throw new Error(`不支持的线程目标状态: ${status}`)
+  }
+  const result = await submitDynamicIntent('tasks', action, { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '线程状态更新失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 暂停主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function pauseThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'pauseThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '暂停主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 恢复主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function resumeThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'resumeThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '恢复主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 完成主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function completeThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'completeThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '完成主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 归档主线（通过 Nexus 链路）
+ * @param threadId - 主线 ID
+ * @returns 更新后的主线
+ */
+export async function archiveThread(threadId: string): Promise<Thread> {
+  const result = await submitDynamicIntent('tasks', 'archiveThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '归档主线失败')
+  }
+  return result.object as Thread
+}
+
+/**
+ * 将任务提升为主线
+ *
+ * 三阶段操作：
+ * 1. 读取原任务获取名称、描述等上下文
+ * 2. 通过 Nexus 创建新主线（走 SM lifecycle，触发 ThreadCreated 事件）
+ * 3. 将原任务的 threadId 关联到新主线（直接 repo——SM 不支持字段更新）
+ *
+ * @param taskId - 要提升的任务 ID
+ * @param threadFields - 可选的主线字段覆盖
+ * @returns 新创建的主线
+ */
+export async function promoteToThread(
+  taskId: string,
+  threadFields?: Partial<CreateThreadInput>,
+): Promise<Thread> {
+  const taskRepo = new TaskRepository()
+  const task = await taskRepo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!task) throw new Error('任务不存在')
+
+  const threadInput: CreateThreadInput & { name: string } = {
+    name: threadFields?.name ?? task.title,
+    description: threadFields?.description ?? (task.description as string | undefined),
+    color: threadFields?.color,
+    priority: threadFields?.priority ?? (task.priority as CreateThreadInput['priority']),
+    startDate: threadFields?.startDate,
+    endDate: threadFields?.endDate,
+    tags: threadFields?.tags,
+  }
+  const result = await submitDynamicIntent('tasks', 'createThread', threadInput as unknown as Record<string, unknown>)
+  if (!result.success) {
+    throw new Error(result.error ?? '提升为主线失败')
+  }
+  const newThread = result.object as Thread
+
+  // 将原任务关联到新主线
+  await taskRepo.update(taskId as USOM_ID, { threadId: newThread.id } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+
+  return newThread
 }
 
 /**
  * 彻底删除主线（不可恢复）
+ *
+ * 注意：Thread 生命周期不支持 deleted 状态（与 Task/Habit 不同）。
+ * 删除操作保留直接 repo 硬删除。
+ * TODO Phase C: 评估是否需要为 Thread 添加软删除支持。
+ *
  * @param threadId - 主线 ID
  */
 export async function deleteThread(threadId: string): Promise<void> {

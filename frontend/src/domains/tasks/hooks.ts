@@ -125,6 +125,42 @@ export function createTasksHooks(manifest: DomainManifest) {
           }],
         }
 
+      case 'ThreadPaused':
+        return {
+          metrics: [{ metricKey: 'thread_paused', value: 1 }],
+          suggestions: [{
+            actionType: 'resume_thread',
+            label: `主线已暂停: ${title}，需要时恢复`,
+            weight: 40,
+          }],
+        }
+
+      case 'ThreadResumed':
+        return {
+          metrics: [{ metricKey: 'thread_resumed', value: 1 }],
+          suggestions: [{
+            actionType: 'add_task',
+            label: `主线已恢复: ${title}，继续推进任务`,
+            weight: 50,
+          }],
+        }
+
+      case 'ThreadCompleted':
+        return {
+          metrics: [{ metricKey: 'thread_completed', value: 1 }],
+          suggestions: [{
+            actionType: 'archive_thread',
+            label: `主线已完成: ${title}，可以归档了`,
+            weight: 60,
+          }],
+        }
+
+      case 'ThreadArchived':
+        return {
+          metrics: [{ metricKey: 'thread_archived', value: 1 }],
+          suggestions: [],
+        }
+
       case 'TaskCreated': {
         const clarity = event.payload['clarity'] as string
         if (clarity === 'fuzzy') {

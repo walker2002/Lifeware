@@ -11,16 +11,32 @@ import type { USOM_ID } from '@/usom/types/primitives'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
-/** 生命周期状态映射 */
-const LIFECYCLE_STATUS_MAP: Record<string, string> = {
+/** 任务生命周期状态映射 */
+const TASK_LIFECYCLE_STATUS_MAP: Record<string, string> = {
   completeTask: 'active',
   archiveTask: 'completed',
 }
 
-/** 生命周期状态机动作映射 */
-const LIFECYCLE_SM_ACTION: Record<string, string> = {
+/** 任务生命周期状态机动作映射 */
+const TASK_LIFECYCLE_SM_ACTION: Record<string, string> = {
   completeTask: 'complete',
   archiveTask: 'archive',
+}
+
+/** 主线生命周期状态映射 — 用于查询对应状态的主线列表 */
+const THREAD_LIFECYCLE_STATUS_MAP: Record<string, string> = {
+  pauseThread: 'active',
+  resumeThread: 'paused',
+  completeThread: 'active',
+  archiveThread: 'completed',
+}
+
+/** 主线生命周期状态机动作映射 */
+const THREAD_LIFECYCLE_SM_ACTION: Record<string, string> = {
+  pauseThread: 'pause',
+  resumeThread: 'resume',
+  completeThread: 'complete',
+  archiveThread: 'archive',
 }
 
 /**
@@ -74,10 +90,79 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       return { content: '请选择要修改的任务', dataSnapshot: { tasks } }
     }
 
-    if (action in LIFECYCLE_STATUS_MAP) {
-      const status = LIFECYCLE_STATUS_MAP[action]
+    // ── 主线操作 ──
+
+    if (action === 'createThread') {
+      return { content: '请填写主线信息', dataSnapshot: {} }
+    }
+
+    if (action === 'updateThread') {
+      try {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const repo = new ThreadRepository()
+        const threads = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+        return {
+          content: '请选择要修改的主线',
+          dataSnapshot: {
+            threads: threads.map(t => ({
+              id: t.id,
+              name: t.name,
+              color: t.color,
+              status: t.status,
+            })),
+          },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询 threads 失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    if (action === 'promoteToThread') {
+      const tasks = await getActiveTasks()
+      return {
+        content: '请选择要提升为主线的任务',
+        dataSnapshot: { tasks },
+      }
+    }
+
+    if (action in THREAD_LIFECYCLE_STATUS_MAP) {
+      try {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const repo = new ThreadRepository()
+        const status = THREAD_LIFECYCLE_STATUS_MAP[action]
+        const threads = await repo.findByStatus(status as any, MVP_USER_ID as USOM_ID)
+        const items = threads.map(t => ({
+          id: t.id,
+          name: t.name,
+          color: t.color,
+          priority: t.priority,
+          status: t.status,
+          description: t.description,
+        }))
+        const smAction = THREAD_LIFECYCLE_SM_ACTION[action]
+        const labels: Record<string, string> = {
+          pause: '暂停',
+          resume: '恢复',
+          complete: '完成',
+          archive: '归档',
+        }
+        return {
+          content: `请选择要${labels[smAction] ?? smAction}的主线`,
+          dataSnapshot: { action: smAction, items },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询线程生命周期列表失败:', e)
+        return { content: '请填写信息', dataSnapshot: {} }
+      }
+    }
+
+    // ── 任务生命周期操作 ──
+
+    if (action in TASK_LIFECYCLE_STATUS_MAP) {
+      const status = TASK_LIFECYCLE_STATUS_MAP[action]
       const items = await getTasksByStatus(status)
-      const smAction = LIFECYCLE_SM_ACTION[action]
+      const smAction = TASK_LIFECYCLE_SM_ACTION[action]
       const labels: Record<string, string> = { complete: '完成', archive: '归档' }
       return {
         content: `请选择要${labels[smAction] ?? smAction}的任务`,
