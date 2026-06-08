@@ -48,6 +48,34 @@ intent_triggers:
       - 归档这条主线
     keywords: [归档, archive]
 
+  - action: pauseThread
+    shortcut: /pauseThread
+    description: 暂停主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 暂停这条主线
+    keywords: [暂停, pause, 主线]
+
+  - action: resumeThread
+    shortcut: /resumeThread
+    description: 恢复主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 恢复这条主线
+    keywords: [恢复, resume, 主线]
+
+  - action: completeThread
+    shortcut: /completeThread
+    description: 完成主线
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 完成这条主线
+      - 标记主线已完成
+    keywords: [完成, complete, 主线]
+
   # 任务相关
   - action: createTask
     shortcut: /createTask
