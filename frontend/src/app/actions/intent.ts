@@ -10,7 +10,7 @@
 
 import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { Timebox } from "@/usom/types/objects";
-import type { Timestamp } from "@/usom/types/primitives";
+import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import { TimeboxRepository } from "@/domains/timebox/repository";
@@ -717,7 +717,12 @@ export async function updateHabitStatus(
   }
 }
 
-/** 删除习惯（软删除 → status = 'deleted'） */
+/**
+ * 删除习惯（软删除 → status = 'deleted'）
+ *
+ * 注意：已归档（archived）的习惯不可直接删除，需先取消归档到其他状态后再删除。
+ * suspended 状态的 reactivateHabit intent 会将状态恢复为 active。
+ */
 export async function deleteHabit(
   habitId: string,
 ): Promise<HabitActionResult> {
@@ -791,10 +796,11 @@ export async function batchLogHabits(
 }
 
 /**
- * 更新习惯信息
+ * 更新习惯字段（直接 repo 调用）
  *
  * 注意：SM 只支持 create/updateStatus，不支持字段更新。
- * 保留独立 Orchestrator 构造。待 SM 扩展字段更新能力后可迁移至 submitDynamicIntent。
+ * 字段更新不是状态转换，保留直接 repo 调用。
+ * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
  *
  * @param habitId - 习惯 ID
  * @param input - 更新数据
@@ -806,52 +812,8 @@ export async function updateHabit(
 ): Promise<HabitActionResult> {
   try {
     const habitRepo = await getHabitRepo();
-    const eventRepo = new SystemEventRepository();
-
-    const habitsRepos = createHabitsGenericRepo({
-      habitRepo: habitRepo as any,
-      habitLogRepo: undefined as any,
-    });
-    const orchestrator = createOrchestrator({
-      eventRepo,
-      intentEngine: { parse: async () => { throw new Error("not used") } },
-      ruleEngine: {
-        evaluate: async () => ({
-          result: "pass" as const,
-          warnings: [],
-          confirmations: [],
-        }),
-      },
-      getRepo: (domainId: string, objectType: string) => {
-        if (domainId === 'habits') {
-          const repo = habitsRepos[objectType]
-          if (!repo) throw new Error(`未找到 Habits repo: ${objectType}`)
-          return repo
-        }
-        throw new Error(`getRepo: 不支持的域 ${domainId}`)
-      },
-    });
-
-    const now = new Date().toISOString() as Timestamp;
-
-    const intent: import("@/usom/types/objects").StructuredIntent = {
-      id: crypto.randomUUID(),
-      intentionId: crypto.randomUUID(),
-      targetDomain: "habits",
-      action: "updateHabit",
-      fields: { habitId, ...input },
-      confidence: 1.0,
-      resolvedBy: "template_form",
-      createdAt: now,
-    };
-
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-
-    if (!result.success) {
-      return { success: false, error: result.error };
-    }
-
-    return { success: true, habit: result.object as Habit | undefined };
+    const habit = await habitRepo.update(habitId as USOM_ID, input, MVP_USER_ID as USOM_ID) as Habit;
+    return { success: true, habit };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.UPDATE_FAILED;
     return { success: false, error: message };

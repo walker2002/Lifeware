@@ -149,6 +149,7 @@ export async function archiveTask(taskId: string): Promise<void> {
  *
  * 注意：删除操作走 SM lifecycle 转换，将 status 设为 'deleted'（非硬删除）。
  * deleted 状态的任务不会出现在任何常规查询中。
+ * 已归档（archived）的任务不可直接删除，需先取消归档到其他状态后再删除。
  * @param taskId - 任务 ID
  */
 export async function deleteTask(taskId: string): Promise<void> {
@@ -220,9 +221,15 @@ export async function searchTasks(
   matches: Task[]
   ancestorMap: Record<string, Array<{ id: string; title: string }>>
 }> {
+  // 输入清理：截断 + 去首尾空白
+  const sanitized = query.trim().slice(0, 200)
+  if (!sanitized) {
+    return { matches: [], ancestorMap: {} }
+  }
+
   const repo = new TaskRepository()
   const { matches, ancestorMap } = await repo.findMatchingWithAncestors(
-    query,
+    sanitized,
     MVP_USER_ID as USOM_ID,
     filters,
   )

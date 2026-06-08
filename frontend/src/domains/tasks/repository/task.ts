@@ -147,7 +147,7 @@ export class TaskRepository implements ITaskRepository {
   }> {
     const conditions = [
       eq(s.tasks.userId, userId),
-      sql`(${s.tasks.title} ILIKE ${`%${query}%`} OR ${s.tasks.description} ILIKE ${`%${query}%`})`,
+      sql`(${s.tasks.title} ILIKE ${`%${query.trim()}%`} OR ${s.tasks.description} ILIKE ${`%${query.trim()}%`})`,
     ]
 
     if (filters?.threadId) {
@@ -164,29 +164,49 @@ export class TaskRepository implements ITaskRepository {
       .where(and(...conditions))
     const matches = rows.map(r => taskRowToUSOM(r as any))
 
-    // 构建祖先映射
+    // 构建祖先映射（批量加载，避免 N+1）
     const ancestorMap = new Map<string, Task[]>()
     const loadedTasks = new Map<string, Task>()
 
-    for (const match of matches) {
-      const ancestors: Task[] = []
-      let currentParentId = match.parentId
+    if (matches.length > 0) {
+      // 收集所有需要加载的祖先 ID
+      let pendingIds = new Set(matches.map(m => m.parentId).filter(Boolean) as string[])
 
-      for (let i = 0; i < 10 && currentParentId; i++) {
-        let parent = loadedTasks.get(currentParentId)
-        if (!parent) {
-          const found = await this.findById(currentParentId as USOM_ID, userId)
-          if (found) {
-            parent = found
-            loadedTasks.set(currentParentId, found)
-          }
+      for (let depth = 0; depth < 10 && pendingIds.size > 0; depth++) {
+        // 去掉已加载的 ID
+        const toLoad = [...pendingIds].filter(id => !loadedTasks.has(id))
+        if (toLoad.length === 0) break
+
+        // 批量查询：一次加载该层的所有祖先
+        const parentRows = await db.select().from(s.tasks)
+          .where(and(
+            eq(s.tasks.userId, userId),
+            inArray(s.tasks.id, toLoad as any[]),
+          ))
+
+        const parents = parentRows.map(r => taskRowToUSOM(r as any))
+        for (const p of parents) {
+          loadedTasks.set(p.id, p)
         }
-        if (!parent) break
-        ancestors.push(parent)
-        currentParentId = parent.parentId
+
+        // 下一层：这些祖先的 parentId
+        pendingIds = new Set(parents.map(p => p.parentId).filter(Boolean) as string[])
       }
 
-      ancestorMap.set(match.id, ancestors)
+      // 为每个匹配结果构建祖先链
+      for (const match of matches) {
+        const ancestors: Task[] = []
+        let currentParentId = match.parentId
+
+        for (let i = 0; i < 10 && currentParentId; i++) {
+          const parent = loadedTasks.get(currentParentId)
+          if (!parent) break
+          ancestors.push(parent)
+          currentParentId = parent.parentId
+        }
+
+        ancestorMap.set(match.id, ancestors)
+      }
     }
 
     return { matches, ancestorMap }
