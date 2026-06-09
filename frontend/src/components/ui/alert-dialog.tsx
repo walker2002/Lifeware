@@ -43,7 +43,7 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-overlay data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-overlay bg-scrim data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -60,13 +60,9 @@ function AlertDialogContent({
   size?: "default" | "sm"
   overlayClassName?: string
 }) {
-  // bg-* 类由 AlertDialogContent 统一控制，AlertDialogOverlay 不再硬编码默认值。
-  // 避免 twMerge 在基础类和覆盖类之间无法确定去重。
-  const overlayBgClass = overlayClassName ?? 'bg-scrim'
-
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay className={overlayBgClass} />
+      <AlertDialogOverlay className={overlayClassName} />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         data-size={size}
