@@ -49,7 +49,7 @@ export function CnuiConfirmDialog({
 }: CnuiConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(o) => { if (!o) onCancel() }}>
-      <AlertDialogContent overlayClassName="bg-scrim-cnui">
+      <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{message}</AlertDialogDescription>
