@@ -81,7 +81,7 @@ export function TaskCreationCard({
       <CardContent className="space-y-3">
         {/* 标题 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">
+          <label className="text-xs text-body mb-1 block">
             标题 <span className="text-error">*</span>
           </label>
           <input
@@ -99,7 +99,7 @@ export function TaskCreationCard({
 
         {/* 描述 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">描述</label>
+          <label className="text-xs text-body mb-1 block">描述</label>
           <textarea
             value={description}
             onChange={e => {
@@ -116,7 +116,7 @@ export function TaskCreationCard({
         {/* 优先级 + 预估时长 */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-muted mb-1 block">优先级</label>
+            <label className="text-xs text-body mb-1 block">优先级</label>
             <select
               value={priority}
               onChange={e => {
@@ -131,7 +131,7 @@ export function TaskCreationCard({
             </select>
           </div>
           <div>
-            <label className="text-xs text-muted mb-1 block">预估时长（分钟）</label>
+            <label className="text-xs text-body mb-1 block">预估时长（分钟）</label>
             <input
               type="number"
               min={5}

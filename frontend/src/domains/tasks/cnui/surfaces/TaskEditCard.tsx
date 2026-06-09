@@ -42,7 +42,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
         <div className="mb-3 text-sm font-medium text-ink">编辑任务</div>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-muted-foreground">标题</label>
+            <label className="text-xs text-body">标题</label>
             <input
               className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
               value={editTitle}
@@ -50,7 +50,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-muted-foreground">描述</label>
+            <label className="text-xs text-body">描述</label>
             <textarea
               className="w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
               rows={2}
@@ -60,7 +60,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-muted-foreground">优先级</label>
+              <label className="text-xs text-body">优先级</label>
               <select
                 value={editPriority}
                 onChange={e => setEditPriority(e.target.value)}
@@ -72,7 +72,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-muted-foreground">预估时长（分钟）</label>
+              <label className="text-xs text-body">预估时长（分钟）</label>
               <input
                 type="number"
                 min={5}

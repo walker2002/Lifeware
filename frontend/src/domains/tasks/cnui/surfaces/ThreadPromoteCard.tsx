@@ -83,7 +83,7 @@ export function ThreadPromoteCard({
         {/* 任务选择 */}
         {tasks.length > 0 && (
           <div>
-            <label className="text-xs text-muted mb-1 block">选择任务</label>
+            <label className="text-xs text-body mb-1 block">选择任务</label>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {tasks.map(task => (
                 <button
@@ -112,7 +112,7 @@ export function ThreadPromoteCard({
 
         {/* 主线名称 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">主线名称</label>
+          <label className="text-xs text-body mb-1 block">主线名称</label>
           <input
             type="text"
             value={threadName}
@@ -127,7 +127,7 @@ export function ThreadPromoteCard({
 
         {/* 颜色 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">颜色标签</label>
+          <label className="text-xs text-body mb-1 block">颜色标签</label>
           <div className="flex items-center gap-2">
             <input
               type="color"

@@ -72,7 +72,7 @@ export function ThreadCreationCard({
       <CardContent className="space-y-3">
         {/* 主线名称 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">
+          <label className="text-xs text-body mb-1 block">
             主线名称 <span className="text-error">*</span>
           </label>
           <input
@@ -90,7 +90,7 @@ export function ThreadCreationCard({
 
         {/* 描述 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">描述</label>
+          <label className="text-xs text-body mb-1 block">描述</label>
           <textarea
             value={description}
             onChange={e => {
@@ -106,7 +106,7 @@ export function ThreadCreationCard({
 
         {/* 颜色 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">颜色标签</label>
+          <label className="text-xs text-body mb-1 block">颜色标签</label>
           <div className="flex items-center gap-2 flex-wrap">
             {PRESET_COLORS.map(c => (
               <button
@@ -129,7 +129,7 @@ export function ThreadCreationCard({
 
         {/* 优先级 */}
         <div>
-          <label className="text-xs text-muted mb-1 block">优先级</label>
+          <label className="text-xs text-body mb-1 block">优先级</label>
           <select
             value={priority}
             onChange={e => {
