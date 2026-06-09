@@ -56,7 +56,7 @@
   --pressed-overlay: rgba(20,20,19,0.08);
   --focus-ring: rgba(204,120,92,0.3);
   --scrim: rgba(20,20,19,0.5);
-  --scrim-cnui: rgba(20,20,19,0.3);
+  --scrim-cnui: rgba(20,20,19,0.5);
 
   /* --- z-index 层级（UI-DESIGN-SPEC §7.3）--- */
   --z-base: 0;
@@ -307,7 +307,7 @@ body {
   --pressed-overlay: rgba(250,249,245,0.10);
   --focus-ring: rgba(212,136,106,0.5);
   --scrim: rgba(0,0,0,0.7);
-  --scrim-cnui: rgba(0,0,0,0.3);
+  --scrim-cnui: rgba(0,0,0,0.7);
 
   /* --- shadcn/ui 兼容层（暗色值）--- */
   --background: var(--canvas);
