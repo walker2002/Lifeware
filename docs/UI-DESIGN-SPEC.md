@@ -45,6 +45,8 @@
 > - **图标、按钮、交互元素**：禁止使用 `text-muted`，统一使用 `text-body`（对比度 8.3:1+ 在所有表面色上）
 > - **纯装饰性辅助文字（非交互）**：可使用 `text-muted`，但仅限在 `bg-canvas` 或 `bg-surface-soft` 等确定性浅底上
 > - **`text-muted-soft`**：仅用于占位符文字（配合 `placeholder:` 伪类），禁止用于任何可见交互元素
+>
+> **CN-UI 表单标签规则**：CN-UI 对话内表单的 `<label>` 元素必须使用 `text-body`（`--body` #3d3d3a），**禁止**使用 `text-muted` 或 `text-muted-foreground`。表单标签是用户操作的直接指引，不属于"辅助文字"。
 
 > **⚠️ 可访问性警告**：`--primary`（#cc785c，亮度 58%）作为背景时，`--on-primary`（#ffffff）的对比度仅为 **3.3:1**，不满足 WCAG AA 对正常文本的要求（4.5:1）。
 >
@@ -90,8 +92,13 @@
 | Hover Overlay | `rgba(20,20,19,0.04)` | `rgba(250,249,245,0.06)` | hover 态叠加 |
 | Pressed Overlay | `rgba(20,20,19,0.08)` | `rgba(250,249,245,0.10)` | 按下态叠加 |
 | Focus Ring | `rgba(204,120,92,0.3)` | `rgba(212,136,106,0.5)` | 聚焦外发光 |
-| Scrim | `rgba(20,20,19,0.5)` | `rgba(0,0,0,0.7)` | 通用模态遮罩 |
-| Scrim CN-UI | `rgba(20,20,19,0.3)` | `rgba(0,0,0,0.4)` | CN-UI 对话内确认对话框遮罩，较通用 scrim 更透明以保留对话上下文 |
+| Scrim | `rgba(20,20,19,0.5)` | `rgba(0,0,0,0.7)` | 通用模态遮罩，Tailwind 类 `bg-scrim` |
+| Scrim CN-UI | `rgba(20,20,19,0.3)` | `rgba(0,0,0,0.4)` | CN-UI 对话内确认对话框遮罩，Tailwind 类 `bg-scrim-cnui`。较通用 scrim 更透明以保留对话上下文 |
+
+> **⚠️ Scrim 使用规则**：
+> - 通用模态/对话框使用 `bg-scrim`
+> - CN-UI 对话内确认对话框使用 `bg-scrim-cnui`
+> - **禁止**使用 `bg-[var(--scrim-cnui)]` 等 arbitrary value 写法，必须使用 `--color-scrim-cnui` 注册的 Tailwind 令牌类 `bg-scrim-cnui`，否则 `twMerge` 无法正确去重基础类
 
 ### 1.6 暗色模式
 

@@ -180,6 +180,7 @@
   --color-pressed-overlay: var(--pressed-overlay);
   --color-focus-ring: var(--focus-ring);
   --color-scrim: var(--scrim);
+  --color-scrim-cnui: var(--scrim-cnui);
 
   /* --- z-index --- */
   --z-index-base: var(--z-base);
