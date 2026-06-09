@@ -307,7 +307,7 @@ body {
   --pressed-overlay: rgba(250,249,245,0.10);
   --focus-ring: rgba(212,136,106,0.5);
   --scrim: rgba(0,0,0,0.7);
-  --scrim-cnui: rgba(0,0,0,0.4);
+  --scrim-cnui: rgba(0,0,0,0.3);
 
   /* --- shadcn/ui 兼容层（暗色值）--- */
   --background: var(--canvas);

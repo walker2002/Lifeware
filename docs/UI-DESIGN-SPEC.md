@@ -93,7 +93,7 @@
 | Pressed Overlay | `rgba(20,20,19,0.08)` | `rgba(250,249,245,0.10)` | 按下态叠加 |
 | Focus Ring | `rgba(204,120,92,0.3)` | `rgba(212,136,106,0.5)` | 聚焦外发光 |
 | Scrim | `rgba(20,20,19,0.5)` | `rgba(0,0,0,0.7)` | 通用模态遮罩，Tailwind 类 `bg-scrim` |
-| Scrim CN-UI | `rgba(20,20,19,0.3)` | `rgba(0,0,0,0.4)` | CN-UI 对话内确认对话框遮罩，Tailwind 类 `bg-scrim-cnui`。较通用 scrim 更透明以保留对话上下文 |
+| Scrim CN-UI | `rgba(20,20,19,0.3)` | `rgba(0,0,0,0.3)` | CN-UI 对话内确认对话框遮罩，Tailwind 类 `bg-scrim-cnui`。较通用 scrim 更透明以保留对话上下文 |
 
 > **⚠️ Scrim 使用规则**：
 > - 通用模态/对话框使用 `bg-scrim`
