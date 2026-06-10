@@ -13,17 +13,17 @@ const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 /** 任务生命周期状态映射 — 用于查询对应状态的任务列表 */
 const TASK_LIFECYCLE_STATUS_MAP: Record<string, string> = {
-  completeTask: 'active',
+  completeTask: 'in_progress',
   archiveTask: 'completed',
 }
 
 /**
- * 可删除的任务状态列表（manifest lifecycle: from [todo, planned, in_progress, completed] → deleted）
- * deleteTask 不用单状态查询，需查多个状态
+ * 可删除的任务状态列表 — 仅归档后可删除（业务规则）
+ * 对应 manifest lifecycle: completed → archived → deleted
  */
-const DELETABLE_TASK_STATUSES = ['todo', 'planned', 'in_progress', 'completed']
+const DELETABLE_TASK_STATUSES = ['archived']
 
-/** 任务生命周期状态机动作映射 */
+/** 任务生命周期状态机动作映射 — 仅归档后可删除（业务规则） */
 const TASK_LIFECYCLE_SM_ACTION: Record<string, string> = {
   completeTask: 'complete',
   archiveTask: 'archive',
@@ -78,6 +78,10 @@ function formatTaskList(tasks: any[]): Record<string, unknown>[] {
     priority: t.priority,
     estimatedDuration: t.estimatedDuration,
     status: t.status,
+    clarity: t.clarity,
+    startDate: t.startDate,
+    endDate: t.endDate,
+    actualDuration: t.actualDuration,
   }))
 }
 
@@ -200,6 +204,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         return {
           content: '请选择要修改的主线',
           dataSnapshot: {
+            action: 'update',
             threads: threads.map(t => ({
               id: t.id,
               name: t.name,
@@ -356,7 +361,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'viewTree') {
+    if (action === 'viewTaskTree') {
       try {
         const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
         const threadRepo = new ThreadRepository()
@@ -394,8 +399,8 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
-    // viewTree 是纯展示 query action，无提交操作
-    if (action === 'viewTree') {
+    // viewTaskTree 是纯展示 query action，无提交操作
+    if (action === 'viewTaskTree') {
       return { success: true }
     }
 
@@ -459,4 +464,5 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'thread-promote-card': taskCnuiHandler,
   'thread-action-panel': taskCnuiHandler,
   'task-split-card': taskCnuiHandler,
+  'task-tree-view': taskCnuiHandler,
 }
