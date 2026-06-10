@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
 /** 任务列表项 */
@@ -18,6 +18,10 @@ interface TaskItem {
   priority: string
   estimatedDuration: number
   status: string
+  clarity?: string         /** 任务清晰度 */
+  startDate?: string       /** 计划开始日期 */
+  endDate?: string         /** 计划结束日期 */
+  actualDuration?: number  /** 实际耗时（分钟） */
 }
 
 /** TaskActionPanel 组件属性 */
@@ -47,6 +51,22 @@ const PRIORITY_LABELS: Record<string, string> = {
   low: '低',
 }
 
+/** 状态标签 */
+const STATUS_LABELS: Record<string, string> = {
+  todo: '待办',
+  planned: '计划中',
+  in_progress: '进行中',
+  completed: '已完成',
+  archived: '已归档',
+}
+
+/** 清晰度标签 */
+const CLARITY_LABELS: Record<string, string> = {
+  fuzzy: '模糊',
+  scoped: '有范围',
+  actionable: '可执行',
+}
+
 /**
  * 任务操作面板组件
  * @description 处理任务的完成、归档、删除和细化批量操作
@@ -57,15 +77,24 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading, isD
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.complete
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [localSearch, setLocalSearch] = useState('')
 
   useEffect(() => {
     setSelectedIds(new Set())
+    setLocalSearch('')  // 切换 action 时清空搜索
   }, [action])
 
-  const allSelected = items.length > 0 && selectedIds.size === items.length
+  // 本地搜索过滤
+  const filteredItems = useMemo(() => {
+    if (!localSearch.trim()) return items
+    const q = localSearch.trim().toLowerCase()
+    return items.filter(t => t.title.toLowerCase().includes(q))
+  }, [items, localSearch])
+
+  const allSelected = filteredItems.length > 0 && filteredItems.every(t => selectedIds.has(t.id))
 
   function toggleSelectAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(items.map(t => t.id)))
+    setSelectedIds(allSelected ? new Set() : new Set(filteredItems.map(t => t.id)))
   }
 
   function toggleOne(id: string) {
@@ -94,52 +123,70 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading, isD
       <div className="mb-3 text-sm font-medium text-ink">{labels.title}</div>
 
       {items.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted">没有符合条件的任务</p>
+        <p className="py-8 text-center text-sm text-body">没有符合条件的任务</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {/* 全选栏 */}
-          <div className="flex items-center justify-between border-b border-hairline pb-2 text-xs text-muted">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleSelectAll}
-                className="size-4 rounded"
-              />
-              全选
-            </label>
-            <span>已选 {selectedIds.size} / {items.length}</span>
+          {/* 搜索框 */}
+          <div className="relative mb-1">
+            <input
+              type="text" value={localSearch}
+              onChange={e => setLocalSearch(e.target.value)}
+              placeholder="按标题过滤..."
+              className="w-full h-7 pl-2.5 pr-3 rounded-md border border-hairline bg-canvas text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            />
           </div>
 
-          {/* 任务列表 */}
-          {items.map(task => {
-            const isSelected = selectedIds.has(task.id)
-            return (
-              <label
-                key={task.id}
-                className={cn(
-                  'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
-                  isSelected && 'border-primary/40 bg-primary/10',
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleOne(task.id)}
-                  className="size-4 rounded"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className={cn('text-sm font-medium truncate', isSelected && 'text-muted line-through')}>
-                    {task.title}
-                  </div>
-                  <div className="text-xs text-muted">
-                    {PRIORITY_LABELS[task.priority] ?? task.priority}
-                    {task.estimatedDuration ? ` · ${task.estimatedDuration}分钟` : ''}
-                  </div>
-                </div>
-              </label>
-            )
-          })}
+          {filteredItems.length === 0 ? (
+            <p className="py-6 text-center text-sm text-body">无匹配任务</p>
+          ) : (
+            <>
+              {/* 全选栏 */}
+              <div className="flex items-center justify-between border-b border-hairline pb-2 text-xs text-body">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="size-4 rounded"
+                  />
+                  全选
+                </label>
+                <span>已选 {selectedIds.size} / {filteredItems.length}</span>
+              </div>
+
+              {/* 任务列表 */}
+              {filteredItems.map(task => {
+                const isSelected = selectedIds.has(task.id)
+                return (
+                  <label
+                    key={task.id}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
+                      isSelected && 'border-primary/40 bg-primary/10',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleOne(task.id)}
+                      className="size-4 rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className={cn('text-sm font-medium truncate', isSelected && 'text-body line-through')}>
+                        {task.title}
+                      </div>
+                      <div className="text-xs text-body">
+                        {STATUS_LABELS[task.status] ?? task.status}
+                        {task.clarity && ` · ${CLARITY_LABELS[task.clarity] ?? task.clarity}`}
+                        {task.startDate && ` · ${task.startDate.slice(0, 10)}`}
+                        {task.actualDuration ? ` · 实际${task.actualDuration}分钟` : (task.estimatedDuration ? ` · ${task.estimatedDuration}分钟` : '')}
+                      </div>
+                    </div>
+                  </label>
+                )
+              })}
+            </>
+          )}
 
           {action === 'delete' && selectedIds.size > 0 && (
             <div className="rounded-md border border-error bg-error-soft px-3 py-2 text-xs text-error">
