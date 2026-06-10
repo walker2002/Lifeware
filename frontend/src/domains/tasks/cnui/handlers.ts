@@ -227,11 +227,14 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       }
       if (intentFields?.title) {
         const repo = new TaskRepository()
-        const candidates = await repo.searchByTitle(intentFields.title as string, MVP_USER_ID as USOM_ID)
-        // 筛选：仅顶级、非终止状态的任务
-        const filtered = candidates.filter(t =>
-          !t.parentId && !['paused', 'completed', 'archived', 'deleted'].includes(t.status)
+        // DB 级过滤：仅可提升状态的任务
+        const candidates = await repo.searchByTitle(
+          intentFields.title as string,
+          MVP_USER_ID as USOM_ID,
+          ['todo', 'planned', 'in_progress'] as any,
         )
+        // 额外过滤：仅顶级任务
+        const filtered = candidates.filter(t => !t.parentId)
         if (filtered.length === 1) {
           return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(filtered[0]), phase: 'detail' } }
         }
@@ -239,12 +242,12 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
           return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(filtered), phase: 'select' } }
         }
       }
-      // 兜底：列出所有符合条件的任务（顶级、非终止状态）
+      // 兜底：DB 级过滤 — 仅顶级、活跃状态的任务
       const repo = new TaskRepository()
-      const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
-      const candidates = allTasks.filter(t =>
-        !t.parentId && !['paused', 'completed', 'archived', 'deleted'].includes(t.status)
-      )
+      const candidates = await repo.findByUserId(MVP_USER_ID as USOM_ID, {
+        parentId: null,
+        status: ['todo', 'planned', 'in_progress'] as any,
+      })
       return {
         content: '请选择要提升为主线的任务',
         dataSnapshot: { tasks: formatTaskList(candidates), phase: 'search' },
@@ -370,7 +373,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'taskTree') {
+    if (action === 'viewTaskTree') {
       try {
         const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
         const threadRepo = new ThreadRepository()
@@ -409,8 +412,8 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
-    // taskTree 是纯展示 query action，无提交操作
-    if (action === 'taskTree') {
+    // viewTaskTree 是纯展示 query action，无提交操作
+    if (action === 'viewTaskTree') {
       return { success: true }
     }
 

@@ -44,7 +44,6 @@ export function ThreadPromoteCard({
     (dataModel.taskId as string) ?? '',
   )
   const [threadName, setThreadName] = useState('')
-  const [threadColor, setThreadColor] = useState(DEFAULT_THREAD_COLOR)
   const [searchQuery, setSearchQuery] = useState('')
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
@@ -64,7 +63,7 @@ export function ThreadPromoteCard({
     onConfirm({
       taskId: selectedTaskId,
       name: (threadName || (selectedTask?.title as string)) ?? '新主线',
-      color: threadColor,
+      color: DEFAULT_THREAD_COLOR,
     })
   }
 
@@ -144,23 +143,6 @@ export function ThreadPromoteCard({
             placeholder="输入主线名称"
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
-        </div>
-
-        {/* 颜色 */}
-        <div>
-          <label className="text-xs text-body mb-1 block">颜色标签</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={threadColor}
-              onChange={e => {
-                setThreadColor(e.target.value)
-                onDataChange({ ...dataModel, color: e.target.value })
-              }}
-              className="size-8 rounded border border-hairline cursor-pointer"
-            />
-            <span className="text-xs text-body">{threadColor}</span>
-          </div>
         </div>
 
         {/* 操作按钮 */}

@@ -1171,6 +1171,7 @@ export interface OpenCnuiSurfaceResult {
 export async function openCnuiSurface(
   domainId: string,
   action: string,
+  intentFields?: Record<string, unknown>,
 ): Promise<OpenCnuiSurfaceResult> {
   // 从 manifest 获取 intent_trigger 元数据
   const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
@@ -1214,7 +1215,7 @@ export async function openCnuiSurface(
   }
 
   try {
-    const result = await handler.open(action)
+    const result = await handler.open(action, intentFields)
     return {
       content: result.content,
       surface: {

@@ -527,7 +527,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           }
           return
         } else {
-          // 无附加内容 → 在对话流内打开 CN-UI 表面
+          // 无附加内容 → 根据 response_type 决定走 CNUI 还是 page
           const targetDomain =
             resolvedDomainId ||
             shortcut?.domainId ||
@@ -535,22 +535,34 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           const targetAction = slashResult.action
 
           if (targetDomain && targetAction) {
-            try {
-              const result = await openCnuiSurface(targetDomain, targetAction)
-              const cnuiMsg: ChatMessage = {
+            // 防御：page 类型 action 走页面导航，不应打开 CNUI
+            const cnui = await isCnuiSurface(targetDomain, targetAction)
+            if (!cnui) {
+              setMainViewState({ type: "action", domainId: targetDomain, action: targetAction })
+              const navMsg: ChatMessage = {
                 role: "assistant",
-                content: result.content,
-                timestamp: new Date().toISOString(),
-                cnuiSurface: result.surface,
-              }
-              deps.addChatMessage(cnuiMsg)
-            } catch {
-              const errMsg: ChatMessage = {
-                role: "assistant",
-                content: "打开表单失败，请重试",
+                content: `已导航到 ${targetDomain}/${targetAction}`,
                 timestamp: new Date().toISOString(),
               }
-              deps.addChatMessage(errMsg)
+              deps.addChatMessage(navMsg)
+            } else {
+              try {
+                const result = await openCnuiSurface(targetDomain, targetAction)
+                const cnuiMsg: ChatMessage = {
+                  role: "assistant",
+                  content: result.content,
+                  timestamp: new Date().toISOString(),
+                  cnuiSurface: result.surface,
+                }
+                deps.addChatMessage(cnuiMsg)
+              } catch {
+                const errMsg: ChatMessage = {
+                  role: "assistant",
+                  content: "打开表单失败，请重试",
+                  timestamp: new Date().toISOString(),
+                }
+                deps.addChatMessage(errMsg)
+              }
             }
             return
           }
