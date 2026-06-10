@@ -71,7 +71,7 @@ export interface CnuiSurfaceData {
 // ── CNUI Surface Handler 接口 ──────────────────────────────
 
 export interface CnuiSurfaceHandler {
-  open: (action: string) => Promise<CnuiSurfaceOpenResult>
+  open: (action: string, intentFields?: Record<string, unknown>) => Promise<CnuiSurfaceOpenResult>
   submit: (action: string, fields: Record<string, unknown>) => Promise<CnuiSurfaceSubmitResult>
 }
 

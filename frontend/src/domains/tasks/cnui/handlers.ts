@@ -143,13 +143,29 @@ async function getActiveTasks(): Promise<Record<string, unknown>[]> {
 }
 
 export const taskCnuiHandler: CnuiSurfaceHandler = {
-  async open(action): Promise<CnuiSurfaceOpenResult> {
+  async open(action, intentFields): Promise<CnuiSurfaceOpenResult> {
     if (action === 'createTask') {
       const threads = await getActiveThreads()
       return { content: '请填写任务信息', dataSnapshot: { threads } }
     }
 
     if (action === 'updateTask') {
+      if (intentFields?.taskId) {
+        const repo = new TaskRepository()
+        const task = await repo.findById(intentFields.taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+        if (task) return { content: '请编辑任务信息', dataSnapshot: { task: formatTaskDetail(task), action, phase: 'detail', tasks: [] } }
+      }
+      if (intentFields?.title) {
+        const repo = new TaskRepository()
+        const statusFilter = ['todo', 'planned', 'in_progress', 'completed']
+        const candidates = await repo.searchByTitle(intentFields.title as string, MVP_USER_ID as USOM_ID, statusFilter as any)
+        if (candidates.length === 1) {
+          return { content: '请编辑任务信息', dataSnapshot: { task: formatTaskDetail(candidates[0]), action, phase: 'detail', tasks: [] } }
+        }
+        if (candidates.length > 1) {
+          return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(candidates), action, phase: 'select', tasks: formatTaskList(candidates) } }
+        }
+      }
       const tasks = await getActiveTasks()
       return { content: '请选择要修改的任务', dataSnapshot: { tasks } }
     }
@@ -164,6 +180,20 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       try {
         const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
         const repo = new ThreadRepository()
+        if (intentFields?.threadId) {
+          const thread = await repo.findById(intentFields.threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+          if (thread) return { content: '编辑主线信息', dataSnapshot: { thread: { id: thread.id, name: thread.name, description: thread.description, color: thread.color, priority: thread.priority, status: thread.status }, action: 'update', phase: 'detail' } }
+        }
+        if (intentFields?.name) {
+          const candidates = await repo.searchByName(intentFields.name as string, MVP_USER_ID as USOM_ID)
+          if (candidates.length === 1) {
+            const t = candidates[0]
+            return { content: '编辑主线信息', dataSnapshot: { thread: { id: t.id, name: t.name, description: t.description, color: t.color, priority: t.priority, status: t.status }, action: 'update', phase: 'detail' } }
+          }
+          if (candidates.length > 1) {
+            return { content: '找到多个匹配主线，请选择', dataSnapshot: { items: candidates.map(t => ({ id: t.id, name: t.name, color: t.color, status: t.status })), action: 'update', phase: 'select' } }
+          }
+        }
         const threads = await repo.findByUserId(MVP_USER_ID as USOM_ID)
         return {
           content: '请选择要修改的主线',
@@ -183,10 +213,25 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
     }
 
     if (action === 'promoteToThread') {
+      if (intentFields?.taskId) {
+        const repo = new TaskRepository()
+        const task = await repo.findById(intentFields.taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+        if (task) return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(task), phase: 'detail' } }
+      }
+      if (intentFields?.title) {
+        const repo = new TaskRepository()
+        const candidates = await repo.searchByTitle(intentFields.title as string, MVP_USER_ID as USOM_ID)
+        if (candidates.length === 1) {
+          return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(candidates[0]), phase: 'detail' } }
+        }
+        if (candidates.length > 1) {
+          return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(candidates), phase: 'select' } }
+        }
+      }
       const tasks = await getActiveTasks()
       return {
         content: '请选择要提升为主线的任务',
-        dataSnapshot: { tasks },
+        dataSnapshot: { tasks, phase: 'search' },
       }
     }
 
@@ -282,9 +327,27 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
     if (action in TASK_LIFECYCLE_STATUS_MAP) {
       const status = TASK_LIFECYCLE_STATUS_MAP[action]
-      const items = await getTasksByStatus(status)
       const smAction = TASK_LIFECYCLE_SM_ACTION[action]
       const labels: Record<string, string> = { complete: '完成', archive: '归档' }
+
+      // intentFields 优先：通过 ID 或标题定位任务
+      if (intentFields?.taskId) {
+        const repo = new TaskRepository()
+        const task = await repo.findById(intentFields.taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+        if (task) return { content: `确认${labels[smAction] ?? smAction}任务`, dataSnapshot: { task: formatTaskDetail(task), action: smAction, phase: 'detail', items: [] } }
+      }
+      if (intentFields?.title) {
+        const repo = new TaskRepository()
+        const candidates = await repo.searchByTitle(intentFields.title as string, MVP_USER_ID as USOM_ID, [status as any])
+        if (candidates.length === 1) {
+          return { content: `确认${labels[smAction] ?? smAction}任务`, dataSnapshot: { task: formatTaskDetail(candidates[0]), action: smAction, phase: 'detail', items: [] } }
+        }
+        if (candidates.length > 1) {
+          return { content: `找到多个匹配任务，请选择要${labels[smAction] ?? smAction}的`, dataSnapshot: { items: formatTaskList(candidates), action: smAction, phase: 'select' } }
+        }
+      }
+
+      const items = await getTasksByStatus(status)
       return {
         content: `请选择要${labels[smAction] ?? smAction}的任务`,
         dataSnapshot: { action: smAction, items },
