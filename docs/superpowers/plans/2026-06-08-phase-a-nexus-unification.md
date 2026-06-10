@@ -1,8 +1,12 @@
-# 阶段 A：Nexus 链路统一 + 任务搜索改进 — 实施计划
+# 任务管理 Nexus 统一实施计划（Phase A / B / C）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 消除所有绕过 Nexus 链路的写操作违宪代码，统一通过 `submitDynamicIntent` → `executePipeline` 执行，并改进任务树搜索支持深层子任务。
+**Goal:** 三阶段完成 Tasks Domain 的 Nexus 链路统一和 CNUI Surface 完善。Phase A 消除违宪写入 + 搜索改进；Phase B 统一 Thread 写操作 + Surface 注册修复；Phase C 完善 Task Surface 交互和消息。
+
+**Architecture:** 改造 `executePipeline` 的 `getRepo` 工厂从硬编码改为 Registry 动态查找。所有写操作统一通过 `submitDynamicIntent` → `executePipeline`。CNUI Surface 通过注册中心管理。
+
+**Tech Stack:** Next.js Server Actions, Drizzle ORM, Domain Plugin Registry, CN-UI Protocol
 
 **Architecture:** 改造 `executePipeline` 的 `getRepo` 工厂从硬编码 timebox 改为通过 Domain Registry 动态查找。所有 Tasks/Habits 写操作和 CNUI handler submit 方法统一改为调用 `submitDynamicIntent`。Manifest 新增 delete 相关 lifecycle 定义。搜索通过新增 Repository 方法实现全量匹配 + 祖先路径构建。
 
@@ -1227,3 +1231,81 @@ Run: `cd frontend && grep -n "repo\.\(create\|update\|save\|delete\|archive\|upd
 git add -A
 git commit -m "chore: 阶段 A 最终集成验证通过"
 ```
+
+---
+
+# Phase B：Thread 写操作 Nexus 统一 + CNUI Surface 注册修复
+
+> **状态：✅ 已完成** | 代码改动在 Phase A 实施期间同步完成，无独立实施计划。
+
+## B.1 完成的改动
+
+### B.1.1 handlers.ts — Thread 生命周期映射
+
+- [x] 新增 `THREAD_LIFECYCLE_STATUS_MAP` 和 `THREAD_LIFECYCLE_SM_ACTION`
+- [x] `open()` 新增 Thread 生命周期查询分支（pauseThread/resumeThread/completeThread/archiveThread）
+- [x] `submit()` 新增 Thread 批量操作：支持 `selectedIds`，逐个调用 `submitDynamicIntent`
+- [x] `submit()` 新增 `promoteToThread` 专用分支（多阶段编排，调 server action）
+
+### B.1.2 CNUI Surface 注册补全
+
+- [x] `register-client-surfaces.ts` 补注册 4 个缺失 surface：`thread-creation-card`、`thread-promote-card`、`thread-action-panel`、`task-action-panel`
+- [x] `surfaceHandlers` 映射覆盖全部 7 个 Tasks Domain surface
+
+### B.1.3 Thread Surface 组件完善
+
+- [x] `ThreadActionPanel.tsx` — 多选 + 批量确认交互（参照 TaskActionPanel 模式）
+- [x] `ThreadCreationCard.tsx` — 自包含创建表单
+- [x] `ThreadPromoteCard.tsx` — 任务选择 + 提升确认
+
+## B.2 验收
+
+- [x] `/createThread`、`/promoteToThread` 命令正常工作
+- [x] Thread 生命周期操作支持批量选择
+- [x] 所有 7 个 surface 注册正确
+
+---
+
+# Phase C：Task CNUI Surface 完善
+
+> **状态：✅ 已完成** | 代码改动在 Phase A/B 实施期间同步完成。
+
+## C.1 完成的改动
+
+### C.1.1 deleteTask handler 分支
+
+- [x] 新增 `DELETABLE_TASK_STATUSES = ['todo', 'planned', 'in_progress', 'completed']`
+- [x] `TASK_LIFECYCLE_SM_ACTION` 新增 `deleteTask: 'delete'`
+- [x] `open()` 新增 `deleteTask` 分支：查询多个可删除状态的任务
+- [x] `TaskActionPanel` 的 `ACTION_LABELS` 新增 `delete` 映射
+
+### C.1.2 refineTask handler 分支
+
+- [x] `open()` 新增 `refineTask` 分支：查询 `clarity === 'fuzzy' || clarity === 'scoped'` 的任务
+- [x] `TaskActionPanel` 的 `ACTION_LABELS` 新增 `refine` 映射
+
+### C.1.3 TaskSplitCard 占位 UI
+
+- [x] 从返回 null 改为展示占位卡片（可拆分任务列表 + 开发中提示 + 关闭按钮）
+
+### C.1.4 通用成功消息
+
+- [x] `use-intent-handler.ts` 新增 `cnuiActionMessages` 映射（覆盖 habit/task/thread 所有操作）
+- [x] 替换原有硬编码的 habit 专属逻辑
+
+## C.2 验收
+
+- [x] `/deleteTask` 显示可删除任务列表
+- [x] `/refineTask` 显示模糊任务列表
+- [x] `/splitTask` 显示占位卡片（非空白）
+- [x] 所有 CNUI 操作有专属成功消息
+
+---
+
+# 附录：三阶段完成状态
+
+| Phase | Design | Plan | 代码 | 状态 |
+|-------|--------|------|------|------|
+| A: Nexus 链路统一 | ✅ §1-6 | ✅ Task 1-8 | ✅ 已合并 | 完成 |
+| B: Thread 统一 | ✅ §B.1-B.4 | ✅ §B.1-B.2 | ✅ 已合并 | 完成 |
+| C: Surface 完善 | ✅ §C.1-C.4 | ✅ §C.1-C.2 | ✅ 已合并 | 完成 |

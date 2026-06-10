@@ -119,7 +119,8 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ```
 用户与配置
 ├── users                  ← 用户主表（非 USOM 对象，系统必需）
-└── user_calibration       ← 个人校准参数（Memory Framework / Rule Engine 使用）
+├── user_calibration       ← 个人校准参数（Memory Framework / Rule Engine 使用）
+└── energy_logs            ← 能量校准日志（日志记录，非 USOM 对象）
 
 核心业务表（Core Objects）
 ├── objectives             ← OKR 目标
@@ -387,7 +388,7 @@ CREATE TABLE tasks (
   schema_version    integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status            text not null check (status in ('todo', 'planned', 'in_progress', 'completed', 'archived')),
+  status            text not null check (status in ('todo', 'planned', 'in_progress', 'completed', 'archived', 'deleted')),
   title             text not null,
   description       text,
   priority          text not null check (priority in ('critical', 'high', 'medium', 'low')),
@@ -506,7 +507,7 @@ CREATE TABLE habits (
   schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
-  status       text not null check (status in ('draft', 'active', 'suspended', 'archived')),
+  status       text not null check (status in ('draft', 'active', 'suspended', 'archived', 'deleted')),
   title        text not null,
   description  text,
   frequency_type text not null check (frequency_type in ('daily', 'weekly', 'custom')),
@@ -1453,5 +1454,5 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_06_06*
+*文档版本：2026_06_10*
 *关联上游文档：docs/usom-design.md*

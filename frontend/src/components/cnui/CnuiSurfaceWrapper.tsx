@@ -96,13 +96,15 @@ export function CnuiSurfaceWrapper({
         />
       </div>
 
-      <CnuiConfirmDialog
-        open={lifecycleState.confirmDialog.open}
-        title={lifecycleState.confirmDialog.title}
-        message={lifecycleState.confirmDialog.message}
-        onConfirm={lifecycleActions.confirmDialogAction}
-        onCancel={lifecycleActions.dismissDialog}
-      />
+      {lifecycleState.confirmDialog.surfaceId === surfaceId && (
+        <CnuiConfirmDialog
+          open={lifecycleState.confirmDialog.open}
+          title={lifecycleState.confirmDialog.title}
+          message={lifecycleState.confirmDialog.message}
+          onConfirm={lifecycleActions.confirmDialogAction}
+          onCancel={lifecycleActions.dismissDialog}
+        />
+      )}
     </>
   )
 }

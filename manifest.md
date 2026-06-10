@@ -106,3 +106,6 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 | 数据库设计 | 2026_06_06 | 2026_06_04 | tasks 表状态枚举回退对齐代码实际值（todo/planned/in_progress/completed/archived）；移除已废弃列（key_result_id/timebox_id/frequency_type/days_of_week）；v_active_tasks 视图修复（列名+状态值） |
 | 界面设计规范 | 2026_06_08 | 2026_05_31 | v1.1→v1.2：新增颜色对比度铁律（WCAG AA 阈值表）；primary/on-primary 可访问性警告及替代方案（primary-active）；text-muted 使用限制（交互元素禁用，统一用 text-body）；C-01/C-06 检查项新增对比度验证 |
 | USOM 详细设计 | 2026_06_08 | 2026_06_04 | TaskStatus 枚举对齐代码与数据库（draft|active|on_hold → todo|planned，移除 deprecated scheduled）；状态转换图同步更新；清理 USOMSnapshot 旧状态注释 |
+| Nexus 统一设计 | 2026_06_10 | 2026_06_08 | Phase A→A/B/C 三阶段演进归档：追加 Phase B（Thread 写操作 Nexus 统一 + CNUI Surface 注册修复）、Phase C（deleteTask/refineTask/splitTask 分支补全 + 通用成功消息映射）；三阶段全部标记已完成 |
+| 界面设计规范 | 2026_06_10 | 2026_06_08 | §1.1 新增 CN-UI 表单标签规则（text-body 禁 text-muted）；§1.5 新增 Scrim 使用规则 + CNUI scrim 语义变量 |
+| 数据库设计 | 2026_06_10 | 2026_06_06 | tasks/habits status CHECK 约束补齐 deleted 状态（与 USOM TaskStatus/HabitStatus 对齐）；表结构总览补充 energy_logs |
