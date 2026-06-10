@@ -36,6 +36,7 @@ const THREAD_LIFECYCLE_STATUS_MAP: Record<string, string> = {
   resumeThread: 'paused',
   completeThread: 'active',
   archiveThread: 'completed',
+  deleteThread: 'archived',
 }
 
 /** 主线生命周期状态机动作映射 */
@@ -44,6 +45,7 @@ const THREAD_LIFECYCLE_SM_ACTION: Record<string, string> = {
   resumeThread: 'resume',
   completeThread: 'complete',
   archiveThread: 'archive',
+  deleteThread: 'delete',
 }
 
 /**

@@ -76,6 +76,15 @@ intent_triggers:
       - 标记主线已完成
     keywords: [完成, complete, 主线]
 
+  - action: deleteThread
+    shortcut: /deleteThread
+    description: 删除已归档的主线（不可恢复）
+    response_type: cnui
+    cnui_surface: thread-action-panel
+    examples:
+      - 删除这条已归档的主线
+    keywords: [删除, delete, 主线]
+
   # 任务相关
   - action: createTask
     shortcut: /createTask
@@ -211,7 +220,7 @@ lifecycle:
     terminal_states: [archived, deleted]
 
   thread:
-    states: [active, paused, completed, archived]
+    states: [active, paused, completed, archived, deleted]
     initial_state: active
     transitions:
       - from: null
@@ -239,7 +248,12 @@ lifecycle:
         trigger: intent
         action: archive
         event_type: ThreadArchived
-    terminal_states: [archived]
+      - from: archived
+        to: deleted
+        trigger: intent
+        action: delete
+        event_type: ThreadDeleted
+    terminal_states: [archived, deleted]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 field_metadata:
@@ -408,6 +422,16 @@ required_fields:
       type: text
       required: false
 
+  deleteThread:
+    - name: threadId
+      label: 主线ID
+      type: text
+      required: false
+    - name: name
+      label: 主线名称（模糊匹配）
+      type: text
+      required: false
+
 # ─── 区块 F: subscribed_events ───────────────────────────────────
 subscribed_events:
   - ThreadCreated
@@ -415,6 +439,7 @@ subscribed_events:
   - ThreadResumed
   - ThreadCompleted
   - ThreadArchived
+  - ThreadDeleted
   - TaskCreated
   - TaskPlanned
   - TaskStarted

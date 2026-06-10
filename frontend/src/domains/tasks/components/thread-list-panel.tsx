@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ListTodo, FolderOpen, Folder, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getThreads, updateThreadStatus } from '@/app/actions/tasks'
+import { getThreads, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
 import type { Thread } from '../../../usom/types/objects'
 
 /** 带任务计数的 Thread 查询结果 */
@@ -74,14 +74,33 @@ export function ThreadListPanel({
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [localRefreshKey, setLocalRefreshKey] = useState(0)
 
-  /** 基于主线状态获取允许的操作项 */
+  /**
+   * 从 manifest lifecycle.thread.transitions 推导各状态下允许的操作。
+   * 权威来源: domains/tasks/manifest.yaml § lifecycle.thread
+   *
+   * 转换规则（from → to = action）:
+   *   active → paused (pause), active → completed (complete)
+   *   paused → active (resume)
+   *   completed → archived (archive)
+   *   archived → deleted (delete) — 仅已归档主线可删除
+   */
   function getAllowedActions(status: string): Array<{ action: string; label: string }> {
-    switch (status) {
-      case 'active': return [{ action: 'pause', label: '暂停' }, { action: 'complete', label: '完成' }]
-      case 'paused': return [{ action: 'resume', label: '恢复' }]
-      case 'completed': return [{ action: 'archive', label: '归档' }]
-      default: return []
+    const LIFECYCLE_ACTIONS: Record<string, Array<{ action: string; label: string }>> = {
+      active: [
+        { action: 'pause', label: '暂停' },
+        { action: 'complete', label: '完成' },
+      ],
+      paused: [
+        { action: 'resume', label: '恢复' },
+      ],
+      completed: [
+        { action: 'archive', label: '归档' },
+      ],
+      archived: [
+        { action: 'delete', label: '删除' },
+      ],
     }
+    return LIFECYCLE_ACTIONS[status] ?? []
   }
 
   // ─── 数据加载 ────────────────────────────────────────────────
@@ -250,7 +269,11 @@ export function ThreadListPanel({
                               onClick={async (e) => {
                                 e.stopPropagation()
                                 setMenuOpen(null)
-                                if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
+                                if (act.action === 'delete') {
+                                  await deleteThread(thread.id)
+                                  toast.success('主线已删除')
+                                  setLocalRefreshKey(k => k + 1)
+                                } else if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
                                   await updateThreadStatus(thread.id, act.action as Thread['status'])
                                   toast.success(`${act.label}成功`)
                                   setLocalRefreshKey(k => k + 1)
