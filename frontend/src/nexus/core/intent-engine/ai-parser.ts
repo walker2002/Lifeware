@@ -211,14 +211,17 @@ interface LLMIntentResponse {
 /**
  * 使用 AI 将自然语言输入解析为 StructuredIntent
  *
- * @param rawInput  - 用户原始自然语言输入
- * @param intentionId - 关联的 Intention 对象 ID
+ * @param rawInput     - 用户原始自然语言输入
+ * @param intentionId  - 关联的 Intention 对象 ID
+ * @param aiRuntime    - AI 运行时实例
+ * @param extraContext - 可选的额外上下文文本，注入系统提示词以辅助解析
  * @returns 解析结果，成功时包含 intent，失败时包含 error
  */
 export async function parseWithAI(
   rawInput: string,
   intentionId: USOM_ID,
   aiRuntime: AIRuntime,
+  extraContext?: string,
 ): Promise<AIParserResult> {
   try {
     // 构建动态路由上下文（替换硬编码 domain prompt）
@@ -237,6 +240,7 @@ export async function parseWithAI(
 
 可用动作列表：
 ${routingText}
+${extraContext ? `\n额外上下文：\n${extraContext}\n` : ''}
 
 当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
 
