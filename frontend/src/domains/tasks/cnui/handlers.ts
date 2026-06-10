@@ -395,6 +395,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
               threadId: t.threadId,
               parentId: t.parentId,
               estimatedDuration: t.estimatedDuration,
+              startDate: t.startDate,
             })),
           },
         }

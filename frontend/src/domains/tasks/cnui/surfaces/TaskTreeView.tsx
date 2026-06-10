@@ -9,7 +9,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ChevronRight, ChevronDown, Check } from 'lucide-react'
+import { Search, ChevronRight, ChevronDown, Check, ArrowUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /** 任务树节点类型 */
@@ -22,6 +22,7 @@ interface TreeNode {
   threadId?: string | null
   estimatedDuration?: number | null
   priority?: string | null
+  startDate?: string | null
 }
 
 /** TaskTreeViewCard 组件属性 */
@@ -44,6 +45,9 @@ export function TaskTreeViewCard({
   isDone,
 }: TaskTreeViewCardProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'title' | 'startDate'>('title')
+  const [sortAsc, setSortAsc] = useState(true)
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -74,7 +78,22 @@ export function TaskTreeViewCard({
   }, [tasks, searchQuery])
 
   function getThreadTasks(threadId: string) {
-    return filteredTasks.filter(t => t.threadId === threadId && !t.parentId)
+    let result = filteredTasks.filter(t => t.threadId === threadId && !t.parentId)
+
+    // 状态筛选
+    if (statusFilter !== 'all') {
+      result = result.filter(t => t.status === statusFilter)
+    }
+
+    // 排序
+    result.sort((a, b) => {
+      const cmp = sortBy === 'title'
+        ? a.title.localeCompare(b.title)
+        : (a.startDate ?? '').localeCompare(b.startDate ?? '')
+      return sortAsc ? cmp : -cmp
+    })
+
+    return result
   }
 
   async function copyId(id: string) {
@@ -92,7 +111,7 @@ export function TaskTreeViewCard({
       {/* 搜索框 */}
       <div className="p-3 border-b border-hairline">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-body" />
           <input
             type="text"
             value={searchQuery}
@@ -100,6 +119,53 @@ export function TaskTreeViewCard({
             placeholder="搜索任务或主线（标题/ID）..."
             className="w-full h-8 pl-8 pr-3 rounded-md border border-hairline bg-canvas text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
+        </div>
+      </div>
+
+      {/* 筛选排序工具栏 */}
+      <div className="px-3 pb-2 flex items-center gap-2 border-b border-hairline">
+        {/* 状态筛选 */}
+        <div className="flex items-center gap-1">
+          {[
+            { value: 'all', label: '全部' },
+            { value: 'in_progress', label: '进行中' },
+            { value: 'completed', label: '已完成' },
+            { value: 'archived', label: '已归档' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setStatusFilter(opt.value)}
+              className={cn(
+                'px-2 py-0.5 rounded-full text-[11px] transition-colors',
+                statusFilter === opt.value
+                  ? 'bg-primary/15 text-primary-active font-medium'
+                  : 'text-body hover:bg-hover-overlay',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 排序 */}
+        <div className="ml-auto flex items-center gap-1">
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as 'title' | 'startDate')}
+            className="h-6 rounded border border-hairline bg-canvas px-1 text-[11px] text-ink cursor-pointer appearance-none"
+          >
+            <option value="title">标题</option>
+            <option value="startDate">开始时间</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setSortAsc(!sortAsc)}
+            className="h-6 w-6 flex items-center justify-center rounded border border-hairline bg-canvas hover:bg-hover-overlay text-body"
+            title={sortAsc ? '顺序' : '逆序'}
+          >
+            <ArrowUpDown className={cn('size-3 text-body transition-transform', !sortAsc && 'rotate-180')} />
+          </button>
         </div>
       </div>
 
@@ -127,8 +193,8 @@ export function TaskTreeViewCard({
                 className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded hover:bg-hover-overlay transition-colors text-left"
               >
                 {isExpanded
-                  ? <ChevronDown className="size-3.5 text-muted shrink-0" />
-                  : <ChevronRight className="size-3.5 text-muted shrink-0" />
+                  ? <ChevronDown className="size-3.5 text-body shrink-0" />
+                  : <ChevronRight className="size-3.5 text-body shrink-0" />
                 }
                 <span
                   className="size-2.5 rounded-full shrink-0"
@@ -136,7 +202,7 @@ export function TaskTreeViewCard({
                 />
                 <span className="text-sm font-medium text-ink truncate flex-1">{thread.name}</span>
                 <span
-                  className="text-[10px] text-muted-soft cursor-pointer hover:text-ink select-all shrink-0"
+                  className="text-[10px] text-body cursor-pointer hover:text-ink select-all shrink-0"
                   onClick={(e) => { e.stopPropagation(); copyId(thread.id) }}
                   title="点击复制 ID"
                 >
@@ -158,7 +224,7 @@ export function TaskTreeViewCard({
                   )} />
                   <span className="text-sm text-ink truncate flex-1">{task.title}</span>
                   <span
-                    className="text-[10px] text-muted-soft cursor-pointer hover:text-ink select-all shrink-0"
+                    className="text-[10px] text-body cursor-pointer hover:text-ink select-all shrink-0"
                     onClick={() => copyId(task.id)}
                     title="点击复制 ID"
                   >
