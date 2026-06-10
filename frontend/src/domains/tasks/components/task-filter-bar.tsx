@@ -208,7 +208,7 @@ export function TaskFilterBar({
 
         {/* 搜索框 */}
         <div className="flex-1 relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-body" />
           <input
             type="text"
             value={searchQuery}
@@ -235,7 +235,7 @@ export function TaskFilterBar({
             className="h-8 w-8 flex items-center justify-center rounded-md border border-hairline bg-canvas hover:bg-hover-overlay transition-colors"
             title={sortOrder === 'asc' ? '顺序' : '逆序'}
           >
-            <ArrowUpDown className={cn('size-3 text-muted transition-transform', sortOrder === 'desc' && 'rotate-180')} />
+            <ArrowUpDown className={cn('size-3 text-body transition-transform', sortOrder === 'desc' && 'rotate-180')} />
           </button>
         </div>
       </div>
