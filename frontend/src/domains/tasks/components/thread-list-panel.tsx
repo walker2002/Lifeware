@@ -9,10 +9,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ListTodo, FolderOpen, Folder, Pencil, Archive, Trash2 } from 'lucide-react'
+import { ListTodo, FolderOpen, Folder, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getThreads, deleteThread, updateThreadStatus } from '@/app/actions/tasks'
+import { getThreads, updateThreadStatus } from '@/app/actions/tasks'
 import type { Thread } from '../../../usom/types/objects'
 
 /** 带任务计数的 Thread 查询结果 */
@@ -68,6 +68,18 @@ export function ThreadListPanel({
 }: ThreadListPanelProps) {
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [localRefreshKey, setLocalRefreshKey] = useState(0)
+
+  /** 基于主线状态获取允许的操作项 */
+  function getAllowedActions(status: string): Array<{ action: string; label: string }> {
+    switch (status) {
+      case 'active': return [{ action: 'pause', label: '暂停' }, { action: 'complete', label: '完成' }]
+      case 'paused': return [{ action: 'resume', label: '恢复' }]
+      case 'completed': return [{ action: 'archive', label: '归档' }]
+      default: return []
+    }
+  }
 
   // ─── 数据加载 ────────────────────────────────────────────────
 
@@ -89,7 +101,7 @@ export function ThreadListPanel({
 
     load()
     return () => { cancelled = true }
-  }, [refreshKey])
+  }, [refreshKey, localRefreshKey])
 
   // ─── 合计计数 ────────────────────────────────────────────────
 
@@ -208,49 +220,40 @@ export function ThreadListPanel({
                     {taskCount}
                   </span>
 
-                  {/* 行内操作图标（始终可见，悬停加深） */}
-                  <div className="flex items-center gap-0.5 shrink-0">
+                  {/* "..." 下拉操作菜单 */}
+                  <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); onOpenThreadDetail?.(thread.id) }}
-                      className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
-                      title="编辑主线"
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === thread.id ? null : thread.id) }}
+                      className="p-1 rounded hover:bg-hover-overlay transition-colors text-muted hover:text-ink"
                     >
-                      <Pencil className="size-3.5" />
+                      <MoreHorizontal className="size-3.5" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        try {
-                          await updateThreadStatus(thread.id, 'archived')
-                          toast.success('主线已归档')
-                        } catch {
-                          toast.error('归档失败')
-                        }
-                      }}
-                      className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
-                      title="归档主线"
-                    >
-                      <Archive className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (!confirm('确认删除此主线？')) return
-                        try {
-                          await deleteThread(thread.id)
-                          toast.success('主线已删除')
-                        } catch {
-                          toast.error('删除失败')
-                        }
-                      }}
-                      className="p-1 rounded text-body hover:text-error hover:bg-error-soft transition-colors"
-                      title="删除主线"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    {menuOpen === thread.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                        <div className="absolute right-0 top-full mt-1 z-20 min-w-[100px] rounded-md border border-hairline bg-canvas shadow-md py-1">
+                          {getAllowedActions(thread.status).map(act => (
+                            <button
+                              key={act.action}
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                setMenuOpen(null)
+                                if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
+                                  await updateThreadStatus(thread.id, act.action)
+                                  toast.success(`${act.label}成功`)
+                                  setLocalRefreshKey(k => k + 1)
+                                }
+                              }}
+                              className="w-full px-3 py-1.5 text-xs text-left hover:bg-hover-overlay transition-colors"
+                            >
+                              {act.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </li>
