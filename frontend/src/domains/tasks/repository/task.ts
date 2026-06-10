@@ -212,6 +212,44 @@ export class TaskRepository implements ITaskRepository {
     return { matches, ancestorMap }
   }
 
+  /**
+   * 按标题或描述模糊搜索任务
+   *
+   * @param query - 搜索关键词
+   * @param userId - 用户 ID
+   * @param statusFilter - 可选的状态过滤（in 查询）
+   * @returns 匹配的任务列表
+   */
+  async searchByTitle(
+    query: string,
+    userId: USOM_ID,
+    statusFilter?: Array<Task['status']>,
+  ): Promise<Task[]> {
+    const conditions = [
+      eq(s.tasks.userId, userId),
+      sql`(${s.tasks.title} ILIKE ${`%${query.trim()}%`} OR ${s.tasks.description} ILIKE ${`%${query.trim()}%`})`,
+    ]
+    if (statusFilter && statusFilter.length > 0) {
+      conditions.push(inArray(s.tasks.status, statusFilter as any[]))
+    }
+    const rows = await db.select().from(s.tasks).where(and(...conditions))
+    return rows.map(r => taskRowToUSOM(r as any))
+  }
+
+  /**
+   * 按多个状态查询任务
+   *
+   * @param statuses - 状态列表
+   * @param userId - 用户 ID
+   * @returns 匹配的任务列表
+   */
+  async findByStatuses(
+    statuses: Array<Task['status']>,
+    userId: USOM_ID,
+  ): Promise<Task[]> {
+    return this.findByUserId(userId, { status: statuses })
+  }
+
   // ─── 写入方法 ──────────────────────────────────────────────────
 
   async create(data: CreateTaskInput, userId: USOM_ID): Promise<Task> {

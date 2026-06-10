@@ -122,6 +122,22 @@ export class ThreadRepository implements IThreadRepository {
     }))
   }
 
+  /**
+   * 按名称模糊搜索主线
+   *
+   * @param query - 搜索关键词
+   * @param userId - 用户 ID
+   * @returns 匹配的主线列表
+   */
+  async searchByName(query: string, userId: USOM_ID): Promise<Thread[]> {
+    const rows = await db.select().from(s.threads)
+      .where(and(
+        eq(s.threads.userId, userId),
+        sql`${s.threads.name} ILIKE ${`%${query.trim()}%`}`,
+      ))
+    return rows.map(r => threadRowToUSOM(r as any))
+  }
+
   // ─── 写入方法 ──────────────────────────────────────────────────
 
   async create(data: CreateThreadInput, userId: USOM_ID): Promise<Thread> {
