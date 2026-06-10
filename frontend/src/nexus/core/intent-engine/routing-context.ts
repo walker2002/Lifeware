@@ -28,6 +28,16 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   name: ['名称', '主线名'],
 }
 
+/**
+ * 枚举字段值映射 — 帮助 LLM 将中文表述转换为系统枚举值。
+ * 在 formatRoutingContextForPrompt 中注入到字段提示的枚举选项部分。
+ */
+const ENUM_VALUE_MAP: Record<string, string> = {
+  priority: '选项: critical(紧急)/high(高)/medium(中)/low(低)',
+  energyRequired: '选项: high(高能量/需要专注)/medium(中)/low(低/轻松)',
+  status: '选项: todo(待办)/planned(已计划)/in_progress(进行中)/completed(已完成)/archived(已归档)',
+}
+
 /** 动作路由信息 */
 interface ActionRoutingInfo {
   /** 域 ID */
@@ -104,12 +114,13 @@ export function formatRoutingContextForPrompt(actions: ActionRoutingInfo[]): str
   const lines = actions.map(a => {
     const label = typeLabel[a.type] ?? a.type
 
-    // 字段 schema 文本：列出字段名、类型、是否必填
+    // 字段 schema 文本：列出字段名、类型、是否必填、同义词、枚举选项
     const fieldHints = a.fields.length > 0
       ? '\n  字段: ' + a.fields.map(f => {
           const synonyms = FIELD_SYNONYMS[f.name]
           const synonymHint = synonyms?.length ? `, 同义词: ${synonyms.join('/')}` : ''
-          return `${f.name}(${f.label}, ${f.type}${f.required ? ', 必填' : ''}${synonymHint})`
+          const enumHint = ENUM_VALUE_MAP[f.name] ? ` (${ENUM_VALUE_MAP[f.name]})` : ''
+          return `${f.name}(${f.label}, ${f.type}${f.required ? ', 必填' : ''}${synonymHint})${enumHint}`
         }).join(', ')
       : ''
 
