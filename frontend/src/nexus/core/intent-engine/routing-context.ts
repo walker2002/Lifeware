@@ -10,6 +10,8 @@ import { domainRegistry } from '@/domains/registry'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 
+// TODO: 后续从 manifest field_metadata.synonyms 加载，消除硬编码。
+// 当前各 Domain manifest 的 field_metadata 尚未定义 synonyms 字段。
 /**
  * 字段同义词映射 — 帮助 LLM 识别自然语言中的字段引用。
  * 在 formatRoutingContextForPrompt 中注入到字段提示中。
