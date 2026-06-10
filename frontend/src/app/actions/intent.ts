@@ -84,6 +84,16 @@ export interface IntentSubmissionResult {
   needsConfirmation?: boolean;
   /** 确认提示消息 */
   confirmationMessage?: string;
+  /** [023] CN-UI 写入确认 — 需要先展示 CNUI Surface 供用户确认 */
+  needsCnuiConfirmation?: boolean;
+  /** [023] CN-UI 写入确认 — 目标 action */
+  cnuiAction?: string;
+  /** [023] CN-UI 写入确认 — 目标 domain */
+  cnuiDomain?: string;
+  /** [023] CN-UI 写入确认 — CNUI surface 类型 */
+  cnuiSurface?: string;
+  /** [023] CN-UI 写入确认 — Intent 已提取的字段（Surface 预填值） */
+  cnuiIntentFields?: Record<string, unknown>;
   /** 追踪会话（仅当 TraceConfig.enabled 时） */
   traceSession?: TraceSession;
 }
@@ -261,6 +271,11 @@ async function executePipeline(
         error: result.error,
         needsConfirmation: result.needsConfirmation,
         confirmationMessage: result.confirmationMessage,
+        needsCnuiConfirmation: result.needsCnuiConfirmation,
+        cnuiAction: result.cnuiAction,
+        cnuiDomain: result.cnuiDomain,
+        cnuiSurface: result.cnuiSurface,
+        cnuiIntentFields: result.cnuiIntentFields,
         traceSession: logger?.getSessions()[0],
       };
     }

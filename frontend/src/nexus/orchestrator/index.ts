@@ -441,7 +441,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const intentTrigger = manifest?.intent_triggers?.find(
         (t: any) => t.action === intent.action
       )
-      if (!confirmed && intentTrigger?.response_type === 'cnui' && intent.resolvedBy !== 'cnui_surface') {
+      // 仅拦截 AI 解析的意图（需用户二次确认）；表单/CNUI 提交的意图已人工确认，直接放行
+      if (!confirmed && intentTrigger?.response_type === 'cnui' && intent.resolvedBy === 'ai') {
         return {
           success: false,
           needsConfirmation: false,

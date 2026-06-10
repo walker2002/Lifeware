@@ -132,7 +132,7 @@ export function TaskTreeViewCard({
                 }
                 <span
                   className="size-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: thread.color || '#ccc785c' }}
+                  style={{ backgroundColor: thread.color || '#cc785c' }}
                 />
                 <span className="text-sm font-medium text-ink truncate flex-1">{thread.name}</span>
                 <span
