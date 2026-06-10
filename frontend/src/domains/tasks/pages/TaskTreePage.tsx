@@ -51,7 +51,7 @@ export default function TaskTreePage() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<SearchType>('task')
-  const [sortBy, setSortBy] = useState<SortField>('title')
+  const [sortBy, setSortBy] = useState<SortField>('startDate')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [filterClarity, setFilterClarity] = useState<string[]>(['fuzzy', 'scoped', 'actionable'])
   const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress', 'completed'])
