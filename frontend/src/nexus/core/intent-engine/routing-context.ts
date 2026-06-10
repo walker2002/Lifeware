@@ -10,6 +10,22 @@ import { domainRegistry } from '@/domains/registry'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 
+/**
+ * 字段同义词映射 — 帮助 LLM 识别自然语言中的字段引用。
+ * 在 formatRoutingContextForPrompt 中注入到字段提示中。
+ */
+const FIELD_SYNONYMS: Record<string, string[]> = {
+  dueDate: ['deadline', '截止日期', '结束日期', '到期日'],
+  estimatedDuration: ['预计时长', '时长', '用时', '耗时'],
+  priority: ['优先级', '紧急程度'],
+  threadId: ['主线', '所属主线', '关联主线'],
+  title: ['标题', '名称', '任务名'],
+  description: ['描述', '说明', '详情'],
+  defaultTime: ['默认时间', '执行时间', '开始时间'],
+  defaultDuration: ['默认时长', '执行时长'],
+  name: ['名称', '主线名'],
+}
+
 /** 动作路由信息 */
 interface ActionRoutingInfo {
   /** 域 ID */
@@ -88,7 +104,11 @@ export function formatRoutingContextForPrompt(actions: ActionRoutingInfo[]): str
 
     // 字段 schema 文本：列出字段名、类型、是否必填
     const fieldHints = a.fields.length > 0
-      ? '\n  字段: ' + a.fields.map(f => `${f.name}(${f.label}, ${f.type}${f.required ? ', 必填' : ''})`).join(', ')
+      ? '\n  字段: ' + a.fields.map(f => {
+          const synonyms = FIELD_SYNONYMS[f.name]
+          const synonymHint = synonyms?.length ? `, 同义词: ${synonyms.join('/')}` : ''
+          return `${f.name}(${f.label}, ${f.type}${f.required ? ', 必填' : ''}${synonymHint})`
+        }).join(', ')
       : ''
 
     return `- ${a.domainId}.${a.action} [${label}]: ${a.description}${fieldHints}
