@@ -15,11 +15,10 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
   },
   tasks: {
     tasks: TaskTreePage,
-    taskTree: TaskTreePage,
     taskDetail: TaskTreePage,
     threadDetail: TaskTreePage,
-    taskList: TaskTreePage,
-    taskDetailPage: TaskTreePage,
+    list: TaskTreePage,
+    detail: TaskTreePage,
     createThread: TaskTreePage,
     createTask: TaskTreePage,
   },
