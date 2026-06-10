@@ -154,8 +154,8 @@ intent_triggers:
       - 删除这个任务
     keywords: [删除, delete]
 
-  # 查看
-  - action: viewTaskTree
+  # 查看（页面）
+  - action: tasks
     shortcut: /tasks
     description: 任务树管理
     response_type: page
@@ -450,7 +450,7 @@ subscribed_events:
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
-  viewTaskTree:
+  tasks:
     component: domains/tasks/pages/TaskTreePage
     url: /tasks
 

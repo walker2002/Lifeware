@@ -14,6 +14,7 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
     view_statistics: HabitStatisticsPage,
   },
   tasks: {
+    tasks: TaskTreePage,
     viewTaskTree: TaskTreePage,
     viewTaskDetail: TaskTreePage,
     viewThreadDetail: TaskTreePage,
