@@ -40,6 +40,9 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   update: { title: '编辑主线', button: '保存修改' },
 }
 
+/** 默认主线颜色（primary token） */
+const DEFAULT_THREAD_COLOR = '#cc785c'
+
 /** 状态标签 */
 const STATUS_LABELS: Record<string, string> = {
   active: '进行中',
@@ -63,7 +66,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editColor, setEditColor] = useState('#3498DB')
+  const [editColor, setEditColor] = useState(DEFAULT_THREAD_COLOR)
 
   useEffect(() => {
     setSelectedIds(new Set())
@@ -191,13 +194,13 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   setEditingThreadId(thread.id)
                   setEditName(thread.name)
                   setEditDescription(thread.description ?? '')
-                  setEditColor(thread.color ?? '#3498DB')
+                  setEditColor(thread.color ?? DEFAULT_THREAD_COLOR)
                 }}
                 className="flex cursor-pointer items-center gap-3 rounded-md border border-hairline bg-canvas p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/10"
               >
                 <span
                   className="size-3 rounded-full shrink-0"
-                  style={{ backgroundColor: thread.color ?? '#3498DB' }}
+                  style={{ backgroundColor: thread.color ?? DEFAULT_THREAD_COLOR }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{thread.name}</div>
@@ -267,7 +270,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                 {/* 颜色圆点 */}
                 <span
                   className="size-3 rounded-full shrink-0"
-                  style={{ backgroundColor: thread.color ?? '#3498DB' }}
+                  style={{ backgroundColor: thread.color ?? DEFAULT_THREAD_COLOR }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className={cn('text-sm font-medium truncate', isSelected && 'text-muted line-through')}>

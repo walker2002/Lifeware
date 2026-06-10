@@ -11,6 +11,9 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CnuiButton } from '@/components/cnui/components/Button'
 
+/** 默认主线颜色（primary token） */
+const DEFAULT_THREAD_COLOR = '#cc785c'
+
 /**
  * ThreadPromoteCard 组件属性
  */
@@ -41,7 +44,7 @@ export function ThreadPromoteCard({
     (dataModel.taskId as string) ?? '',
   )
   const [threadName, setThreadName] = useState('')
-  const [threadColor, setThreadColor] = useState('#6366f1')
+  const [threadColor, setThreadColor] = useState(DEFAULT_THREAD_COLOR)
   const [searchQuery, setSearchQuery] = useState('')
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
