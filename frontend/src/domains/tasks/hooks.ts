@@ -39,6 +39,36 @@ function buildTransitionMap(
 }
 
 /**
+ * 规范化字段值 — 将自然语言表述转换为系统枚举。
+ * 在 onValidate 中调用，确保 AI 解析的中文值能通过验证。
+ * @param fields - 原始字段对象
+ * @returns 规范化后的字段对象
+ */
+function normalizeFieldValues(fields: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...fields }
+
+  // 优先级：中文 → 枚举
+  if (typeof normalized.priority === 'string') {
+    const priorityMap: Record<string, string> = {
+      '高': 'high', '高优先级': 'high', '紧急': 'critical', '最重要': 'critical',
+      '中': 'medium', '中等': 'medium', '普通': 'medium',
+      '低': 'low', '低优先级': 'low', '不急': 'low',
+    }
+    const mapped = priorityMap[normalized.priority]
+    if (mapped) normalized.priority = mapped
+  }
+
+  // 日期格式规范化：YYYY/MM/DD → YYYY-MM-DD
+  for (const key of ['dueDate', 'startDate', 'endDate']) {
+    if (typeof normalized[key] === 'string') {
+      normalized[key] = (normalized[key] as string).replace(/\//g, '-')
+    }
+  }
+
+  return normalized
+}
+
+/**
  * 创建任务域钩子函数
  * @param manifest - 域 manifest
  * @returns 钩子函数对象
@@ -63,7 +93,9 @@ export function createTasksHooks(manifest: DomainManifest) {
     _snapshot: USOMSnapshot,
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = []
-    const { fields, action } = intent
+    // 规范化字段值（中文→枚举、日期格式等）
+    const fields = normalizeFieldValues(intent.fields)
+    const { action } = intent
 
     if (action === 'createTask' || action === 'updateTask') {
       const result = validateTaskFields(fields, action as 'createTask' | 'updateTask')
