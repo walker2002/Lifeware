@@ -115,6 +115,12 @@ export interface OrchestratorResult {
   warnings?: string[]
   needsConfirmation?: boolean
   confirmationMessage?: string
+  // [023] CN-UI Write Confirmation 新增字段
+  needsCnuiConfirmation?: boolean
+  cnuiAction?: string
+  cnuiDomain?: string
+  cnuiSurface?: string
+  cnuiIntentFields?: Record<string, unknown>
   generativeResult?: GenerationResult
   queryResult?: QueryResult
 }
@@ -427,6 +433,24 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           needsConfirmation: true,
           confirmationMessage: ruleResult.confirmations?.join('; '),
           warnings: ruleResult.warnings,
+        }
+      }
+
+      // CN-UI Write Confirmation（宪章 VIII 新增）:
+      // 所有 response_type === 'cnui' 的写操作必须经用户二次确认
+      const intentTrigger = manifest?.intent_triggers?.find(
+        (t: any) => t.action === intent.action
+      )
+      if (!confirmed && intentTrigger?.response_type === 'cnui' && intent.resolvedBy !== 'cnui_surface') {
+        return {
+          success: false,
+          needsConfirmation: false,
+          needsCnuiConfirmation: true,
+          cnuiAction: intent.action,
+          cnuiDomain: intent.targetDomain,
+          cnuiSurface: intentTrigger.cnui_surface,
+          cnuiIntentFields: intent.fields,
+          warnings: ruleResult.result === 'warning' ? ruleResult.warnings : undefined,
         }
       }
 
