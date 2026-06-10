@@ -42,6 +42,7 @@ export function ThreadPromoteCard({
   )
   const [threadName, setThreadName] = useState('')
   const [threadColor, setThreadColor] = useState('#6366f1')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
 
@@ -84,8 +85,25 @@ export function ThreadPromoteCard({
         {tasks.length > 0 && (
           <div>
             <label className="text-xs text-body mb-1 block">选择任务</label>
+            <div className="relative mb-3">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="搜索任务（标题或 ID）..."
+                className="h-8 w-full rounded-md border border-hairline bg-canvas pl-2 pr-3 text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              />
+            </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
-              {tasks.map(task => (
+              {tasks
+                .filter(task => {
+                  if (!searchQuery) return true
+                  const q = searchQuery.toLowerCase()
+                  const id = String(task.id ?? '').toLowerCase()
+                  const title = String(task.title ?? '').toLowerCase()
+                  return id.includes(q) || title.includes(q)
+                })
+                .map(task => (
                 <button
                   key={task.id as string}
                   type="button"

@@ -35,6 +35,8 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
   const [editDescription, setEditDescription] = useState('')
   const [editPriority, setEditPriority] = useState('medium')
   const [editDuration, setEditDuration] = useState('60')
+  const [showSubtaskInput, setShowSubtaskInput] = useState(false)
+  const [subtaskTitle, setSubtaskTitle] = useState('')
 
   if (selectedTaskId) {
     return (
@@ -82,6 +84,49 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
               />
             </div>
           </div>
+          {/* 子任务创建 */}
+          <div className="border-t border-hairline pt-3">
+            <button
+              type="button"
+              onClick={() => setShowSubtaskInput(v => !v)}
+              className="text-xs text-muted hover:text-ink transition-colors"
+            >
+              {showSubtaskInput ? '− 取消添加' : '＋ 添加子任务'}
+            </button>
+
+            {showSubtaskInput && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={subtaskTitle}
+                  onChange={e => setSubtaskTitle(e.target.value)}
+                  placeholder="子任务标题..."
+                  maxLength={100}
+                  className="h-8 flex-1 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!subtaskTitle.trim()) return
+                    onConfirm({
+                      taskId: selectedTaskId,
+                      title: editTitle,
+                      description: editDescription,
+                      priority: editPriority,
+                      estimatedDuration: Number(editDuration),
+                      createSubtask: { title: subtaskTitle.trim(), parentId: selectedTaskId },
+                    })
+                    setSubtaskTitle('')
+                    setShowSubtaskInput(false)
+                  }}
+                  disabled={!subtaskTitle.trim()}
+                  className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-on-primary disabled:opacity-40"
+                >
+                  添加
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
@@ -100,7 +145,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
                 estimatedDuration: Number(editDuration),
               })}
               disabled={isLoading}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-50"
             >
               {isLoading ? '保存中...' : '保存'}
             </button>
@@ -115,7 +160,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
       <div className="mb-3 text-sm font-medium text-ink">请选择要修改的任务</div>
 
       {tasks.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">没有可编辑的任务</p>
+        <p className="py-8 text-center text-sm text-muted">没有可编辑的任务</p>
       ) : (
         <div className="flex flex-col gap-2">
           {tasks.map(task => (
@@ -133,7 +178,7 @@ export function TaskEditCard({ dataModel, onDataChange, onConfirm, onCancel, isL
             >
               <div className="flex-1">
                 <div className="text-sm font-medium">{task.title}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted">
                   {PRIORITY_LABELS[task.priority] ?? task.priority}
                   {task.estimatedDuration ? ` · ${task.estimatedDuration}分钟` : ''}
                 </div>

@@ -51,6 +51,9 @@ export function TaskCreationCard({
   const [estimatedDuration, setEstimatedDuration] = useState(
     dataModel.estimatedDuration ? String(dataModel.estimatedDuration) : '',
   )
+  const [threadId, setThreadId] = useState<string | null>(
+    (dataModel.threadId as string) ?? null,
+  )
 
   /** 提交表单 */
   function handleConfirm() {
@@ -60,6 +63,7 @@ export function TaskCreationCard({
       description: description || undefined,
       priority: priority || undefined,
       estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
+      threadId: threadId || undefined,
     })
   }
 
@@ -144,6 +148,25 @@ export function TaskCreationCard({
               className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
             />
           </div>
+        </div>
+
+        {/* 主线选择 */}
+        <div>
+          <label className="text-xs text-body mb-1 block">主线</label>
+          <select
+            value={threadId ?? ''}
+            onChange={e => {
+              const val = e.target.value || null
+              setThreadId(val)
+              onDataChange({ ...dataModel, threadId: val })
+            }}
+            className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+          >
+            <option value="">普通任务（无主线）</option>
+            {(dataModel.threads as Array<{ id: string; name: string }> | undefined)?.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* 操作按钮 */}

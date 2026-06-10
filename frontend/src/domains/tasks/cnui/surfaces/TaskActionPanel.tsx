@@ -141,6 +141,12 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading, isD
             )
           })}
 
+          {action === 'delete' && selectedIds.size > 0 && (
+            <div className="rounded-md border border-error bg-error-soft px-3 py-2 text-xs text-error">
+              ⚠️ 删除操作不可恢复。子任务将自动变为根任务。
+            </div>
+          )}
+
           {/* 操作按钮 */}
           <div className="flex items-center justify-end gap-2 pt-2">
             {onCancel && (

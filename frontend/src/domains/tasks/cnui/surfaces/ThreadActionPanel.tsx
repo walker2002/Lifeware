@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   resume: { title: '恢复主线', button: '恢复所选' },
   complete: { title: '完成主线', button: '完成所选' },
   archive: { title: '归档主线', button: '归档所选' },
+  update: { title: '编辑主线', button: '保存修改' },
 }
 
 /** 状态标签 */
@@ -57,6 +58,12 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.pause
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // ─── update 模式状态 ─────────────────────
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editColor, setEditColor] = useState('#3498DB')
 
   useEffect(() => {
     setSelectedIds(new Set())
@@ -85,6 +92,135 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
     return (
       <div className="w-full max-w-lg text-center py-4">
         <p className="text-sm text-ink">✅ 操作已完成</p>
+      </div>
+    )
+  }
+
+  // ─── update 模式：编辑主线 ─────────────────────
+  if (action === 'update') {
+    // 编辑表单视图
+    if (editingThreadId) {
+      const thread = items.find(t => t.id === editingThreadId)
+      return (
+        <div className="w-full max-w-lg">
+          <div className="mb-3 text-sm font-medium text-ink">编辑主线</div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-body">名称</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                placeholder="主线名称"
+                className="h-9 w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-body">描述</label>
+              <textarea
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                placeholder="主线描述..."
+                rows={2}
+                className="w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-body">颜色</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={editColor}
+                  onChange={e => setEditColor(e.target.value)}
+                  className="size-8 rounded border border-hairline cursor-pointer"
+                />
+                <span className="text-xs text-body">{editColor}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingThreadId(null)}
+                className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
+              >
+                返回
+              </button>
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
+                >
+                  取消
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onConfirm({
+                  action: 'update',
+                  threadId: editingThreadId,
+                  name: editName || thread?.name,
+                  description: editDescription || thread?.description,
+                  color: editColor || thread?.color,
+                })}
+                disabled={isLoading}
+                className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // 选择主线视图
+    return (
+      <div className="w-full max-w-lg">
+        <div className="mb-3 text-sm font-medium text-ink">选择要编辑的主线</div>
+
+        {items.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted">没有符合条件的主线</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {items.map(thread => (
+              <button
+                key={thread.id}
+                type="button"
+                onClick={() => {
+                  setEditingThreadId(thread.id)
+                  setEditName(thread.name)
+                  setEditDescription(thread.description ?? '')
+                  setEditColor(thread.color ?? '#3498DB')
+                }}
+                className="flex cursor-pointer items-center gap-3 rounded-md border border-hairline bg-canvas p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/10"
+              >
+                <span
+                  className="size-3 rounded-full shrink-0"
+                  style={{ backgroundColor: thread.color ?? '#3498DB' }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{thread.name}</div>
+                  <div className="text-xs text-muted">
+                    {STATUS_LABELS[thread.status] ?? thread.status}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {onCancel && (
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        )}
       </div>
     )
   }
