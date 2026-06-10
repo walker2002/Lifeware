@@ -228,17 +228,26 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       if (intentFields?.title) {
         const repo = new TaskRepository()
         const candidates = await repo.searchByTitle(intentFields.title as string, MVP_USER_ID as USOM_ID)
-        if (candidates.length === 1) {
-          return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(candidates[0]), phase: 'detail' } }
+        // 筛选：仅顶级、非终止状态的任务
+        const filtered = candidates.filter(t =>
+          !t.parentId && !['paused', 'completed', 'archived', 'deleted'].includes(t.status)
+        )
+        if (filtered.length === 1) {
+          return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(filtered[0]), phase: 'detail' } }
         }
-        if (candidates.length > 1) {
-          return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(candidates), phase: 'select' } }
+        if (filtered.length > 1) {
+          return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(filtered), phase: 'select' } }
         }
       }
-      const tasks = await getActiveTasks()
+      // 兜底：列出所有符合条件的任务（顶级、非终止状态）
+      const repo = new TaskRepository()
+      const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+      const candidates = allTasks.filter(t =>
+        !t.parentId && !['paused', 'completed', 'archived', 'deleted'].includes(t.status)
+      )
       return {
         content: '请选择要提升为主线的任务',
-        dataSnapshot: { tasks, phase: 'search' },
+        dataSnapshot: { tasks: formatTaskList(candidates), phase: 'search' },
       }
     }
 
@@ -405,6 +414,22 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
     }
 
     try {
+      // ── 字段更新：不走 SM，直接 repo 调用（临时方案） ──
+
+      // updateTask: 字段更新走直接 repo
+      if (action === 'updateTask') {
+        const { updateTask } = await import('@/app/actions/tasks')
+        const task = await updateTask(fields.taskId as string, fields as any)
+        return { success: true, data: { object: task } }
+      }
+
+      // updateThread: 字段更新走直接 repo
+      if (action === 'updateThread') {
+        const { updateThread } = await import('@/app/actions/tasks')
+        const thread = await updateThread(fields.threadId as string, fields as any)
+        return { success: true, data: { object: thread } }
+      }
+
       // promoteToThread 是多阶段编排操作（创建主线 + 关联任务），
       // 不走 SM 单步转换路径，直接调用专用服务端操作
       if (action === 'promoteToThread') {
@@ -444,6 +469,16 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
           if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
         }
         return { success: true, data: { selectedIds: ids } }
+      }
+
+      // createTask 校验：已归档主线不允许添加任务
+      if (action === 'createTask' && fields.threadId) {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const repo = new ThreadRepository()
+        const thread = await repo.findById(fields.threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+        if (thread?.status === 'archived') {
+          return { success: false, error: '已归档的主线不允许添加任务' }
+        }
       }
 
       const result = await submitDynamicIntent('tasks', action, fields)
