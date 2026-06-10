@@ -390,10 +390,12 @@ export async function archiveThread(threadId: string): Promise<Thread> {
 /**
  * 将任务提升为主线
  *
- * 三阶段操作：
+ * 五阶段操作：
  * 1. 读取原任务获取名称、描述等上下文
  * 2. 通过 Nexus 创建新主线（走 SM lifecycle，触发 ThreadCreated 事件）
  * 3. 将原任务的 threadId 关联到新主线（直接 repo——SM 不支持字段更新）
+ * 4. 子任务保持层级但关联到新主线（仅更新 threadId，不改变 parentId）
+ * 5. 清除原任务 parentId（它现在是主线的直接子任务）
  *
  * @param taskId - 要提升的任务 ID
  * @param threadFields - 可选的主线字段覆盖
@@ -424,6 +426,24 @@ export async function promoteToThread(
 
   // 将原任务关联到新主线
   await taskRepo.update(taskId as USOM_ID, { threadId: newThread.id } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+
+  // ── 子任务关联到新主线 ──
+  // 原任务的子任务保持层级结构（不改变 parentId），但全部关联到新主线
+  const subtasks = await taskRepo.findByParent(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  for (const subtask of subtasks) {
+    await taskRepo.update(subtask.id as USOM_ID, {
+      threadId: newThread.id,
+    } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+  }
+
+  // 清除原任务的 parentId（它现在是主线的直接子任务）
+  // UpdateTaskInput 类型中 parentId 为 USOM_ID | undefined，无法表达 null；
+  // 使用 as unknown 断言绕过类型检查，运行时 parentId 被设为 null → DB 写入 NULL
+  if (task.parentId) {
+    await taskRepo.update(taskId as USOM_ID, {
+      parentId: null as unknown as USOM_ID,
+    } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+  }
 
   return newThread
 }
