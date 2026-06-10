@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ListTodo, FolderOpen, Folder, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,8 @@ export interface ThreadListPanelProps {
   onOpenThreadDetail?: (threadId: string) => void
   /** 数据刷新计数器，变化时重新加载 */
   refreshKey?: number
+  /** [022] 主线状态筛选 */
+  filterThreadStatus?: string[]
 }
 
 // ─── 虚拟入口常量 ──────────────────────────────────────────────
@@ -65,6 +67,7 @@ export function ThreadListPanel({
   onSelectThread,
   onOpenThreadDetail,
   refreshKey = 0,
+  filterThreadStatus,
 }: ThreadListPanelProps) {
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,9 +106,16 @@ export function ThreadListPanel({
     return () => { cancelled = true }
   }, [refreshKey, localRefreshKey])
 
+  // ─── 按主线状态筛选 ──────────────────────────────────────────
+
+  const filteredThreads = useMemo(() => {
+    if (!filterThreadStatus || filterThreadStatus.length === 0) return threads
+    return threads.filter(t => filterThreadStatus.includes(t.thread.status))
+  }, [threads, filterThreadStatus])
+
   // ─── 合计计数 ────────────────────────────────────────────────
 
-  const totalCount = threads.reduce((sum, t) => sum + t.taskCount, 0)
+  const totalCount = filteredThreads.reduce((sum, t) => sum + t.taskCount, 0)
 
   // 点击处理
   const handleClick = useCallback((threadId: string) => {
@@ -168,13 +178,13 @@ export function ThreadListPanel({
         {/* ═══ 主线列表 ════════════════════════════════════════ */}
         {loading ? (
           <ThreadListSkeleton />
-        ) : threads.length === 0 ? (
+        ) : filteredThreads.length === 0 ? (
           <p className="px-4 py-6 text-center text-xs text-muted">
             暂无主线，点击上方按钮创建
           </p>
         ) : (
           <ul className="flex flex-col">
-            {threads.map(({ thread, taskCount }) => (
+            {filteredThreads.map(({ thread, taskCount }) => (
               <li key={thread.id}>
                 {/*
                   外层用 div + role="button" 避免嵌套 <button> 的 hydration 错误。

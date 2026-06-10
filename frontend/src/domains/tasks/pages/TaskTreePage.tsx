@@ -202,6 +202,7 @@ export default function TaskTreePage() {
             onSelectThread={handleSelectThread}
             onOpenThreadDetail={openThreadDetail}
             refreshKey={refreshKey}
+            filterThreadStatus={filterThreadStatus}
           />
         </aside>
 
