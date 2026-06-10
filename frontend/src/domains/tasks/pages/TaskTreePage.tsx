@@ -18,7 +18,7 @@ import { TaskDetailDrawer } from '../components/task-detail-drawer'
 import { ThreadDetailDrawer } from '../components/thread-detail-drawer'
 import { TaskFullscreenView } from '../components/task-fullscreen-view'
 import { TaskFilterBar } from '../components/task-filter-bar'
-import type { SortField } from '../components/task-filter-bar'
+import type { SortField, SearchType } from '../components/task-filter-bar'
 
 // ─── 状态类型 ──────────────────────────────────────────────────
 
@@ -50,9 +50,12 @@ export default function TaskTreePage() {
   // ─── 筛选状态 ──────────────────────────────────────────────
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchType, setSearchType] = useState<SearchType>('task')
   const [sortBy, setSortBy] = useState<SortField>('title')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [filterClarity, setFilterClarity] = useState<string[]>(['fuzzy', 'scoped', 'actionable'])
   const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress', 'completed'])
+  const [filterThreadStatus, setFilterThreadStatus] = useState<string[]>(['active', 'paused', 'completed'])
 
   /** 筛选变更回调（复选框切换） */
   const handleFilterChange = useCallback((key: 'clarity' | 'status', value: string) => {
@@ -137,11 +140,20 @@ export default function TaskTreePage() {
       <TaskFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        searchType={searchType}
+        onSearchTypeChange={setSearchType}
         filterClarity={filterClarity}
         filterStatus={filterStatus}
         onFilterChange={handleFilterChange}
+        filterThreadStatus={filterThreadStatus}
+        onThreadStatusChange={(v) => setFilterThreadStatus(prev => {
+          if (prev.includes(v)) { const n = prev.filter(x => x !== v); return n.length === 0 ? prev : n }
+          return [...prev, v]
+        })}
         sortBy={sortBy}
         onSortByChange={setSortBy}
+        sortOrder={sortOrder}
+        onSortOrderChange={setSortOrder}
       />
 
       {/* ═══ 主内容区（左面板 + 右内容区） ══════════════════════ */}
