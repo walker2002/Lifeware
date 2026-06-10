@@ -25,6 +25,13 @@ export type ManifestLoadResult =
 const cache = new Map<string, ManifestLoadResult>()
 
 /**
+ * 清除 manifest 缓存（开发模式下文件变更后调用）
+ */
+export function clearManifestCache(): void {
+  cache.clear()
+}
+
+/**
  * 加载域 manifest 文件
  * 
  * Next.js Turbopack 环境下 __dirname 不指向实际源码路径，
@@ -35,8 +42,12 @@ const cache = new Map<string, ManifestLoadResult>()
  * @returns Manifest 加载结果
  */
 export function loadDomainManifest(domainId: string): ManifestLoadResult {
-  const cached = cache.get(domainId)
-  if (cached) return cached
+  // 开发模式下跳过缓存，避免 manifest 修改后不生效
+  const isDev = process.env.NODE_ENV === 'development'
+  if (!isDev) {
+    const cached = cache.get(domainId)
+    if (cached) return cached
+  }
 
   // 支持绝对路径（测试用）或域名 ID（生产用）
   const domainDir = path.isAbsolute(domainId)
