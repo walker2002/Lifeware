@@ -47,8 +47,64 @@ const THREAD_LIFECYCLE_SM_ACTION: Record<string, string> = {
 }
 
 /**
+ * 将 Task 对象格式化为 CNUI dataModel 的 detail 格式
+ * @param t - 任务对象
+ * @returns 格式化后的任务详情
+ */
+function formatTaskDetail(t: any): Record<string, unknown> {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description ?? '',
+    priority: t.priority,
+    estimatedDuration: t.estimatedDuration,
+    status: t.status,
+    threadId: t.threadId,
+    dueDate: t.endDate,
+  }
+}
+
+/**
+ * 将 Task 数组格式化为 CNUI dataModel 的列表格式
+ * @param tasks - 任务数组
+ * @returns 格式化的任务列表
+ */
+function formatTaskList(tasks: any[]): Record<string, unknown>[] {
+  return tasks.map(t => ({
+    id: t.id,
+    title: t.title,
+    priority: t.priority,
+    estimatedDuration: t.estimatedDuration,
+    status: t.status,
+  }))
+}
+
+/**
+ * 获取所有未归档的有效主线列表
+ * @returns 主线列表（供 createTask CNUI surface 的主线下拉使用）
+ */
+async function getActiveThreads(): Promise<Record<string, unknown>[]> {
+  try {
+    const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+    const repo = new ThreadRepository()
+    const threads = await repo.findByUserId(MVP_USER_ID as USOM_ID)
+    return threads
+      .filter(t => t.status !== 'archived')
+      .map(t => ({
+        id: t.id,
+        name: t.name,
+        color: t.color,
+        status: t.status,
+      }))
+  } catch (e) {
+    console.error('[taskCnuiHandler] 查询主线列表失败:', e)
+    return []
+  }
+}
+
+/**
  * 根据状态获取任务列表
- * 
+ *
  * @param status - 任务状态
  * @returns 任务列表
  */
@@ -89,7 +145,8 @@ async function getActiveTasks(): Promise<Record<string, unknown>[]> {
 export const taskCnuiHandler: CnuiSurfaceHandler = {
   async open(action): Promise<CnuiSurfaceOpenResult> {
     if (action === 'createTask') {
-      return { content: '请填写任务信息', dataSnapshot: {} }
+      const threads = await getActiveThreads()
+      return { content: '请填写任务信息', dataSnapshot: { threads } }
     }
 
     if (action === 'updateTask') {
@@ -234,10 +291,49 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    if (action === 'viewTree') {
+      try {
+        const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+        const threadRepo = new ThreadRepository()
+        const taskRepo = new TaskRepository()
+        const allThreads = await threadRepo.findByUserId(MVP_USER_ID as USOM_ID)
+        const allTasks = await taskRepo.findByUserId(MVP_USER_ID as USOM_ID)
+
+        return {
+          content: '任务树',
+          dataSnapshot: {
+            threads: allThreads.map(t => ({
+              id: t.id,
+              name: t.name,
+              color: t.color,
+              status: t.status,
+            })),
+            tasks: allTasks.map(t => ({
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              priority: t.priority,
+              threadId: t.threadId,
+              parentId: t.parentId,
+              estimatedDuration: t.estimatedDuration,
+            })),
+          },
+        }
+      } catch (e) {
+        console.error('[taskCnuiHandler] 查询任务树失败:', e)
+        return { content: '查询任务树失败', dataSnapshot: {} }
+      }
+    }
+
     return { content: '请填写信息', dataSnapshot: {} }
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
+    // viewTree 是纯展示 query action，无提交操作
+    if (action === 'viewTree') {
+      return { success: true }
+    }
+
     try {
       // promoteToThread 是多阶段编排操作（创建主线 + 关联任务），
       // 不走 SM 单步转换路径，直接调用专用服务端操作
