@@ -834,6 +834,14 @@ function TaskTreeRow({
           {task.title}
         </span>
 
+        {/* ID 显示（可选中复制） */}
+        <span
+          className="ml-1 text-[10px] text-muted-soft cursor-pointer select-all shrink-0"
+          title="选中以复制 ID"
+        >
+          #{task.id.slice(0, 8)}
+        </span>
+
         {/* 优先级徽章（仅 critical 和 high 显示） */}
         {(task.priority === Priority.Critical || task.priority === Priority.High) && (
           <span
