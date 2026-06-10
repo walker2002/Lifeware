@@ -370,7 +370,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'viewTaskTree') {
+    if (action === 'taskTree') {
       try {
         const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
         const threadRepo = new ThreadRepository()
@@ -409,8 +409,8 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
-    // viewTaskTree 是纯展示 query action，无提交操作
-    if (action === 'viewTaskTree') {
+    // taskTree 是纯展示 query action，无提交操作
+    if (action === 'taskTree') {
       return { success: true }
     }
 
