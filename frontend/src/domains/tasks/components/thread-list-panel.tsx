@@ -80,6 +80,7 @@ export function ThreadListPanel({
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
   const [localRefreshKey, setLocalRefreshKey] = useState(0)
 
   /**
@@ -257,19 +258,36 @@ export function ThreadListPanel({
                     {taskCount}
                   </span>
 
-                  {/* "..." 下拉操作菜单 */}
-                  <div className="relative shrink-0">
+                  {/* "..." 下拉操作菜单（fixed 定位，避免被 overflow-y-auto 裁剪） */}
+                  <div className="shrink-0">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === thread.id ? null : thread.id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (menuOpen === thread.id) {
+                          setMenuOpen(null)
+                          setMenuRect(null)
+                        } else {
+                          setMenuRect(e.currentTarget.getBoundingClientRect())
+                          setMenuOpen(thread.id)
+                        }
+                      }}
                       className="p-1 rounded hover:bg-hover-overlay transition-colors text-body hover:text-ink"
                     >
                       <MoreHorizontal className="size-3.5" />
                     </button>
-                    {menuOpen === thread.id && (
+                    {menuOpen === thread.id && menuRect && (
                       <>
-                        <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
-                        <div className="absolute right-0 top-full mt-1 z-20 min-w-[100px] rounded-md border border-hairline bg-canvas shadow-md py-1">
+                        <div className="fixed inset-0 z-10" onClick={() => { setMenuOpen(null); setMenuRect(null) }} />
+                        <div
+                          className="fixed z-20 min-w-[100px] rounded-md border border-hairline bg-canvas shadow-md py-1"
+                          style={
+                            // 空间不足时向上展开
+                            window.innerHeight - menuRect.bottom < (getAllowedActions(thread.status).length * 28 + 8)
+                              ? { right: window.innerWidth - menuRect.right, bottom: window.innerHeight - menuRect.top + 4 }
+                              : { right: window.innerWidth - menuRect.right, top: menuRect.bottom + 4 }
+                          }
+                        >
                           {getAllowedActions(thread.status).map(act => (
                             <button
                               key={act.action}
@@ -277,11 +295,12 @@ export function ThreadListPanel({
                               onClick={async (e) => {
                                 e.stopPropagation()
                                 setMenuOpen(null)
+                                setMenuRect(null)
                                 if (act.action === 'delete') {
                                   await deleteThread(thread.id)
                                   toast.success('主线已删除')
                                   setLocalRefreshKey(k => k + 1)
-                                } else if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
+                                } else {
                                   const targetStatus = ACTION_TO_TARGET_STATUS[act.action]
                                   if (targetStatus) {
                                     await updateThreadStatus(thread.id, targetStatus as Thread['status'])
