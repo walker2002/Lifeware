@@ -55,6 +55,14 @@ const ORPHAN_ID = '__orphan__'
 /** 选中主线项的高亮样式 */
 const SELECTED_CLASS = 'bg-primary/8 border-l-2 border-l-primary'
 
+/** manifest lifecycle action → 目标 Thread status 映射 */
+const ACTION_TO_TARGET_STATUS: Record<string, string> = {
+  pause: 'paused',
+  resume: 'active',
+  complete: 'completed',
+  archive: 'archived',
+}
+
 // ─── 组件 ──────────────────────────────────────────────────────
 
 /**
@@ -254,7 +262,7 @@ export function ThreadListPanel({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === thread.id ? null : thread.id) }}
-                      className="p-1 rounded hover:bg-hover-overlay transition-colors text-muted hover:text-ink"
+                      className="p-1 rounded hover:bg-hover-overlay transition-colors text-body hover:text-ink"
                     >
                       <MoreHorizontal className="size-3.5" />
                     </button>
@@ -274,9 +282,12 @@ export function ThreadListPanel({
                                   toast.success('主线已删除')
                                   setLocalRefreshKey(k => k + 1)
                                 } else if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
-                                  await updateThreadStatus(thread.id, act.action as Thread['status'])
-                                  toast.success(`${act.label}成功`)
-                                  setLocalRefreshKey(k => k + 1)
+                                  const targetStatus = ACTION_TO_TARGET_STATUS[act.action]
+                                  if (targetStatus) {
+                                    await updateThreadStatus(thread.id, targetStatus as Thread['status'])
+                                    toast.success(`${act.label}成功`)
+                                    setLocalRefreshKey(k => k + 1)
+                                  }
                                 }
                               }}
                               className="w-full px-3 py-1.5 text-xs text-left hover:bg-hover-overlay transition-colors"
