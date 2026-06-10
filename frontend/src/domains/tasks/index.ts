@@ -19,7 +19,7 @@ import { TaskCreationCard } from './cnui/surfaces/TaskCreationCard'
 import { TaskEditCard } from './cnui/surfaces/TaskEditCard'
 import { TaskActionPanel } from './cnui/surfaces/TaskActionPanel'
 import { TaskSplitCard } from './cnui/surfaces/TaskSplitCard'
-import { TaskTreeViewCard } from './cnui/surfaces/TaskTreeViewCard'
+import { TaskTreeViewCard } from './cnui/surfaces/TaskTreeView'
 
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'

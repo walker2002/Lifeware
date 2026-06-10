@@ -241,7 +241,7 @@ export function ThreadListPanel({
                                 e.stopPropagation()
                                 setMenuOpen(null)
                                 if (act.action === 'pause' || act.action === 'resume' || act.action === 'complete' || act.action === 'archive') {
-                                  await updateThreadStatus(thread.id, act.action)
+                                  await updateThreadStatus(thread.id, act.action as Thread['status'])
                                   toast.success(`${act.label}成功`)
                                   setLocalRefreshKey(k => k + 1)
                                 }

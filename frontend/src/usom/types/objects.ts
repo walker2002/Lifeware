@@ -126,7 +126,7 @@ export interface StructuredIntent {
   action: string
   fields: Record<string, unknown>
   confidence: number
-  resolvedBy: 'ai' | 'template_form'
+  resolvedBy: 'ai' | 'template_form' | 'cnui_surface'
   pathType?: 'contract' | 'generative' | 'query'
   createdAt: Timestamp
 }
