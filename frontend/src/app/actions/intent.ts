@@ -23,6 +23,7 @@ import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-r
 import { createHabitsGenericRepo } from "@/domains/habits/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
 import { parseHabitWithAI } from "../../nexus/core/intent-engine/ai-parser";
+import type { AIParserResult } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
 import { createAIRuntime } from "../../nexus/ai-runtime";
@@ -159,6 +160,54 @@ async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummariesByRange(startOfDay, endOfDay);
 }
 
+// ─── 解析失败兜底辅助函数 ───────────────────────────────────────
+
+/**
+ * 从原始输入推断可能的 action 名称
+ * @param rawInput - 用户原始输入
+ * @returns 推断的 action 名称，或 undefined
+ */
+function guessActionFromInput(rawInput: string): string | undefined {
+  const input = rawInput.toLowerCase()
+  const ACTION_KEYWORDS: Record<string, string[]> = {
+    createTask: ['创建任务', '新建任务', '添加任务', '/createtask'],
+    createThread: ['创建主线', '新建主线', '/createthread'],
+    updateTask: ['修改任务', '更新任务', '/updatetask'],
+    completeTask: ['完成任务', '/completetask'],
+    archiveTask: ['归档任务', '/archivetask'],
+    deleteTask: ['删除任务', '/deletetask'],
+    promoteToThread: ['提升为主线', '/promotetothread'],
+  }
+  for (const [action, keywords] of Object.entries(ACTION_KEYWORDS)) {
+    if (keywords.some(kw => input.includes(kw))) return action
+  }
+  // 默认：创建任务（最常见操作）
+  return 'createTask'
+}
+
+/**
+ * 构建 CNUI 表单兜底 intent
+ * 当 AI 解析失败时，构建一个低置信度 intent 触发 CNUI 表单让用户手动填写
+ * @param rawInput - 用户原始输入
+ * @param intentionId - 意图 ID
+ * @returns 低置信度兜底解析结果
+ */
+function buildFallbackIntent(rawInput: string, intentionId: string): AIParserResult {
+  return {
+    success: true,
+    intent: {
+      id: crypto.randomUUID(),
+      intentionId,
+      targetDomain: 'tasks',
+      action: guessActionFromInput(rawInput) ?? 'createTask',
+      fields: {},
+      confidence: 0.3,
+      resolvedBy: 'ai',
+      createdAt: new Date().toISOString(),
+    } as any,
+  }
+}
+
 /**
  * 创建并执行 Orchestrator 管道（提取公共逻辑）
  * 
@@ -182,16 +231,25 @@ async function executePipeline(
     if (logger) logger.startSession(rawInput);
 
     // Step 1: 解析意图
-    const parseResult = await intentSupplier();
+    let parseResult = await intentSupplier();
     if (!parseResult.success || !parseResult.intent) {
-      const timeboxes = await fetchTimeboxSummaries();
-      if (logger) logger.endSession('error');
-      return {
-        success: false,
-        timeboxes,
-        error: parseResult.error ?? HABIT_ERRORS.INTENT_PARSE_FAILED,
-        traceSession: logger?.getSessions()[0],
-      };
+      // ── 解析失败兜底 → 构建 CNUI 表单 intent ──
+      // 从 rawInput 推断可能的 action，构建低置信度 intent
+      // 让 Orchestrator 检测到 confidence < 0.5 时自动进入 CNUI 表单模式
+      const fallbackIntentionId = crypto.randomUUID()
+      parseResult = buildFallbackIntent(rawInput, fallbackIntentionId)
+
+      // 如果兜底也失败，返回原始错误
+      if (!parseResult.success || !parseResult.intent) {
+        const timeboxes = await fetchTimeboxSummaries();
+        if (logger) logger.endSession('error');
+        return {
+          success: false,
+          timeboxes,
+          error: parseResult.error ?? HABIT_ERRORS.INTENT_PARSE_FAILED,
+          traceSession: logger?.getSessions()[0],
+        };
+      }
     }
 
     // Step 1.5: 规范化 intent.action
