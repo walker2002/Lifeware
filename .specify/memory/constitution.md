@@ -1,15 +1,11 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.8.0 → 1.9.0
-  Rationale: MINOR — 新增 UI 设计规范 (docs/UI-DESIGN-SPEC.md) 为宪章治理
-  领域。扩展了 Document Authority Chain、Tier 2 文档清单和 Compliance
-  Review，将 UI 合规纳入 PR 审查要求。
+  Version change: 1.9.0 → 1.10.0
+  Rationale: MINOR — 新增 CN-UI Write Confirmation 治理原则
 
   Modified sections:
-    - Governance > Document Ownership Model (Tier 2 文档清单补充 UI-DESIGN-SPEC.md)
-    - Governance > Compliance Review (新增 UI 合规审查条目)
-    - Governance > Document Authority Chain (新增 UI-DESIGN-SPEC.md 节点)
+    - VIII. AI/Rule Boundary (新增 CN-UI Write Confirmation 子章节)
 
   Modified principles:
     - None (治理扩展，不影响现有原则)
@@ -364,6 +360,25 @@ Engine files MUST include a non-AI fallback path tested independently.
 Handler files MUST include a rule-based fallback path. Phase A and
 Phase B MUST have separate test suites — Phase A tests routing
 accuracy, Phase B tests field extraction completeness.
+
+### CN-UI Write Confirmation
+
+所有通过 CN-UI 表面提交的写操作意图（`pathType === 'contract'`），必须
+经过用户在 CNUI Surface 中的显式确认。系统不得跳过确认步骤直接执行写入
+操作，即使 Intent Engine 已成功提取所有必填字段。这确保用户始终对写入
+操作拥有最终控制权。
+
+**实现位置**: Orchestrator `executeIntent` 中 contract path 的路由阶段。
+当 `pathType === 'contract'` 且 manifest 中该 action 的
+`response_type === 'cnui'` 时，Orchestrator MUST 将 Intent 路由到
+CNUI Surface 展示（传入已提取的 fields 作为预填值），而非直接进入
+Rule Engine → State Machine 流水线。
+
+**不受影响**:
+- `pathType === 'query'`: 只读查询，无写入
+- `pathType === 'generative'`: 已有独立 CNUI 确认流程
+- `response_type === 'page'`: 页面导航
+- `response_type === 'text'`: 纯文本响应
 
 ## Architecture Constraints
 
@@ -1074,4 +1089,4 @@ tokens is DESIGN.md; the downstream implementation is `globals.css`.
 MVP scope is Web only; mobile layout specifications are pre-designed
 for future iteration.
 
-**Version**: 1.9.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-05-31
+**Version**: 1.10.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-10
