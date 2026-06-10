@@ -156,6 +156,17 @@ intent_triggers:
       - 任务树管理
     keywords: [任务列表, 任务树, 管理]
 
+  - action: viewTree
+    shortcut: /viewTree
+    description: 查看任务树（CNUI 内展示，含搜索和树形结构）
+    response_type: cnui
+    cnui_surface: task-tree-view
+    examples:
+      - 查看任务树
+      - 看看我的任务
+      - 展示所有任务
+    keywords: [任务树, 查看任务, 展示]
+
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
   task:
@@ -266,6 +277,10 @@ field_metadata:
     type: string
     label: 颜色
     required: false
+  threadId:
+    type: string
+    label: 主线
+    required: false
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:
@@ -307,6 +322,11 @@ required_fields:
       label: 截止日期
       type: date
       required: false
+    - name: threadId
+      label: 主线
+      type: select
+      required: false
+      default_value: null
 
   createThread:
     - name: name
@@ -327,6 +347,66 @@ required_fields:
       type: select
       required: false
       options: [critical, high, medium, low]
+
+  promoteToThread:
+    - name: taskId
+      label: 任务ID
+      type: text
+      required: false
+    - name: title
+      label: 任务标题（模糊匹配）
+      type: text
+      required: false
+
+  updateThread:
+    - name: threadId
+      label: 主线ID
+      type: text
+      required: false
+    - name: name
+      label: 主线名称（模糊匹配）
+      type: text
+      required: false
+
+  updateTask:
+    - name: taskId
+      label: 任务ID
+      type: text
+      required: false
+    - name: title
+      label: 任务标题（模糊匹配）
+      type: text
+      required: false
+
+  completeTask:
+    - name: taskId
+      label: 任务ID
+      type: text
+      required: false
+    - name: title
+      label: 任务标题（模糊匹配）
+      type: text
+      required: false
+
+  archiveTask:
+    - name: taskId
+      label: 任务ID
+      type: text
+      required: false
+    - name: title
+      label: 任务标题（模糊匹配）
+      type: text
+      required: false
+
+  deleteTask:
+    - name: taskId
+      label: 任务ID
+      type: text
+      required: false
+    - name: title
+      label: 任务标题（模糊匹配）
+      type: text
+      required: false
 
 # ─── 区块 F: subscribed_events ───────────────────────────────────
 subscribed_events:
@@ -349,6 +429,15 @@ view_routes:
     component: domains/tasks/pages/TaskTreePage
     url: /tasks
 
+# ─── 区块 I: query_actions ─────────────────────────────────────
+query_actions:
+  viewTree:
+    action: viewTree
+    description: 查看任务树（纯展示，含主线和任务的树形结构）
+    response_mode: cnui
+    cnui_surface: task-tree-view
+    context_capabilities: []
+
 # ─── 区块 H: cnui_surfaces ───────────────────────────────────────
 cnui_surfaces:
   thread-creation-card:
@@ -364,4 +453,6 @@ cnui_surfaces:
   task-action-panel:
     handler: ./cnui/handlers
   task-split-card:
+    handler: ./cnui/handlers
+  task-tree-view:
     handler: ./cnui/handlers
