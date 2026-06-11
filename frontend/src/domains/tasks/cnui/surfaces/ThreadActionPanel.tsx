@@ -203,7 +203,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   style={{ backgroundColor: thread.color ?? DEFAULT_THREAD_COLOR }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{thread.name}</div>
+                  <div className="text-sm font-medium truncate" title={thread.name}>{thread.name}</div>
                   <div className="text-xs text-muted">
                     {STATUS_LABELS[thread.status] ?? thread.status}
                   </div>
@@ -273,7 +273,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   style={{ backgroundColor: thread.color ?? DEFAULT_THREAD_COLOR }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className={cn('text-sm font-medium truncate', isSelected && 'text-muted line-through')}>
+                  <div className={cn('text-sm font-medium truncate', isSelected && 'text-muted line-through')} title={thread.name}>
                     {thread.name}
                   </div>
                   <div className="text-xs text-muted">

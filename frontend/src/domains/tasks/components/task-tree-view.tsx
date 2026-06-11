@@ -469,7 +469,7 @@ export function TaskTreeView({
               >
                 {/* 祖先路径面包屑 */}
                 {ancestors.length > 0 && (
-                  <div className="text-xs text-muted-foreground mb-0.5 truncate">
+                  <div className="text-xs text-muted-foreground mb-0.5 truncate" title={[...ancestors].reverse().map(a => a.title).join(' > ')}>
                     {ancestors.reverse().map(a => a.title).join(' > ')}
                   </div>
                 )}
@@ -496,7 +496,7 @@ export function TaskTreeView({
                   <span className={cn(
                     'flex-1 text-sm text-ink truncate',
                     task.status === 'completed' && 'line-through opacity-60',
-                  )}>
+                  )} title={task.title}>
                     {task.title}
                   </span>
                   {/* 优先级徽章 */}
@@ -830,7 +830,7 @@ function TaskTreeRow({
         <span className={cn(
           'flex-1 text-sm text-ink truncate',
           task.status === 'completed' && 'line-through text-body opacity-60',
-        )}>
+        )} title={task.title}>
           {task.title}
         </span>
 

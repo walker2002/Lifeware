@@ -234,6 +234,7 @@ export function TaskDetailDrawer({
           type="button"
           onClick={() => navigateToBreadcrumb(anc.id)}
           className="text-body hover:text-ink transition-colors truncate max-w-[120px]"
+          title={anc.title}
         >
           {anc.title}
         </button>,
@@ -241,7 +242,7 @@ export function TaskDetailDrawer({
     })
     items.push(
       <ChevronRight key="sep-current" className="size-3 text-muted shrink-0" />,
-      <span key="current" className="text-ink font-medium truncate max-w-[120px]">{currentTask.title}</span>,
+      <span key="current" className="text-ink font-medium truncate max-w-[120px]" title={currentTask.title}>{currentTask.title}</span>,
     )
     return items
   }, [ancestors, currentTask, onClose, navigateToBreadcrumb])

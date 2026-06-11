@@ -200,7 +200,7 @@ export function TaskTreeViewCard({
                   className="size-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: thread.color || '#cc785c' }}
                 />
-                <span className="text-sm font-medium text-ink truncate flex-1">{thread.name}</span>
+                <span className="text-sm font-medium text-ink truncate flex-1" title={thread.name}>{thread.name}</span>
                 <span
                   className="text-[10px] text-body cursor-pointer hover:text-ink select-all shrink-0"
                   onClick={(e) => { e.stopPropagation(); copyId(thread.id) }}
@@ -222,7 +222,7 @@ export function TaskTreeViewCard({
                     task.status === 'in_progress' ? 'bg-primary' :
                     task.status === 'archived' ? 'bg-muted' : 'bg-muted-soft',
                   )} />
-                  <span className="text-sm text-ink truncate flex-1">{task.title}</span>
+                  <span className="text-sm text-ink truncate flex-1" title={task.title}>{task.title}</span>
                   <span
                     className="text-[10px] text-body cursor-pointer hover:text-ink select-all shrink-0"
                     onClick={() => copyId(task.id)}

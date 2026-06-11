@@ -174,7 +174,7 @@ export function SubtaskList({ taskId, userId, onOpenTask }: SubtaskListProps) {
               <span className={cn(
                 'text-sm text-ink flex-1 truncate',
                 sub.status === 'completed' && 'line-through',
-              )}>
+              )} title={sub.title}>
                 {sub.title}
               </span>
               <span className="text-[10px] text-muted-soft shrink-0">

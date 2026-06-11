@@ -50,6 +50,7 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
               <div
                 key={item.id as string}
                 className="rounded-md border border-hairline bg-canvas px-3 py-1.5 text-sm text-ink truncate"
+                title={item.title as string}
               >
                 {item.title as string}
               </div>

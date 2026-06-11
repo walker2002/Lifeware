@@ -89,7 +89,7 @@ export function TaskFullscreenView({ taskId, userId, onBack, onTaskChanged }: Ta
           <ArrowLeft className="size-4 mr-1" />
           返回任务树
         </Button>
-        <span className="text-sm font-medium text-ink truncate">{task.title}</span>
+        <span className="text-sm font-medium text-ink truncate" title={task.title}>{task.title}</span>
       </div>
 
       {/* 详情内容 */}

@@ -165,8 +165,8 @@ intent_triggers:
       - 任务树管理
     keywords: [任务列表, 任务树, 管理]
 
-  - action: taskTree
-    shortcut: /taskTree
+  - action: viewTaskTree
+    shortcut: /viewTaskTree
     description: 查看任务树（CNUI 内展示，含搜索和树形结构）
     response_type: cnui
     cnui_surface: task-tree-view
@@ -456,8 +456,8 @@ view_routes:
 
 # ─── 区块 I: query_actions ─────────────────────────────────────
 query_actions:
-  taskTree:
-    action: taskTree
+  viewTaskTree:
+    action: viewTaskTree
     description: 查看任务树（纯展示，含主线和任务的树形结构）
     response_mode: cnui
     cnui_surface: task-tree-view

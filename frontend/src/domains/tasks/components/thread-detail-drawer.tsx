@@ -147,7 +147,7 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
               className="w-3 h-3 rounded-full shrink-0"
               style={{ backgroundColor: thread.color ?? '#3498DB' }}
             />
-            <h2 className="text-base font-semibold text-ink truncate max-w-[280px]">
+            <h2 className="text-base font-semibold text-ink truncate max-w-[280px]" title={thread.name}>
               {thread.name}
             </h2>
           </div>

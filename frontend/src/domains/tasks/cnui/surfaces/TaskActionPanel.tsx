@@ -172,7 +172,7 @@ export function TaskActionPanel({ dataModel, onConfirm, onCancel, isLoading, isD
                       className="size-4 rounded"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className={cn('text-sm font-medium truncate', isSelected && 'text-body line-through')}>
+                      <div className={cn('text-sm font-medium truncate', isSelected && 'text-body line-through')} title={task.title}>
                         {task.title}
                       </div>
                       <div className="text-xs text-body">

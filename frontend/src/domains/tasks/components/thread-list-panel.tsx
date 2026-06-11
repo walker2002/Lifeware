@@ -239,10 +239,13 @@ export function ThreadListPanel({
                   {/* 名称 + 徽章 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className={cn(
-                        'text-sm truncate block',
-                        selectedThreadId === thread.id ? 'text-ink font-medium' : 'text-body',
-                      )}>
+                      <span
+                        title={thread.name}
+                        className={cn(
+                          'text-sm truncate block',
+                          selectedThreadId === thread.id ? 'text-ink font-medium' : 'text-body',
+                        )}
+                      >
                         {thread.name}
                       </span>
                       {thread.status === 'paused' && (
