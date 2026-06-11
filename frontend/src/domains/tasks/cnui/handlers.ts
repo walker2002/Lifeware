@@ -399,6 +399,8 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
               parentId: t.parentId,
               estimatedDuration: t.estimatedDuration,
               startDate: t.startDate,
+              endDate: t.endDate,
+              clarity: t.clarity,
             })),
           },
         }
