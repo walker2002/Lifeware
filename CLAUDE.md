@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Lifeware** is an intent-driven personal growth system built with Next.js and Drizzle ORM. It aims to convert life meaning into executable, reviewable time structures by integrating career planning, personal OKRs, tasks/habits, timeboxing, and reflection into a unified "life operating system."
+**Lifeware** is an intent-driven personal growth system. It aims to convert life meaning into executable, reviewable time structures by integrating career planning, personal OKRs, tasks/habits, timeboxing, and reflection into a unified "life operating system."
 
-**Core Philosophy**: Energy-first scheduling - the system respects biological rhythms and helps users arrange high-energy tasks during peak hours.
+**Core Philosophy**: 从用户的个人事务流水账中进行行为建模，陪伴用户完成从「知道」到「做到」再到「持续做到」的完整成长闭环，是个人的“成长陪跑教练”和“意义协商伙伴”
 
 ## Technology Stack
 
@@ -49,7 +49,7 @@ This is not a traditional MVC application. Lifeware uses a custom four-layer Nex
 The system brain with seven main components:
 - **Intent Engine**: Parses user input (AI-driven with template-form fallback)
 - **Rule Engine**: Validates proposals and detects conflicts
-- **State Machine**: Manages object lifecycles
+- **State Machine**: Manages object lifecycles and key attributes
 - **Action Surface Engine**: Determines UI actions (Action Guide, Dynamic Tile, Continuity Cue)
 - **Context Engine**: Assembles cross-Domain context data for generative operations
 - **AI Runtime**: Unified AI infrastructure (LLM routing, Session management, Token budget, CN-UI protocol) — dependency-injected into Handlers, not called by Orchestrator
@@ -135,7 +135,7 @@ Located in `frontend/src/lib/db/schema.ts` with core tables:
 ## Project Status
 
 **Current Phase**: MVP Development (Stage 1 of 6)
-- Key metrics: Daily usage, 2+ meaningful tasks/day, 85% AI accuracy, 60% weekly closure rate
+
 
 ---
 
@@ -158,7 +158,8 @@ Located in `frontend/src/lib/db/schema.ts` with core tables:
 | 项目开发必读 | `mydocs/core/` | Product vision and decisions |
 | 总体设计 | `mydocs/core/` | Architecture design |
 | 技术栈设计演进 | `mydocs/core/` | Tech stack evolution |
-| 意图驱动场景示例 | `mydocs/core/` | Intent-driven scenario examples |
+| AI_Runtime_Architecture_Design | `mydocs/core/` | AI 运行时架构 |
+| Domain 注册指南 | `mydocs/core/` | 一个完整Domain 插件的建立规范 |
 
 
 ### 第二层：协同维护 (`docs/`)
