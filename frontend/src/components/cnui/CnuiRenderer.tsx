@@ -29,9 +29,11 @@ interface CnuiRendererProps {
   isLoading?: boolean
   /** 是否已完成 */
   isDone?: boolean
+  /** 全屏请求回调 */
+  onRequestFullscreen?: () => void
 }
 
-export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: CnuiRendererProps) {
+export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, onRequestFullscreen }: CnuiRendererProps) {
   const reg = cnuiRegistry.get(surfaceType)
 
   if (!reg) {
@@ -52,6 +54,7 @@ export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, 
       onCancel={onCancel}
       isLoading={isLoading}
       isDone={isDone}
+      onRequestFullscreen={onRequestFullscreen}
     />
   )
 }
