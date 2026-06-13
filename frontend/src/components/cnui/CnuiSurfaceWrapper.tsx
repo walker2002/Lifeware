@@ -102,7 +102,7 @@ export function CnuiSurfaceWrapper({
   // ── 活跃态 ────────────────────────────────────────────────
   return (
     <>
-      <div className="mt-3 max-h-[65vh] overflow-hidden rounded-lg border border-hairline bg-surface-soft p-4">
+      <div className="relative mt-3 max-h-[65vh] overflow-hidden rounded-lg border border-hairline bg-surface-soft p-4">
         {errors && errors.length > 0 && (
           <div className="mb-3 rounded-md border border-error bg-error-soft px-3 py-2 text-sm text-error">
             {errors.map((err, i) => (
@@ -118,8 +118,18 @@ export function CnuiSurfaceWrapper({
           onCancel={() => lifecycleActions.requestCancel(surfaceId)}
           isLoading={isLoading}
           isDone={false}
-          onRequestFullscreen={expandable ? requestFullscreen : undefined}
         />
+        {/* ── 右上角全屏按钮 ──────────────────────────────── */}
+        {expandable && (
+          <button
+            type="button"
+            onClick={requestFullscreen}
+            className="absolute right-2 top-2 flex size-6 items-center justify-center rounded text-muted hover:bg-hover-overlay hover:text-ink transition-colors"
+            title="全屏展开"
+          >
+            □
+          </button>
+        )}
       </div>
 
       {/* ── 全屏 Dialog ──────────────────────────────────── */}
