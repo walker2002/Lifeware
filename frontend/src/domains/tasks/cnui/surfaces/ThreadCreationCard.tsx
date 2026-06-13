@@ -8,7 +8,6 @@
 'use client'
 
 import { useState } from 'react'
-import { CnuiButton } from '@/components/cnui/components/Button'
 
 /** 预设颜色列表 */
 const PRESET_COLORS = ['#3498DB', '#2ECC71', '#E74C3C', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#6366f1']
@@ -139,12 +138,7 @@ export function ThreadCreationCard({
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex items-center gap-2 pt-2">
-          <CnuiButton
-            label="创建主线"
-            onClick={handleConfirm}
-            disabled={!name.trim() || isLoading}
-          />
+        <div className="flex items-center justify-end gap-2 pt-2">
           {onCancel && (
             <button
               type="button"
@@ -154,6 +148,14 @@ export function ThreadCreationCard({
               取消
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!name.trim() || isLoading}
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
+          >
+            创建主线
+          </button>
         </div>
       </div>
     </>

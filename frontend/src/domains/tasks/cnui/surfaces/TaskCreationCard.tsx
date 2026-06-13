@@ -8,7 +8,6 @@
 'use client'
 
 import { useState } from 'react'
-import { CnuiButton } from '@/components/cnui/components/Button'
 
 /** 优先级选项 */
 const PRIORITY_OPTIONS = [
@@ -162,12 +161,7 @@ export function TaskCreationCard({
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex items-center gap-2 pt-2">
-          <CnuiButton
-            label="创建任务"
-            onClick={handleConfirm}
-            disabled={!title.trim() || isLoading}
-          />
+        <div className="flex items-center justify-end gap-2 pt-2">
           {onCancel && (
             <button
               type="button"
@@ -177,6 +171,14 @@ export function TaskCreationCard({
               取消
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!title.trim() || isLoading}
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
+          >
+            创建任务
+          </button>
         </div>
       </div>
     </>
