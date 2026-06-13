@@ -45,9 +45,11 @@ interface HabitCheckinPanelProps {
   onCancel: () => void
   /** 是否加载中 */
   isLoading?: boolean
+  /** 全屏请求回调 */
+  onRequestFullscreen?: () => void
 }
 
-export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }: HabitCheckinPanelProps) {
+export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitCheckinPanelProps) {
   const items = (dataModel.items as CheckinHabitItem[]) ?? []
 
   const pending = items.filter(h => !h.todayLogged)
@@ -97,8 +99,43 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading }:
 
   return (
     <div className="w-full max-w-lg">
-      <div className="mb-3 text-sm font-medium text-ink">
-        今日打卡 ({completed.length}/{items.length})
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-medium text-ink">今日打卡 ({completed.length}/{items.length})</span>
+        <div className="flex items-center gap-1.5">
+          {dataModel._pagination && (
+            <>
+              <button
+                type="button"
+                disabled={(dataModel._pagination as { page: number }).page <= 1}
+                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
+                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="min-w-[2rem] text-center text-xs text-muted">
+                {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
+                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
+                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+              >
+                ›
+              </button>
+            </>
+          )}
+          {onRequestFullscreen && (
+            <button
+              type="button"
+              onClick={onRequestFullscreen}
+              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+              title="全屏展开"
+            >
+              ⛶
+            </button>
+          )}
+        </div>
       </div>
 
       {pending.length === 0 ? (

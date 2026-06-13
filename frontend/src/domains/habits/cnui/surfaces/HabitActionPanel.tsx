@@ -44,6 +44,8 @@ interface HabitActionPanelProps {
   onCancel: () => void
   /** 是否加载中 */
   isLoading?: boolean
+  /** 全屏请求回调 */
+  onRequestFullscreen?: () => void
 }
 
 /** 操作标签映射 */
@@ -54,7 +56,7 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   archive: { title: '归档暂停习惯', button: '归档所选' },
 }
 
-export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: HabitActionPanelProps) {
+export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitActionPanelProps) {
   const action = (dataModel.action as string) ?? 'activate'
   const items = (dataModel.items as HabitItem[]) ?? []
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.activate
@@ -93,7 +95,44 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: 
 
   return (
     <div className="w-full max-w-lg">
-      <div className="mb-3 text-sm font-medium text-ink">{labels.title}</div>
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-medium text-ink">{labels.title}</span>
+        <div className="flex items-center gap-1.5">
+          {dataModel._pagination && (
+            <>
+              <button
+                type="button"
+                disabled={(dataModel._pagination as { page: number }).page <= 1}
+                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
+                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="min-w-[2rem] text-center text-xs text-muted">
+                {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
+                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
+                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+              >
+                ›
+              </button>
+            </>
+          )}
+          {onRequestFullscreen && (
+            <button
+              type="button"
+              onClick={onRequestFullscreen}
+              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+              title="全屏展开"
+            >
+              ⛶
+            </button>
+          )}
+        </div>
+      </div>
 
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm text-body/70">没有符合条件的习惯</p>
