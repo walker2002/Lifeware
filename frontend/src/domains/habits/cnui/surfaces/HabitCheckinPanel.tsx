@@ -49,7 +49,7 @@ interface HabitCheckinPanelProps {
   onRequestFullscreen?: () => void
 }
 
-export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitCheckinPanelProps) {
+export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitCheckinPanelProps) {
   const items = (dataModel.items as CheckinHabitItem[]) ?? []
 
   const pending = items.filter(h => !h.todayLogged)
@@ -102,29 +102,32 @@ export function HabitCheckinPanel({ dataModel, onConfirm, onCancel, isLoading, o
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">今日打卡 ({completed.length}/{items.length})</span>
         <div className="flex items-center gap-1.5">
-          {dataModel._pagination && (
-            <>
-              <button
-                type="button"
-                disabled={(dataModel._pagination as { page: number }).page <= 1}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
-                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-              >
-                ‹
-              </button>
-              <span className="min-w-[2rem] text-center text-xs text-muted">
-                {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
-                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-              >
-                ›
-              </button>
-            </>
-          )}
+          {(() => {
+  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+  return p && (
+    <>
+      <button
+        type="button"
+        disabled={p.page <= 1}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ‹
+      </button>
+      <span className="min-w-[2rem] text-center text-xs text-muted">
+        {p.page}/{p.totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={p.page >= p.totalPages}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ›
+      </button>
+    </>
+  )
+})()}
           {onRequestFullscreen && (
             <button
               type="button"

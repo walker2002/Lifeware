@@ -58,7 +58,7 @@ const STATUS_LABELS: Record<string, string> = {
  * 主线操作面板组件
  * @description 处理主线的暂停、恢复、完成和归档批量操作
  */
-export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, isDone, onRequestFullscreen }: ThreadActionPanelProps) {
+export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, onRequestFullscreen }: ThreadActionPanelProps) {
   const action = (dataModel.action as string) ?? 'pause'
   const items = (dataModel.items as ThreadItem[]) ?? []
   // updateThread handler 返回的 key 是 "threads"，需要兼容读取
@@ -115,29 +115,32 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-medium text-ink">编辑主线</span>
             <div className="flex items-center gap-1.5">
-              {dataModel._pagination && (
-                <>
-                  <button
-                    type="button"
-                    disabled={(dataModel._pagination as { page: number }).page <= 1}
-                    onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
-                    className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-                  >
-                    ‹
-                  </button>
-                  <span className="min-w-[2rem] text-center text-xs text-muted">
-                    {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
-                    onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
-                    className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-                  >
-                    ›
-                  </button>
-                </>
-              )}
+              {(() => {
+  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+  return p && (
+    <>
+      <button
+        type="button"
+        disabled={p.page <= 1}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ‹
+      </button>
+      <span className="min-w-[2rem] text-center text-xs text-muted">
+        {p.page}/{p.totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={p.page >= p.totalPages}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ›
+      </button>
+    </>
+  )
+})()}
               {onRequestFullscreen && (
                 <button
                   type="button"
@@ -241,29 +244,32 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-medium text-ink">选择要编辑的主线</span>
           <div className="flex items-center gap-1.5">
-            {dataModel._pagination && (
-              <>
-                <button
-                  type="button"
-                  disabled={(dataModel._pagination as { page: number }).page <= 1}
-                  onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
-                  className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-                >
-                  ‹
-                </button>
-                <span className="min-w-[2rem] text-center text-xs text-muted">
-                  {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
-                  onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
-                  className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-                >
-                  ›
-                </button>
-              </>
-            )}
+            {(() => {
+  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+  return p && (
+    <>
+      <button
+        type="button"
+        disabled={p.page <= 1}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ‹
+      </button>
+      <span className="min-w-[2rem] text-center text-xs text-muted">
+        {p.page}/{p.totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={p.page >= p.totalPages}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ›
+      </button>
+    </>
+  )
+})()}
             {onRequestFullscreen && (
               <button
                 type="button"
@@ -329,29 +335,32 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">{labels.title}</span>
         <div className="flex items-center gap-1.5">
-          {dataModel._pagination && (
-            <>
-              <button
-                type="button"
-                disabled={(dataModel._pagination as { page: number }).page <= 1}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
-                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-              >
-                ‹
-              </button>
-              <span className="min-w-[2rem] text-center text-xs text-muted">
-                {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
-                className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-              >
-                ›
-              </button>
-            </>
-          )}
+          {(() => {
+  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+  return p && (
+    <>
+      <button
+        type="button"
+        disabled={p.page <= 1}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ‹
+      </button>
+      <span className="min-w-[2rem] text-center text-xs text-muted">
+        {p.page}/{p.totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={p.page >= p.totalPages}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ›
+      </button>
+    </>
+  )
+})()}
           {onRequestFullscreen && (
             <button
               type="button"
