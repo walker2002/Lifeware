@@ -1,6 +1,6 @@
 # Lifeware 界面设计规范
 
-> 版本：v1.2 | 更新日期：2026-06-07
+> 版本：v1.3 | 更新日期：2026-06-13
 > 状态：**生效中** — 所有 UI 相关开发必须遵守本规范
 > 上游：DESIGN.md（品牌设计令牌来源）
 > 下游：globals.css（CSS 变量实现）
@@ -561,3 +561,95 @@ TopNav 高度：**56px**。LeftPanel 默认宽度：**300px**。
 - [ ] 图片有 `alt` 文本
 - [ ] 表单输入有 `<label>`
 - [ ] 键盘可导航（Tab 顺序符合视觉顺序）
+
+---
+
+## 十一、CN-UI Surface 视觉规范
+
+> 本章节为 CN-UI Surface 组件开发的权威视觉参考，所有新增 Surface 必须遵守。
+
+### 11.1 容器样式
+
+| 属性 | 值 | Tailwind 类 |
+|---|---|---|
+| 边框 | `border-hairline` | `border border-hairline` |
+| 圆角 | 8px | `rounded-lg` |
+| 背景 | `bg-surface-soft` | `bg-surface-soft` |
+| 内边距 | 16px | `p-4` |
+| 高度上限（活跃态） | 65vh | `max-h-[65vh]` |
+| 溢出 | 隐藏（翻页处理） | `overflow-hidden` |
+
+### 11.2 标题行
+
+Surface 标题使用 `text-sm font-medium text-ink`，与右侧控件通过 `flex items-center justify-between` 同行布局。
+
+```
+┌──────────────────────────────────────────────┐
+│ [标题文本]          [‹ 1/3 ›] [⛶]            │
+└──────────────────────────────────────────────┘
+```
+
+### 11.3 翻页控件
+
+仅当列表项超过 `pageSize`（默认 5）时显示。
+
+| 元素 | 尺寸 | 样式 |
+|---|---|---|
+| ‹ / › 按钮 | 20×20px (`size-5`) | `rounded border border-hairline bg-canvas text-xs text-ink` |
+| 页码文字 | `min-w-[2rem]` | `text-xs text-muted` 居中 |
+| disabled 态 | — | `disabled:opacity-40` |
+
+### 11.4 全屏按钮（⛶）
+
+所有 Surface 通用，标题行最右侧。
+
+| 属性 | 值 |
+|---|---|
+| 尺寸 | 22×22px (`size-[22px]`) |
+| 边框 | `border border-primary` |
+| 文字色 | `text-primary` |
+| hover | `hover:bg-primary/10 transition-colors` |
+| 无全屏功能时 | 不渲染（`onRequestFullscreen` 为 undefined） |
+
+### 11.5 列表项
+
+| 状态 | 样式 |
+|---|---|
+| 默认 | `rounded-md border p-3` |
+| 选中 | `border-primary/40 bg-primary/10` |
+| 间距 | `gap-2` |
+| 分隔线 | `border-b border-hairline-soft` |
+
+### 11.6 操作按钮
+
+| 按钮 | 样式 |
+|---|---|
+| 主操作（确认/打卡等） | `bg-primary text-primary-foreground rounded-md px-4 py-1.5 text-xs font-medium` |
+| 取消 | `rounded-md border border-hairline px-3 py-1.5 text-xs` |
+| disabled | `disabled:opacity-50` |
+
+### 11.7 完成态（Done）
+
+| 状态 | 样式 |
+|---|---|
+| 折叠 | `rounded-lg border border-hairline bg-surface-soft px-4 py-2`，单行，`▶` 展开 |
+| 展开 | 同容器样式 + `max-h-48 overflow-y-auto`，`▼ 收起` |
+| 只读遮罩 | `pointer-events-none opacity-50` |
+| hover（折叠态） | `hover:bg-hover-overlay transition-colors` |
+
+### 11.8 全屏模式
+
+| 属性 | 桌面端 | 移动端 |
+|---|---|---|
+| 容器 | Dialog，`max-w-3xl`，`h-[85vh]` | Dialog，全屏 |
+| 顶部栏 | `border-b border-hairline px-4 py-3` | 同左 |
+| 返回按钮 | `text-sm text-primary` | 同左 |
+| 内容区 | `flex-1 overflow-y-auto p-4`，全量展示 | 同左 |
+| 列表展示 | 全量 + 滚动（不翻页） | 同左 |
+
+### 11.9 高度约束
+
+| 场景 | 值 | 用途 |
+|---|---|---|
+| 对话内活跃态 | `65vh` | Surface 最大高度 |
+| 完成态展开 | `12rem` | 只读详情最大高度 |
