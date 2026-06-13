@@ -36,7 +36,6 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
 
   return (
     <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
-      <div className="mb-3 text-sm font-medium text-ink">任务拆分</div>
       <div className="space-y-3">
         {items.length > 0 ? (
           <div className="max-h-40 overflow-y-auto space-y-1">

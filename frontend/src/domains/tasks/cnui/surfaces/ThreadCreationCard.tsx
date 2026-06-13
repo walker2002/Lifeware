@@ -63,7 +63,6 @@ export function ThreadCreationCard({
 
   return (
     <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
-      <div className="mb-3 text-sm font-medium text-ink">创建主线</div>
       <div className="space-y-3">
         {/* 主线名称 */}
         <div>
