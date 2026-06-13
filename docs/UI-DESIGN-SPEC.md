@@ -568,24 +568,30 @@ TopNav 高度：**56px**。LeftPanel 默认宽度：**300px**。
 
 > 本章节为 CN-UI Surface 组件开发的权威视觉参考，所有新增 Surface 必须遵守。
 
-### 11.1 容器样式
+### 11.1 容器样式（单层架构）
 
-| 属性 | 值 | Tailwind 类 |
+> **核心原则**：容器由 `CnuiSurfaceWrapper` 统一提供，**Surface 组件本身不得再套任何容器**（边框/背景/内边距），用 React Fragment (`<>...</>`) 直接返回内容。否则会与 ChatBubble 形成重复嵌套。
+
+| 层 | 提供方 | 说明 |
 |---|---|---|
-| 边框 | `border-hairline` | `border border-hairline` |
-| 圆角 | 8px | `rounded-lg` |
-| 背景 | `bg-surface-soft` | `bg-surface-soft` |
-| 内边距 | 16px | `p-4` |
-| 高度上限（活跃态） | 65vh | `max-h-[65vh]` |
-| 溢出 | 隐藏（翻页处理） | `overflow-hidden` |
+| 视觉盒 | ChatBubble（`bg-surface-soft` + `px-3 py-2`） | 消息气泡，唯一背景盒 |
+| 功能容器 | `CnuiSurfaceWrapper`（`mt-2 max-h-[65vh] overflow-hidden`） | 仅高度约束，**无**边框/背景/内边距 |
+| 内容 | Surface 组件（Fragment） | 直接返回，禁止再包 `<div className="border... bg... p-4">` |
 
-### 11.2 标题行
+**CnuiSurfaceWrapper 容器类**（活跃内联态）：`mt-2 max-h-[65vh] overflow-hidden`
+**全屏态**：见 §11.8
 
-Surface 标题使用 `text-sm font-medium text-ink`，与右侧控件通过 `flex items-center justify-between` 同行布局。
+### 11.2 标题行（header）
+
+标题文本来自 AI 消息内容（`msg.content`），由 `conversation-view` 通过 `header` prop 传入 `CnuiSurfaceWrapper`，渲染在容器顶部。
+
+> **禁止**：Surface 组件内部不要再渲染静态标题（如"删除任务"、"创建任务"），这些与 AI 文本重复。唯一例外：含动态计数的标题（如"今日打卡 (2/5)"、"智能编排方案 (3 项)"）可保留。
 
 ```
 ┌──────────────────────────────────────────────┐
-│ [标题文本]          [‹ 1/3 ›] [⛶]            │
+│ [AI 标题文本]                        [⛶]     │  ← 标题行（header）
+├──────────────────────────────────────────────┤
+│ [Surface 内容]                               │
 └──────────────────────────────────────────────┘
 ```
 
@@ -599,17 +605,19 @@ Surface 标题使用 `text-sm font-medium text-ink`，与右侧控件通过 `fle
 | 页码文字 | `min-w-[2rem]` | `text-xs text-muted` 居中 |
 | disabled 态 | — | `disabled:opacity-40` |
 
-### 11.4 全屏按钮（⛶）
+### 11.4 全屏按钮（⛶ / ↙）
 
-所有 Surface 通用，标题行最右侧。
+> **职责归属**：全屏按钮由 `CnuiSurfaceWrapper` 在标题行（header）右侧统一渲染，**Surface 组件不再渲染任何全屏按钮**。`CnuiRenderer` 不再传递 `onRequestFullscreen` prop。
 
 | 属性 | 值 |
 |---|---|
-| 尺寸 | 22×22px (`size-[22px]`) |
-| 边框 | `border border-primary` |
-| 文字色 | `text-primary` |
-| hover | `hover:bg-primary/10 transition-colors` |
-| 无全屏功能时 | 不渲染（`onRequestFullscreen` 为 undefined） |
+| 位置 | 标题行（header）最右侧，与 `msg.content` 同行 |
+| 尺寸 | 24×24px (`size-6`)，`shrink-0` |
+| 内联态图标 | `⛶` |
+| 全屏态图标 | `↙`（点击缩小回对话） |
+| 样式 | `text-muted-soft hover:bg-hover-overlay hover:text-ink transition-colors` |
+| title | 内联「全屏展开」/ 全屏「缩小回对话」 |
+| 无全屏能力时 | `onFullscreenChange` 为 undefined → 不渲染 |
 
 ### 11.5 列表项
 
@@ -637,15 +645,25 @@ Surface 标题使用 `text-sm font-medium text-ink`，与右侧控件通过 `fle
 | 只读遮罩 | `pointer-events-none opacity-50` |
 | hover（折叠态） | `hover:bg-hover-overlay transition-colors` |
 
-### 11.8 全屏模式
+### 11.8 全屏模式（状态保持）
 
-| 属性 | 桌面端 | 移动端 |
+> **核心原则**：全屏与内联共用**同一个 `CnuiRenderer` 实例**，仅切换 CSS（`position: fixed`），**绝不**渲染第二个实例。这样输入内容、焦点、选中项、滚动位置全部保持。
+
+| 属性 | 内联态 | 全屏态 |
 |---|---|---|
-| 容器 | Dialog，`max-w-3xl`，`h-[85vh]` | Dialog，全屏 |
-| 顶部栏 | `border-b border-hairline px-4 py-3` | 同左 |
-| 返回按钮 | `text-sm text-primary` | 同左 |
-| 内容区 | `flex-1 overflow-y-auto p-4`，全量展示 | 同左 |
-| 列表展示 | 全量 + 滚动（不翻页） | 同左 |
+| 容器类 | `mt-2 max-h-[65vh] overflow-hidden` | `fixed inset-0 z-40 flex flex-col bg-canvas` |
+| dataModel | 分页后数据（`pageSize` 默认 5） | 全量数据（`rawData`，不翻页，滚动浏览） |
+| 标题行 | header + `⛶` | header + `↙`，底部加 `border-b border-hairline px-4 py-3` |
+| 内容区 | 直接渲染 | `flex-1 overflow-y-auto p-4` |
+| 切换按钮 | 标题行 `⛶`（点击进入） | 标题行 `↙`（点击退出） |
+
+**实现要点（CnuiSurfaceWrapper）**：
+- **占位符防塌陷**：进入全屏前用 `getBoundingClientRect()` 测量内联高度，渲染同高度占位 `<div aria-hidden>`，防止对话流塌陷、下方消息跳动。
+- **Escape 退出**：`useEffect` 监听 `keydown`，按 Esc 退出全屏。
+- **滚动锁**：全屏时 `document.body.style.overflow = 'hidden'`，退出时还原。
+- **互斥**：`conversation-view` 维护单一 `fullscreenSurfaceId`，同一时刻仅一个 Surface 全屏。
+- **受控状态**：全屏状态由 `conversation-view` 通过 `isFullscreen` + `onFullscreenChange` 受控，Wrapper 内部不持有。
+- **`CnuiSurfaceFullscreen.tsx` 已废弃删除**（旧 Dialog 方案，会丢失状态）。
 
 ### 11.9 高度约束
 
@@ -653,3 +671,27 @@ Surface 标题使用 `text-sm font-medium text-ink`，与右侧控件通过 `fle
 |---|---|---|
 | 对话内活跃态 | `65vh` | Surface 最大高度 |
 | 完成态展开 | `12rem` | 只读详情最大高度 |
+
+### 11.10 新增 Surface 自测检查点（强制）
+
+> **每次新增或修改 CNUI Surface，必须逐项自测通过，方可提交。** PR 审查对照本清单。
+
+#### 架构与嵌套
+- [ ] **CUC-01 单层容器**：Surface 组件用 Fragment (`<>...</>`) 返回内容，**没有**自己的 `border / bg-surface-soft / p-4` 容器（容器由 CnuiSurfaceWrapper 提供，视觉盒由 ChatBubble 提供）。
+- [ ] **CUC-02 无静态标题**：Surface 内部不渲染与 AI 文本重复的静态标题（如"删除任务"）。例外：含动态计数的标题（"今日打卡 (2/5)"）可保留。
+- [ ] **CUC-03 全屏职责**：Surface 组件**不**渲染任何全屏按钮、不接收 `onRequestFullscreen`（已移除）。全屏由 CnuiSurfaceWrapper 在 header 行统一处理。
+
+#### 按钮与控件
+- [ ] **CUC-04 按钮字号统一**：主操作按钮统一 `rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors`；取消统一 `rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors`。**禁止**用 `CnuiButton`/shadcn Button（字号不一致）。
+- [ ] **CUC-05 按钮右对齐**：操作按钮容器用 `flex items-center justify-end gap-2 pt-2`，取消在左、主操作在右。
+- [ ] **CUC-06 翻页控件**：列表超过 `pageSize` 时显示翻页；`disabled:opacity-40` 仅用于翻页小按钮；主操作按钮用 `disabled:opacity-50`。
+
+#### 全屏与状态（如支持全屏）
+- [ ] **CUC-07 状态保持**：全屏与缩小共用同一组件实例（CSS `fixed` 切换）。实测：表单输入文字 → 全屏 → 文字与焦点都在 → 缩小 → 文字仍在。
+- [ ] **CUC-08 无塌陷**：全屏时对话流不塌陷（占位符撑住原高度），下方消息不跳动。
+- [ ] **CUC-09 全屏图标**：内联显示 `⛶`，全屏显示 `↙`；全屏时 Esc 可退出、背景不可滚动。
+
+#### 通用
+- [ ] **CUC-10 色彩令牌**：颜色全部用 CSS 变量令牌，无 `text-on-primary`/`disabled:opacity-40`（主操作）/硬编码颜色。
+- [ ] **CUC-11 TypeScript 零错误**：`npx tsc --noEmit --project tsconfig.json` 对改动文件无报错。
+- [ ] **CUC-12 完成态**：`isDone` 时返回简单内联文本（`<p className="text-sm text-ink text-center py-2">✅ ...</p>`），不套容器。

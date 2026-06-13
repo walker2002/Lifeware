@@ -70,7 +70,7 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 
 | 文档 | 当前版本 | 上一版本 | 主要变更 |
 |---|---|---|---|
-| 项目开发必读 | 2026_05_01 | 2026_03_18 | （待用户更新变更记录） |
+| UI-DESIGN-SPEC | 2026_06_13 | 2026_05_31 | §十一 CN-UI 大幅修订：容器改单层架构（CnuiSurfaceWrapper 提供容器，Surface 用 Fragment）；标题行改为 header prop（移除静态标题）；全屏按钮移至 wrapper 标题行（⛶/↙ 小图标）；全屏模式改 CSS fixed 状态保持（删 CnuiSurfaceFullscreen Dialog）；新增 §11.10 新增 Surface 自测检查点 CUC-01~CUC-12 |
 | 总体设计 | 2026_05_02 | 2026_03_18 | 增加附录 TODO，列出可能的下一步核心扩展设计（非 MVP 考虑） |
 | 技术栈设计演进 | 2026_03_18 | 2026_02_27 | 各阶段追加 Bridge Layer 实现时序、新增约束5、风险表新增2条 |
 | USOM 详细设计 | 2026_05_12 | 2026_03_21 | 新增 Project/ProjectTemplate/TaskTemplate 类型；TaskStatus 扩展 in_progress/on_hold 状态、deprecated scheduled；Task 新增 parentId/projectId/时间窗口/频率等 10 个字段 |
