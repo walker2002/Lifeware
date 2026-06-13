@@ -98,7 +98,7 @@ export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel
   }
 
   return (
-    <div className="w-full max-w-lg">
+    <>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">今日打卡 ({completed.length}/{items.length})</span>
         <div className="flex items-center gap-1.5">
@@ -247,6 +247,6 @@ export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

@@ -99,9 +99,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
 
   if (isDone) {
     return (
-      <div className="w-full max-w-lg text-center py-4">
-        <p className="text-sm text-ink">✅ 操作已完成</p>
-      </div>
+      <p className="text-sm text-ink text-center py-4">✅ 操作已完成</p>
     )
   }
 
@@ -247,7 +245,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
             {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
-    <>
+    <div className="w-full max-w-lg">
       <button
         type="button"
         disabled={p.page <= 1}
@@ -338,7 +336,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
           {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
-    <>
+    <div className="w-full max-w-lg">
       <button
         type="button"
         disabled={p.page <= 1}
@@ -448,6 +446,4 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
           </div>
         </div>
       )}
-    </div>
-  )
-}
+    </>

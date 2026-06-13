@@ -94,7 +94,7 @@ export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel,
   }
 
   return (
-    <div className="w-full max-w-lg">
+    <>
       {/* 翻页 + 全屏控件 — 仅在有控件时渲染 */}
       {(dataModel._pagination || onRequestFullscreen) && (
         <div className="mb-3 flex items-center justify-end gap-1.5">
@@ -216,6 +216,6 @@ export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel,
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

@@ -53,14 +53,12 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
 
   if (isDone) {
     return (
-      <div className="w-full max-w-lg border border-hairline rounded-lg bg-surface-soft p-4 text-center">
-        <p className="text-sm text-ink">✅ 编排方案已确认</p>
-      </div>
+      <p className="text-sm text-ink text-center py-2">✅ 编排方案已确认</p>
     )
   }
 
   return (
-    <div className="w-full max-w-lg">
+    <>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">智能编排方案 ({items.length} 项)</span>
         <div className="flex items-center gap-1.5">
@@ -149,7 +147,6 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
         >
           确认全部
         </button>
-      </div>
-    </div>
+    </>
   )
 }
