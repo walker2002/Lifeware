@@ -1,14 +1,11 @@
 /**
  * @file TimeboxList
  * @brief 智能编排时间盒列表 Surface
- * 
+ *
  * CNUI Surface 组件，展示智能编排方案中的时间盒列表
  */
 
 'use client'
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CnuiButton } from '@/components/cnui/components/Button'
 
 /**
  * 时间盒项
@@ -40,9 +37,13 @@ interface TimeboxListProps {
   onCancel?: () => void
   /** 是否完成 */
   isDone?: boolean
+  /** 是否加载中 */
+  isLoading?: boolean
+  /** 全屏请求回调 */
+  onRequestFullscreen?: () => void
 }
 
-export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDone }: TimeboxListProps) {
+export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDone, isLoading, onRequestFullscreen }: TimeboxListProps) {
   const items = (dataModel.items as TimeboxItem[]) ?? []
 
   function removeItem(index: number) {
@@ -50,39 +51,105 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
     onDataChange({ ...dataModel, items: updated })
   }
 
+  if (isDone) {
+    return (
+      <div className="w-full max-w-lg border border-hairline rounded-lg bg-surface-soft p-4 text-center">
+        <p className="text-sm text-ink">✅ 编排方案已确认</p>
+      </div>
+    )
+  }
+
   return (
-    <Card className="w-full max-w-lg">
-      <CardHeader>
-        <CardTitle>智能编排方案 ({items.length} 项)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {items.length === 0 && (
-          <p className="text-sm text-body/70">暂无时间盒</p>
-        )}
-        {items.map((item, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3 rounded-md border p-2"
-            style={{ borderLeftColor: item.color ?? '#6366f1', borderLeftWidth: 4 }}
-          >
-            <div className="flex-1">
-              <span className="text-sm font-medium">{item.title}</span>
-              <span className="ml-2 text-xs text-muted-foreground">
-                {item.startTime} - {item.endTime}
-              </span>
-            </div>
+    <div className="w-full max-w-lg">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-medium text-ink">智能编排方案 ({items.length} 项)</span>
+        <div className="flex items-center gap-1.5">
+          {(() => {
+            const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+            return p && (
+              <>
+                <button
+                  type="button"
+                  disabled={p.page <= 1}
+                  onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+                  className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+                >
+                  ‹
+                </button>
+                <span className="min-w-[2rem] text-center text-xs text-muted">
+                  {p.page}/{p.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={p.page >= p.totalPages}
+                  onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+                  className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+                >
+                  ›
+                </button>
+              </>
+            )
+          })()}
+          {onRequestFullscreen && (
             <button
-              onClick={() => removeItem(i)}
-              className="text-xs text-error/70 hover:text-error"
+              type="button"
+              onClick={onRequestFullscreen}
+              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+              title="全屏展开"
             >
-              移除
+              ⛶
             </button>
-          </div>
-        ))}
-        <div className="pt-2">
-          <CnuiButton label="确认全部" onClick={() => onConfirm(dataModel)} />
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="py-8 text-center text-sm text-body/70">暂无时间盒</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {items.map((item, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 rounded-md border border-hairline bg-canvas p-3"
+              style={{ borderLeftColor: item.color ?? '#6366f1', borderLeftWidth: 4 }}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-ink truncate">{item.title}</div>
+                <div className="text-xs text-body/70">
+                  {item.startTime} - {item.endTime}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeItem(i)}
+                className="text-xs text-error/70 hover:text-error transition-colors"
+              >
+                移除
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-2 pt-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
+          >
+            取消
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onConfirm(dataModel)}
+          disabled={items.length === 0 || isLoading}
+          className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
+        >
+          确认全部
+        </button>
+      </div>
+    </div>
   )
 }
