@@ -34,7 +34,7 @@ export function HabitCreationCard({ dataModel, onDataChange, onConfirm, onCancel
   const [serverErrors, setServerErrors] = useState<string[]>([])
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
       <div className="mb-3 text-sm font-medium text-ink">习惯创建</div>
       <CnuiFormAdapter
         domainId="habits"

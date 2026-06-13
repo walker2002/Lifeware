@@ -8,7 +8,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CnuiButton } from '@/components/cnui/components/Button'
 
 /** 优先级选项 */
@@ -69,20 +68,16 @@ export function TaskCreationCard({
 
   if (isDone) {
     return (
-      <Card className="w-full max-w-md">
-        <CardContent className="pt-4 text-center">
-          <p className="text-sm text-ink">✅ 任务已创建</p>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
+        <p className="text-sm text-ink">✅ 任务已创建</p>
+      </div>
     )
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>创建任务</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
+      <div className="mb-3 text-sm font-medium text-ink">创建任务</div>
+      <div className="space-y-3">
         {/* 标题 */}
         <div>
           <label className="text-xs text-body mb-1 block">
@@ -180,13 +175,13 @@ export function TaskCreationCard({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md px-3 py-1.5 text-xs text-body/60 hover:text-ink transition-colors"
+              className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
             >
               取消
             </button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

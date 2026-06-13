@@ -8,8 +8,6 @@
 
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
 /** TaskSplitCard 组件属性 */
 interface TaskSplitCardProps {
   surfaceType: string
@@ -30,20 +28,16 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
 
   if (isDone) {
     return (
-      <Card className="w-full max-w-md">
-        <CardContent className="pt-4 text-center">
-          <p className="text-sm text-ink">✅ 拆分请求已提交</p>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
+        <p className="text-sm text-ink">✅ 拆分请求已提交</p>
+      </div>
     )
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>任务拆分</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
+      <div className="mb-3 text-sm font-medium text-ink">任务拆分</div>
+      <div className="space-y-3">
         {items.length > 0 ? (
           <div className="max-h-40 overflow-y-auto space-y-1">
             {items.map(item => (
@@ -69,13 +63,13 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md px-3 py-1.5 text-xs text-body/60 hover:text-ink transition-colors"
+              className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
             >
               关闭
             </button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

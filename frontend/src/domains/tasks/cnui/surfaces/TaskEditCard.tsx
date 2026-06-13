@@ -97,7 +97,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   // ─── 完成状态 ─────────────────────────────────────────────────
   if (isDone) {
     return (
-      <div className="w-full max-w-md text-center py-4">
+      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
         <p className="text-sm text-ink">✅ 任务已更新</p>
       </div>
     )
@@ -243,7 +243,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
             type="button"
             onClick={handleSave}
             disabled={isLoading}
-            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
           >
             {isLoading ? '保存中...' : '保存'}
           </button>
@@ -255,7 +255,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   // ─── 直接编辑模式（handler 已确定任务） ──────────────────────────
   if (directEdit && editingId) {
     return (
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
         <div className="mb-3 text-sm font-medium text-ink">编辑任务</div>
         {renderEditForm(editingId)}
       </div>
@@ -264,7 +264,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
 
   // ─── 列表模式（选择后内联展开） ─────────────────────────────────
   return (
-    <div className="w-full max-w-lg">
+    <div className="w-full max-w-lg border border-hairline rounded-lg bg-surface-soft p-4">
       <div className="mb-3 text-sm font-medium text-ink">请选择要修改的任务</div>
 
       {tasks.length === 0 ? (
