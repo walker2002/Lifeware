@@ -45,6 +45,8 @@ interface TaskTreeViewCardProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
+  /** 全屏请求回调 */
+  onRequestFullscreen?: () => void
 }
 
 // ─── 常量 ──────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ function FilterDropdown({
                   'size-3.5 rounded border flex items-center justify-center shrink-0',
                   isSelected ? 'bg-primary border-primary' : 'border-hairline',
                 )}>
-                  {isSelected && <Check className="size-2.5 text-on-primary" />}
+                  {isSelected && <Check className="size-2.5 text-primary-foreground" />}
                 </span>
                 {opt.label}
               </button>
@@ -307,7 +309,7 @@ function EditForm({
                 setShowSubtask(false)
               }}
               disabled={!subtaskTitle.trim()}
-              className="h-7 rounded-md bg-primary px-3 text-[11px] font-medium text-on-primary disabled:opacity-40"
+              className="h-7 rounded-md bg-primary px-3 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
             >
               添加
             </button>
@@ -325,7 +327,7 @@ function EditForm({
         </button>
         <button
           type="button" onClick={handleSave} disabled={isLoading}
-          className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+          className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
         >
           {isLoading ? '保存中...' : '保存'}
         </button>
@@ -383,7 +385,7 @@ function TaskRow({
             'size-3.5 rounded border flex items-center justify-center shrink-0',
             isSelected ? 'bg-primary border-primary' : 'border-hairline',
           )}>
-            {isSelected && <Check className="size-2.5 text-on-primary" />}
+            {isSelected && <Check className="size-2.5 text-primary-foreground" />}
           </span>
         )}
 
@@ -449,6 +451,7 @@ export function TaskTreeViewCard({
   onCancel,
   isLoading,
   isDone,
+  onRequestFullscreen,
 }: TaskTreeViewCardProps) {
   // ─── 模式检测 ────────────────────────────────────────────────
   const action = dataModel.action as string | undefined
@@ -657,7 +660,7 @@ export function TaskTreeViewCard({
   // ─── 完成状态 ────────────────────────────────────────────────
   if (isDone) {
     return (
-      <div className="w-full max-w-2xl rounded-lg border border-hairline bg-canvas p-4 text-center">
+      <div className="w-full max-w-2xl rounded-lg border border-hairline bg-surface-soft p-4 text-center">
         <p className="text-sm text-ink">✅ 操作已完成</p>
       </div>
     )
@@ -687,7 +690,7 @@ export function TaskTreeViewCard({
             </button>
           )}
           <button type="button" onClick={handleDirectConfirm} disabled={isLoading}
-            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors">
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors">
             {isLoading ? '处理中...' : '确认'}
           </button>
         </div>
@@ -775,7 +778,7 @@ export function TaskTreeViewCard({
             onClick={handleFinalConfirm}
             disabled={isLoading}
             className={cn(
-              'rounded-md px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors',
+              'rounded-md px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors',
               action === 'delete' ? 'bg-error' : 'bg-primary',
             )}
           >
@@ -789,26 +792,47 @@ export function TaskTreeViewCard({
   // ─── 树形视图渲染（view/edit/select 通用） ────────────────────
 
   return (
-    <div className="w-full max-w-2xl rounded-lg border border-hairline bg-canvas">
+    <div className="w-full max-w-2xl rounded-lg border border-hairline bg-surface-soft">
       {/* 标题栏 */}
       {labels && (
         <div className="px-3 pt-3 pb-1 text-sm font-medium text-ink flex items-center justify-between">
           <span>{labels.title}</span>
-          {/* select 模式：全选按钮 */}
-          {mode === 'select' && allVisibleTaskIds.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
-            >
-              {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {mode === 'select' && allVisibleTaskIds.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
+              >
+                {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
+              </button>
+            )}
+            {onRequestFullscreen && (
+              <button
+                type="button"
+                onClick={onRequestFullscreen}
+                className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+                title="全屏展开"
+              >
+                ⛶
+              </button>
+            )}
+          </div>
         </div>
       )}
       {mode === 'edit' && !labels && (
-        <div className="px-3 pt-3 pb-1 text-sm font-medium text-ink">
-          选择要修改的任务
+        <div className="px-3 pt-3 pb-1 text-sm font-medium text-ink flex items-center justify-between">
+          <span>选择要修改的任务</span>
+          {onRequestFullscreen && (
+            <button
+              type="button"
+              onClick={onRequestFullscreen}
+              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+              title="全屏展开"
+            >
+              ⛶
+            </button>
+          )}
         </div>
       )}
 
@@ -975,7 +999,7 @@ export function TaskTreeViewCard({
             )}
             <button type="button" onClick={handleSelectConfirm}
               disabled={selectedIds.size === 0 || isLoading}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors">
+              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors">
               {labels?.button ?? '确认'} ({selectedIds.size})
             </button>
           </div>
