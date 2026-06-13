@@ -122,9 +122,9 @@ export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, 
 
   return (
     <div className="w-full max-w-lg">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-ink">{labels.title}</span>
-        <div className="flex items-center gap-1.5">
+      {/* 翻页 + 全屏控件 — 仅在有控件时渲染 */}
+      {(dataModel._pagination || onRequestFullscreen) && (
+        <div className="mb-3 flex items-center justify-end gap-1.5">
           {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
@@ -162,7 +162,7 @@ export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, 
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm text-body">没有符合条件的任务</p>
