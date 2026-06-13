@@ -84,7 +84,7 @@ export function ThreadCreationCard({
             }}
             placeholder="例如：事业进阶"
             maxLength={50}
-            className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
 
@@ -100,7 +100,7 @@ export function ThreadCreationCard({
             placeholder="主线的描述说明…"
             maxLength={500}
             rows={3}
-            className="w-full rounded-md border border-hairline bg-canvas px-2 py-1.5 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
+            className="w-full rounded-md border border-hairline bg-canvas px-2 py-1.5 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
           />
         </div>
 
@@ -157,7 +157,7 @@ export function ThreadCreationCard({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md px-3 py-1.5 text-xs text-muted hover:text-ink transition-colors"
+              className="rounded-md px-3 py-1.5 text-xs text-body/60 hover:text-ink transition-colors"
             >
               取消
             </button>

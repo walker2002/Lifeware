@@ -317,7 +317,6 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
       const name = (d as any)?.name ?? (d as any)?.object?.name
       return name ? `已创建主线「${name}」` : '主线创建成功！'
     },
-    promoteToThread: () => '任务已提升为主线！',
     pauseThread: (d) => `已暂停 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     resumeThread: (d) => `已恢复 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     completeThread: (d) => `已完成 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,

@@ -19,16 +19,6 @@ intent_triggers:
       - 建立健康管理主线
     keywords: [主线, thread, 创建]
 
-  - action: promoteToThread
-    shortcut: /promoteToThread
-    description: 将现有任务提升为主线
-    response_type: cnui
-    cnui_surface: thread-promote-card
-    examples:
-      - 把这个任务提升为主线
-      - 设为事业主线
-    keywords: [提升, 主线, promote]
-
   - action: updateThread
     shortcut: /updateThread
     description: 更新主线信息
@@ -120,7 +110,7 @@ intent_triggers:
     shortcut: /updateTask
     description: 更新任务信息
     response_type: cnui
-    cnui_surface: task-edit-card
+    cnui_surface: task-tree-view
     examples:
       - 修改任务标题
       - 更新任务优先级
@@ -130,7 +120,7 @@ intent_triggers:
     shortcut: /completeTask
     description: 完成任务
     response_type: cnui
-    cnui_surface: task-action-panel
+    cnui_surface: task-tree-view
     examples:
       - 完成这个任务
       - 标记任务已完成
@@ -140,7 +130,7 @@ intent_triggers:
     shortcut: /archiveTask
     description: 归档任务
     response_type: cnui
-    cnui_surface: task-action-panel
+    cnui_surface: task-tree-view
     examples:
       - 归档这个任务
     keywords: [归档, archive]
@@ -149,7 +139,7 @@ intent_triggers:
     shortcut: /deleteTask
     description: 删除任务（不可恢复）
     response_type: cnui
-    cnui_surface: task-action-panel
+    cnui_surface: task-tree-view
     examples:
       - 删除这个任务
     keywords: [删除, delete]
@@ -217,7 +207,7 @@ lifecycle:
         trigger: intent
         action: delete
         event_type: TaskDeleted
-    terminal_states: [archived, deleted]
+    terminal_states: [deleted]
 
   thread:
     states: [active, paused, completed, archived, deleted]
@@ -253,7 +243,7 @@ lifecycle:
         trigger: intent
         action: delete
         event_type: ThreadDeleted
-    terminal_states: [archived, deleted]
+    terminal_states: [deleted]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 field_metadata:
@@ -362,16 +352,6 @@ required_fields:
       required: false
       options: [critical, high, medium, low]
 
-  promoteToThread:
-    - name: taskId
-      label: 任务ID
-      type: text
-      required: false
-    - name: title
-      label: 任务标题（模糊匹配）
-      type: text
-      required: false
-
   updateThread:
     - name: threadId
       label: 主线ID
@@ -466,8 +446,6 @@ query_actions:
 # ─── 区块 H: cnui_surfaces ───────────────────────────────────────
 cnui_surfaces:
   thread-creation-card:
-    handler: ./cnui/handlers
-  thread-promote-card:
     handler: ./cnui/handlers
   thread-action-panel:
     handler: ./cnui/handlers

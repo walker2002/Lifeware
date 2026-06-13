@@ -72,7 +72,7 @@ export default async function AnalyticsPage() {
               </div>
             ))}
             {topIntents.length === 0 && (
-              <p className="text-sm text-body/40">暂无数据</p>
+              <p className="text-sm text-body/70">暂无数据</p>
             )}
           </div>
         </section>

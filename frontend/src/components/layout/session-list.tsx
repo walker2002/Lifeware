@@ -159,7 +159,7 @@ export function SessionList({ sessions, activeSessionId, onSelectSession, onNewS
       )}
 
       {sessions.length === 0 && (
-        <p className="py-4 text-center text-xs text-body/40">暂无对话</p>
+        <p className="py-4 text-center text-xs text-body/70">暂无对话</p>
       )}
     </div>
   )

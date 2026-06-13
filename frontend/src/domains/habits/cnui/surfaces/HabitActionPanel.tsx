@@ -96,7 +96,7 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading }: 
       <div className="mb-3 text-sm font-medium text-ink">{labels.title}</div>
 
       {items.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">没有符合条件的习惯</p>
+        <p className="py-8 text-center text-sm text-body/70">没有符合条件的习惯</p>
       ) : (
         <div className="flex flex-col gap-2">
           {/* 全选 */}

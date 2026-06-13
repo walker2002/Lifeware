@@ -74,7 +74,7 @@ export function TaskFullscreenView({ taskId, userId, onBack, onTaskChanged }: Ta
 
   if (!task) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted">
+      <div className="flex flex-col items-center justify-center h-full text-body/70">
         <p className="text-sm mb-4">任务不存在</p>
         <Button variant="secondary" onClick={onBack}>返回任务树</Button>
       </div>

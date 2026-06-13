@@ -9,7 +9,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ListTodo, FolderOpen, Folder, MoreHorizontal } from 'lucide-react'
+import { ListTodo, FolderOpen, Folder, MoreHorizontal, PauseCircle, CircleCheck, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getThreads, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
@@ -49,6 +49,16 @@ const ALL_ID = '__all__'
 
 /** "无主线任务"虚拟主线 ID */
 const ORPHAN_ID = '__orphan__'
+
+// ─── 主线状态图标 ──────────────────────────────────────────────
+
+/** 主线状态 → 图标组件映射 */
+const THREAD_STATUS_ICON: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  active: FolderOpen,
+  paused: PauseCircle,
+  completed: CircleCheck,
+  archived: Archive,
+}
 
 // ─── 选中态样式 ────────────────────────────────────────────────
 
@@ -96,13 +106,16 @@ export function ThreadListPanel({
   function getAllowedActions(status: string): Array<{ action: string; label: string }> {
     const LIFECYCLE_ACTIONS: Record<string, Array<{ action: string; label: string }>> = {
       active: [
+        { action: 'edit', label: '编辑' },
         { action: 'pause', label: '暂停' },
         { action: 'complete', label: '完成' },
       ],
       paused: [
+        { action: 'edit', label: '编辑' },
         { action: 'resume', label: '恢复' },
       ],
       completed: [
+        { action: 'edit', label: '编辑' },
         { action: 'archive', label: '归档' },
       ],
       archived: [
@@ -174,7 +187,7 @@ export function ThreadListPanel({
             'flex-1 text-sm',
             selectedThreadId === ALL_ID ? 'text-ink font-medium' : 'text-body',
           )}>全部任务</span>
-          <span className="text-xs text-muted">{totalCount}</span>
+          <span className="text-xs text-body/70">{totalCount}</span>
         </button>
 
         {/* ─── 无主线任务入口 ────────────────────────────────── */}
@@ -197,7 +210,7 @@ export function ThreadListPanel({
             'flex-1 text-sm',
             selectedThreadId === ORPHAN_ID ? 'text-ink font-medium' : 'text-body',
           )}>普通任务</span>
-          <span className="text-xs text-muted-soft">—</span>
+          <span className="text-xs text-body/70-soft">—</span>
         </button>
 
         {/* ─── 分隔线 ────────────────────────────────────────── */}
@@ -207,7 +220,7 @@ export function ThreadListPanel({
         {loading ? (
           <ThreadListSkeleton />
         ) : filteredThreads.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-muted">
+          <p className="px-4 py-6 text-center text-xs text-body/70">
             暂无主线，点击上方按钮创建
           </p>
         ) : (
@@ -230,11 +243,11 @@ export function ThreadListPanel({
                     selectedThreadId === thread.id && SELECTED_CLASS,
                   )}
                 >
-                  {/* 文件夹图标 */}
-                  <Folder
-                    className="size-4 flex-shrink-0"
-                    style={{ color: thread.color || 'var(--color-text-muted)' }}
-                  />
+                  {/* 状态图标 */}
+                  {(() => {
+                    const Icon = THREAD_STATUS_ICON[thread.status] ?? Folder
+                    return <Icon className="size-4 flex-shrink-0" style={{ color: thread.color || 'var(--color-text-body/70)' }} />
+                  })()}
 
                   {/* 名称 + 徽章 */}
                   <div className="flex-1 min-w-0">
@@ -257,7 +270,7 @@ export function ThreadListPanel({
                   </div>
 
                   {/* 任务计数 */}
-                  <span className="flex-shrink-0 text-xs text-muted">
+                  <span className="flex-shrink-0 text-xs text-body/70">
                     {taskCount}
                   </span>
 
@@ -299,11 +312,9 @@ export function ThreadListPanel({
                                 e.stopPropagation()
                                 setMenuOpen(null)
                                 setMenuRect(null)
-                                if (act.action === 'delete') {
-                                  await deleteThread(thread.id)
-                                  toast.success('主线已删除')
-                                  setLocalRefreshKey(k => k + 1)
-                                } else {
+                                if (act.action === 'edit') {
+                                  onOpenThreadDetail?.(thread.id)
+                                } else if (act.action === 'delete') {
                                   const targetStatus = ACTION_TO_TARGET_STATUS[act.action]
                                   if (targetStatus) {
                                     await updateThreadStatus(thread.id, targetStatus as Thread['status'])

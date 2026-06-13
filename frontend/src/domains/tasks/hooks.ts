@@ -120,13 +120,6 @@ export function createTasksHooks(manifest: DomainManifest) {
       }
     }
 
-    if (action === 'promoteToThread') {
-      const taskId = fields['taskId']
-      if (!taskId || typeof taskId !== 'string') {
-        errors.push('taskId 必填')
-      }
-    }
-
     return { valid: errors.length === 0, errors }
   }
 

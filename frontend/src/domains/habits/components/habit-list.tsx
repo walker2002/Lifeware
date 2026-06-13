@@ -307,7 +307,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
 
                 {!isCollapsed &&
                   (group.habits.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-2 pl-6">暂无习惯</p>
+                    <p className="text-xs text-body/70 py-2 pl-6">暂无习惯</p>
                   ) : (
                     <div className="grid gap-3 pl-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {group.habits.map((habit) => (

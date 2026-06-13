@@ -54,8 +54,8 @@ export default function TaskTreePage() {
   const [sortBy, setSortBy] = useState<SortField>('startDate')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [filterClarity, setFilterClarity] = useState<string[]>(['fuzzy', 'scoped', 'actionable'])
-  const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress', 'completed'])
-  const [filterThreadStatus, setFilterThreadStatus] = useState<string[]>(['active', 'paused', 'completed'])
+  const [filterStatus, setFilterStatus] = useState<string[]>(['todo', 'planned', 'in_progress'])
+  const [filterThreadStatus, setFilterThreadStatus] = useState<string[]>(['active', 'paused'])
 
   /** 筛选变更回调（复选框切换） */
   const handleFilterChange = useCallback((key: 'clarity' | 'status', value: string) => {
@@ -89,11 +89,6 @@ export default function TaskTreePage() {
   /** 数据变更回调 — 递增 refreshKey 触发树和主线列表刷新 */
   const handleDataChanged = useCallback(() => {
     setRefreshKey(k => k + 1)
-  }, [])
-
-  /** 将任务提升为主线（打开 __new__ 模式主线详情抽屉） */
-  const promoteToThread = useCallback((taskId: string) => {
-    setDrawer({ type: 'thread', threadId: '__new__' })
   }, [])
 
   /** 进入全屏模式 */
@@ -163,7 +158,7 @@ export default function TaskTreePage() {
           type="button"
           className={cn(
             'md:hidden absolute top-3 left-3 z-30 rounded-md border border-hairline bg-surface-soft p-1.5',
-            'text-muted hover:text-ink transition-colors',
+            'text-body/60 hover:text-ink transition-colors',
           )}
           onClick={() => setMobilePanelOpen(v => !v)}
           aria-label="切换主线面板"
@@ -189,7 +184,7 @@ export default function TaskTreePage() {
               <button
                 type="button"
                 onClick={() => setMobilePanelOpen(false)}
-                className="rounded p-1 text-muted hover:text-ink transition-colors"
+                className="rounded p-1 text-body/60 hover:text-ink transition-colors"
                 aria-label="关闭面板"
               >
                 <ChevronUp className="size-5 rotate-90" />
@@ -220,7 +215,6 @@ export default function TaskTreePage() {
               threadId={selectedThreadId}
               refreshKey={refreshKey}
               onOpenTaskDetail={openTaskDetail}
-              onPromoteToThread={promoteToThread}
               onDataChanged={handleDataChanged}
               filterClarity={filterClarity}
               filterStatus={filterStatus}

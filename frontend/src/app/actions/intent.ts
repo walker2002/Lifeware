@@ -176,7 +176,6 @@ function guessActionFromInput(rawInput: string): string | undefined {
     completeTask: ['完成任务', '/completetask'],
     archiveTask: ['归档任务', '/archivetask'],
     deleteTask: ['删除任务', '/deletetask'],
-    promoteToThread: ['提升为主线', '/promotetothread'],
   }
   for (const [action, keywords] of Object.entries(ACTION_KEYWORDS)) {
     if (keywords.some(kw => input.includes(kw))) return action

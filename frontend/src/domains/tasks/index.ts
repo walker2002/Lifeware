@@ -13,7 +13,6 @@ import { createTasksHooks } from './hooks'
 
 // ── CNUI Surface 组件导入 ─────────────────────────────────────────
 import { ThreadCreationCard } from './cnui/surfaces/ThreadCreationCard'
-import { ThreadPromoteCard } from './cnui/surfaces/ThreadPromoteCard'
 import { ThreadActionPanel } from './cnui/surfaces/ThreadActionPanel'
 import { TaskCreationCard } from './cnui/surfaces/TaskCreationCard'
 import { TaskEditCard } from './cnui/surfaces/TaskEditCard'
@@ -28,10 +27,6 @@ const handlerModulePath = './domains/tasks/cnui/handlers'
 
 cnuiRegistry.register('tasks', 'thread-creation-card', {
   component: ThreadCreationCard,
-  handlerModulePath,
-})
-cnuiRegistry.register('tasks', 'thread-promote-card', {
-  component: ThreadPromoteCard,
   handlerModulePath,
 })
 cnuiRegistry.register('tasks', 'thread-action-panel', {

@@ -18,6 +18,7 @@ interface ThreadItem {
   color?: string
   status: string
   description?: string
+  priority?: string
 }
 
 /** ThreadActionPanel 组件属性 */
@@ -58,6 +59,8 @@ const STATUS_LABELS: Record<string, string> = {
 export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, isDone }: ThreadActionPanelProps) {
   const action = (dataModel.action as string) ?? 'pause'
   const items = (dataModel.items as ThreadItem[]) ?? []
+  // updateThread handler 返回的 key 是 "threads"，需要兼容读取
+  const threads = (dataModel.threads as ThreadItem[]) ?? items
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.pause
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -67,6 +70,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editColor, setEditColor] = useState(DEFAULT_THREAD_COLOR)
+  const [editPriority, setEditPriority] = useState('')
 
   useEffect(() => {
     setSelectedIds(new Set())
@@ -103,7 +107,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
   if (action === 'update') {
     // 编辑表单视图
     if (editingThreadId) {
-      const thread = items.find(t => t.id === editingThreadId)
+      const thread = threads.find(t => t.id === editingThreadId)
       return (
         <div className="w-full max-w-lg">
           <div className="mb-3 text-sm font-medium text-ink">编辑主线</div>
@@ -115,7 +119,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
                 placeholder="主线名称"
-                className="h-9 w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+                className="h-9 w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -125,7 +129,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                 onChange={e => setEditDescription(e.target.value)}
                 placeholder="主线描述..."
                 rows={2}
-                className="w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
+                className="w-full rounded-md border border-hairline bg-canvas px-3 py-1 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -139,6 +143,20 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                 />
                 <span className="text-xs text-body">{editColor}</span>
               </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-body">优先级</label>
+              <select
+                value={editPriority}
+                onChange={e => setEditPriority(e.target.value)}
+                className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              >
+                <option value="">不设置</option>
+                <option value="critical">紧急</option>
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
+              </select>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -165,6 +183,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   name: editName || thread?.name,
                   description: editDescription || thread?.description,
                   color: editColor || thread?.color,
+                  priority: editPriority || thread?.priority,
                 })}
                 disabled={isLoading}
                 className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
@@ -182,11 +201,11 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
       <div className="w-full max-w-lg">
         <div className="mb-3 text-sm font-medium text-ink">选择要编辑的主线</div>
 
-        {items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted">没有符合条件的主线</p>
+        {threads.length === 0 ? (
+          <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {items.map(thread => (
+            {threads.map(thread => (
               <button
                 key={thread.id}
                 type="button"
@@ -195,6 +214,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   setEditName(thread.name)
                   setEditDescription(thread.description ?? '')
                   setEditColor(thread.color ?? DEFAULT_THREAD_COLOR)
+                  setEditPriority(thread.priority ?? '')
                 }}
                 className="flex cursor-pointer items-center gap-3 rounded-md border border-hairline bg-canvas p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/10"
               >
@@ -204,7 +224,7 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate" title={thread.name}>{thread.name}</div>
-                  <div className="text-xs text-muted">
+                  <div className="text-xs text-body/70">
                     {STATUS_LABELS[thread.status] ?? thread.status}
                   </div>
                 </div>
@@ -233,11 +253,11 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
       <div className="mb-3 text-sm font-medium text-ink">{labels.title}</div>
 
       {items.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted">没有符合条件的主线</p>
+        <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
       ) : (
         <div className="flex flex-col gap-2">
           {/* 全选栏 */}
-          <div className="flex items-center justify-between border-b border-hairline pb-2 text-xs text-muted">
+          <div className="flex items-center justify-between border-b border-hairline pb-2 text-xs text-body/70">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -273,10 +293,10 @@ export function ThreadActionPanel({ dataModel, onConfirm, onCancel, isLoading, i
                   style={{ backgroundColor: thread.color ?? DEFAULT_THREAD_COLOR }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className={cn('text-sm font-medium truncate', isSelected && 'text-muted line-through')} title={thread.name}>
+                  <div className={cn('text-sm font-medium truncate', isSelected && 'text-body/70 line-through')} title={thread.name}>
                     {thread.name}
                   </div>
-                  <div className="text-xs text-muted">
+                  <div className="text-xs text-body/70">
                     {STATUS_LABELS[thread.status] ?? thread.status}
                   </div>
                 </div>

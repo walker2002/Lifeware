@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ExternalLink, Pause, Play, Archive, Trash2 } from 'lucide-react'
+import { X, ExternalLink, Pause, Play, Archive, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { getThreadById, getThreadWithCount, createThread, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
+import { getThreadById, getThreadWithCount, createThread, updateThread, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
 import { TaskTreeView } from './task-tree-view'
 import type { Thread } from '../../../usom/types/objects'
 
@@ -60,6 +60,10 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
   const [counts, setCounts] = useState<ThreadWithCount | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  /** 任务树刷新计数器（新建任务后递增） */
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0)
 
   const router = useRouter()
 
@@ -102,7 +106,41 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
     }
   }, [thread])
 
-  // ─── 创建模式表单状态 ─────────────────────────────────────────────
+  // ─── 编辑模式 ─────────────────────────────────────────────────────
+  function enterEdit() {
+    if (!thread) return
+    setName(thread.name ?? '')
+    setColor(thread.color ?? '#3498DB')
+    setPriority(thread.priority ?? '')
+    setStartDate(thread.startDate ?? '')
+    setEndDate(thread.endDate ?? '')
+    setDescription(thread.description ?? '')
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!thread || !name.trim()) return
+    setSavingEdit(true)
+    try {
+      const updated = await updateThread(thread.id, {
+        name: name.trim(),
+        color,
+        priority: priority as any || undefined,
+        startDate: startDate as any || undefined,
+        endDate: endDate as any || undefined,
+        description: description || undefined,
+      })
+      setThread(updated)
+      setEditing(false)
+      toast.success('主线已更新')
+    } catch {
+      toast.error('保存失败，请重试')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // ─── 创建/编辑模式表单状态 ─────────────────────────────────────────────
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3498DB')
   const [priority, setPriority] = useState('')
@@ -152,6 +190,17 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
             </h2>
           </div>
           <div className="flex items-center gap-1">
+            {!editing && thread.status !== 'archived' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={enterEdit}
+                aria-label="编辑"
+                title="编辑主线"
+              >
+                <Pencil className="size-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -169,143 +218,226 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
-          {/* 概览信息 */}
-          <div className="px-5 py-4 space-y-3 border-b border-hairline-soft">
-            {/* 状态 + 优先级 */}
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-surface-card text-ink">
-                {thread.status === 'active' ? '进行中' : thread.status === 'paused' ? '已暂停' : thread.status === 'completed' ? '已完成' : thread.status}
-              </span>
-              <span className="text-xs text-muted">{thread.priority ?? '默认'} 优先级</span>
-            </div>
-
-            {/* 日期范围 */}
-            {(thread.startDate || thread.endDate) && (
-              <p className="text-xs text-muted">
-                {thread.startDate ?? '未设置'} — {thread.endDate ?? '未设置'}
-              </p>
-            )}
-
-            {/* 描述 */}
-            {thread.description && (
-              <p className="text-sm text-body">{thread.description}</p>
-            )}
-
-            {/* 任务统计 */}
-            {counts && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <span className="text-lg font-semibold text-ink">{counts.taskCount}</span>
-                    <span className="text-xs text-muted ml-1">任务总数</span>
-                  </div>
-                  <div>
-                    <span className="text-lg font-semibold text-ink">{counts.completedTaskCount}</span>
-                    <span className="text-xs text-muted ml-1">已完成</span>
-                  </div>
-                  <div>
-                    <span className="text-lg font-semibold text-ink">{completionRate}%</span>
-                    <span className="text-xs text-muted ml-1">完成率</span>
-                  </div>
-                </div>
-
-                {/* 进度条 */}
-                <div className="w-full h-1.5 rounded-full bg-surface-soft overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-success transition-all duration-300"
-                    style={{ width: `${completionRate}%` }}
-                  />
+          {editing ? (
+            /* ═══ 编辑模式表单 ═════════════════════════════════════════ */
+            <div className="px-5 py-4 space-y-5 border-b border-hairline-soft">
+              {/* 名称 */}
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">名称</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  maxLength={50}
+                  className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
+                />
+              </div>
+              {/* 颜色 */}
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">颜色</label>
+                <div className="flex gap-2 flex-wrap">
+                  {PRESET_COLORS.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setColor(c)}
+                      className="size-7 rounded-md border-2 transition-colors hover:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: c === color ? 'var(--ink)' : 'transparent',
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
-            )}
-
-            {/* 状态操作按钮 */}
-            <div className="flex items-center gap-2 pt-1">
-              {thread.status === 'active' && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleStatusChange('paused')}
+              {/* 优先级 */}
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">优先级</label>
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value)}
+                  className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
                 >
-                  <Pause className="size-3.5 mr-1" />暂停
+                  <option value="">不设置</option>
+                  <option value="critical">紧急</option>
+                  <option value="high">高</option>
+                  <option value="medium">中</option>
+                  <option value="low">低</option>
+                </select>
+              </div>
+              {/* 日期 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1.5">开始日期</label>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                    className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink mb-1.5">结束日期</label>
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                    className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]" />
+                </div>
+              </div>
+              {/* 描述 */}
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">描述</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)] resize-none"
+                />
+              </div>
+              {/* 保存/取消按钮 */}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button variant="secondary" onClick={() => setEditing(false)}>取消</Button>
+                <Button onClick={saveEdit} disabled={!name.trim() || savingEdit}>
+                  {savingEdit ? '保存中…' : '保存'}
                 </Button>
-              )}
-              {thread.status === 'paused' && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleStatusChange('active')}
-                >
-                  <Play className="size-3.5 mr-1" />恢复
-                </Button>
-              )}
-              {(thread.status === 'active' || thread.status === 'paused') && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await updateThreadStatus(thread!.id, 'archived')
-                      onThreadChanged?.()
-                      onClose()
-                      toast.success('主线已归档')
-                    } catch {
-                      toast.error('归档失败，请重试')
-                    }
-                  }}
-                >
-                  <Archive className="size-3.5 mr-1" />
-                  归档主线
-                </Button>
-              )}
-              {/* 彻底删除（仅无下级任务时可用） */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-error hover:text-error"
-                    disabled={counts ? counts.taskCount > 0 : false}
-                    title={counts && counts.taskCount > 0 ? '存在下级任务，无法删除' : ''}
-                  >
-                    <Trash2 className="size-3.5 mr-1" />
-                    彻底删除
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>确认彻底删除主线</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      此操作不可撤销，主线将被永久删除。
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={async () => {
-                        try {
-                          await deleteThread(threadId)
-                          onThreadChanged?.()
-                          onClose()
-                          toast.success('主线已删除')
-                        } catch {
-                          toast.error('删除失败，请重试')
-                        }
-                      }}
-                    >
-                      确认删除
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* ═══ 只读概览 ═══════════════════════════════════════════ */
+            <div className="px-5 py-4 space-y-3 border-b border-hairline-soft">
+              {/* 状态 + 优先级 */}
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-surface-card text-ink">
+                  {thread.status === 'active' ? '进行中' : thread.status === 'paused' ? '已暂停' : thread.status === 'completed' ? '已完成' : thread.status}
+                </span>
+                <span className="text-xs text-body/70">{thread.priority ?? '默认'} 优先级</span>
+              </div>
+
+              {/* 日期范围 */}
+              {(thread.startDate || thread.endDate) && (
+                <p className="text-xs text-body/70">
+                  {thread.startDate ?? '未设置'} — {thread.endDate ?? '未设置'}
+                </p>
+              )}
+
+              {/* 描述（保留换行） */}
+              {thread.description && (
+                <p className="text-sm text-body whitespace-pre-wrap">{thread.description}</p>
+              )}
+
+              {/* 任务统计 */}
+              {counts && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <span className="text-lg font-semibold text-ink">{counts.taskCount}</span>
+                      <span className="text-xs text-body/70 ml-1">任务总数</span>
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold text-ink">{counts.completedTaskCount}</span>
+                      <span className="text-xs text-body/70 ml-1">已完成</span>
+                    </div>
+                    <div>
+                      <span className="text-lg font-semibold text-ink">{completionRate}%</span>
+                      <span className="text-xs text-body/70 ml-1">完成率</span>
+                    </div>
+                  </div>
+
+                  {/* 进度条 */}
+                  <div className="w-full h-1.5 rounded-full bg-surface-soft overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-success transition-all duration-300"
+                      style={{ width: `${completionRate}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 状态操作按钮 */}
+              <div className="flex items-center gap-2 pt-1">
+                {thread.status === 'active' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleStatusChange('paused')}
+                  >
+                    <Pause className="size-3.5 mr-1" />暂停
+                  </Button>
+                )}
+                {thread.status === 'paused' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleStatusChange('active')}
+                  >
+                    <Play className="size-3.5 mr-1" />恢复
+                  </Button>
+                )}
+                {(thread.status === 'active' || thread.status === 'paused') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await updateThreadStatus(thread!.id, 'archived')
+                        onThreadChanged?.()
+                        onClose()
+                        toast.success('主线已归档')
+                      } catch {
+                        toast.error('归档失败，请重试')
+                      }
+                    }}
+                  >
+                    <Archive className="size-3.5 mr-1" />
+                    归档主线
+                  </Button>
+                )}
+                {/* 彻底删除（仅无下级任务时可用） */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-error hover:text-error"
+                      disabled={counts ? counts.taskCount > 0 : false}
+                      title={counts && counts.taskCount > 0 ? '存在下级任务，无法删除' : ''}
+                    >
+                      <Trash2 className="size-3.5 mr-1" />
+                      彻底删除
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>确认彻底删除主线</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        此操作不可撤销，主线将被永久删除。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async () => {
+                          try {
+                            await deleteThread(threadId)
+                            onThreadChanged?.()
+                            onClose()
+                            toast.success('主线已删除')
+                          } catch {
+                            toast.error('删除失败，请重试')
+                          }
+                        }}
+                      >
+                        确认删除
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          )}
 
           {/* 内嵌任务树 */}
           <div className="flex-1">
             <TaskTreeView
               threadId={threadId}
               onOpenTaskDetail={() => {}}
+              refreshKey={taskRefreshKey}
+              onDataChanged={() => setTaskRefreshKey(k => k + 1)}
             />
           </div>
         </div>
@@ -345,7 +477,7 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
                   onChange={e => setName(e.target.value)}
                   maxLength={50}
                   placeholder="例如：事业进阶"
-                  className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
+                  className="w-full h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
                 />
               </div>
 
@@ -412,7 +544,7 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
                   maxLength={500}
                   rows={4}
                   placeholder="主线的描述说明…"
-                  className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)] resize-none"
+                  className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)] resize-none"
                 />
               </div>
             </div>
@@ -439,7 +571,7 @@ export function ThreadDetailDrawer({ threadId, onClose, onThreadChanged }: Threa
             ) : notFound ? (
               /* 404 状态 */
               <div className="flex-1 flex flex-col items-center justify-center px-5 text-center">
-                <p className="text-sm text-muted mb-4">主线不存在或已删除</p>
+                <p className="text-sm text-body/70 mb-4">主线不存在或已删除</p>
                 <Button variant="secondary" onClick={onClose}>返回</Button>
               </div>
             ) : (

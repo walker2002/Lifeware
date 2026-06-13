@@ -97,7 +97,7 @@ export function TaskCreationCard({
             }}
             placeholder="例如：完成周报"
             maxLength={100}
-            className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
 
@@ -113,7 +113,7 @@ export function TaskCreationCard({
             placeholder="任务描述…"
             maxLength={500}
             rows={2}
-            className="w-full rounded-md border border-hairline bg-canvas px-2 py-1.5 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
+            className="w-full rounded-md border border-hairline bg-canvas px-2 py-1.5 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-none"
           />
         </div>
 
@@ -145,7 +145,7 @@ export function TaskCreationCard({
                 onDataChange({ ...dataModel, estimatedDuration: e.target.value })
               }}
               placeholder="60"
-              className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
             />
           </div>
         </div>
@@ -180,7 +180,7 @@ export function TaskCreationCard({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md px-3 py-1.5 text-xs text-muted hover:text-ink transition-colors"
+              className="rounded-md px-3 py-1.5 text-xs text-body/60 hover:text-ink transition-colors"
             >
               取消
             </button>

@@ -40,7 +40,7 @@ export function DynamicTile({ candidates }: DynamicTileProps) {
             {candidate.label}
           </div>
           {candidate.subLabel && (
-            <div className="text-xs text-muted mt-1">
+            <div className="text-xs text-body/70 mt-1">
               {candidate.subLabel}
             </div>
           )}

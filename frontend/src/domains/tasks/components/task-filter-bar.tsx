@@ -160,7 +160,7 @@ function FilterDropdown({
             <button
               type="button"
               onClick={() => options.forEach(o => selected.includes(o.value) && onToggle(o.value))}
-              className="w-full px-3 py-1 text-xs text-muted hover:text-ink transition-colors text-left"
+              className="w-full px-3 py-1 text-xs text-body/60 hover:text-ink transition-colors text-left"
             >
               清除
             </button>
@@ -214,7 +214,7 @@ export function TaskFilterBar({
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             placeholder={searchType === 'task' ? '搜索任务标题/ID...' : '搜索主线名称/ID...'}
-            className="w-full h-8 pl-8 pr-3 rounded-r-md border border-hairline border-l-0 bg-canvas text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            className="w-full h-8 pl-8 pr-3 rounded-r-md border border-hairline border-l-0 bg-canvas text-xs text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
         </div>
 

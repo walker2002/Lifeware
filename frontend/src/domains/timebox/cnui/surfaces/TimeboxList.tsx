@@ -57,7 +57,7 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
       </CardHeader>
       <CardContent className="space-y-2">
         {items.length === 0 && (
-          <p className="text-sm text-muted-foreground">暂无时间盒</p>
+          <p className="text-sm text-body/70">暂无时间盒</p>
         )}
         {items.map((item, i) => (
           <div

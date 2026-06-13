@@ -65,8 +65,6 @@ export interface TaskTreeViewProps {
   refreshKey?: number
   /** 打开任务详情回调 */
   onOpenTaskDetail?: (taskId: string) => void
-  /** 将任务提升为主线回调 */
-  onPromoteToThread?: (taskId: string) => void
   /** 数据变更回调，创建/状态变更后通知父组件刷新 */
   onDataChanged?: () => void
   /** 清晰度筛选 */
@@ -178,7 +176,6 @@ export function TaskTreeView({
   threadId = '__all__',
   refreshKey = 0,
   onOpenTaskDetail,
-  onPromoteToThread,
   onDataChanged,
   filterClarity,
   filterStatus,
@@ -437,10 +434,10 @@ export function TaskTreeView({
         /* ═══ 搜索模式 ═══════════════════════════════════════ */
         <div className="space-y-1">
           {isSearching && (
-            <div className="text-sm text-muted-foreground px-3 py-2">搜索中...</div>
+            <div className="text-sm text-body/70-foreground px-3 py-2">搜索中...</div>
           )}
           {!isSearching && searchResults.matches.length === 0 && (
-            <div className="text-sm text-muted-foreground px-3 py-2">未找到匹配的任务</div>
+            <div className="text-sm text-body/70-foreground px-3 py-2">未找到匹配的任务</div>
           )}
           {searchResults.matches.map(task => {
             const ancestors = searchResults.ancestorMap[task.id] ?? []
@@ -469,7 +466,7 @@ export function TaskTreeView({
               >
                 {/* 祖先路径面包屑 */}
                 {ancestors.length > 0 && (
-                  <div className="text-xs text-muted-foreground mb-0.5 truncate" title={[...ancestors].reverse().map(a => a.title).join(' > ')}>
+                  <div className="text-xs text-body/70-foreground mb-0.5 truncate" title={[...ancestors].reverse().map(a => a.title).join(' > ')}>
                     {ancestors.reverse().map(a => a.title).join(' > ')}
                   </div>
                 )}
@@ -523,7 +520,7 @@ export function TaskTreeView({
                     <FinalIcon className="shrink-0 size-3.5 text-body" />
                   )}
                   {/* 任务 ID 片段 */}
-                  <span className="text-xs text-muted-foreground shrink-0">#{task.id.slice(0, 8)}</span>
+                  <span className="text-xs text-body/70-foreground shrink-0">#{task.id.slice(0, 8)}</span>
                 </div>
               </div>
             )
@@ -531,7 +528,7 @@ export function TaskTreeView({
         </div>
       ) : rootNodes.length === 0 ? (
         /* ═══ 空状态 ═════════════════════════════════════════ */
-        <div className="flex flex-col items-center justify-center h-64 text-muted">
+        <div className="flex flex-col items-center justify-center h-64 text-body/70">
           <ListTodo className="size-12 mb-3 opacity-30" />
           <p className="text-sm">暂无任务</p>
           <p className="text-xs mt-1 opacity-60">
@@ -559,7 +556,6 @@ export function TaskTreeView({
                   onToggle={handleToggle}
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
-                  onPromoteToThread={onPromoteToThread}
                   onDataChanged={onDataChanged}
                 />
               ))}
@@ -577,7 +573,7 @@ export function TaskTreeView({
             onChange={e => setQuickAddText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleQuickAdd() }}
             placeholder="+ 快速添加任务，回车确认"
-            className="flex-1 h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
+            className="flex-1 h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
           />
           {isCreating && (
             <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -607,7 +603,6 @@ interface TaskTreeRowProps {
   onToggle: (node: TreeNode) => void
   onOpenTaskDetail?: (taskId: string) => void
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
-  onPromoteToThread?: (taskId: string) => void
   /** 数据变更回调（行内归档后刷新） */
   onDataChanged?: () => void
 }
@@ -627,7 +622,6 @@ function SortableTaskRow({
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
-  onPromoteToThread,
   onDataChanged,
 }: { id: string } & TaskTreeRowProps) {
   const {
@@ -669,7 +663,6 @@ function SortableTaskRow({
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
-          onPromoteToThread={onPromoteToThread}
           onDataChanged={onDataChanged}
         />
       </div>
@@ -691,7 +684,6 @@ function TaskTreeRow({
   onToggle,
   onOpenTaskDetail,
   onStatusChange,
-  onPromoteToThread,
   onDataChanged,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
@@ -836,7 +828,7 @@ function TaskTreeRow({
 
         {/* ID 显示（可选中复制） */}
         <span
-          className="ml-1 text-[10px] text-muted-soft cursor-pointer select-all shrink-0"
+          className="ml-1 text-[10px] text-body/70-soft cursor-pointer select-all shrink-0"
           title="选中以复制 ID"
         >
           #{task.id.slice(0, 8)}
@@ -873,7 +865,7 @@ function TaskTreeRow({
           const thread = threadMap.get(task.threadId)
           if (!thread) return null
           return (
-            <span className="flex-shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-muted bg-surface-soft">
+            <span className="flex-shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] text-body/70 bg-surface-soft">
               <span
                 className="size-1.5 rounded-full shrink-0"
                 style={{ backgroundColor: thread.color }}
@@ -927,11 +919,6 @@ function TaskTreeRow({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('子任务创建即将支持') }}>
               在此下方新建子任务
             </DropdownMenuItem>
-            {!task.parentId && !task.threadId && (
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPromoteToThread?.(task.id) }}>
-                提升为主线
-              </DropdownMenuItem>
-            )}
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('关联主线即将支持') }}>
               关联到主线...
             </DropdownMenuItem>
@@ -968,7 +955,6 @@ function TaskTreeRow({
           onToggle={onToggle}
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
-          onPromoteToThread={onPromoteToThread}
           onDataChanged={onDataChanged}
         />
       ))}

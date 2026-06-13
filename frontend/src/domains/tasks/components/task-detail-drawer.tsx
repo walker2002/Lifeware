@@ -228,7 +228,7 @@ export function TaskDetailDrawer({
     ]
     reversed.forEach((anc) => {
       items.push(
-        <ChevronRight key={`sep-${anc.id}`} className="size-3 text-muted shrink-0" />,
+        <ChevronRight key={`sep-${anc.id}`} className="size-3 text-body/70 shrink-0" />,
         <button
           key={anc.id}
           type="button"
@@ -241,7 +241,7 @@ export function TaskDetailDrawer({
       )
     })
     items.push(
-      <ChevronRight key="sep-current" className="size-3 text-muted shrink-0" />,
+      <ChevronRight key="sep-current" className="size-3 text-body/70 shrink-0" />,
       <span key="current" className="text-ink font-medium truncate max-w-[120px]" title={currentTask.title}>{currentTask.title}</span>,
     )
     return items
@@ -315,7 +315,7 @@ export function TaskDetailDrawer({
               <button
                 type="button"
                 onClick={() => onEnterFullscreen(currentTaskId)}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-body/60 hover:text-ink hover:bg-hover-overlay transition-colors"
                 title="全屏模式"
               >
                 <Maximize2 className="size-3.5" />
@@ -325,7 +325,7 @@ export function TaskDetailDrawer({
           <button
             type="button"
             onClick={handleCloseAttempt}
-            className="rounded-md p-1 text-muted hover:text-ink hover:bg-hover-overlay transition-colors"
+            className="rounded-md p-1 text-body/60 hover:text-ink hover:bg-hover-overlay transition-colors"
             aria-label="关闭"
           >
             <X className="size-4" />
@@ -347,7 +347,7 @@ export function TaskDetailDrawer({
           {/* 404 */}
           {!loading && notFound && (
             <div className="flex flex-col items-center justify-center py-20 px-5 text-center">
-              <p className="text-sm text-muted-soft mb-4">任务不存在或已删除</p>
+              <p className="text-sm text-body/70-soft mb-4">任务不存在或已删除</p>
               <button
                 type="button"
                 onClick={onClose}

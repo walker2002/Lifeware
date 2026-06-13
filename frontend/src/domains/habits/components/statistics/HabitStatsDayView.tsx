@@ -25,7 +25,7 @@ export function HabitStatsDayView({ data }: HabitStatsDayViewProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   if (data.length === 0) {
-    return <p className="py-8 text-center text-sm text-body/40">暂无活跃习惯</p>
+    return <p className="py-8 text-center text-sm text-body/70">暂无活跃习惯</p>
   }
 
   return (

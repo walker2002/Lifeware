@@ -75,13 +75,13 @@ function CompletedSummary({ task }: { task: Task }) {
         <h3 className="text-sm font-semibold text-ink">已完成</h3>
       </div>
       {task.completedAt && (
-        <div className="text-xs text-muted-soft mb-2">
+        <div className="text-xs text-body/70-soft mb-2">
           完成时间：{new Date(task.completedAt).toLocaleString('zh-CN')}
         </div>
       )}
       {task.actualDuration ? (
         <div className="flex items-center gap-1.5 text-xs text-ink mb-1">
-          <Clock className="size-3 text-muted-soft" />
+          <Clock className="size-3 text-body/70-soft" />
           实际用时：{formatDuration(task.actualDuration)}
         </div>
       ) : null}
@@ -127,7 +127,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-20 shrink-0">实际用时</label>
+          <label className="text-xs text-body/70-soft w-20 shrink-0">实际用时</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -137,7 +137,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
               className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
               placeholder="0"
             />
-            <span className="text-xs text-muted-soft">小时</span>
+            <span className="text-xs text-body/70-soft">小时</span>
             <input
               type="number"
               min={0}
@@ -147,7 +147,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
               className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
               placeholder="0"
             />
-            <span className="text-xs text-muted-soft">分钟</span>
+            <span className="text-xs text-body/70-soft">分钟</span>
           </div>
         </div>
 
@@ -155,21 +155,21 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
         {task.captureMode === 'retrospective' && (
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-muted mb-1">实际执行日期</label>
+              <label className="block text-xs text-body/70 mb-1">实际执行日期</label>
               <input
                 type="date"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">开始时间</label>
+              <label className="block text-xs text-body/70 mb-1">开始时间</label>
               <input
                 type="time"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">结束时间</label>
+              <label className="block text-xs text-body/70 mb-1">结束时间</label>
               <input
                 type="time"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
@@ -227,7 +227,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-soft w-20 shrink-0">实际用时</label>
+          <label className="text-xs text-body/70-soft w-20 shrink-0">实际用时</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -237,7 +237,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
               className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
               placeholder="0"
             />
-            <span className="text-xs text-muted-soft">小时</span>
+            <span className="text-xs text-body/70-soft">小时</span>
             <input
               type="number"
               min={0}
@@ -247,7 +247,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
               className="h-8 w-14 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
               placeholder="0"
             />
-            <span className="text-xs text-muted-soft">分钟</span>
+            <span className="text-xs text-body/70-soft">分钟</span>
           </div>
         </div>
 
@@ -255,21 +255,21 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
         {task.captureMode === 'retrospective' && (
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-muted mb-1">实际执行日期</label>
+              <label className="block text-xs text-body/70 mb-1">实际执行日期</label>
               <input
                 type="date"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">开始时间</label>
+              <label className="block text-xs text-body/70 mb-1">开始时间</label>
               <input
                 type="time"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">结束时间</label>
+              <label className="block text-xs text-body/70 mb-1">结束时间</label>
               <input
                 type="time"
                 className="w-full h-8 rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
@@ -279,12 +279,12 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
         )}
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-soft">本次产出</label>
+          <label className="text-xs text-body/70-soft">本次产出</label>
           <textarea
             value={output}
             onChange={e => setOutput(e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-y"
+            className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-xs text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-y"
             placeholder="描述本次完成的内容..."
           />
         </div>
@@ -438,7 +438,7 @@ function ReviewField({
         value={value}
         onChange={e => onChange(e.target.value)}
         rows={3}
-        className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-xs text-ink placeholder:text-muted-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-y"
+        className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-xs text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring resize-y"
         placeholder={placeholder}
       />
     </div>

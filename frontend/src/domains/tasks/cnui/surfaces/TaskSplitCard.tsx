@@ -57,10 +57,10 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted text-center py-2">暂无可拆分的任务</p>
+          <p className="text-xs text-body/70 text-center py-2">暂无可拆分的任务</p>
         )}
 
-        <p className="text-xs text-muted text-center">
+        <p className="text-xs text-body/70 text-center">
           🚧 AI 拆分功能正在开发中，敬请期待
         </p>
 
@@ -69,7 +69,7 @@ export function TaskSplitCard({ dataModel, onCancel, isDone }: TaskSplitCardProp
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md px-3 py-1.5 text-xs text-muted hover:text-ink transition-colors"
+              className="rounded-md px-3 py-1.5 text-xs text-body/60 hover:text-ink transition-colors"
             >
               关闭
             </button>

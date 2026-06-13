@@ -221,13 +221,14 @@ async function seed() {
   console.log('  ✓ 关键结果 (4)')
 
   // 5. 任务 (tasks)
+  // 状态值对齐 manifest lifecycle: [todo, planned, in_progress, completed, archived, deleted]
   const taskSeedData = [
-    { id: IDS.taskDesign, title: '完成时间盒模块 UI 设计', priority: 'high' as const, energy: 'high' as const, duration: 120, status: 'active' as const, keyResultId: IDS.krProject, due: 3 },
-    { id: IDS.taskCode, title: '实现时间冲突检测逻辑', priority: 'critical' as const, energy: 'high' as const, duration: 180, status: 'active' as const, keyResultId: IDS.krProject, due: 1 },
-    { id: IDS.taskReview, title: '代码审查与重构', priority: 'medium' as const, energy: 'medium' as const, duration: 90, status: 'active' as const, keyResultId: IDS.krProject, due: 5 },
-    { id: IDS.taskDeploy, title: '部署 MVP 到测试环境', priority: 'high' as const, energy: 'medium' as const, duration: 60, status: 'draft' as const, keyResultId: IDS.krProject, due: 7 },
-    { id: IDS.taskRead, title: '阅读《系统设计面试》第 3-5 章', priority: 'medium' as const, energy: 'medium' as const, duration: 60, status: 'active' as const, keyResultId: IDS.krRead, due: 4 },
-    { id: IDS.taskGrocery, title: '采购本周食材', priority: 'low' as const, energy: 'low' as const, duration: 45, status: 'active' as const, keyResultId: null, due: 1 },
+    { id: IDS.taskDesign, title: '完成时间盒模块 UI 设计', priority: 'high' as const, energy: 'high' as const, duration: 120, status: 'in_progress' as const, keyResultId: IDS.krProject, due: 3 },
+    { id: IDS.taskCode, title: '实现时间冲突检测逻辑', priority: 'critical' as const, energy: 'high' as const, duration: 180, status: 'in_progress' as const, keyResultId: IDS.krProject, due: 1 },
+    { id: IDS.taskReview, title: '代码审查与重构', priority: 'medium' as const, energy: 'medium' as const, duration: 90, status: 'in_progress' as const, keyResultId: IDS.krProject, due: 5 },
+    { id: IDS.taskDeploy, title: '部署 MVP 到测试环境', priority: 'high' as const, energy: 'medium' as const, duration: 60, status: 'planned' as const, keyResultId: IDS.krProject, due: 7 },
+    { id: IDS.taskRead, title: '阅读《系统设计面试》第 3-5 章', priority: 'medium' as const, energy: 'medium' as const, duration: 60, status: 'in_progress' as const, keyResultId: IDS.krRead, due: 4 },
+    { id: IDS.taskGrocery, title: '采购本周食材', priority: 'low' as const, energy: 'low' as const, duration: 45, status: 'in_progress' as const, keyResultId: null, due: 1 },
     { id: IDS.taskExercise, title: '晨跑 5 公里', priority: 'medium' as const, energy: 'high' as const, duration: 40, status: 'completed' as const, keyResultId: IDS.krExercise, due: -1 },
   ]
   for (const t of taskSeedData) {

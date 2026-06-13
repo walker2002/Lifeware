@@ -146,7 +146,7 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                       const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']
                       return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                     })()}
-                    <span className="truncate">{act.description}</span>
+                    <span className="truncate" title={act.description}>{act.description}</span>
                     {act.shortcut && (
                       <span className="ml-auto shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground">
                         {act.shortcut}
@@ -184,7 +184,7 @@ export function GrowthMenu({ domainActions, onAction }: GrowthMenuProps) {
                           const RespIcon = RESPONSE_TYPE_ICON[act.response_type ?? '']
                           return RespIcon ? <RespIcon className="size-3.5 shrink-0 text-body/40" /> : null
                         })()}
-                        <span className="truncate">{act.description}</span>
+                        <span className="truncate" title={act.description}>{act.description}</span>
                         {act.shortcut && (
                           <span className="ml-auto shrink-0 rounded-md bg-surface-soft px-2 py-0.5 text-xs text-muted-foreground">
                             {act.shortcut}

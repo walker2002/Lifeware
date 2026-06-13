@@ -141,10 +141,39 @@ async function getActiveTasks(): Promise<Record<string, unknown>[]> {
       priority: t.priority,
       estimatedDuration: t.estimatedDuration,
       status: t.status,
+      threadId: t.threadId,
     }))
   } catch (e) {
     console.error('[taskCnuiHandler] 查询 active tasks 失败:', e)
     return []
+  }
+}
+
+/**
+ * 构建任务树形数据（主线 + 任务），供 TaskTreeView 共享复用
+ * @param taskFilter - 可选的任务过滤器（如按状态筛选）
+ * @returns 主线列表和过滤后的任务列表
+ */
+async function buildTaskTreeData(
+  taskFilter?: (t: any) => boolean
+): Promise<{ threads: Record<string, unknown>[]; tasks: Record<string, unknown>[] }> {
+  const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
+  const threadRepo = new ThreadRepository()
+  const taskRepo = new TaskRepository()
+  const allThreads = await threadRepo.findByUserId(MVP_USER_ID as USOM_ID)
+  let allTasks = await taskRepo.findByUserId(MVP_USER_ID as USOM_ID)
+  if (taskFilter) allTasks = allTasks.filter(taskFilter)
+
+  return {
+    threads: allThreads.map(t => ({
+      id: t.id, name: t.name, color: t.color, status: t.status,
+    })),
+    tasks: allTasks.map(t => ({
+      id: t.id, title: t.title, status: t.status, priority: t.priority,
+      threadId: t.threadId, parentId: t.parentId,
+      estimatedDuration: t.estimatedDuration,
+      startDate: t.startDate, endDate: t.endDate, clarity: t.clarity,
+    })),
   }
 }
 
@@ -172,8 +201,8 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
           return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(candidates), action, phase: 'select', tasks: formatTaskList(candidates) } }
         }
       }
-      const tasks = await getActiveTasks()
-      return { content: '请选择要修改的任务', dataSnapshot: { tasks } }
+      const treeData = await buildTaskTreeData(t => !['archived', 'deleted'].includes(t.status))
+      return { content: '请选择要修改的任务', dataSnapshot: { action: 'update', defaultStatusFilter: ['todo', 'planned', 'in_progress', 'completed'], ...treeData } }
     }
 
     // ── 主线操作 ──
@@ -197,7 +226,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
             return { content: '编辑主线信息', dataSnapshot: { thread: { id: t.id, name: t.name, description: t.description, color: t.color, priority: t.priority, status: t.status }, action: 'update', phase: 'detail' } }
           }
           if (candidates.length > 1) {
-            return { content: '找到多个匹配主线，请选择', dataSnapshot: { items: candidates.map(t => ({ id: t.id, name: t.name, color: t.color, status: t.status })), action: 'update', phase: 'select' } }
+            return { content: '找到多个匹配主线，请选择', dataSnapshot: { items: candidates.map(t => ({ id: t.id, name: t.name, color: t.color, priority: t.priority, status: t.status })), action: 'update', phase: 'select' } }
           }
         }
         const threads = await repo.findByUserId(MVP_USER_ID as USOM_ID)
@@ -210,47 +239,13 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
               name: t.name,
               color: t.color,
               status: t.status,
+              priority: t.priority,
             })),
           },
         }
       } catch (e) {
         console.error('[taskCnuiHandler] 查询 threads 失败:', e)
         return { content: '请填写信息', dataSnapshot: {} }
-      }
-    }
-
-    if (action === 'promoteToThread') {
-      if (intentFields?.taskId) {
-        const repo = new TaskRepository()
-        const task = await repo.findById(intentFields.taskId as USOM_ID, MVP_USER_ID as USOM_ID)
-        if (task) return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(task), phase: 'detail' } }
-      }
-      if (intentFields?.title) {
-        const repo = new TaskRepository()
-        // DB 级过滤：仅可提升状态的任务
-        const candidates = await repo.searchByTitle(
-          intentFields.title as string,
-          MVP_USER_ID as USOM_ID,
-          ['todo', 'planned', 'in_progress'] as any,
-        )
-        // 额外过滤：仅顶级任务
-        const filtered = candidates.filter(t => !t.parentId)
-        if (filtered.length === 1) {
-          return { content: '确认将任务提升为主线', dataSnapshot: { task: formatTaskDetail(filtered[0]), phase: 'detail' } }
-        }
-        if (filtered.length > 1) {
-          return { content: '找到多个匹配任务，请选择', dataSnapshot: { items: formatTaskList(filtered), phase: 'select' } }
-        }
-      }
-      // 兜底：DB 级过滤 — 仅顶级、活跃状态的任务
-      const repo = new TaskRepository()
-      const candidates = await repo.findByUserId(MVP_USER_ID as USOM_ID, {
-        parentId: null,
-        status: ['todo', 'planned', 'in_progress'] as any,
-      })
-      return {
-        content: '请选择要提升为主线的任务',
-        dataSnapshot: { tasks: formatTaskList(candidates), phase: 'search' },
       }
     }
 
@@ -321,22 +316,18 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
     // ── 任务生命周期操作 ──
 
     if (action === 'deleteTask') {
-      // deleteTask 需查询多个可删除状态（非单状态映射）
-      try {
+      // intentFields 优先
+      if (intentFields?.taskId) {
         const repo = new TaskRepository()
-        const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
-        const items = allTasks
-          .filter(t => (DELETABLE_TASK_STATUSES as string[]).includes(t.status))
-          .map(t => ({
-            id: t.id,
-            title: t.title,
-            priority: t.priority,
-            estimatedDuration: t.estimatedDuration,
-            status: t.status,
-          }))
+        const task = await repo.findById(intentFields.taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+        if (task) return { content: '确认删除任务', dataSnapshot: { task: formatTaskDetail(task), action: 'delete', phase: 'detail', items: [] } }
+      }
+
+      try {
+        const treeData = await buildTaskTreeData(t => (DELETABLE_TASK_STATUSES as string[]).includes(t.status))
         return {
           content: '请选择要删除的任务',
-          dataSnapshot: { action: 'delete', items },
+          dataSnapshot: { action: 'delete', fixedStatusFilter: ['archived'], ...treeData },
         }
       } catch (e) {
         console.error('[taskCnuiHandler] 查询可删除任务失败:', e)
@@ -366,10 +357,10 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         }
       }
 
-      const items = await getTasksByStatus(status)
+      const treeData = await buildTaskTreeData(t => t.status === status)
       return {
         content: `请选择要${labels[smAction] ?? smAction}的任务`,
-        dataSnapshot: { action: smAction, items },
+        dataSnapshot: { action: smAction, fixedStatusFilter: [status], ...treeData },
       }
     }
 
@@ -424,8 +415,19 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
       // updateTask: 字段更新走直接 repo
       if (action === 'updateTask') {
-        const { updateTask } = await import('@/app/actions/tasks')
+        const { updateTask, createTask } = await import('@/app/actions/tasks')
         const task = await updateTask(fields.taskId as string, fields as any)
+
+        // 处理子任务创建
+        if (fields.createSubtask && typeof fields.createSubtask === 'object') {
+          const sub = fields.createSubtask as { title: string; parentId: string; threadId?: string | null }
+          await createTask({
+            title: sub.title,
+            parentId: sub.parentId,
+            threadId: sub.threadId ?? task.threadId ?? undefined,
+          })
+        }
+
         return { success: true, data: { object: task } }
       }
 
@@ -433,14 +435,6 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
       if (action === 'updateThread') {
         const { updateThread } = await import('@/app/actions/tasks')
         const thread = await updateThread(fields.threadId as string, fields as any)
-        return { success: true, data: { object: thread } }
-      }
-
-      // promoteToThread 是多阶段编排操作（创建主线 + 关联任务），
-      // 不走 SM 单步转换路径，直接调用专用服务端操作
-      if (action === 'promoteToThread') {
-        const { promoteToThread } = await import('@/app/actions/tasks')
-        const thread = await promoteToThread(fields.taskId as string, fields as Partial<import('@/usom/interfaces/irepository').CreateThreadInput>)
         return { success: true, data: { object: thread } }
       }
 
@@ -502,7 +496,6 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'task-edit-card': taskCnuiHandler,
   'task-action-panel': taskCnuiHandler,
   'thread-creation-card': taskCnuiHandler,
-  'thread-promote-card': taskCnuiHandler,
   'thread-action-panel': taskCnuiHandler,
   'task-split-card': taskCnuiHandler,
   'task-tree-view': taskCnuiHandler,
