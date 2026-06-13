@@ -54,6 +54,35 @@ const STATUS_LABELS: Record<string, string> = {
   archived: '已归档',
 }
 
+/** 翻页控件（内联渲染） */
+function PaginationControls({ dataModel, onDataChange }: { dataModel: Record<string, unknown>; onDataChange: (d: Record<string, unknown>) => void }) {
+  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+  if (!p) return null
+  return (
+    <>
+      <button
+        type="button"
+        disabled={p.page <= 1}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ‹
+      </button>
+      <span className="min-w-[2rem] text-center text-xs text-muted">
+        {p.page}/{p.totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={p.page >= p.totalPages}
+        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
+        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
+      >
+        ›
+      </button>
+    </>
+  )
+}
+
 /**
  * 主线操作面板组件
  * @description 处理主线的暂停、恢复、完成和归档批量操作
@@ -98,9 +127,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
   }
 
   if (isDone) {
-    return (
-      <p className="text-sm text-ink text-center py-4">✅ 操作已完成</p>
-    )
+    return <p className="text-sm text-ink text-center py-4">✅ 操作已完成</p>
   }
 
   // ─── update 模式：编辑主线 ─────────────────────
@@ -109,36 +136,11 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
     if (editingThreadId) {
       const thread = threads.find(t => t.id === editingThreadId)
       return (
-        <div className="w-full max-w-lg">
+        <>
           {/* 翻页 + 全屏控件 */}
-{(dataModel._pagination || onRequestFullscreen) && (
-  <div className="mb-3 flex items-center justify-end gap-1.5">
-              {(() => {
-  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
-  return p && (
-    <>
-      <button
-        type="button"
-        disabled={p.page <= 1}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ‹
-      </button>
-      <span className="min-w-[2rem] text-center text-xs text-muted">
-        {p.page}/{p.totalPages}
-      </span>
-      <button
-        type="button"
-        disabled={p.page >= p.totalPages}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ›
-      </button>
-    </>
-  )
-})()}
+          {(dataModel._pagination || onRequestFullscreen) && (
+            <div className="mb-3 flex items-center justify-end gap-1.5">
+              <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
               {onRequestFullscreen && (
                 <button
                   type="button"
@@ -232,42 +234,17 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
               </button>
             </div>
           </div>
-        </div>
+        </>
       )
     }
 
     // 选择主线视图
     return (
-      <div className="w-full max-w-lg">
+      <>
         {/* 翻页 + 全屏控件 */}
-{(dataModel._pagination || onRequestFullscreen) && (
-  <div className="mb-3 flex items-center justify-end gap-1.5">
-            {(() => {
-  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
-  return p && (
-    <div className="w-full max-w-lg">
-      <button
-        type="button"
-        disabled={p.page <= 1}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ‹
-      </button>
-      <span className="min-w-[2rem] text-center text-xs text-muted">
-        {p.page}/{p.totalPages}
-      </span>
-      <button
-        type="button"
-        disabled={p.page >= p.totalPages}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ›
-      </button>
-    </div>
-  )
-})()}
+        {(dataModel._pagination || onRequestFullscreen) && (
+          <div className="mb-3 flex items-center justify-end gap-1.5">
+            <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
             {onRequestFullscreen && (
               <button
                 type="button"
@@ -278,8 +255,8 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
                 ⛶
               </button>
             )}
-            </div>
-          )}
+          </div>
+        )}
 
         {threads.length === 0 ? (
           <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
@@ -324,41 +301,17 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
             </button>
           </div>
         )}
-      </div>
+      </>
     )
   }
 
+  // ─── 默认批量操作模式 ─────────────────────
   return (
-    <div className="w-full max-w-lg">
+    <>
       {/* 翻页 + 全屏控件 */}
-{(dataModel._pagination || onRequestFullscreen) && (
-  <div className="mb-3 flex items-center justify-end gap-1.5">
-          {(() => {
-  const p = dataModel._pagination as { page: number; totalPages: number } | undefined
-  return p && (
-    <div className="w-full max-w-lg">
-      <button
-        type="button"
-        disabled={p.page <= 1}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ‹
-      </button>
-      <span className="min-w-[2rem] text-center text-xs text-muted">
-        {p.page}/{p.totalPages}
-      </span>
-      <button
-        type="button"
-        disabled={p.page >= p.totalPages}
-        onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
-        className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
-      >
-        ›
-      </button>
-    </div>
-  )
-})()}
+      {(dataModel._pagination || onRequestFullscreen) && (
+        <div className="mb-3 flex items-center justify-end gap-1.5">
+          <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
           {onRequestFullscreen && (
             <button
               type="button"
@@ -369,8 +322,8 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
               ⛶
             </button>
           )}
-            </div>
-          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
@@ -439,11 +392,13 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
               type="button"
               onClick={handleExecute}
               disabled={selectedIds.size === 0 || isLoading}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
             >
               {labels.button} ({selectedIds.size})
             </button>
           </div>
         </div>
       )}
-    </div>
+    </>
+  )
+}
