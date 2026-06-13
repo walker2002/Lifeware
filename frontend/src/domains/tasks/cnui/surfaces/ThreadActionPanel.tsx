@@ -265,7 +265,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
       >
         ›
       </button>
-    </>
+    </div>
   )
 })()}
             {onRequestFullscreen && (
@@ -356,7 +356,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
       >
         ›
       </button>
-    </>
+    </div>
   )
 })()}
           {onRequestFullscreen && (
@@ -446,4 +446,4 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
           </div>
         </div>
       )}
-    </>
+    </div>

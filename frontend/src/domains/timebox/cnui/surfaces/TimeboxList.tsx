@@ -147,6 +147,7 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
         >
           确认全部
         </button>
+        </div>
     </>
   )
 }
