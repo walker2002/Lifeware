@@ -651,7 +651,7 @@ TopNav 高度：**56px**。LeftPanel 默认宽度：**300px**。
 
 | 属性 | 内联态 | 全屏态 |
 |---|---|---|
-| 容器类 | `mt-2 max-h-[65vh] overflow-hidden` | `fixed inset-0 z-40 flex flex-col bg-canvas` |
+| 容器类 | `mt-2 max-h-[65vh] overflow-hidden` | `fixed inset-0 z-overlay flex flex-col bg-canvas` |
 | dataModel | 分页后数据（`pageSize` 默认 5） | 全量数据（`rawData`，不翻页，滚动浏览） |
 | 标题行 | header + `⛶` | header + `↙`，底部加 `border-b border-hairline px-4 py-3` |
 | 内容区 | 直接渲染 | `flex-1 overflow-y-auto p-4` |

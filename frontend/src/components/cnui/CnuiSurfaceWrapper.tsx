@@ -102,7 +102,7 @@ export function CnuiSurfaceWrapper({
   // ── 全屏切换 ─────────────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
     if (!isFullscreen) {
-      // 进入全屏前测量内联高度，留给占位符防止对话流塌陷
+      // 进入全屏前测量内联高度（布局高度，与滚动位置无关），留给占位符防止对话流塌陷
       setInlineHeight(wrapperRef.current?.getBoundingClientRect().height ?? 0)
     }
     onFullscreenChange?.(!isFullscreen)
@@ -139,7 +139,7 @@ export function CnuiSurfaceWrapper({
         className={cn(
           'relative',
           isFullscreen
-            ? 'fixed inset-0 z-40 flex flex-col bg-canvas'
+            ? 'fixed inset-0 z-overlay flex flex-col bg-canvas'
             : 'mt-2 max-h-[65vh] overflow-hidden',
         )}
       >
