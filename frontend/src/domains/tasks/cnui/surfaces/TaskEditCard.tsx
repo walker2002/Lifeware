@@ -211,7 +211,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
                 type="button"
                 onClick={handleAddSubtask}
                 disabled={!subtaskTitle.trim()}
-                className="h-7 rounded-md bg-primary px-3 text-[11px] font-medium text-on-primary disabled:opacity-40"
+                className="h-7 rounded-md bg-primary px-3 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
               >
                 添加
               </button>
