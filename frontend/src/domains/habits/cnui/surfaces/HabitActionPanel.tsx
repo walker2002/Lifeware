@@ -44,8 +44,6 @@ interface HabitActionPanelProps {
   onCancel: () => void
   /** 是否加载中 */
   isLoading?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
 /** 操作标签映射 */
@@ -56,7 +54,7 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   archive: { title: '归档暂停习惯', button: '归档所选' },
 }
 
-export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitActionPanelProps) {
+export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading }: HabitActionPanelProps) {
   const action = (dataModel.action as string) ?? 'activate'
   const items = (dataModel.items as HabitItem[]) ?? []
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.activate
@@ -95,8 +93,8 @@ export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel,
 
   return (
     <>
-      {/* 翻页 + 全屏控件 — 仅在有控件时渲染 */}
-      {(dataModel._pagination || onRequestFullscreen) && (
+      {/* 翻页控件 — 仅在有翻页时渲染 */}
+      {dataModel._pagination && (
         <div className="mb-3 flex items-center justify-end gap-1.5">
           {(() => {
             const p = dataModel._pagination as { page: number; totalPages: number } | undefined
@@ -124,16 +122,6 @@ export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel,
             </>
           )
           })()}
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
         </div>
       )}
 

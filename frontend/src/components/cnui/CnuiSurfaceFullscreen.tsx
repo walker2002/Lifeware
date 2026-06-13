@@ -53,23 +53,15 @@ export function CnuiSurfaceFullscreen({
             type="button"
             onClick={onClose}
             className="text-sm text-muted hover:text-ink transition-colors"
+            title="缩小回对话"
           >
-            ✕
+            ↙
           </button>
         </div>
 
         {/* ── 内容区：全量展示 + 滚动 ─────────────────── */}
-        <div className="relative flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4">
           {children}
-          {/* ── 右上角返回缩小按钮 ──────────────────────── */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="sticky top-0 float-right ml-2 mb-1 flex size-6 items-center justify-center rounded text-muted hover:bg-hover-overlay hover:text-ink transition-colors"
-            title="退出全屏"
-          >
-            ▽
-          </button>
         </div>
       </DialogContent>
     </Dialog>

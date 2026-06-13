@@ -45,11 +45,9 @@ interface HabitCheckinPanelProps {
   onCancel: () => void
   /** 是否加载中 */
   isLoading?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
-export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitCheckinPanelProps) {
+export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading }: HabitCheckinPanelProps) {
   const items = (dataModel.items as CheckinHabitItem[]) ?? []
 
   const pending = items.filter(h => !h.todayLogged)
@@ -128,16 +126,6 @@ export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel
     </>
   )
 })()}
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
         </div>
       </div>
 

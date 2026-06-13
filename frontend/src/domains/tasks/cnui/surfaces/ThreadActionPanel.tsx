@@ -30,8 +30,6 @@ interface ThreadActionPanelProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
 /** 操作标签映射 */
@@ -87,7 +85,7 @@ function PaginationControls({ dataModel, onDataChange }: { dataModel: Record<str
  * 主线操作面板组件
  * @description 处理主线的暂停、恢复、完成和归档批量操作
  */
-export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, onRequestFullscreen }: ThreadActionPanelProps) {
+export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: ThreadActionPanelProps) {
   const action = (dataModel.action as string) ?? 'pause'
   const items = (dataModel.items as ThreadItem[]) ?? []
   // updateThread handler 返回的 key 是 "threads"，需要兼容读取
@@ -137,20 +135,10 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
       const thread = threads.find(t => t.id === editingThreadId)
       return (
         <>
-          {/* 翻页 + 全屏控件 */}
-          {(dataModel._pagination || onRequestFullscreen) && (
+          {/* 翻页控件 */}
+          {dataModel._pagination && (
             <div className="mb-3 flex items-center justify-end gap-1.5">
               <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
-              {onRequestFullscreen && (
-                <button
-                  type="button"
-                  onClick={onRequestFullscreen}
-                  className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-                  title="全屏展开"
-                >
-                  ⛶
-                </button>
-              )}
             </div>
           )}
           <div className="flex flex-col gap-3">
@@ -241,20 +229,10 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
     // 选择主线视图
     return (
       <>
-        {/* 翻页 + 全屏控件 */}
-        {(dataModel._pagination || onRequestFullscreen) && (
+        {/* 翻页控件 */}
+        {dataModel._pagination && (
           <div className="mb-3 flex items-center justify-end gap-1.5">
             <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
-            {onRequestFullscreen && (
-              <button
-                type="button"
-                onClick={onRequestFullscreen}
-                className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-                title="全屏展开"
-              >
-                ⛶
-              </button>
-            )}
           </div>
         )}
 
@@ -308,20 +286,10 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
   // ─── 默认批量操作模式 ─────────────────────
   return (
     <>
-      {/* 翻页 + 全屏控件 */}
-      {(dataModel._pagination || onRequestFullscreen) && (
+      {/* 翻页控件 */}
+      {dataModel._pagination && (
         <div className="mb-3 flex items-center justify-end gap-1.5">
           <PaginationControls dataModel={dataModel} onDataChange={onDataChange} />
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
         </div>
       )}
 

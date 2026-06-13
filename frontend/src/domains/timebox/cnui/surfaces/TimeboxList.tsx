@@ -39,11 +39,9 @@ interface TimeboxListProps {
   isDone?: boolean
   /** 是否加载中 */
   isLoading?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
-export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDone, isLoading, onRequestFullscreen }: TimeboxListProps) {
+export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDone, isLoading }: TimeboxListProps) {
   const items = (dataModel.items as TimeboxItem[]) ?? []
 
   function removeItem(index: number) {
@@ -88,16 +86,6 @@ export function TimeboxList({ dataModel, onDataChange, onConfirm, onCancel, isDo
               </>
             )
           })()}
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
         </div>
       </div>
 

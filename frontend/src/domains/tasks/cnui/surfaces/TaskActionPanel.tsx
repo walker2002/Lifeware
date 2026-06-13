@@ -33,8 +33,6 @@ interface TaskActionPanelProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
 /** 操作标签映射 */
@@ -73,7 +71,7 @@ const CLARITY_LABELS: Record<string, string> = {
  * 任务操作面板组件
  * @description 处理任务的完成、归档、删除和细化批量操作
  */
-export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, onRequestFullscreen }: TaskActionPanelProps) {
+export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: TaskActionPanelProps) {
   const action = (dataModel.action as string) ?? 'complete'
   const items = (dataModel.items as TaskItem[]) ?? []
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.complete
@@ -120,8 +118,8 @@ export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, 
 
   return (
     <>
-      {/* 翻页 + 全屏控件 — 仅在有控件时渲染 */}
-      {(dataModel._pagination || onRequestFullscreen) && (
+      {/* 翻页控件 — 仅在有翻页时渲染 */}
+      {dataModel._pagination && (
         <div className="mb-3 flex items-center justify-end gap-1.5">
           {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
@@ -149,16 +147,6 @@ export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, 
     </>
   )
 })()}
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
         </div>
       )}
 

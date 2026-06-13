@@ -45,8 +45,6 @@ interface TaskTreeViewCardProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
-  /** 全屏请求回调 */
-  onRequestFullscreen?: () => void
 }
 
 // ─── 常量 ──────────────────────────────────────────────────────────
@@ -451,7 +449,6 @@ export function TaskTreeViewCard({
   onCancel,
   isLoading,
   isDone,
-  onRequestFullscreen,
 }: TaskTreeViewCardProps) {
   // ─── 模式检测 ────────────────────────────────────────────────
   const action = dataModel.action as string | undefined
@@ -780,28 +777,16 @@ export function TaskTreeViewCard({
 
   return (
     <>
-      {/* 控件栏 — 全选/全屏 */}
-      {((mode === 'select' && allVisibleTaskIds.length > 0) || onRequestFullscreen) && (
+      {/* 控件栏 — 全选 */}
+      {mode === 'select' && allVisibleTaskIds.length > 0 && (
         <div className="px-3 pt-3 pb-1 flex items-center justify-end gap-1.5">
-          {mode === 'select' && allVisibleTaskIds.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
-            >
-              {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
-            </button>
-          )}
-          {onRequestFullscreen && (
-            <button
-              type="button"
-              onClick={onRequestFullscreen}
-              className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-              title="全屏展开"
-            >
-              ⛶
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
+          >
+            {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
+          </button>
         </div>
       )}
 
