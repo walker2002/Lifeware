@@ -670,9 +670,6 @@ export function TaskTreeViewCard({
   if (isDirectConfirm && detailTask) {
     return (
       <div className="w-full max-w-md">
-        <div className="mb-3 text-sm font-medium text-ink">
-          确认{ACTION_LABELS[action!]?.button ?? action!}
-        </div>
         <div className="rounded-md border border-hairline p-3 flex items-center gap-2">
           <StatusIcon status={(detailTask.status as string) ?? 'todo'} />
           <span className="text-sm text-ink font-medium truncate">{detailTask.title as string}</span>
@@ -702,7 +699,6 @@ export function TaskTreeViewCard({
   if (isDirectEdit && directEditInited) {
     return (
       <div className="w-full max-w-md">
-        <div className="mb-3 text-sm font-medium text-ink">编辑任务</div>
         <EditForm
           taskId={(detailTask?.id as string) ?? ''}
           initialTitle={directTitle}
@@ -722,7 +718,6 @@ export function TaskTreeViewCard({
   if (mode === 'edit' && editingTask) {
     return (
       <div className="w-full max-w-md">
-        <div className="mb-3 text-sm font-medium text-ink">编辑任务</div>
         <EditForm
           taskId={editingTask.id}
           initialTitle={editingTask.title}
@@ -743,10 +738,6 @@ export function TaskTreeViewCard({
     const btnLabel = ACTION_LABELS[action!]?.button ?? '确认'
     return (
       <div className="w-full max-w-md">
-        <div className="mb-3 text-sm font-medium text-ink">
-          确认{btnLabel} {selectedIds.size} 项任务
-        </div>
-
         {/* 影响的任务列表 */}
         <div className="max-h-[300px] overflow-y-auto rounded-md border border-hairline">
           {tasks.filter(t => selectedIds.has(t.id)).map(t => (
@@ -793,36 +784,18 @@ export function TaskTreeViewCard({
 
   return (
     <div className="w-full max-w-2xl rounded-lg border border-hairline bg-surface-soft">
-      {/* 标题栏 */}
-      {labels && (
-        <div className="px-3 pt-3 pb-1 text-sm font-medium text-ink flex items-center justify-between">
-          <span>{labels.title}</span>
-          <div className="flex items-center gap-1.5">
-            {mode === 'select' && allVisibleTaskIds.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
-              >
-                {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
-              </button>
-            )}
-            {onRequestFullscreen && (
-              <button
-                type="button"
-                onClick={onRequestFullscreen}
-                className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-                title="全屏展开"
-              >
-                ⛶
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      {mode === 'edit' && !labels && (
-        <div className="px-3 pt-3 pb-1 text-sm font-medium text-ink flex items-center justify-between">
-          <span>选择要修改的任务</span>
+      {/* 控件栏 — 全选/全屏 */}
+      {((mode === 'select' && allVisibleTaskIds.length > 0) || onRequestFullscreen) && (
+        <div className="px-3 pt-3 pb-1 flex items-center justify-end gap-1.5">
+          {mode === 'select' && allVisibleTaskIds.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="text-xs text-primary hover:text-primary-active font-normal transition-colors"
+            >
+              {selectedIds.size === allVisibleTaskIds.length ? '取消全选' : '全选'}
+            </button>
+          )}
           {onRequestFullscreen && (
             <button
               type="button"
@@ -833,6 +806,18 @@ export function TaskTreeViewCard({
               ⛶
             </button>
           )}
+        </div>
+      )}
+      {mode === 'edit' && !labels && onRequestFullscreen && (
+        <div className="px-3 pt-3 pb-1 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRequestFullscreen}
+            className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
+            title="全屏展开"
+          >
+            ⛶
+          </button>
         </div>
       )}
 
