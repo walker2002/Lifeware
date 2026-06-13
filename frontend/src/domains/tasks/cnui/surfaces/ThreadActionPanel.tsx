@@ -112,9 +112,9 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
       const thread = threads.find(t => t.id === editingThreadId)
       return (
         <div className="w-full max-w-lg">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-ink">编辑主线</span>
-            <div className="flex items-center gap-1.5">
+          {/* 翻页 + 全屏控件 */}
+{(dataModel._pagination || onRequestFullscreen) && (
+  <div className="mb-3 flex items-center justify-end gap-1.5">
               {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
@@ -152,7 +152,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
                 </button>
               )}
             </div>
-          </div>
+          )}
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs text-body">名称</label>
@@ -241,9 +241,9 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
     // 选择主线视图
     return (
       <div className="w-full max-w-lg">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">选择要编辑的主线</span>
-          <div className="flex items-center gap-1.5">
+        {/* 翻页 + 全屏控件 */}
+{(dataModel._pagination || onRequestFullscreen) && (
+  <div className="mb-3 flex items-center justify-end gap-1.5">
             {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
@@ -280,8 +280,8 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
                 ⛶
               </button>
             )}
-          </div>
-        </div>
+            </div>
+          )}
 
         {threads.length === 0 ? (
           <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
@@ -332,9 +332,9 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
 
   return (
     <div className="w-full max-w-lg">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-ink">{labels.title}</span>
-        <div className="flex items-center gap-1.5">
+      {/* 翻页 + 全屏控件 */}
+{(dataModel._pagination || onRequestFullscreen) && (
+  <div className="mb-3 flex items-center justify-end gap-1.5">
           {(() => {
   const p = dataModel._pagination as { page: number; totalPages: number } | undefined
   return p && (
@@ -371,8 +371,8 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
               ⛶
             </button>
           )}
-        </div>
-      </div>
+            </div>
+          )}
 
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm text-body/70">没有符合条件的主线</p>
