@@ -659,17 +659,13 @@ export function TaskTreeViewCard({
 
   // ─── 完成状态 ────────────────────────────────────────────────
   if (isDone) {
-    return (
-      <div className="w-full max-w-2xl rounded-lg border border-hairline bg-surface-soft p-4 text-center">
-        <p className="text-sm text-ink">✅ 操作已完成</p>
-      </div>
-    )
+    return <p className="text-sm text-ink text-center py-2">✅ 操作已完成</p>
   }
 
   // ─── direct-confirm 渲染（单任务确认） ────────────────────────
   if (isDirectConfirm && detailTask) {
     return (
-      <div className="w-full max-w-md">
+      <>
         <div className="rounded-md border border-hairline p-3 flex items-center gap-2">
           <StatusIcon status={(detailTask.status as string) ?? 'todo'} />
           <span className="text-sm text-ink font-medium truncate">{detailTask.title as string}</span>
@@ -691,14 +687,14 @@ export function TaskTreeViewCard({
             {isLoading ? '处理中...' : '确认'}
           </button>
         </div>
-      </div>
+      </>
     )
   }
 
   // ─── direct-edit 渲染（单任务编辑） ──────────────────────────
   if (isDirectEdit && directEditInited) {
     return (
-      <div className="w-full max-w-md">
+      <>
         <EditForm
           taskId={(detailTask?.id as string) ?? ''}
           initialTitle={directTitle}
@@ -710,14 +706,14 @@ export function TaskTreeViewCard({
           onCancel={() => onCancel?.()}
           isLoading={isLoading}
         />
-      </div>
+      </>
     )
   }
 
   // ─── edit 模式 — 选中后全屏覆盖编辑表单 ──────────────────────
   if (mode === 'edit' && editingTask) {
     return (
-      <div className="w-full max-w-md">
+      <>
         <EditForm
           taskId={editingTask.id}
           initialTitle={editingTask.title}
@@ -729,7 +725,7 @@ export function TaskTreeViewCard({
           onCancel={exitEdit}
           isLoading={isLoading}
         />
-      </div>
+      </>
     )
   }
 
@@ -737,7 +733,7 @@ export function TaskTreeViewCard({
   if (mode === 'select' && confirmPhase) {
     const btnLabel = ACTION_LABELS[action!]?.button ?? '确认'
     return (
-      <div className="w-full max-w-md">
+      <>
         {/* 影响的任务列表 */}
         <div className="max-h-[300px] overflow-y-auto rounded-md border border-hairline">
           {tasks.filter(t => selectedIds.has(t.id)).map(t => (
@@ -776,14 +772,14 @@ export function TaskTreeViewCard({
             {isLoading ? '处理中...' : `确认${btnLabel} (${selectedIds.size})`}
           </button>
         </div>
-      </div>
+      </>
     )
   }
 
   // ─── 树形视图渲染（view/edit/select 通用） ────────────────────
 
   return (
-    <div className="w-full max-w-2xl rounded-lg border border-hairline bg-surface-soft">
+    <>
       {/* 控件栏 — 全选/全屏 */}
       {((mode === 'select' && allVisibleTaskIds.length > 0) || onRequestFullscreen) && (
         <div className="px-3 pt-3 pb-1 flex items-center justify-end gap-1.5">
@@ -806,18 +802,6 @@ export function TaskTreeViewCard({
               ⛶
             </button>
           )}
-        </div>
-      )}
-      {mode === 'edit' && !labels && onRequestFullscreen && (
-        <div className="px-3 pt-3 pb-1 flex items-center justify-end">
-          <button
-            type="button"
-            onClick={onRequestFullscreen}
-            className="flex size-[22px] items-center justify-center rounded border border-primary text-xs text-primary hover:bg-primary/10 transition-colors"
-            title="全屏展开"
-          >
-            ⛶
-          </button>
         </div>
       )}
 
@@ -1010,6 +994,6 @@ export function TaskTreeViewCard({
           </button>
         </div>
       )}
-    </div>
+    </>
   )
 }
