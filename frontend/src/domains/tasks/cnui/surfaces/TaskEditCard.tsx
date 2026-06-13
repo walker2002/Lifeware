@@ -97,9 +97,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   // ─── 完成状态 ─────────────────────────────────────────────────
   if (isDone) {
     return (
-      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
-        <p className="text-sm text-ink">✅ 任务已更新</p>
-      </div>
+      <p className="text-sm text-ink text-center py-2">✅ 任务已更新</p>
     )
   }
 
@@ -255,15 +253,15 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   // ─── 直接编辑模式（handler 已确定任务） ──────────────────────────
   if (directEdit && editingId) {
     return (
-      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
+      <>
         {renderEditForm(editingId)}
-      </div>
+      </>
     )
   }
 
   // ─── 列表模式（选择后内联展开） ─────────────────────────────────
   return (
-    <div className="w-full max-w-lg border border-hairline rounded-lg bg-surface-soft p-4">
+    <>
 
       {tasks.length === 0 ? (
         <p className="py-8 text-center text-sm text-body/70">没有可编辑的任务</p>
@@ -318,6 +316,6 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
           </button>
         )}
       </div>
-    </div>
+    </>
   )
 }

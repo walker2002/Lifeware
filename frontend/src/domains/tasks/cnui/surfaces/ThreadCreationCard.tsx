@@ -55,14 +55,12 @@ export function ThreadCreationCard({
 
   if (isDone) {
     return (
-      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
-        <p className="text-sm text-ink">✅ 主线已创建</p>
-      </div>
+      <p className="text-sm text-ink text-center py-2">✅ 主线已创建</p>
     )
   }
 
   return (
-    <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
+    <>
       <div className="space-y-3">
         {/* 主线名称 */}
         <div>
@@ -158,6 +156,6 @@ export function ThreadCreationCard({
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 }

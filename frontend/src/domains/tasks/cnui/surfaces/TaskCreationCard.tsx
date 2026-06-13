@@ -68,14 +68,12 @@ export function TaskCreationCard({
 
   if (isDone) {
     return (
-      <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4 text-center">
-        <p className="text-sm text-ink">✅ 任务已创建</p>
-      </div>
+      <p className="text-sm text-ink text-center py-2">✅ 任务已创建</p>
     )
   }
 
   return (
-    <div className="w-full max-w-md border border-hairline rounded-lg bg-surface-soft p-4">
+    <>
       <div className="space-y-3">
         {/* 标题 */}
         <div>
@@ -181,6 +179,6 @@ export function TaskCreationCard({
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 }
