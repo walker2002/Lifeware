@@ -188,14 +188,14 @@ export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel
                   <button
                     type="button"
                     onClick={() => handleQuickLog(habit.id)}
-                    className="rounded bg-success px-2 py-1 text-xs text-on-primary hover:bg-success/90"
+                    className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90 transition-colors"
                   >
                     完成
                   </button>
                   <button
                     type="button"
                     onClick={() => setDetailHabit(habit)}
-                    className="rounded bg-muted px-2 py-1 text-xs text-on-primary hover:bg-muted/80"
+                    className="rounded border border-hairline bg-canvas px-2 py-1 text-xs text-ink hover:bg-hover-overlay transition-colors"
                   >
                     详情
                   </button>
@@ -218,7 +218,7 @@ export function HabitCheckinPanel({ dataModel, onDataChange, onConfirm, onCancel
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md border px-3 py-1.5 text-xs"
+              className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
             >
               取消
             </button>

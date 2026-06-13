@@ -56,7 +56,7 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   archive: { title: '归档暂停习惯', button: '归档所选' },
 }
 
-export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitActionPanelProps) {
+export function HabitActionPanel({ dataModel, onDataChange, onConfirm, onCancel, isLoading, onRequestFullscreen }: HabitActionPanelProps) {
   const action = (dataModel.action as string) ?? 'activate'
   const items = (dataModel.items as HabitItem[]) ?? []
   const labels = ACTION_LABELS[action] ?? ACTION_LABELS.activate
@@ -98,29 +98,32 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading, on
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">{labels.title}</span>
         <div className="flex items-center gap-1.5">
-          {dataModel._pagination && (
+          {(() => {
+            const p = dataModel._pagination as { page: number; totalPages: number } | undefined
+            return p && (
             <>
               <button
                 type="button"
-                disabled={(dataModel._pagination as { page: number }).page <= 1}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page - 1 })}
+                disabled={p.page <= 1}
+                onClick={() => onDataChange({ ...dataModel, _page: p.page - 1 })}
                 className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
               >
                 ‹
               </button>
               <span className="min-w-[2rem] text-center text-xs text-muted">
-                {(dataModel._pagination as { page: number }).page}/{(dataModel._pagination as { totalPages: number }).totalPages}
+                {p.page}/{p.totalPages}
               </span>
               <button
                 type="button"
-                disabled={(dataModel._pagination as { page: number; totalPages: number }).page >= (dataModel._pagination as { totalPages: number }).totalPages}
-                onClick={() => onDataChange({ ...dataModel, _page: (dataModel._pagination as { page: number }).page + 1 })}
+                disabled={p.page >= p.totalPages}
+                onClick={() => onDataChange({ ...dataModel, _page: p.page + 1 })}
                 className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40"
               >
                 ›
               </button>
             </>
-          )}
+          )
+          })()}
           {onRequestFullscreen && (
             <button
               type="button"
@@ -198,7 +201,7 @@ export function HabitActionPanel({ dataModel, onConfirm, onCancel, isLoading, on
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md border px-3 py-1.5 text-xs"
+              className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay transition-colors"
             >
               取消
             </button>

@@ -251,7 +251,7 @@ export function TaskActionPanel({ dataModel, onDataChange, onConfirm, onCancel, 
               type="button"
               onClick={handleExecute}
               disabled={selectedIds.size === 0 || isLoading}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
             >
               {labels.button} ({selectedIds.size})
             </button>

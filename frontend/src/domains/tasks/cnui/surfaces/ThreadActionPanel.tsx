@@ -228,7 +228,7 @@ export function ThreadActionPanel({ dataModel, onDataChange, onConfirm, onCancel
                   priority: editPriority || thread?.priority,
                 })}
                 disabled={isLoading}
-                className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-on-primary disabled:opacity-40 transition-colors"
+                className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 transition-colors"
               >
                 保存
               </button>
