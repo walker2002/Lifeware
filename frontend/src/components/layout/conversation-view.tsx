@@ -113,6 +113,8 @@ export function ConversationView({ messages, sessionId, onSendMessage, isLoading
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // 当前全屏的 surface ID（同一时刻仅一个 surface 全屏）
+  const [fullscreenSurfaceId, setFullscreenSurfaceId] = useState<string | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" })
@@ -362,18 +364,20 @@ export function ConversationView({ messages, sessionId, onSendMessage, isLoading
             {messages.map((msg, i) => (
               <ChatBubble key={i} role={msg.role} timestamp={msg.timestamp}>
                 {msg.cnuiSurface ? (
-                  <div>
-                    <div>{msg.content}</div>
-                    <CnuiSurfaceWrapper
-                      surfaceId={msg.cnuiSurface.cnuiSurfaceId}
-                      domainId={msg.cnuiSurface.domainId}
-                      action={msg.cnuiSurface.action}
-                      surfaceType={msg.cnuiSurface.cnuiSurfaceType}
-                      dataSnapshot={msg.cnuiSurface.dataSnapshot}
-                      lifecycleState={lifecycleState}
-                      lifecycleActions={lifecycleActions}
-                    />
-                  </div>
+                  <CnuiSurfaceWrapper
+                    surfaceId={msg.cnuiSurface.cnuiSurfaceId}
+                    domainId={msg.cnuiSurface.domainId}
+                    action={msg.cnuiSurface.action}
+                    surfaceType={msg.cnuiSurface.cnuiSurfaceType}
+                    dataSnapshot={msg.cnuiSurface.dataSnapshot}
+                    lifecycleState={lifecycleState}
+                    lifecycleActions={lifecycleActions}
+                    header={msg.content}
+                    isFullscreen={fullscreenSurfaceId === msg.cnuiSurface.cnuiSurfaceId}
+                    onFullscreenChange={(fs) =>
+                      setFullscreenSurfaceId(fs ? msg.cnuiSurface!.cnuiSurfaceId : null)
+                    }
+                  />
                 ) : (
                   msg.content
                 )}
