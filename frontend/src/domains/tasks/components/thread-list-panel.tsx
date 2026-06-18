@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ListTodo, FolderOpen, Folder, MoreHorizontal, PauseCircle, CircleCheck, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getThreads, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
+import { getThreads, getOrphanTaskCount, updateThreadStatus, deleteThread } from '@/app/actions/tasks'
 import type { Thread } from '../../../usom/types/objects'
 
 /** 带任务计数的 Thread 查询结果 */
@@ -88,6 +88,7 @@ export function ThreadListPanel({
   filterThreadStatus,
 }: ThreadListPanelProps) {
   const [threads, setThreads] = useState<ThreadWithCount[]>([])
+  const [orphanCount, setOrphanCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
@@ -133,8 +134,11 @@ export function ThreadListPanel({
     async function load() {
       setLoading(true)
       try {
-        const data = await getThreads()
-        if (!cancelled) setThreads(data)
+        const [data, orphan] = await Promise.all([getThreads(), getOrphanTaskCount()])
+        if (!cancelled) {
+          setThreads(data)
+          setOrphanCount(orphan)
+        }
       } catch {
         if (!cancelled) setThreads([])
         toast.error('加载主线列表失败，请刷新重试')
@@ -156,7 +160,9 @@ export function ThreadListPanel({
 
   // ─── 合计计数 ────────────────────────────────────────────────
 
-  const totalCount = filteredThreads.reduce((sum, t) => sum + t.taskCount, 0)
+  // 合计含 orphan 任务：各主线 taskCount 之和 + 无主线任务数，
+  // 避免 findAllWithCount 的 LEFT JOIN 漏掉 thread_id 为空的任务。
+  const totalCount = filteredThreads.reduce((sum, t) => sum + t.taskCount, 0) + orphanCount
 
   // 点击处理
   const handleClick = useCallback((threadId: string) => {
@@ -210,7 +216,7 @@ export function ThreadListPanel({
             'flex-1 text-sm',
             selectedThreadId === ORPHAN_ID ? 'text-ink font-medium' : 'text-body',
           )}>普通任务</span>
-          <span className="text-xs text-body/70-soft">—</span>
+          <span className="text-xs text-body/70-soft">{orphanCount}</span>
         </button>
 
         {/* ─── 分隔线 ────────────────────────────────────────── */}

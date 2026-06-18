@@ -397,6 +397,28 @@ export class TaskRepository implements ITaskRepository {
   }
 
   /**
+   * 统计无主线（orphan）任务数量：thread_id 为空且未归档。
+   *
+   * 补齐 ThreadRepository.findAllWithCount 的盲区——该方法以
+   * threads LEFT JOIN tasks ON thread_id 关联，thread_id 为空的任务
+   * 不挂任何主线行，永远不会被计入。此方法用于侧栏「普通任务」计数
+   * 与「全部任务」合计，使 orphan 任务不再从计数中消失。
+   *
+   * @param userId - 用户 ID（多租户 T-02：where 必含 userId）
+   * @returns 未归档的 orphan 任务数
+   */
+  async countOrphanTasks(userId: USOM_ID): Promise<number> {
+    const rows = await db.select({ count: sql<number>`count(*)::int` })
+      .from(s.tasks)
+      .where(and(
+        eq(s.tasks.userId, userId),
+        isNull(s.tasks.threadId),
+        sql`${s.tasks.status} != 'archived'`,
+      ))
+    return rows[0]?.count ?? 0
+  }
+
+  /**
    * 彻底删除任务（不可恢复）
    *
    * 注意：数据库 schema 定义 parentId 的 onDelete 为 'set null'，

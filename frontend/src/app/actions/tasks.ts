@@ -296,6 +296,18 @@ export async function getThreads(): Promise<ThreadWithCount[]> {
 }
 
 /**
+ * 获取无主线（orphan）任务计数
+ *
+ * findAllWithCount 以 threads LEFT JOIN tasks 关联，漏掉 thread_id 为空的任务；
+ * 此 action 单独统计 orphan 任务数，供侧栏「普通任务」计数与「全部任务」合计使用。
+ * @returns 未归档的 orphan 任务数
+ */
+export async function getOrphanTaskCount(): Promise<number> {
+  const repo = new TaskRepository()
+  return repo.countOrphanTasks(MVP_USER_ID as USOM_ID)
+}
+
+/**
  * 根据 ID 获取单个主线
  * @param threadId - 主线 ID
  * @returns 主线或 null
