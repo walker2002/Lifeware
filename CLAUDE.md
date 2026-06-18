@@ -28,53 +28,31 @@ npm run db:migrate   # Run database migrations
 npm run db:studio    # Open Drizzle Studio
 ```
 
-Database setup:
-```bash
-docker-compose up -d  # Start PostgreSQL
-```
+首次准备：在 `.env.local` 配置 `DATABASE_URL`，再 `docker-compose up -d` 启动 PostgreSQL。
 
 ---
 
 ## Architecture: The Nexus Pattern
 
-This is not a traditional MVC application. Lifeware uses a custom four-layer Nexus architecture:
+This is not a traditional MVC application. Lifeware uses a custom four-layer Nexus architecture.
 
 ### 1. USOM (Unified Semantic & Object Model)
-- Foundation layer defining object structures
-- Contains all core object types and schemas
-- Versioning mechanism for object evolution
-- Location: `frontend/src/usom/`
+Foundation layer: object structures, schemas, and versioning. Location: `frontend/src/usom/`
 
 ### 2. Nexus (Core Engine)
-The system brain with seven main components:
-- **Intent Engine**: Parses user input (AI-driven with template-form fallback)
-- **Rule Engine**: Validates proposals and detects conflicts
-- **State Machine**: Manages object lifecycles and key attributes
-- **Action Surface Engine**: Determines UI actions (Action Guide, Dynamic Tile, Continuity Cue)
-- **Context Engine**: Assembles cross-Domain context data for generative operations
-- **AI Runtime**: Unified AI infrastructure (LLM routing, Session management, Token budget, CN-UI protocol) — dependency-injected into Handlers, not called by Orchestrator
-- **Orchestrator**: Pure dispatcher — routes Reactive/Generative/Time Trigger paths, coordinates components, never calls AI directly
-- Location: `frontend/src/nexus/`
+Seven components: Intent Engine, Rule Engine, State Machine, Action Surface Engine, Context Engine, AI Runtime, Orchestrator. **AI Runtime** is dependency-injected into Handlers; the **Orchestrator** is a pure dispatcher that never calls AI directly. Location: `frontend/src/nexus/`
 
 ### 3. Domain Plugins
-Extensible domain-specific logic with dual-track model:
+Extensible domain logic with a dual-track model:
+- **Reactive Track**: `onValidate` / `onEvent` / `onActionSurfaceRequest` / `onOutboundRequest`
+- **Generative Track**: `onGenerate(request, aiRuntime)` via injected AI Runtime, plus read-only Context Providers
 
-**Reactive Track** (four hooks):
-- `onValidate`: Intent validation
-- `onEvent`: Event response, returns metrics and suggestions
-- `onActionSurfaceRequest`: Returns action surface candidates
-- `onOutboundRequest`: Outbound push declarations (not implemented in MVP)
-
-**Generative Track** (Handler + Context Providers):
-- `onGenerate(request, aiRuntime)`: AI-powered planning via injected AI Runtime
-- Handler owns prompt design, tool use, and CN-UI output decisions
-- Context Providers expose read-only Domain data for cross-Domain consumption
-
-- Location: `frontend/src/domains/`
+Location: `frontend/src/domains/`
 
 ### 4. Bridge Layer (Phase 2)
-- External access layer via standard protocols (REST API, MCP Server, Webhook/SSE)
-- **MVP phase**: Architecture constraints must be followed, implementation in Phase 2
+External access (REST, MCP, Webhook/SSE). Architecture constraints apply from MVP; implementation in Phase 2.
+
+> Hook signatures, cross-component contracts, and the AI/Rule boundary live in `.specify/memory/constitution.md`.
 
 ---
 
@@ -107,17 +85,7 @@ definitions and rationale live in the constitution:
 
 ## Database Schema
 
-Located in `frontend/src/lib/db/schema.ts` with core tables:
-- `users`, `user_calibration`, `user_settings` - User data
-- `tasks`, `habits`, `habit_logs`, `task_execution_logs`, `timeboxes` - Domain objects
-- `threads` - Thread/project objects
-- `objectives`, `key_results` - OKR objects
-- `reviews` - Review objects
-- `timebox_tasks`, `timebox_habits`, `habit_templates`, `template_habits` - Junction/template tables
-- `intentions`, `structured_intents`, `state_proposals` - System processing tables
-- `context_snapshots`, `system_events`, `action_surfaces`, `derived_signals` - System tables
-- `ai_sessions`, `l1_messages`, `memory_episodes` - AI/memory tables
-- `energy_logs`, `user_activities` - Analytics tables
+Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-design.md`. Tables span user data, Domain objects (tasks/habits/OKRs/timeboxes), system processing (intentions/state_proposals/action_surfaces), and AI/memory (`ai_sessions`/`memory_episodes`).
 
 ---
 
@@ -149,106 +117,72 @@ Located in `frontend/src/lib/db/schema.ts` with core tables:
 | 第二层：协同维护 | `docs/` | 用户定义意图，Claude 保证与代码一致 |
 | 第三层：Claude 自动维护 | 根目录 + `.specify/` | Claude 维护，用户审批 |
 
-完整索引见 `manifest.md`（项目根目录）。
-
-### 第一层：用户所有 (`mydocs/`)
-
-| Document | Location | Purpose |
-|---|---|---|
-| 项目开发必读 | `mydocs/core/` | Product vision and decisions |
-| 总体设计 | `mydocs/core/` | Architecture design |
-| 技术栈设计演进 | `mydocs/core/` | Tech stack evolution |
-| AI_Runtime_Architecture_Design | `mydocs/core/` | AI 运行时架构 |
-| Domain 注册指南 | `mydocs/core/` | 一个完整Domain 插件的建立规范 |
-
-
-### 第二层：协同维护 (`docs/`)
-
-| Document | Purpose |
-|---|---|
-| `docs/usom-design.md` | USOM object definitions |
-| `docs/database-design.md` | Database schema design |
-| `docs/UI-DESIGN-SPEC.md` | Visual & interaction design specification |
-
-**Document Update Rule**: 以上文档若有修改, **MUST** 更新 `manifest.md` 版本历史记录。
+完整文档索引与版本历史见 `manifest.md`（项目根目录）。`docs/` 与 `mydocs/` 下各文档（usom-design、database-design、UI-DESIGN-SPEC 等）若有修改，**MUST** 同步更新 `manifest.md`。
 
 ---
 
-## Environment Setup
+## gstack
 
-1. Configure `.env.local` with DATABASE_URL
-2. Start PostgreSQL: `docker-compose up -d`
-3. Run migrations: `npm run db:migrate`
-4. Start dev server: `npm run dev`
+```
+1. 所有网页浏览均使用 gstack 中的/browse 功能，绝不要使用 mcp__claude-in-chrome__*工具。
+2. 主要规划skill包括: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /autoplan, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse, /connect-chrome, /qa
+```
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-at `specs/009-ai-runtime-upgrade/plan.md`.
-<!-- SPECKIT END -->
 
+
+## 开发流程插件协作
+
+### 插件能力
+
+- **gstack**：负责决策和外部能力
+```
+  决策层 — /office-hour, /autoplan 
+  外部层 — /browse, /qa,  /ship, /land-and-deploy, /canary
+```
+
+- **superpowers**：负责思考与开发执行流程 
+
+  ```
+  包含 brainstorming → plan  → Subagent-driven-dev+TDD  →  review  →  finish
+  ```
+
+  
+
+### 任务分流
+
+先判断规模，再定流程深度
+
+| 任务规模 | 触发特征 | 流程 |
+|---|---|---|
+| 只读 | 分析、解释、架构、阅读 | 直接处理；真实 bug 排查用 systematic-debugging |
+| 轻量 | 单文件、明确 bug、配置 | 实现 + 定向验证，必要时 浏览器验证 /browse` |
+| 中 | 多文件、边界清晰的新功能/重构 | `头脑风暴 /brainstorming → 短 plan → 实现 → /browse+/qa → verification` |
+| 大 | 跨模块、共享逻辑、新架构、公共 API | `/office-hour → /autoplan  →  brainstorming → writing-plans → executing-plans + TDD → `/qa` → verification → code-review → finishing-branch → `/ship` → `/land-and-deploy` → `/canary` |
+
+
+
+### Change Delivery Gate（声明完成前必须）
+
+验证已执行并如实报告 · 过质量门禁 · 无法执行的验证明确说明原因 · 禁止虚构命令输出 · 无证据不得声称完成。
+
+
+
+---
 
 ## Coding Guidelines
 
 ### 1. Think Before Coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
-
-Before implementing:
-
-State your assumptions explicitly. If uncertain, ask.
-If multiple interpretations exist, present them - don't pick silently.
-If a simpler approach exists, say so. Push back when warranted.
-If something is unclear, stop. Name what's confusing. Ask.
+Don't assume or hide confusion — surface tradeoffs. State assumptions explicitly; if multiple interpretations exist, present them instead of picking silently; push back when a simpler approach exists.
 
 ### 2. Simplicity First
-Minimum code that solves the problem. Nothing speculative.
-
-No features beyond what was asked.
-No abstractions for single-use code.
-No "flexibility" or "configurability" that wasn't requested.
-No error handling for impossible scenarios.
-If you write 200 lines and it could be 50, rewrite it.
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+Minimum code that solves the problem — nothing speculative. No features, abstractions, or "flexibility" beyond what was asked. If 200 lines could be 50, rewrite.
 
 ### 3. Surgical Changes
-Touch only what you must. Clean up only your own mess.
-
-When editing existing code:
-
-Don't "improve" adjacent code, comments, or formatting.
-Don't refactor things that aren't broken.
-Match existing style, even if you'd do it differently.
-If you notice unrelated dead code, mention it - don't delete it.
-When your changes create orphans:
-
-Remove imports/variables/functions that YOUR changes made unused.
-Don't remove pre-existing dead code unless asked.
-The test: Every changed line should trace directly to the user's request.
+Touch only what you must; clean up only your own mess. Match existing style; don't refactor what isn't broken. Every changed line should trace directly to the request.
 
 ### 4. Goal-Driven Execution
-Define success criteria. Loop until verified.
-
-Transform tasks into verifiable goals:
-
-"Add validation" → "Write tests for invalid inputs, then make them pass"
-"Fix the bug" → "Write a test that reproduces it, then make it pass"
-"Refactor X" → "Ensure tests pass before and after"
-For multi-step tasks, state a brief plan:
-
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+Define verifiable success criteria and loop until they pass: "fix the bug" → "write a test that reproduces it, then make it pass". For multi-step tasks, state a brief step → verify plan.
 
 ### 5. 代码注释规范
 
-生成和修改代码时，必须遵守 `docs/code-commenting-guide.md` 的注释规范：
-
-- **文件头部注释**：每个 TS/JS 文件开头必须包含 `/** @file ... @brief ... */` 说明注释
-- **模块分隔注释**：使用 `// ─── 模块名称 ─────────────────────` 样式划分逻辑模块
-- **接口/类型注释**：所有导出的接口、类型别名必须添加 JSDoc 说明
-- **函数注释**：所有导出的函数/方法必须添加 JSDoc，说明参数、返回值、异常
-- **组件注释**：React 组件及其 Props 类型必须添加 JSDoc
-- **语言**：所有注释必须使用**简体中文**
-- **特殊标记**：TODO/FIXME/NOTE/HACK 等标记按规范使用
-
-**约束**：新建文件或修改现有文件时，必须同步添加或更新相关注释，确保注释与代码逻辑一致。
+详见 `docs/code-commenting-guide.md`。关键约束：每个 TS/JS 文件必须有 `/** @file ... @brief ... */` 文件头注释；所有注释使用**简体中文**。新建或修改文件时必须同步更新注释，确保与代码逻辑一致。

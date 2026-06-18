@@ -11,3 +11,5 @@ Thumbs.db
 *.swp
 mydocs/dev/
 .claude/worktrees/
+# gstack 产物软链（指向 ~/.gstack/projects/...，提交进 git 只存死链接，无意义）
+.gstack
