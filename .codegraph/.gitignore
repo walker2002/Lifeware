@@ -12,5 +12,9 @@ cache/
 # Logs
 *.log
 
+# Daemon 运行时文件（pid/socket，每台机器不同，不应提交）
+daemon.pid
+daemon.sock
+
 # Hook markers
 .dirty
