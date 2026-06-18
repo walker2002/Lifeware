@@ -251,40 +251,62 @@ field_metadata:
     type: string
     label: 标题
     required: true
+    mutation_mode: ContentField
   name:
     type: string
     label: 主线名称
     required: true
+    mutation_mode: ContentField
   description:
     type: string
     label: 描述
     required: false
+    mutation_mode: ContentField
   priority:
     type: enum
     label: 优先级
     required: false
     options: [critical, high, medium, low]
+    mutation_mode: FactField
   energyRequired:
     type: enum
     label: 所需能量
     required: false
     options: [high, medium, low]
+    mutation_mode: FactField
   estimatedDuration:
     type: number
     label: 预估时长（分钟）
     required: false
+    mutation_mode: FactField
   dueDate:
     type: date
     label: 截止日期
     required: false
+    mutation_mode: FactField
   color:
     type: string
     label: 颜色
     required: false
+    mutation_mode: ContentField
   threadId:
     type: string
     label: 主线
     required: false
+    mutation_mode: FactField
+  # 完成任务时记录的实际时长/备注（schema tasks.actual_duration / tasks.notes）。
+  # completeTask 把 actualDuration/notes 作为 field 步骤走字段执行器，需在此声明，
+  # 否则字段执行器拒绝「未声明字段」导致整体回滚（修复 BUG-002）。
+  actualDuration:
+    type: number
+    label: 实际时长（分钟）
+    required: false
+    mutation_mode: FactField
+  notes:
+    type: string
+    label: 备注
+    required: false
+    mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

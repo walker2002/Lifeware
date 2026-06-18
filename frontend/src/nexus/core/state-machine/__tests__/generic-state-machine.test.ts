@@ -31,6 +31,13 @@ function makeMockRepo(existing?: Record<string, unknown> | null): GenericRepo {
       store.set(id, updated)
       return updated
     }),
+    updateFields: vi.fn(async (id: string, fields: Record<string, unknown>, _userId: string) => {
+      const obj = store.get(id)
+      if (!obj) throw new Error('对象不存在')
+      const updated = { ...obj, ...fields, updatedAt: new Date().toISOString() }
+      store.set(id, updated)
+      return updated
+    }),
   }
 }
 
@@ -435,6 +442,7 @@ describe('Generic SM — create/updateStatus 方法路径', () => {
 
     expect(result.success).toBe(true)
     expect(result.object!.status).toBe('active')
-    expect(repo.updateStatus).toHaveBeenCalledWith('t-001', 'active', userId)
+    // 第 4 参数为可选 tx 句柄；execute 未传 tx 时为 undefined（仓储回退到 db 单例）
+    expect(repo.updateStatus).toHaveBeenCalledWith('t-001', 'active', userId, undefined)
   })
 })

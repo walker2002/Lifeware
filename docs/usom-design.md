@@ -903,6 +903,31 @@ interface DerivedSignals {
 
 **归属说明**：钩子签名本身是 USOM 层的契约定义，因为它规定了 Domain 与 Nexus 之间数据传递的完整类型，需在此统一记录。
 
+#### ValidationResult 判别联合
+
+意图校验（`onValidate`）与规则判定（Rule Engine）统一产出
+`ValidationResult`；Orchestrator 聚合取最严格
+（`Rejected > NeedConfirm > Passed`）后路由（见宪章 §VIII 判定模型）。
+MVP 试点仅此三变体；`PassedWithWarning / NeedInput` 延后到 [025]。
+
+```typescript
+type ValidationResult =
+  | { kind: 'Passed' }
+  | { kind: 'Rejected'; errors: string[] }
+  | { kind: 'NeedConfirm'; data: unknown }
+```
+
+#### 字段写入三分类（mutation_mode）
+
+业务事实写入口按 manifest `field_metadata.*.mutation_mode` 把字段写入分流
+（见宪章 §III 业务事实写入口）：
+
+| 分类 | 写入路径 |
+|---|---|
+| `FactField`（改变业务事实） | 经写入口：Intent → Rule Engine → 写入口（SM 生命周期 / Field Executor 字段）→ Event |
+| `ContentField`（不改业务事实） | 可直走 Repository |
+| `PresentationField`（纯展示态） | 本地/UI store，不入库 |
+
 ```typescript
 interface DomainPlugin {
   // ── 声明文件（静态配置，非运行时钩子）────────────────────────
@@ -910,13 +935,15 @@ interface DomainPlugin {
 
   // ── 钩子 1：意图校验 ─────────────────────────────────────────
   // 调用者：Rule Engine（经 Orchestrator）
-  // 时机：StructuredIntent 进入 State Machine 之前
+  // 时机：StructuredIntent 进入业务事实写入口之前
   // 职责：Domain 内部的结构性校验（字段合法性、状态合法性）
   // 注意：个性冲突检测由 Rule Engine 自身读取 DerivedSignals 完成，不在此钩子
+  // 返回：ValidationResult（见本节类型定义）；Orchestrator 与 Rule Engine
+  //        结果聚合取最严格（Rejected > NeedConfirm > Passed）后路由
   onValidate(
     intent:   StructuredIntent,
     snapshot: USOMSnapshot
-  ): { valid: boolean; errors: string[] }
+  ): ValidationResult
 
   // ── 钩子 2：事件响应 ─────────────────────────────────────────
   // 调用者：Event Bus 广播后由 Memory Framework 触发
@@ -1441,7 +1468,7 @@ interface VersionedObject {
 | G-04 | `SystemEvent.payload` 只包含该事件类型必需的最小字段，不得内嵌完整对象 | HabitLogged payload 中嵌套完整 Habit 对象 |
 | G-05 | `StructuredIntent.fields` 的 key 名称必须与对应 USOM 对象字段名一致 | fields.name 对应 Habit 对象，但 Habit 字段名为 title |
 | G-06 | 新 USOM 对象字段必须先在本文档定义，再在代码中实现 | 代码先行，文档滞后 |
-| G-07 | Bridge Layer 约束（A-D）从 MVP 第一行代码起即生效：所有外部写操作必须经过完整 Nexus 链路（Intent Engine → Rule Engine → State Machine）；MCP Tools 只暴露读查询和意图提交；Nexus 组件方法签名须与 Bridge Layer 兼容，不依赖 HTTP 上下文 | Bridge Layer 暴露直接 CRUD 接口；Domain 方法签名依赖 HTTP 上下文 |
+| G-07 | Bridge Layer 约束（A-D）从 MVP 第一行代码起即生效：所有外部写操作必须经过完整 Nexus 链路（Intent Engine → Rule Engine → 业务事实写入口）；MCP Tools 只暴露读查询和意图提交；Nexus 组件方法签名须与 Bridge Layer 兼容，不依赖 HTTP 上下文 | Bridge Layer 暴露直接 CRUD 接口；Domain 方法签名依赖 HTTP 上下文 |
 | G-08 | `DerivedSignals` 的字段变更视为 Bridge Layer API 的 breaking change，需要遵循版本化机制处理 | DerivedSignals 变更未全局通报 |
 
 ---

@@ -18,6 +18,7 @@ import type {
   GenerationRequest,
   QueryResult,
   QueryContext,
+  ValidationResult,
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type {
@@ -76,6 +77,60 @@ interface RuleEngine {
   }>
 }
 
+// ─── T10：ValidationResult 聚合与 RuleEngine 映射（纯函数）────────
+// 宪法 §VIII：onValidate 与 RuleEngine 各产 ValidationResult，Orchestrator
+// 聚合取最严格（Rejected > NeedConfirm > Passed）。MVP 试点仅三变体；
+// PassedWithWarning / NeedInput 延后到 [025]。
+
+/** RuleEngine 内部结果（severity 字段经 adapter 映射为 result） */
+type RuleEngineOutcome = {
+  result: 'pass' | 'warning' | 'confirm'
+  warnings?: string[]
+  confirmations?: string[]
+}
+
+/**
+ * 把 RuleEngine 结果映射为 ValidationResult。
+ *
+ * 映射策略（试点）：
+ * - confirm → NeedConfirm({source:'rule', confirmations}) —— 需用户二次确认
+ * - warning → Passed —— 试点无 PassedWithWarning，warning 不阻塞流程
+ *   （[025] 引入 PassedWithWarning 后改为携带 warnings，避免静默吞掉）
+ * - pass    → Passed
+ */
+export function ruleResultToValidation(outcome: RuleEngineOutcome): ValidationResult {
+  if (outcome.result === 'confirm') {
+    return { kind: 'NeedConfirm', data: { source: 'rule', confirmations: outcome.confirmations ?? [] } }
+  }
+  // warning / pass：试点阶段均按 Passed 处理，不阻塞。
+  return { kind: 'Passed' }
+}
+
+/** 偏序优先级：Rejected(2) > NeedConfirm(1) > Passed(0) */
+const VALIDATION_RANK: Record<ValidationResult['kind'], number> = {
+  Passed: 0,
+  NeedConfirm: 1,
+  Rejected: 2,
+}
+
+/**
+ * 聚合两个 ValidationResult，取最严格（偏序 Rejected > NeedConfirm > Passed）。
+ *
+ * - 任一方 Rejected → Rejected（取其 errors）
+ * - 否则任一方 NeedConfirm → NeedConfirm（取首先到达的 data）
+ * - 否则 Passed
+ *
+ * 这是 Orchestrator 调度职责（聚合判定结果路由），不属业务逻辑，合规。
+ */
+export function aggregateValidation(a: ValidationResult, b: ValidationResult): ValidationResult {
+  // Rejected 短路：优先取 Rejected 方的 errors
+  if (a.kind === 'Rejected') return a
+  if (b.kind === 'Rejected') return b
+  // NeedConfirm：取优先级更高者；同级取 a
+  if (VALIDATION_RANK[a.kind] >= VALIDATION_RANK[b.kind]) return a
+  return b
+}
+
 /**
  * 动作表面引擎接口
  * 负责生成用户界面上的推荐操作
@@ -121,6 +176,10 @@ export interface OrchestratorResult {
   cnuiDomain?: string
   cnuiSurface?: string
   cnuiIntentFields?: Record<string, unknown>
+  // [018] T10：ValidationResult 聚合后 NeedConfirm 的 Suspend 路由产物。
+  // MVP 试点仅 Orchestrator 内部状态；完整 CNUI Suspend 回环（持久化/回填）
+  // 延后到 [025]。吸收原散落的 needsCnuiConfirmation 分支。
+  suspended?: { reason: 'need_confirm'; data: unknown }
   generativeResult?: GenerationResult
   queryResult?: QueryResult
 }
@@ -393,11 +452,14 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const domainId = intent.targetDomain
       const domain = findDomain(domainId)
 
-      // 1. Domain plugin validation
+      // 1. Domain plugin validation（T3 已返回 ValidationResult）
+      // onValidate 默认 Passed；当前域仅产 Passed/Rejected，NeedConfirm 为 [025] 留口。
+      let domainValidation: ValidationResult = { kind: 'Passed' }
       if (domain) {
-        const validation = await domain.onValidate(intent, usomSnapshot)
-        if (!validation.valid) {
-          return { success: false, error: validation.errors.join('; ') }
+        domainValidation = await domain.onValidate(intent, usomSnapshot)
+        // Rejected 短路：onValidate 结构性拒绝直接终止（聚合前短路，行为同 T3）
+        if (domainValidation.kind === 'Rejected') {
+          return { success: false, error: domainValidation.errors.join('; ') }
         }
       }
 
@@ -420,38 +482,69 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // pathType === 'contract' — 继续走现有被动型路径（行 421 起不变）
+      // pathType === 'contract' — 继续走现有被动型路径
 
       // 2. RuleEngine 评估（被动型路径）
       trace(deps.onTrace, 'RuleEngine', 'start', { input: { intent } })
       const ruleResult = await deps.ruleEngine.evaluate(intent, snapshot)
       trace(deps.onTrace, 'RuleEngine', 'end', { input: { intent }, output: { ruleResult } })
 
-      if (ruleResult.result === 'confirm' && !confirmed) {
-        return {
-          success: false,
-          needsConfirmation: true,
-          confirmationMessage: ruleResult.confirmations?.join('; '),
-          warnings: ruleResult.warnings,
-        }
-      }
+      // T10：把 RuleEngine 结果映射为 ValidationResult。
+      // confirmed=true 时 RuleEngine 的 confirm 降级为 Passed（保留二次确认后继续的语义）。
+      const ruleValidation = confirmed
+        ? { kind: 'Passed' } as ValidationResult
+        : ruleResultToValidation(ruleResult)
 
-      // CN-UI Write Confirmation（宪章 VIII 新增）:
-      // 所有 response_type === 'cnui' 的写操作必须经用户二次确认
+      // CN-UI Write Confirmation 吸收：response_type==='cnui' 且 AI 解析意图需二次确认。
+      // 原为独立 needsCnuiConfirmation 分支，现映射为 NeedConfirm 变体并入聚合。
+      // confirmed=true 时（表单/CNUI 提交已人工确认）降级为 Passed，直接放行。
       const intentTrigger = manifest?.intent_triggers?.find(
         (t: any) => t.action === intent.action
       )
-      // 仅拦截 AI 解析的意图（需用户二次确认）；表单/CNUI 提交的意图已人工确认，直接放行
+      let cnuiValidation: ValidationResult = { kind: 'Passed' }
       if (!confirmed && intentTrigger?.response_type === 'cnui' && intent.resolvedBy === 'ai') {
+        cnuiValidation = {
+          kind: 'NeedConfirm',
+          data: {
+            source: 'cnui',
+            cnuiAction: intent.action,
+            cnuiDomain: intent.targetDomain,
+            cnuiSurface: intentTrigger.cnui_surface,
+            cnuiIntentFields: intent.fields,
+          },
+        }
+      }
+
+      // 3. 聚合三方 ValidationResult：domain × rule × cnui，取最严格（Rejected > NeedConfirm > Passed）
+      // Orchestrator 聚合属调度职责，不属业务逻辑，合规。
+      const aggregated = aggregateValidation(
+        aggregateValidation(domainValidation, ruleValidation),
+        cnuiValidation,
+      )
+
+      if (aggregated.kind === 'Rejected') {
+        return { success: false, error: aggregated.errors.join('; ') }
+      }
+
+      if (aggregated.kind === 'NeedConfirm') {
+        // Suspend 路由：MVP 试点仅 Orchestrator 内部状态。
+        // 完整 CNUI Suspend 回环（持久化/回填/UI 回流）延后到 [025]。
+        // 向后兼容：同时回填旧字段 needsCnuiConfirmation/needsConfirmation/confirmationMessage。
+        const data = aggregated.data as Record<string, unknown>
+        const confirmations =
+          data?.source === 'rule' ? (data.confirmations as string[] | undefined) : undefined
         return {
           success: false,
-          needsConfirmation: false,
-          needsCnuiConfirmation: true,
-          cnuiAction: intent.action,
-          cnuiDomain: intent.targetDomain,
-          cnuiSurface: intentTrigger.cnui_surface,
-          cnuiIntentFields: intent.fields,
-          warnings: ruleResult.result === 'warning' ? ruleResult.warnings : undefined,
+          suspended: { reason: 'need_confirm', data: aggregated.data },
+          // 兼容旧消费方（intent.ts 透传字段）
+          needsConfirmation: data?.source === 'rule' ? true : false,
+          needsCnuiConfirmation: data?.source === 'cnui' ? true : false,
+          confirmationMessage: confirmations?.join('; '),
+          cnuiAction: data?.source === 'cnui' ? (data.cnuiAction as string) : undefined,
+          cnuiDomain: data?.source === 'cnui' ? (data.cnuiDomain as string) : undefined,
+          cnuiSurface: data?.source === 'cnui' ? (data.cnuiSurface as string) : undefined,
+          cnuiIntentFields: data?.source === 'cnui' ? (data.cnuiIntentFields as Record<string, unknown>) : undefined,
+          warnings: ruleResult.warnings,
         }
       }
 

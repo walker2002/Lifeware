@@ -111,4 +111,80 @@ subscribed_events: []
     const result2 = loadDomainManifest(realDir)
     expect(result1).toBe(result2) // 同一引用（缓存命中）
   })
+
+  it('field_metadata 解析 mutation_mode 字段（[018] T8）', () => {
+    writeManifest(`
+id: mutation-test
+version: 1.0.0
+name: Test
+description: test
+intent_triggers: []
+lifecycle:
+  obj:
+    states: [draft, active]
+    initial_state: draft
+    transitions:
+      - from: null
+        to: draft
+        trigger: intent
+        action: create
+        event_type: Created
+    terminal_states: []
+field_metadata:
+  priority:
+    type: enum
+    label: 优先级
+    required: false
+    options: [high, medium, low]
+    mutation_mode: FactField
+  title:
+    type: string
+    label: 标题
+    required: true
+    mutation_mode: ContentField
+list_actions: []
+required_fields: {}
+subscribed_events: []
+`)
+    const result = loadDomainManifest(tmpDir)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.manifest.field_metadata['priority'].mutation_mode).toBe('FactField')
+      expect(result.manifest.field_metadata['title'].mutation_mode).toBe('ContentField')
+    }
+  })
+
+  it('field_metadata 缺省 mutation_mode 仍可解析（可选字段，[018] T8）', () => {
+    writeManifest(`
+id: mutation-default-test
+version: 1.0.0
+name: Test
+description: test
+intent_triggers: []
+lifecycle:
+  obj:
+    states: [draft, active]
+    initial_state: draft
+    transitions:
+      - from: null
+        to: draft
+        trigger: intent
+        action: create
+        event_type: Created
+    terminal_states: []
+field_metadata:
+  title:
+    type: string
+    label: 标题
+    required: true
+list_actions: []
+required_fields: {}
+subscribed_events: []
+`)
+    const result = loadDomainManifest(tmpDir)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.manifest.field_metadata['title'].mutation_mode).toBeUndefined()
+    }
+  })
 })

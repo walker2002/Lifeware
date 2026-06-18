@@ -1,9 +1,13 @@
 // Timebox Domain Plugin 单元测试 — TDD 先写测试
 import { describe, it, expect, vi } from 'vitest'
 import type { StructuredIntent } from '@/usom/types/objects'
-import type { USOMSnapshot, SystemEvent, DerivedSignals } from '@/usom/types/process'
+import type { USOMSnapshot, SystemEvent, DerivedSignals, ValidationResult } from '@/usom/types/process'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { USOM_ID } from '@/usom/types/primitives'
+
+/** 提取 Rejected 变体的 errors（Passed/NeedConfirm 无 errors 字段，返回空数组以支持链式断言） */
+const rejectedErrors = (r: ValidationResult): string[] =>
+  r.kind === 'Rejected' ? r.errors : []
 
 // Mock manifest-loader 以避免 jsdom 环境下 fs 调用
 vi.mock('@/domains/manifest-loader', () => ({
@@ -141,8 +145,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(true)
-    expect(result.errors).toHaveLength(0)
+    expect(result.kind).toBe('Passed')
+    expect(rejectedErrors(result)).toHaveLength(0)
   })
 
   it('缺少 title 应返回 valid=false，错误信息包含 title', async () => {
@@ -156,8 +160,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('title'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('title'))).toBe(true)
   })
 
   it('title 为空字符串应返回 valid=false', async () => {
@@ -172,8 +176,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('title'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('title'))).toBe(true)
   })
 
   it('缺少 startTime 应返回 valid=false', async () => {
@@ -187,8 +191,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('startTime'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('startTime'))).toBe(true)
   })
 
   it('startTime 格式非法应返回 valid=false', async () => {
@@ -203,8 +207,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('startTime'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('startTime'))).toBe(true)
   })
 
   it('duration 为 0 应返回 valid=false', async () => {
@@ -219,8 +223,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('duration'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
   })
 
   it('duration 超过 480 分钟应返回 valid=false', async () => {
@@ -235,8 +239,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('duration'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
   })
 
   it('duration 小于 5 分钟应返回 valid=false', async () => {
@@ -251,8 +255,8 @@ describe('Timebox Domain Plugin — onValidate', () => {
 
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('duration'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
   })
 })
 

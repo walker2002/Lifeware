@@ -241,6 +241,7 @@ function createTimeboxGetRepo(timeboxRepo: ReturnType<typeof createMockTimeboxRe
       await timeboxRepo.save(updated, userId)
       return updated
     },
+    updateFields: vi.fn().mockResolvedValue({}),
   }
   return (domainId: string, objectType: string) => {
     if (domainId === 'timebox' && objectType === 'timebox') return timeboxGenericRepo
@@ -550,6 +551,7 @@ function createMockHabitRepo() {
       id,
       status,
     })),
+    updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -597,6 +599,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -645,6 +648,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -706,6 +710,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -758,6 +763,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -824,6 +830,7 @@ describe('createOrchestrator — Habit 意图分发', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -1147,6 +1154,7 @@ describe('Orchestrator — executeIntent 统一入口', () => {
       save: habitRepo.save,
       create: habitRepo.create,
       updateStatus: habitRepo.updateStatus,
+      updateFields: habitRepo.updateFields,
     }
 
     const habitIntent: StructuredIntent = {
@@ -1272,6 +1280,7 @@ function createMockTaskRepo() {
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
+    updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -1303,6 +1312,7 @@ function createMockThreadRepo() {
       createdAt: '2026-05-15T08:00:00Z',
       updatedAt: new Date().toISOString(),
     })),
+    updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
     save: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     archive: vi.fn().mockResolvedValue(undefined),
@@ -1340,12 +1350,14 @@ describe('Orchestrator — Tasks 意图分发', () => {
       save: taskRepo.save,
       create: taskRepo.create,
       updateStatus: taskRepo.updateStatus,
+      updateFields: taskRepo.updateFields,
     }
     const threadGenericRepo: GenericRepo = {
       findById: threadRepo.findById,
       save: threadRepo.save,
       create: threadRepo.create,
       updateStatus: threadRepo.updateStatus,
+      updateFields: threadRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -1404,6 +1416,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
       save: taskRepo.save,
       create: taskRepo.create,
       updateStatus: taskRepo.updateStatus,
+      updateFields: taskRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -1448,6 +1461,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
       save: threadRepo.save,
       create: threadRepo.create,
       updateStatus: threadRepo.updateStatus,
+      updateFields: threadRepo.updateFields,
     }
 
     const orchestrator = createOrchestrator({
@@ -1492,6 +1506,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
       save: threadRepo.save,
       create: threadRepo.create,
       updateStatus: threadRepo.updateStatus,
+      updateFields: threadRepo.updateFields,
     }
 
     const intent: StructuredIntent = {
@@ -1546,6 +1561,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
       save: taskRepo.save,
       create: taskRepo.create,
       updateStatus: taskRepo.updateStatus,
+      updateFields: taskRepo.updateFields,
     }
 
     const intent: StructuredIntent = {

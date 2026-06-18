@@ -6,7 +6,7 @@
  */
 
 import { eq, and, asc } from 'drizzle-orm'
-import { db } from '../../../lib/db/index'
+import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type {
   IHabitRepository,
@@ -24,8 +24,8 @@ import { calculateStreak, calculateLongestStreak, calculateCompletion7d } from '
  * 习惯仓储
  */
 export class HabitRepository implements IHabitRepository {
-  async findById(id: USOM_ID, userId: USOM_ID): Promise<Habit | null> {
-    const rows = await db.select().from(s.habits)
+  async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Habit | null> {
+    const rows = await tx.select().from(s.habits)
       .where(and(eq(s.habits.id, id), eq(s.habits.userId, userId)))
     return rows[0] ? habitRowToUSOM(rows[0] as any) : null
   }
@@ -52,7 +52,7 @@ export class HabitRepository implements IHabitRepository {
     return rows.map(r => habitRowToUSOM(r as any))
   }
 
-  async create(data: CreateHabitInput, userId: USOM_ID): Promise<Habit> {
+  async create(data: CreateHabitInput, userId: USOM_ID, tx: DbClient = db): Promise<Habit> {
     const now = new Date().toISOString() as Timestamp
     const id = crypto.randomUUID() as USOM_ID
     const habit: Habit = {
@@ -81,7 +81,7 @@ export class HabitRepository implements IHabitRepository {
       updatedAt: now,
     }
     const row = habitUSOMToRow(habit, userId)
-    await db.insert(s.habits).values(row)
+    await tx.insert(s.habits).values(row)
     return habit
   }
 
@@ -116,8 +116,8 @@ export class HabitRepository implements IHabitRepository {
     return updated
   }
 
-  async updateStatus(id: USOM_ID, status: Habit['status'], userId: USOM_ID): Promise<Habit> {
-    const existing = await this.findById(id, userId)
+  async updateStatus(id: USOM_ID, status: Habit['status'], userId: USOM_ID, tx: DbClient = db): Promise<Habit> {
+    const existing = await this.findById(id, userId, tx)
     if (!existing) throw new Error(`Habit ${id} not found`)
 
     const now = new Date()
@@ -128,15 +128,38 @@ export class HabitRepository implements IHabitRepository {
     if (status === 'suspended') updates.suspended_at = now
     if (status === 'archived') updates.archived_at = now
 
-    await db.update(s.habits).set(updates)
+    await tx.update(s.habits).set(updates)
       .where(and(eq(s.habits.id, id), eq(s.habits.userId, userId)))
 
     return { ...existing, status, updatedAt: now.toISOString() as Timestamp }
   }
 
-  async save(habit: Habit, userId: USOM_ID): Promise<void> {
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成。
+   * 注意 habit 表部分列在 schema 中以 snake_case 数据库列名定义，
+   * fields 键应使用 schema 列属性名（驼峰，如 title / defaultTime）。
+   * 多租户 T-02：where 必含 userId 过滤。
+   */
+  async updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<Habit> {
+    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    await tx.update(s.habits)
+      .set(setPayload)
+      .where(and(eq(s.habits.id, id), eq(s.habits.userId, userId)))
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`Habit ${id} not found after updateFields`)
+    return updated
+  }
+
+  async save(habit: Habit, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     const row = habitUSOMToRow(habit, userId)
-    await db.insert(s.habits).values(row).onConflictDoUpdate({
+    await tx.insert(s.habits).values(row).onConflictDoUpdate({
       target: s.habits.id,
       set: row,
     })

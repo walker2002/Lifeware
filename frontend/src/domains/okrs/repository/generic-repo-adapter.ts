@@ -9,6 +9,7 @@
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { DbClient } from '@/lib/db'
 
 /**
  * OKRs 域的 GenericRepo 适配器工厂参数
@@ -17,15 +18,17 @@ import type { USOM_ID } from '@/usom/types/primitives'
  */
 interface OkrsRepoPair {
   objectiveRepo: {
-    findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
+    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
   keyResultRepo: {
-    findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
-    findByObjective(objectiveId: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown>[]>
-    deleteDraft(id: USOM_ID, userId: USOM_ID): Promise<void>
-    updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID): Promise<Record<string, unknown>>
+    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    findByObjective(objectiveId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>[]>
+    deleteDraft(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
+    updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
 }
 
@@ -37,13 +40,13 @@ interface OkrsRepoPair {
 export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, GenericRepo> {
   return {
     objective: {
-      async findById(id, userId) {
-        return repos.objectiveRepo.findById(id, userId)
+      async findById(id, userId, tx) {
+        return repos.objectiveRepo.findById(id, userId, tx)
       },
-      async save(obj, userId) {
-        await repos.objectiveRepo.save(obj, userId)
+      async save(obj, userId, tx) {
+        await repos.objectiveRepo.save(obj, userId, tx)
       },
-      async create(fields, userId) {
+      async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const objective = {
@@ -64,11 +67,11 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           createdAt: now,
           updatedAt: now,
         }
-        await repos.objectiveRepo.save(objective, userId)
+        await repos.objectiveRepo.save(objective, userId, tx)
         return objective
       },
-      async updateStatus(id, toStatus, userId) {
-        const existing = await repos.objectiveRepo.findById(id, userId)
+      async updateStatus(id, toStatus, userId, tx) {
+        const existing = await repos.objectiveRepo.findById(id, userId, tx)
         if (!existing) throw new Error(`Objective ${id} not found`)
         const now = new Date().toISOString()
         const updated = {
@@ -79,18 +82,21 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           ...(toStatus === 'completed' ? { completedAt: now } : {}),
           ...(toStatus === 'archived' ? { archivedAt: now } : {}),
         }
-        await repos.objectiveRepo.save(updated, userId)
+        await repos.objectiveRepo.save(updated, userId, tx)
         return updated
+      },
+      async updateFields(id, fields, userId, tx) {
+        return repos.objectiveRepo.updateFields(id, fields, userId, tx)
       },
     },
     key_result: {
-      async findById(id, userId) {
-        return repos.keyResultRepo.findById(id, userId)
+      async findById(id, userId, tx) {
+        return repos.keyResultRepo.findById(id, userId, tx)
       },
-      async save(obj, userId) {
-        await repos.keyResultRepo.save(obj, userId)
+      async save(obj, userId, tx) {
+        await repos.keyResultRepo.save(obj, userId, tx)
       },
-      async create(fields, userId) {
+      async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const kr = {
@@ -106,11 +112,11 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           createdAt: now,
           updatedAt: now,
         }
-        await repos.keyResultRepo.save(kr, userId)
+        await repos.keyResultRepo.save(kr, userId, tx)
         return kr
       },
-      async updateStatus(id, toStatus, userId) {
-        const existing = await repos.keyResultRepo.findById(id, userId)
+      async updateStatus(id, toStatus, userId, tx) {
+        const existing = await repos.keyResultRepo.findById(id, userId, tx)
         if (!existing) throw new Error(`KeyResult ${id} not found`)
         const now = new Date().toISOString()
         const updated = {
@@ -121,14 +127,17 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           ...(toStatus === 'completed' ? { completedAt: now } : {}),
           ...(toStatus === 'archived' ? { archivedAt: now } : {}),
         }
-        await repos.keyResultRepo.save(updated, userId)
+        await repos.keyResultRepo.save(updated, userId, tx)
         return updated
       },
-      async findByParent(parentId, userId) {
-        return repos.keyResultRepo.findByObjective(parentId, userId)
+      async updateFields(id, fields, userId, tx) {
+        return repos.keyResultRepo.updateFields(id, fields, userId, tx)
       },
-      async deleteDraft(id, userId) {
-        await repos.keyResultRepo.deleteDraft(id, userId)
+      async findByParent(parentId, userId, tx) {
+        return repos.keyResultRepo.findByObjective(parentId, userId, tx)
+      },
+      async deleteDraft(id, userId, tx) {
+        await repos.keyResultRepo.deleteDraft(id, userId, tx)
       },
     },
   }

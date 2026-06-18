@@ -80,6 +80,30 @@ export interface DerivedSignals {
   dataWindowDays: number
 }
 
+// ─── ValidationResult（意图校验/规则判定统一产出）────────────
+// 详见宪章 §VIII 判定模型；Orchestrator 聚合 onValidate 与 Rule Engine
+// 结果取最严格（Rejected > NeedConfirm > Passed）后路由。
+// MVP 试点仅此三变体；PassedWithWarning/NeedInput 延后到 [025]。
+export type ValidationResult =
+  | { kind: 'Passed' }
+  | { kind: 'Rejected'; errors: string[] }
+  | { kind: 'NeedConfirm'; data: unknown }
+
+/** 产出 Passed 变体 —— 进入业务事实写入口 */
+export function validationPassed(): ValidationResult {
+  return { kind: 'Passed' }
+}
+
+/** 产出 Rejected 变体 —— 结构性拒绝，携带错误信息 */
+export function validationRejected(errors: string[]): ValidationResult {
+  return { kind: 'Rejected', errors }
+}
+
+/** 产出 NeedConfirm 变体 —— 结构化确认，携带确认数据（吸收 needsCnuiConfirmation） */
+export function validationNeedConfirm(data: unknown): ValidationResult {
+  return { kind: 'NeedConfirm', data }
+}
+
 // ─── 4.4 Domain Plugin Four-Hook Signature ────────────────────
 export interface DomainPlugin {
   manifest: DomainManifest
@@ -87,7 +111,7 @@ export interface DomainPlugin {
   onValidate(
     intent: StructuredIntent,
     snapshot: USOMSnapshot,
-  ): Promise<{ valid: boolean; errors: string[] }> | { valid: boolean; errors: string[] }
+  ): Promise<ValidationResult> | ValidationResult
 
   onEvent(
     event: SystemEvent,
@@ -174,6 +198,7 @@ export type SystemEventType =
   | 'GenerativeContextAssembled' | 'GenerativeHandlerCompleted'
   | 'GenerativeUserConfirmed' | 'GenerativeProposalRejected' | 'GenerativeBatchExecuted'
   | 'ExecutionLogged'
+  | 'TaskFieldUpdated'
 
 export interface SystemEvent {
   id: USOM_ID

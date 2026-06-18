@@ -13,7 +13,9 @@ import type {
   ActionCandidate,
   ActionSurfaceSuggestion,
   MetricUpdate,
+  ValidationResult,
 } from '@/usom/types/process'
+import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
@@ -52,7 +54,7 @@ export function createOkrsHooks(
   async function onValidate(
     intent: StructuredIntent,
     _snapshot: USOMSnapshot,
-  ): Promise<{ valid: boolean; errors: string[] }> {
+  ): Promise<ValidationResult> {
     const errors: string[] = []
     const { fields } = intent
     const action = intent.action
@@ -130,7 +132,7 @@ export function createOkrsHooks(
       }
     }
 
-    return { valid: errors.length === 0, errors }
+    return errors.length === 0 ? validationPassed() : validationRejected(errors)
   }
 
   /**

@@ -15,6 +15,7 @@ function makeMockHabitRepo() {
     save: vi.fn(),
     create: vi.fn(),
     updateStatus: vi.fn(),
+    updateFields: vi.fn(),
   }
 }
 
@@ -51,7 +52,7 @@ describe('createHabitsGenericRepo', () => {
       const repos = createHabitsGenericRepo({ habitRepo, habitLogRepo })
       const result = await repos.habit.findById('h-1' as USOM_ID, userId)
 
-      expect(habitRepo.findById).toHaveBeenCalledWith('h-1', userId)
+      expect(habitRepo.findById).toHaveBeenCalledWith('h-1', userId, undefined)
       expect(result).toEqual(expected)
     })
 
@@ -64,7 +65,7 @@ describe('createHabitsGenericRepo', () => {
       const repos = createHabitsGenericRepo({ habitRepo, habitLogRepo })
       await repos.habit.save(obj, userId)
 
-      expect(habitRepo.save).toHaveBeenCalledWith(obj, userId)
+      expect(habitRepo.save).toHaveBeenCalledWith(obj, userId, undefined)
     })
 
     it('create 委托到 habitRepo.create', async () => {
@@ -77,7 +78,7 @@ describe('createHabitsGenericRepo', () => {
       const repos = createHabitsGenericRepo({ habitRepo, habitLogRepo })
       const result = await repos.habit.create(fields, userId)
 
-      expect(habitRepo.create).toHaveBeenCalledWith(fields, userId)
+      expect(habitRepo.create).toHaveBeenCalledWith(fields, userId, undefined)
       expect(result).toEqual(created)
     })
 
@@ -90,7 +91,7 @@ describe('createHabitsGenericRepo', () => {
       const repos = createHabitsGenericRepo({ habitRepo, habitLogRepo })
       const result = await repos.habit.updateStatus('h-1' as USOM_ID, 'suspended', userId)
 
-      expect(habitRepo.updateStatus).toHaveBeenCalledWith('h-1', 'suspended', userId)
+      expect(habitRepo.updateStatus).toHaveBeenCalledWith('h-1', 'suspended', userId, undefined)
       expect(result).toEqual(updated)
     })
   })

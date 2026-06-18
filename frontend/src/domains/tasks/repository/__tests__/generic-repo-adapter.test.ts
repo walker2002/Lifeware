@@ -15,6 +15,7 @@ function makeMockRepo() {
     save: vi.fn(),
     create: vi.fn(),
     updateStatus: vi.fn(),
+    updateFields: vi.fn(),
   }
 }
 
@@ -43,7 +44,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.task.findById('t-1' as USOM_ID, userId)
 
-      expect(taskRepo.findById).toHaveBeenCalledWith('t-1', userId)
+      expect(taskRepo.findById).toHaveBeenCalledWith('t-1', userId, undefined)
       expect(result).toEqual(expected)
     })
 
@@ -56,7 +57,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       await repos.task.save(obj, userId)
 
-      expect(taskRepo.save).toHaveBeenCalledWith(obj, userId)
+      expect(taskRepo.save).toHaveBeenCalledWith(obj, userId, undefined)
     })
 
     it('create 委托到 taskRepo.create', async () => {
@@ -69,7 +70,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.task.create(fields, userId)
 
-      expect(taskRepo.create).toHaveBeenCalledWith(fields, userId)
+      expect(taskRepo.create).toHaveBeenCalledWith(fields, userId, undefined)
       expect(result).toEqual(created)
     })
 
@@ -82,7 +83,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.task.updateStatus('t-1' as USOM_ID, 'completed', userId)
 
-      expect(taskRepo.updateStatus).toHaveBeenCalledWith('t-1', 'completed', userId)
+      expect(taskRepo.updateStatus).toHaveBeenCalledWith('t-1', 'completed', userId, undefined)
       expect(result).toEqual(updated)
     })
   })
@@ -97,7 +98,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.thread.findById('th-1' as USOM_ID, userId)
 
-      expect(threadRepo.findById).toHaveBeenCalledWith('th-1', userId)
+      expect(threadRepo.findById).toHaveBeenCalledWith('th-1', userId, undefined)
       expect(result).toEqual(expected)
     })
 
@@ -110,7 +111,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       await repos.thread.save(obj, userId)
 
-      expect(threadRepo.save).toHaveBeenCalledWith(obj, userId)
+      expect(threadRepo.save).toHaveBeenCalledWith(obj, userId, undefined)
     })
 
     it('create 委托到 threadRepo.create', async () => {
@@ -123,7 +124,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.thread.create(fields, userId)
 
-      expect(threadRepo.create).toHaveBeenCalledWith(fields, userId)
+      expect(threadRepo.create).toHaveBeenCalledWith(fields, userId, undefined)
       expect(result).toEqual(created)
     })
 
@@ -136,7 +137,7 @@ describe('createTasksGenericRepo', () => {
       const repos = createTasksGenericRepo({ taskRepo, threadRepo })
       const result = await repos.thread.updateStatus('th-1' as USOM_ID, 'completed', userId)
 
-      expect(threadRepo.updateStatus).toHaveBeenCalledWith('th-1', 'completed', userId)
+      expect(threadRepo.updateStatus).toHaveBeenCalledWith('th-1', 'completed', userId, undefined)
       expect(result).toEqual(updated)
     })
   })

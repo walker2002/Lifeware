@@ -13,7 +13,9 @@ import type {
   ActionCandidate,
   ActionSurfaceSuggestion,
   MetricUpdate,
+  ValidationResult,
 } from '@/usom/types/process'
+import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
@@ -42,7 +44,7 @@ export function createTimeboxHooks(manifest: DomainManifest) {
   function onValidate(
     intent: StructuredIntent,
     _snapshot: USOMSnapshot,
-  ): { valid: boolean; errors: string[] } {
+  ): ValidationResult {
     const errors: string[] = []
     const { fields } = intent
 
@@ -66,7 +68,7 @@ export function createTimeboxHooks(manifest: DomainManifest) {
       errors.push(`duration 必须是 ${MIN_DURATION}~${MAX_DURATION} 之间的整数（分钟）`)
     }
 
-    return { valid: errors.length === 0, errors }
+    return errors.length === 0 ? validationPassed() : validationRejected(errors)
   }
 
   /**

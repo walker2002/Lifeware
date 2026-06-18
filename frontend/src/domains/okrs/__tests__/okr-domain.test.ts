@@ -76,18 +76,20 @@ describe('OKR Domain Plugin', () => {
   describe('onValidate', () => {
     it('createObjective 缺少 title 应校验失败', async () => {
       const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: '' }), mockSnapshot())
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.kind).toBe('Rejected')
+      if (result.kind === 'Rejected') {
+        expect(result.errors.length).toBeGreaterThan(0)
+      }
     })
 
     it('createObjective 有 title 应校验通过', async () => {
       const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: '提升产品质量' }), mockSnapshot())
-      expect(result.valid).toBe(true)
+      expect(result.kind).toBe('Passed')
     })
 
     it('createObjective title 超过 200 字符应校验失败', async () => {
       const result = await okrsPlugin.onValidate(makeIntent('createObjective', { title: 'x'.repeat(201) }), mockSnapshot())
-      expect(result.valid).toBe(false)
+      expect(result.kind).toBe('Rejected')
     })
 
     it('createKeyResult targetValue <= 0 应校验失败', async () => {
@@ -95,7 +97,7 @@ describe('OKR Domain Plugin', () => {
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 0, unit: '%' }),
         mockSnapshot(),
       )
-      expect(result.valid).toBe(false)
+      expect(result.kind).toBe('Rejected')
     })
 
     it('createKeyResult 缺少 unit 应校验失败', async () => {
@@ -103,7 +105,7 @@ describe('OKR Domain Plugin', () => {
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 100 }),
         mockSnapshot(),
       )
-      expect(result.valid).toBe(false)
+      expect(result.kind).toBe('Rejected')
     })
 
     it('createKeyResult 有效输入应校验通过', async () => {
@@ -111,7 +113,7 @@ describe('OKR Domain Plugin', () => {
         makeIntent('createKeyResult', { title: 'KR1', targetValue: 100, unit: '%' }),
         mockSnapshot(),
       )
-      expect(result.valid).toBe(true)
+      expect(result.kind).toBe('Passed')
     })
 
     it('updateKeyResultProgress currentValue < 0 应校验失败', async () => {
@@ -119,7 +121,7 @@ describe('OKR Domain Plugin', () => {
         makeIntent('updateKeyResultProgress', { keyResultId: 'kr-1', currentValue: -1 }),
         mockSnapshot(),
       )
-      expect(result.valid).toBe(false)
+      expect(result.kind).toBe('Rejected')
     })
 
     it('activateObjective 缺少 objectiveId 应校验失败', async () => {
@@ -127,7 +129,7 @@ describe('OKR Domain Plugin', () => {
         makeIntent('activateObjective', {}),
         mockSnapshot(),
       )
-      expect(result.valid).toBe(false)
+      expect(result.kind).toBe('Rejected')
     })
   })
 

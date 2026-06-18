@@ -13,6 +13,7 @@ function makeMockObjectiveRepo() {
   return {
     findById: vi.fn(),
     save: vi.fn(),
+    updateFields: vi.fn(),
   }
 }
 
@@ -23,6 +24,7 @@ function makeMockKeyResultRepo() {
     findByObjective: vi.fn(),
     deleteDraft: vi.fn(),
     updateProgress: vi.fn(),
+    updateFields: vi.fn(),
   }
 }
 
@@ -53,7 +55,7 @@ describe('createOkrsGenericRepo', () => {
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo })
       const result = await repos.objective.findById('o-1' as USOM_ID, userId)
 
-      expect(objectiveRepo.findById).toHaveBeenCalledWith('o-1', userId)
+      expect(objectiveRepo.findById).toHaveBeenCalledWith('o-1', userId, undefined)
       expect(result).toEqual(expected)
     })
 
@@ -65,7 +67,7 @@ describe('createOkrsGenericRepo', () => {
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo })
       await repos.objective.save(obj, userId)
 
-      expect(objectiveRepo.save).toHaveBeenCalledWith(obj, userId)
+      expect(objectiveRepo.save).toHaveBeenCalledWith(obj, userId, undefined)
     })
 
     it('create 构造完整对象并持久化', async () => {
@@ -84,7 +86,7 @@ describe('createOkrsGenericRepo', () => {
       expect(result.status).toBe('draft')
       expect(result.priority).toBe('P0')
       expect(result.createdAt).toBeTruthy()
-      expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ title: '新目标' }), userId)
+      expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ title: '新目标' }), userId, undefined)
     })
 
     it('create 使用 SM 注入的 status', async () => {
@@ -115,7 +117,7 @@ describe('createOkrsGenericRepo', () => {
 
       expect(result.status).toBe('active')
       expect(result.updatedAt).toBeTruthy()
-      expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'active' }), userId)
+      expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'active' }), userId, undefined)
     })
 
     it('updateStatus 对 discarded 状态添加 discardedAt', async () => {
@@ -143,7 +145,7 @@ describe('createOkrsGenericRepo', () => {
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo })
       const result = await repos.key_result.findById('kr-1' as USOM_ID, userId)
 
-      expect(keyResultRepo.findById).toHaveBeenCalledWith('kr-1', userId)
+      expect(keyResultRepo.findById).toHaveBeenCalledWith('kr-1', userId, undefined)
       expect(result).toEqual(expected)
     })
 
@@ -176,7 +178,7 @@ describe('createOkrsGenericRepo', () => {
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo })
       const result = await repos.key_result.findByParent!('o-1' as USOM_ID, userId)
 
-      expect(keyResultRepo.findByObjective).toHaveBeenCalledWith('o-1', userId)
+      expect(keyResultRepo.findByObjective).toHaveBeenCalledWith('o-1', userId, undefined)
       expect(result).toEqual(krs)
     })
 
@@ -188,7 +190,7 @@ describe('createOkrsGenericRepo', () => {
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo })
       await repos.key_result.deleteDraft!('kr-1' as USOM_ID, userId)
 
-      expect(keyResultRepo.deleteDraft).toHaveBeenCalledWith('kr-1', userId)
+      expect(keyResultRepo.deleteDraft).toHaveBeenCalledWith('kr-1', userId, undefined)
     })
 
     it('updateStatus 对 archived 状态添加 archivedAt', async () => {

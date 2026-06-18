@@ -1,23 +1,24 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.9.0 → 1.10.0
-  Rationale: MINOR — 新增 CN-UI Write Confirmation 治理原则
+  Version change: 1.10.0 → 1.11.0
+  Rationale: MINOR — 新增「业务事实写入口」治理原则 + SM 重定位 + ValidationResult 判定模型
 
   Modified sections:
-    - VIII. AI/Rule Boundary (新增 CN-UI Write Confirmation 子章节)
+    - III. Single-Writer Invariant (新增「业务事实写入口」子章节；SM 行重定位为生命周期组件；新增 Field Executor 写者)
+    - VI. Domain Plugin Dual-Track Model (onValidate 返回 ValidationResult)
+    - VII. Bridge Layer Readiness Constraint A (链路终点改为「业务事实写入口」)
+    - VIII. AI/Rule Boundary (新增 ValidationResult 判定模型 + 聚合/路由；NeedConfirm 吸收 needsCnuiConfirmation)
 
   Modified principles:
-    - None (治理扩展，不影响现有原则)
+    - III (materially expanded), VIII (materially expanded)
 
   Templates requiring updates:
-    - .specify/templates/plan-template.md            ✅ no changes needed
-    - .specify/templates/spec-template.md             ✅ no changes needed
-    - .specify/templates/tasks-template.md             ✅ no changes needed
+    - .specify/templates/*.md                         ✅ 无需改动（模板未硬编码 SM/validation 细节，已核查）
 
   Follow-up documents requiring updates:
-    - manifest.md                                     (to be updated)
-    - CLAUDE.md                                       (可选：补充 UI 设计规范引用)
+    - docs/usom-design.md                             (onValidate 签名 → ValidationResult；G-07 链路；写入口+字段三分类概念)
+    - manifest.md                                     (版本历史同步)
 -->
 
 # Lifeware Constitution
@@ -87,16 +88,50 @@ energy compatibility. User calibration values override system defaults.
 
 ### III. Single-Writer Invariant
 
-Five components hold exclusive write authority — no other component may
+Six components hold exclusive write authority — no other component may
 usurp their responsibilities:
 
 | Component | Exclusive Authority |
 |---|---|
-| State Machine | System state writes; generic lifecycle executor that validates transitions against Domain manifest `lifecycle` declarations (accepts only StateProposal from Orchestrator or time triggers) |
+| State Machine | Lifecycle writes (state transitions) — the **lifecycle execution component** within the Business Fact Write Entry; validates transitions against Domain manifest `lifecycle` declarations (accepts only StateProposal from Orchestrator or time triggers) |
+| Field Executor | FactField writes (business-fact field mutations) — the **field-mutation component** within the Business Fact Write Entry; persists individual FactField updates via Repository `updateFields`; accepts field mutations routed by manifest `mutation_mode` only |
 | Memory Framework | Memory writes (all levels L1–L5); Derived Signals as the sole read interface for external consumers |
 | Intent Engine | Intent parsing and StructuredIntent production |
 | Action Surface Engine | Output presentation (Action Guide, Dynamic Tile, Continuity Cue) |
 | Context Engine | Context assembly for generative operations; reads manifest `generation_actions`, resolves Context Capabilities, produces `GenerationRequest` |
+
+> **写权威归属**：业务事实写入口（见下）整合 State Machine（生命周期写）
+> 与 Field Executor（FactField 写）两路写权威；二者是写入口的内部组件，
+> 写权威由本表授予。外部组件 MUST NOT 新增并列写执行器绕过写入口
+> （防绕过不变式）。
+
+#### 业务事实写入口（Business Fact Write Entry）
+
+**业务事实写入口是系统唯一的业务事实写入通道。** 所有改变业务事实
+（Business Fact）的写操作 —— 无论是生命周期状态变更还是 FactField 字段
+变更 —— MUST 经由该写入口；任何组件（含 UI、Server Action、CNUI、Bridge
+Layer）MUST NOT 绕过写入口直接调用 Repository 写方法或 Drizzle。`domainMutationService` 是写入口的对外 API 面（门面，非写者本身），
+内部把写入语义分流到两个并列组件：
+
+- **State Machine（生命周期组件）**：状态转换，纯生命周期执行器，沿用
+  既有 generic-state-machine，职责不变。
+- **Field Executor（字段组件）**：FactField 字段写，按 manifest
+  `field_metadata.*.mutation_mode` 路由。
+
+**字段三分类（mutation_mode）**：
+
+| 分类 | 含义 | 写入路径 |
+|---|---|---|
+| `FactField` | 改变业务事实的字段（priority/dueDate/parentId/threadId/status 等） | MUST 经写入口（Intent → Rule Engine → 写入口 → Event） |
+| `ContentField` | 不改变业务事实的内容（title/description/name 等） | 可直走 Repository（可不发业务事件） |
+| `PresentationField` | 纯展示态（展开/排序/选中），不入库 | 本地/UI store |
+
+**两层 API**：写入口对外暴露两层 API —— 原子单字段写
+`update(id, field, value)` 与聚合/事务写 `execute(intent)`（跨对象、多步、
+需事务的复合写，如提升为主线：软删原 task + 建主线 + 迁子任务 threadId，
+单事务边界）。FactField + 生命周期状态同写时，编排顺序固定「先字段后状态」，
+单事务，任一步失败整体回滚；事务由写入口顶层持有，State Machine 与 Field
+Executor 均作为该事务内的子操作。
 
 AI Runtime's Session Manager coordinates with Memory Framework L1 for
 session history but MUST NOT bypass Memory Framework's write authority.
@@ -106,12 +141,18 @@ CN-UI protocol), not a writer of system state.
 
 **Rationale**: Prevents race conditions, ensures auditability, and
 enables each component to reason about its invariants without
-coordinating with peers. Context Engine is the sole authority for
-assembling cross-Domain context data — no Handler may fetch its own
-context, and no other component may produce GenerationRequests.
+coordinating with peers. 业务事实写入口把「按字段机械分流（改 status 走
+SM、改其他字段走 repo）」升级为「按语义分流（是否改变业务事实）」，从源头
+消除「这个字段该不该走 SM」的争论与 repo-bypass 技术债。Context Engine is
+the sole authority for assembling cross-Domain context data — no Handler
+may fetch its own context, and no other component may produce
+GenerationRequests.
 
 **How to apply**: Code reviews MUST reject any PR where a component
-outside these five performs its reserved write operation.
+outside these authorities performs its reserved write operation, AND any
+PR that performs a FactField 或生命周期写 outside the Business Fact Write
+Entry（例：Server Action / Page / CNUI 直接调用 Repository.update 或 Drizzle
+写 FactField、直接写 `status` 字段绕过 SM）。
 
 ### IV. USOM Sovereignty & Document Authority
 
@@ -155,7 +196,7 @@ constraint checking from active generation:
 Four hooks with three prohibitions (unchanged):
 
 **Permitted (four hooks)**:
-1. `onValidate` — structural validation of intents
+1. `onValidate` — structural validation of intents；返回 `ValidationResult`（Passed / Rejected / NeedConfirm，判定模型见 §VIII）
 2. `onEvent` — return metrics and suggestions (no state mutation)
 3. `onActionSurfaceRequest` — return action candidates
 4. `onOutboundRequest` — declare outbound push intent (optional, not in MVP)
@@ -294,7 +335,7 @@ Bridge Layer constraints take effect from the first line of MVP code:
 
 | ID | Constraint |
 |---|---|
-| A | All external writes MUST traverse the full Nexus chain (Intent Engine → Rule Engine → State Machine) |
+| A | All external writes MUST traverse the full Nexus chain (Intent Engine → Rule Engine → **业务事实写入口**：State Machine 生命周期组件 / Field Executor 字段组件)；任何绕过写入口直接写业务事实或生命周期的路径均为违宪 |
 | B | MCP Tools expose only read queries and intent submission — no direct CRUD |
 | C | Derived Signals is the ONLY memory entry point for Agent reads; L2–L5 layers are not exposed |
 | D | Nexus method signatures MUST NOT depend on HTTP context; they MUST be callable from Bridge Layer |
@@ -361,12 +402,48 @@ Handler files MUST include a rule-based fallback path. Phase A and
 Phase B MUST have separate test suites — Phase A tests routing
 accuracy, Phase B tests field extraction completeness.
 
+### ValidationResult 判定模型
+
+意图校验（Domain `onValidate`）与规则判定（Rule Engine）统一产出
+`ValidationResult` 判别联合；Orchestrator 聚合二者取最严格，并据此路由：
+
+```typescript
+type ValidationResult =
+  | { kind: 'Passed' }                          // 进入业务事实写入口
+  | { kind: 'Rejected'; errors: string[] }      // 结构性拒绝，终止
+  | { kind: 'NeedConfirm'; data: unknown }      // 结构化确认（携带确认数据）
+```
+
+**聚合偏序（全序，取最严格）**：`Rejected > NeedConfirm > Passed`。
+Rejected 恒最高（任一方结构性拒绝即终止）。
+
+**路由**：
+- `Passed` → 业务事实写入口（State Machine 或 Field Executor）
+- `NeedConfirm` → Suspend（结构化确认卡；吸收原散落的
+  `needsCnuiConfirmation`，CNUI Surface 写确认即 NeedConfirm 的一个实例）
+- `Rejected` → end
+
+**MVP 试点范围**：仅实现 `Passed | Rejected | NeedConfirm` 三变体。
+`PassedWithWarning / NeedInput / Suspend 一等公民状态` 延后到 [025] 首个
+真实场景（如级联确认 CascadePreview、字段补全）出现时再补 —— 当前无端到端
+可验证场景，遵循 YAGNI；类型先按三变体落地，避免推测性扩展。
+
+**教练而非守门**：Rule Engine 仍是 coach 不是 gatekeeper —— 其 coaching
+关注以 `NeedConfirm`（可继续的确认卡）呈现，而非静默硬阻断；结构性
+`Rejected`（如非法枚举、缺必填 FactField）来自 `onValidate` 守卫，二者各司
+其职。
+
 ### CN-UI Write Confirmation
 
 所有通过 CN-UI 表面提交的写操作意图（`pathType === 'contract'`），必须
 经过用户在 CNUI Surface 中的显式确认。系统不得跳过确认步骤直接执行写入
 操作，即使 Intent Engine 已成功提取所有必填字段。这确保用户始终对写入
 操作拥有最终控制权。
+
+> **与判定模型的关系**：本确认即 `ValidationResult.NeedConfirm` 的一个
+> 实例 —— Orchestrator 将 contract path 的确认需求聚合为 NeedConfirm 并
+> Suspend 到 CNUI Surface，不再单列 `needsCnuiConfirmation` 分支（见
+> §VIII ValidationResult 判定模型）。
 
 **实现位置**: Orchestrator `executeIntent` 中 contract path 的路由阶段。
 当 `pathType === 'contract'` 且 manifest 中该 action 的
@@ -959,6 +1036,11 @@ The Rule Engine produces exactly three result types: `pass`,
 `warning`, and `confirm`. It MUST NEVER block user actions. Lifeware
 is a coach, not a gatekeeper.
 
+> 统一判定模型见 §VIII ValidationResult：Rule Engine 的 `pass/warning/confirm`
+> 在与 Domain `onValidate` 聚合时映射为 `ValidationResult`（Passed /
+> NeedConfirm），coaching 关注以 NeedConfirm（可继续）呈现而非硬阻断；
+> 结构性 Rejected 来自 onValidate 守卫。
+
 ### Calibration Governance
 
 Calibration proposals appear only during Review cycles — never
@@ -1089,4 +1171,4 @@ tokens is DESIGN.md; the downstream implementation is `globals.css`.
 MVP scope is Web only; mobile layout specifications are pre-designed
 for future iteration.
 
-**Version**: 1.10.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-10
+**Version**: 1.11.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-18

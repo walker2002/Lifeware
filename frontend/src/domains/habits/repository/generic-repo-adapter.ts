@@ -9,6 +9,7 @@
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { DbClient } from '@/lib/db'
 
 /**
  * Habits 域的 GenericRepo 适配器工厂参数
@@ -17,10 +18,11 @@ import type { USOM_ID } from '@/usom/types/primitives'
  */
 interface HabitsRepoPair {
   habitRepo: {
-    findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
-    create(fields: Record<string, unknown>, userId: USOM_ID): Promise<Record<string, unknown>>
-    updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID): Promise<Record<string, unknown>>
+    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    create(fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
   habitLogRepo: {
     save(log: Record<string, unknown>, userId: USOM_ID): Promise<void>
@@ -35,17 +37,20 @@ interface HabitsRepoPair {
 export function createHabitsGenericRepo(repos: HabitsRepoPair): Record<string, GenericRepo> {
   return {
     habit: {
-      async findById(id, userId) {
-        return repos.habitRepo.findById(id, userId)
+      async findById(id, userId, tx) {
+        return repos.habitRepo.findById(id, userId, tx)
       },
-      async save(obj, userId) {
-        await repos.habitRepo.save(obj, userId)
+      async save(obj, userId, tx) {
+        await repos.habitRepo.save(obj, userId, tx)
       },
-      async create(fields, userId) {
-        return repos.habitRepo.create(fields, userId)
+      async create(fields, userId, tx) {
+        return repos.habitRepo.create(fields, userId, tx)
       },
-      async updateStatus(id, toStatus, userId) {
-        return repos.habitRepo.updateStatus(id, toStatus, userId)
+      async updateStatus(id, toStatus, userId, tx) {
+        return repos.habitRepo.updateStatus(id, toStatus, userId, tx)
+      },
+      async updateFields(id, fields, userId, tx) {
+        return repos.habitRepo.updateFields(id, fields, userId, tx)
       },
     },
     habit_log: {
@@ -65,6 +70,10 @@ export function createHabitsGenericRepo(repos: HabitsRepoPair): Record<string, G
       },
       async updateStatus() {
         throw new Error('HabitLog 不支持状态转换')
+      },
+      async updateFields() {
+        // HabitLog 为不可变事实记录，不支持局部字段更新
+        throw new Error('HabitLog 不支持字段更新')
       },
     },
   }

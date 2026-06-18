@@ -6,7 +6,7 @@
  */
 
 import { eq, and, inArray, sql } from 'drizzle-orm'
-import { db } from '../../../lib/db/index'
+import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IThreadRepository, CreateThreadInput, UpdateThreadInput } from '../../../usom/interfaces/irepository'
 import type { Thread } from '../../../usom/types/objects'
@@ -28,8 +28,8 @@ export interface ThreadWithCount {
 export class ThreadRepository implements IThreadRepository {
   // ─── 查询方法 ──────────────────────────────────────────────────
 
-  async findById(id: USOM_ID, userId: USOM_ID): Promise<Thread | null> {
-    const rows = await db.select().from(s.threads)
+  async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Thread | null> {
+    const rows = await tx.select().from(s.threads)
       .where(and(eq(s.threads.id, id), eq(s.threads.userId, userId)))
     return rows[0] ? threadRowToUSOM(rows[0] as any) : null
   }
@@ -140,7 +140,7 @@ export class ThreadRepository implements IThreadRepository {
 
   // ─── 写入方法 ──────────────────────────────────────────────────
 
-  async create(data: CreateThreadInput, userId: USOM_ID): Promise<Thread> {
+  async create(data: CreateThreadInput, userId: USOM_ID, tx: DbClient = db): Promise<Thread> {
     const id = crypto.randomUUID() as USOM_ID
     const now = new Date().toISOString() as Timestamp
 
@@ -159,7 +159,7 @@ export class ThreadRepository implements IThreadRepository {
     }
 
     const row = threadUSOMToRow(thread, userId)
-    await db.insert(s.threads).values(row)
+    await tx.insert(s.threads).values(row)
     return thread
   }
 
@@ -185,8 +185,8 @@ export class ThreadRepository implements IThreadRepository {
     return updated
   }
 
-  async updateStatus(id: USOM_ID, status: Thread['status'], userId: USOM_ID): Promise<Thread> {
-    const existing = await this.findById(id, userId)
+  async updateStatus(id: USOM_ID, status: Thread['status'], userId: USOM_ID, tx: DbClient = db): Promise<Thread> {
+    const existing = await this.findById(id, userId, tx)
     if (!existing) throw new Error(`Thread ${id} not found`)
 
     const now = new Date()
@@ -197,7 +197,7 @@ export class ThreadRepository implements IThreadRepository {
     if (status === 'completed') updates.completedAt = now
     if (status === 'archived') updates.archivedAt = now
 
-    await db.update(s.threads).set(updates)
+    await tx.update(s.threads).set(updates)
       .where(and(eq(s.threads.id, id), eq(s.threads.userId, userId)))
 
     return {
@@ -209,9 +209,30 @@ export class ThreadRepository implements IThreadRepository {
     }
   }
 
-  async save(thread: Thread, userId: USOM_ID): Promise<void> {
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成。
+   * fields 的键为 schema 列属性名（驼峰）。多租户 T-02：where 必含 userId 过滤。
+   */
+  async updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<Thread> {
+    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    await tx.update(s.threads)
+      .set(setPayload)
+      .where(and(eq(s.threads.id, id), eq(s.threads.userId, userId)))
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`Thread ${id} not found after updateFields`)
+    return updated
+  }
+
+  async save(thread: Thread, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     const row = threadUSOMToRow(thread, userId)
-    await db.insert(s.threads).values(row).onConflictDoUpdate({
+    await tx.insert(s.threads).values(row).onConflictDoUpdate({
       target: s.threads.id,
       set: row,
     })

@@ -94,28 +94,34 @@ describe('tasksPlugin.onValidate', () => {
     const intent = makeIntent({ action: 'createProject', fields: {} })
     const snapshot = makeSnapshot()
     const result = await onValidate(intent, snapshot as any)
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain('项目名称必填')
+    expect(result.kind).toBe('Rejected')
+    if (result.kind === 'Rejected') {
+      expect(result.errors).toContain('项目名称必填')
+    }
   })
 
   it('创建项目时名称不为空则通过', async () => {
     const intent = makeIntent({ action: 'createProject', fields: { name: '测试项目' } })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 
   it('创建任务时标题必填', async () => {
     const intent = makeIntent({ action: 'createTask', fields: {} })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain('任务标题必填')
+    expect(result.kind).toBe('Rejected')
+    if (result.kind === 'Rejected') {
+      expect(result.errors).toContain('任务标题必填')
+    }
   })
 
   it('创建任务时预估时长必须大于 0', async () => {
     const intent = makeIntent({ action: 'createTask', fields: { title: '测试', estimatedDuration: 0 } })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain('预估时长必须大于 0')
+    expect(result.kind).toBe('Rejected')
+    if (result.kind === 'Rejected') {
+      expect(result.errors).toContain('预估时长必须大于 0')
+    }
   })
 
   it('项目状态 active → paused 是合法转换', async () => {
@@ -128,7 +134,7 @@ describe('tasksPlugin.onValidate', () => {
       },
     })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 
   it('completed 状态的项目不能重新激活', async () => {
@@ -141,8 +147,10 @@ describe('tasksPlugin.onValidate', () => {
       },
     })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(false)
-    expect(result.errors[0]).toContain('completed')
+    expect(result.kind).toBe('Rejected')
+    if (result.kind === 'Rejected') {
+      expect(result.errors[0]).toContain('completed')
+    }
   })
 
   it('任务状态 active → in_progress 是合法转换', async () => {
@@ -155,6 +163,6 @@ describe('tasksPlugin.onValidate', () => {
       },
     })
     const result = await onValidate(intent, makeSnapshot() as any)
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 })

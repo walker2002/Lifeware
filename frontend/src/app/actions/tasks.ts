@@ -6,16 +6,24 @@
  * 页面/组件通过调用这些 actions 获取和修改数据，而非直接 import Repository，
  * 避免 Node.js 模块（tls/net/fs）被打包到浏览器端导致构建失败。
  *
- * 架构说明：
+ * 架构说明（宪法 §III 1.11.0 业务事实写入口）：
  * - 读操作：直接调用 Repository（设计规格允许）
- * - 写操作：通过 submitDynamicIntent 走完整 Nexus 链路（SM lifecycle）
- * - 字段更新（updateTask/updateThread）：保持直接 repo 调用（SM 不支持字段更新）
- * - deletTthread：硬删除，保持直接 repo 调用（Thread 生命周期不支持 deleted 状态）
+ * - 写操作（创建/状态转换）：通过 submitDynamicIntent 走完整 Nexus 链路（SM lifecycle）
+ * - 字段写（updateTask/updateThread）：经 createTasksMutationService 写入口，
+ *   FactField 走字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
+ *   ContentField 直走 repo.updateFields；不再直接 repo.update 写 FactField。
+ * - 完成任务（completeTask）：字段（actualDuration/notes）+ 状态（complete）在
+ *   写入口 execute() 单事务内原子完成（消除两阶段写）。
+ * - 提升为主线（promoteToThread）：建主线 + 迁子任务 threadId + 软删原任务，
+ *   聚合事务 execute() 内原子完成（失败回滚）。
+ * - 删除主线（deleteThread）：走 SM（thread lifecycle 含 archived→deleted），
+ *   非硬删；需先归档再删除（lifecycle 约束）。
  */
 
 'use server'
 
 import { submitDynamicIntent } from './intent'
+import { createTasksMutationService } from './tasks/mutation-service'
 import { TaskRepository } from '@/domains/tasks/repository/task'
 import { ThreadRepository, type ThreadWithCount } from '@/domains/tasks/repository/thread'
 import type { Task, Thread } from '@/usom/types/objects'
@@ -86,19 +94,38 @@ export async function createTask(input: CreateTaskInput & { title: string }): Pr
 }
 
 /**
- * 更新任务字段（直接 repo 调用）
+ * 更新任务字段（经业务事实写入口）
  *
- * 注意：SM 只支持 create/updateStatus，不支持字段更新。
- * 字段更新不是状态转换，保留直接 repo 调用。
- * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ * 按字段逐一经写入口写：FactField（priority/energyRequired/estimatedDuration/
+ * dueDate/threadId 等）走字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
+ * ContentField（title/description/color 等）直走 repo.updateFields。
+ * 不再直接 repo.update 写 FactField（消除 repo-bypass 违宪）。
  *
  * @param taskId - 任务 ID
  * @param input - 更新数据
  * @returns 更新后的任务
  */
 export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
+  const service = createTasksMutationService()
+  for (const [field, value] of Object.entries(input)) {
+    if (value === undefined) continue
+    const res = await service.update(
+      taskId as USOM_ID,
+      field,
+      value,
+      MVP_USER_ID as USOM_ID,
+      'tasks',
+      'task',
+    )
+    if (!res.success) {
+      throw new Error(res.error ?? `更新字段 "${field}" 失败`)
+    }
+  }
+  // 读回最新对象（读操作允许直接 repo 调用）
   const repo = new TaskRepository()
-  return repo.update(taskId as USOM_ID, input, MVP_USER_ID as USOM_ID)
+  const updated = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!updated) throw new Error('任务不存在')
+  return updated
 }
 
 /**
@@ -161,28 +188,41 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 /**
- * 完成任务：先保存额外字段，再通过 Nexus 链路执行状态转换
+ * 完成任务：字段 + 状态在写入口单事务内原子完成
  *
- * 两阶段模式：先通过 repo.update() 持久化非破坏性字段，
- * 再调用 submitDynamicIntent 走 SM 状态转换。
- * 若状态转换失败，字段数据至少已持久化。
+ * 步骤：先字段（actualDuration/notes 等），后状态（complete）。
+ * 整体在 createTasksMutationService().execute() 单事务内，任一步失败整体回滚
+ * （消除旧版「先 repo 存字段、再走 SM 状态转换」的两阶段写）。
  *
  * @param taskId - 任务 ID
  * @param extraFields - 额外字段（actualDuration, notes 等）
  * @returns 更新后的任务
  */
 export async function completeTask(taskId: string, extraFields?: Record<string, unknown>): Promise<Task> {
-  // 第一阶段：保存额外字段（直接 repo 调用——SM 不支持字段更新）
-  if (extraFields && Object.keys(extraFields).length > 0) {
-    const repo = new TaskRepository()
-    await repo.update(taskId as USOM_ID, extraFields as UpdateTaskInput, MVP_USER_ID as USOM_ID)
+  const service = createTasksMutationService()
+  const fieldSteps = Object.entries(extraFields ?? {})
+    .filter(([, v]) => v !== undefined)
+    .map(([field, value]) => ({ kind: 'field' as const, field, value }))
+
+  const res = await service.execute(
+    {
+      id: crypto.randomUUID() as USOM_ID,
+      domainId: 'tasks',
+      objectType: 'task',
+      targetId: taskId as USOM_ID,
+      steps: [...fieldSteps, { kind: 'state', action: 'complete' }],
+    },
+    MVP_USER_ID as USOM_ID,
+  )
+  if (!res.success) {
+    throw new Error(res.error ?? '完成任务失败')
   }
-  // 第二阶段：状态转换（通过 Nexus SM）
-  const result = await submitDynamicIntent('tasks', 'completeTask', { taskId })
-  if (!result.success) {
-    throw new Error(result.error ?? '完成任务失败')
-  }
-  return result.object as Task
+  // SM 状态步返回更新后的对象；兜底读回
+  if (res.object) return res.object as Task
+  const repo = new TaskRepository()
+  const updated = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!updated) throw new Error('任务不存在')
+  return updated
 }
 
 /**
@@ -289,19 +329,36 @@ export async function createThread(input: CreateThreadInput & { name: string }):
 }
 
 /**
- * 更新主线字段（直接 repo 调用）
+ * 更新主线字段（经业务事实写入口）
  *
- * 注意：SM 只支持 create/updateStatus，不支持字段更新。
- * 字段更新不是状态转换，保留直接 repo 调用。
- * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ * 按字段逐一经写入口写：FactField（priority）走字段执行器，
+ * ContentField（name/description/color 等）直走 repo.updateFields。
+ * 不再直接 repo.update 写 FactField（消除 repo-bypass 违宪）。
  *
  * @param threadId - 主线 ID
  * @param input - 更新数据
  * @returns 更新后的主线
  */
 export async function updateThread(threadId: string, input: UpdateThreadInput): Promise<Thread> {
+  const service = createTasksMutationService()
+  for (const [field, value] of Object.entries(input)) {
+    if (value === undefined) continue
+    const res = await service.update(
+      threadId as USOM_ID,
+      field,
+      value,
+      MVP_USER_ID as USOM_ID,
+      'tasks',
+      'thread',
+    )
+    if (!res.success) {
+      throw new Error(res.error ?? `更新字段 "${field}" 失败`)
+    }
+  }
   const repo = new ThreadRepository()
-  return repo.update(threadId as USOM_ID, input, MVP_USER_ID as USOM_ID)
+  const updated = await repo.findById(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!updated) throw new Error('主线不存在')
+  return updated
 }
 
 /**
@@ -388,13 +445,16 @@ export async function archiveThread(threadId: string): Promise<Thread> {
 }
 
 /**
- * 将任务提升为主线
+ * 将任务提升为主线（聚合事务，单事务原子）
  *
- * 四阶段操作：
- * 1. 读取原任务获取名称、描述等上下文
- * 2. 通过 Nexus 创建新主线（走 SM lifecycle，触发 ThreadCreated 事件）
- * 3. 子任务关联到新主线（仅更新 threadId，保持层级不变）
- * 4. 软删除原任务（status → deleted），因为它已提升为主线不再需要
+ * 单事务内有序步骤：
+ *   1. state:create（thread）—— 建新主线（SM create 路径，触发 ThreadCreated）
+ *   2. field:threadId（每个子任务）—— 子任务关联到新主线（字段执行器，
+ *      valueFromLastObject 取新建主线 ID），保持 parentId 层级不变
+ *   3. state:delete（task）—— 软删除原任务（SM delete，触发 TaskDeleted）
+ *
+ * 任一步失败整体回滚。旧版分别用 repo.update 写 threadId / 直写 status='deleted'
+ * 的 repo-bypass 违宪代码已消除。
  *
  * @param taskId - 要提升的任务 ID
  * @param threadFields - 可选的主线字段覆盖
@@ -408,7 +468,11 @@ export async function promoteToThread(
   const task = await taskRepo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!task) throw new Error('任务不存在')
 
-  const threadInput: CreateThreadInput & { name: string } = {
+  // 读取子任务列表（读操作允许直接 repo 调用），用于构造迁移步骤
+  const subtasks = await taskRepo.findByParent(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+
+  // 建主线的初始字段（SM create 的 payload）
+  const createPayload: Record<string, unknown> = {
     name: threadFields?.name ?? task.title,
     description: threadFields?.description ?? (task.description as string | undefined),
     color: threadFields?.color,
@@ -417,40 +481,65 @@ export async function promoteToThread(
     endDate: threadFields?.endDate,
     tags: threadFields?.tags,
   }
-  const result = await submitDynamicIntent('tasks', 'createThread', threadInput as unknown as Record<string, unknown>)
-  if (!result.success) {
-    throw new Error(result.error ?? '提升为主线失败')
+
+  const service = createTasksMutationService()
+  const res = await service.execute(
+    {
+      id: crypto.randomUUID() as USOM_ID,
+      domainId: 'tasks',
+      objectType: 'task',
+      targetId: taskId as USOM_ID,
+      steps: [
+        // 1. 建主线（新对象，create:true → SM create 路径，targetId 保持 undefined
+        //    不回退到 intent.targetId；修复 BUG-001），tag 供取回
+        {
+          kind: 'state',
+          action: 'create',
+          objectType: 'thread',
+          create: true,
+          payload: createPayload,
+          tag: 'newThread',
+        },
+        // 2. 子任务关联到新主线（threadId 取上一步新建主线的 ID）
+        ...subtasks.map((subtask) => ({
+          kind: 'field' as const,
+          objectType: 'task' as const,
+          targetId: subtask.id as USOM_ID,
+          field: 'threadId',
+          valueFromLastObject: true,
+        })),
+        // 3. 软删除原任务（SM delete，走生命周期，不再直写 status）
+        {
+          kind: 'state',
+          action: 'delete',
+          objectType: 'task',
+          targetId: taskId as USOM_ID,
+        },
+      ],
+    },
+    MVP_USER_ID as USOM_ID,
+  )
+  if (!res.success) {
+    throw new Error(res.error ?? '提升为主线失败')
   }
-  const newThread = result.object as Thread
-
-  // ── 子任务关联到新主线 ──
-  // 原任务的子任务保持层级结构（不改变 parentId），但全部关联到新主线
-  const subtasks = await taskRepo.findByParent(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
-  for (const subtask of subtasks) {
-    await taskRepo.update(subtask.id as USOM_ID, {
-      threadId: newThread.id,
-    } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
-  }
-
-  // 删除原任务（已提升为主线，不再需要保留）
-  // 使用 repo 直接软删除，将 status 设为 'deleted'
-  await taskRepo.update(taskId as USOM_ID, {
-    status: 'deleted',
-  } as UpdateTaskInput, MVP_USER_ID as USOM_ID)
-
+  // 取回新建主线对象（由 tag 收集）
+  const newThread = res.objects?.newThread as Thread | undefined
+  if (!newThread) throw new Error('提升为主线失败：未取得新建主线')
   return newThread
 }
 
 /**
- * 彻底删除主线（不可恢复）
+ * 删除主线（走 SM lifecycle，软删除 → status='deleted'）
  *
- * 注意：Thread 生命周期不支持 deleted 状态（与 Task/Habit 不同）。
- * 删除操作保留直接 repo 硬删除。
- * TODO Phase C: 评估是否需要为 Thread 添加软删除支持。
+ * Thread 生命周期已声明 archived → deleted 转换。删除经 Nexus SM（submitDynamicIntent
+ * → deleteThread → SM action=delete），不再 repo 硬删（消除 repo-bypass 违宪）。
+ * 需主线处于 archived 状态；其它状态需先归档。deleted 为终态、不可恢复。
  *
  * @param threadId - 主线 ID
  */
 export async function deleteThread(threadId: string): Promise<void> {
-  const repo = new ThreadRepository()
-  return repo.delete(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+  const result = await submitDynamicIntent('tasks', 'deleteThread', { threadId })
+  if (!result.success) {
+    throw new Error(result.error ?? '删除主线失败')
+  }
 }

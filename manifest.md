@@ -108,3 +108,5 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 | Nexus 统一设计 | 2026_06_10 | 2026_06_08 | Phase A→A/B/C 三阶段演进归档：追加 Phase B（Thread 写操作 Nexus 统一 + CNUI Surface 注册修复）、Phase C（deleteTask/refineTask/splitTask 分支补全 + 通用成功消息映射）；三阶段全部标记已完成 |
 | 界面设计规范 | 2026_06_10 | 2026_06_08 | §1.1 新增 CN-UI 表单标签规则（text-body 禁 text-muted）；§1.5 新增 Scrim 使用规则 + CNUI scrim 语义变量 |
 | 数据库设计 | 2026_06_10 | 2026_06_06 | tasks/habits status CHECK 约束补齐 deleted 状态（与 USOM TaskStatus/HabitStatus 对齐）；表结构总览补充 energy_logs |
+| 项目宪章 | 2026_06_18 | 2026_06_10 | v1.10.0→v1.11.0：MINOR — 新增「业务事实写入口」治理原则（§III 子章节：SM 重定位为写入口内生命周期组件、新增 Field Executor 写者、字段三分类 Fact/Content/Presentation、两层 API update/execute）；Constraint A 链路终点改为「业务事实写入口」并保留防绕过不变式；§VIII 新增 ValidationResult 判定模型（Passed/Rejected/NeedConfirm 三变体聚合+路由，NeedConfirm 吸收 needsCnuiConfirmation）；onValidate 返回 ValidationResult |
+| USOM 详细设计 | 2026_06_18 | 2026_06_08 | §4.4 onValidate 签名由 `{valid,errors}` 改为 `ValidationResult`（Passed/Rejected/NeedConfirm 判别联合）；新增「ValidationResult 判别联合」「字段写入三分类 mutation_mode」两小节；G-07 Nexus 链路终点改为「业务事实写入口」 |

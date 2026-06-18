@@ -6,7 +6,7 @@
  */
 
 import { eq, and } from 'drizzle-orm'
-import { db } from '../../../lib/db/index'
+import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IKeyResultRepository } from '../../../usom/interfaces/irepository'
 import type { KeyResult } from '../../../usom/types/objects'
@@ -17,14 +17,14 @@ import { keyResultRowToUSOM, keyResultUSOMToRow } from '../../../lib/db/reposito
  * KeyResult 仓储
  */
 export class KeyResultRepository implements IKeyResultRepository {
-  async findById(id: USOM_ID, userId: USOM_ID): Promise<KeyResult | null> {
-    const rows = await db.select().from(s.keyResults)
+  async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<KeyResult | null> {
+    const rows = await tx.select().from(s.keyResults)
       .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
     return rows[0] ? keyResultRowToUSOM(rows[0] as any) : null
   }
 
-  async findByObjective(objectiveId: USOM_ID, userId: USOM_ID): Promise<KeyResult[]> {
-    const rows = await db.select().from(s.keyResults)
+  async findByObjective(objectiveId: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<KeyResult[]> {
+    const rows = await tx.select().from(s.keyResults)
       .where(and(eq(s.keyResults.objectiveId, objectiveId), eq(s.keyResults.userId, userId)))
     return rows.map(r => keyResultRowToUSOM(r as any))
   }
@@ -65,8 +65,8 @@ export class KeyResultRepository implements IKeyResultRepository {
       ))
   }
 
-  async deleteDraft(id: USOM_ID, userId: USOM_ID): Promise<void> {
-    await db.delete(s.keyResults)
+  async deleteDraft(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<void> {
+    await tx.delete(s.keyResults)
       .where(and(
         eq(s.keyResults.id, id),
         eq(s.keyResults.userId, userId),
@@ -74,9 +74,30 @@ export class KeyResultRepository implements IKeyResultRepository {
       ))
   }
 
-  async save(keyResult: KeyResult, userId: USOM_ID): Promise<void> {
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成。
+   * fields 的键为 schema 列属性名（驼峰）。多租户 T-02：where 必含 userId 过滤。
+   */
+  async updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<KeyResult> {
+    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    await tx.update(s.keyResults)
+      .set(setPayload)
+      .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`KeyResult ${id} not found after updateFields`)
+    return updated
+  }
+
+  async save(keyResult: KeyResult, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     const row = keyResultUSOMToRow(keyResult, userId)
-    await db.insert(s.keyResults).values(row).onConflictDoUpdate({
+    await tx.insert(s.keyResults).values(row).onConflictDoUpdate({
       target: s.keyResults.id,
       set: row,
     })

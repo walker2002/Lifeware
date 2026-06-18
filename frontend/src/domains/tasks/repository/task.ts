@@ -6,7 +6,7 @@
  */
 
 import { eq, and, isNull, inArray, gte, lte, sql } from 'drizzle-orm'
-import { db } from '../../../lib/db/index'
+import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { ITaskRepository, CreateTaskInput, UpdateTaskInput, TaskFilters } from '../../../usom/interfaces/irepository'
 import type { Task } from '../../../usom/types/objects'
@@ -20,8 +20,8 @@ import { taskRowToUSOM, taskUSOMToRow } from '../../../lib/db/repositories/mappe
 export class TaskRepository implements ITaskRepository {
   // ─── 查询方法 ──────────────────────────────────────────────────
 
-  async findById(id: USOM_ID, userId: USOM_ID): Promise<Task | null> {
-    const rows = await db.select().from(s.tasks)
+  async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Task | null> {
+    const rows = await tx.select().from(s.tasks)
       .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
     return rows[0] ? taskRowToUSOM(rows[0] as any) : null
   }
@@ -252,7 +252,7 @@ export class TaskRepository implements ITaskRepository {
 
   // ─── 写入方法 ──────────────────────────────────────────────────
 
-  async create(data: CreateTaskInput, userId: USOM_ID): Promise<Task> {
+  async create(data: CreateTaskInput, userId: USOM_ID, tx: DbClient = db): Promise<Task> {
     const id = crypto.randomUUID() as USOM_ID
     const now = new Date().toISOString() as Timestamp
 
@@ -289,7 +289,7 @@ export class TaskRepository implements ITaskRepository {
     }
 
     const row = taskUSOMToRow(task, userId)
-    await db.insert(s.tasks).values(row)
+    await tx.insert(s.tasks).values(row)
     return task
   }
 
@@ -328,8 +328,8 @@ export class TaskRepository implements ITaskRepository {
     return updated
   }
 
-  async updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID): Promise<Task> {
-    const existing = await this.findById(id, userId)
+  async updateStatus(id: USOM_ID, status: Task['status'], userId: USOM_ID, tx: DbClient = db): Promise<Task> {
+    const existing = await this.findById(id, userId, tx)
     if (!existing) throw new Error(`Task ${id} not found`)
 
     const now = new Date()
@@ -340,7 +340,7 @@ export class TaskRepository implements ITaskRepository {
     if (status === 'completed') updates.completedAt = now
     if (status === 'archived') updates.archivedAt = now
 
-    await db.update(s.tasks).set(updates)
+    await tx.update(s.tasks).set(updates)
       .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
 
     return {
@@ -352,9 +352,39 @@ export class TaskRepository implements ITaskRepository {
     }
   }
 
-  async save(task: Task, userId: USOM_ID): Promise<void> {
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成，
+   * 不先 findById 再 save。fields 的键为 schema 列属性名（驼峰），由 Drizzle 映射到数据库列。
+   * 多租户 T-02：where 子句必含 userId 过滤。
+   *
+   * @param id - 任务 ID
+   * @param fields - 待更新字段（驼峰键，如 title / description / priority）
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄，缺省回退到 db 单例
+   * @returns 更新后的完整 USOM 对象
+   */
+  async updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<Task> {
+    // 注入 updatedAt，确保更新时间戳随字段写一起落库
+    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    await tx.update(s.tasks)
+      .set(setPayload)
+      .where(and(eq(s.tasks.id, id), eq(s.tasks.userId, userId)))
+    // 更新后回读一次，返回最新 USOM 对象
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`Task ${id} not found after updateFields`)
+    return updated
+  }
+
+  async save(task: Task, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     const row = taskUSOMToRow(task, userId)
-    await db.insert(s.tasks).values(row).onConflictDoUpdate({
+    await tx.insert(s.tasks).values(row).onConflictDoUpdate({
       target: s.tasks.id,
       set: row,
     })

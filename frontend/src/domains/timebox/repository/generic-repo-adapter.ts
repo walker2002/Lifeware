@@ -8,6 +8,7 @@
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { DbClient } from '@/lib/db'
 
 /**
  * Timebox 域的 GenericRepo 适配器工厂参数
@@ -15,9 +16,9 @@ import type { USOM_ID } from '@/usom/types/primitives'
  */
 interface TimeboxRepoPair {
   timeboxRepo: {
-    findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
-    updateStatus?(id: USOM_ID, toStatus: string, userId: USOM_ID): Promise<Record<string, unknown>>
+    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
 }
 
@@ -29,26 +30,29 @@ interface TimeboxRepoPair {
 export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string, GenericRepo> {
   return {
     timebox: {
-      async findById(id, userId) {
-        return repos.timeboxRepo.findById(id, userId)
+      async findById(id, userId, tx) {
+        return repos.timeboxRepo.findById(id, userId, tx)
       },
-      async save(obj, userId) {
-        await repos.timeboxRepo.save(obj, userId)
+      async save(obj, userId, tx) {
+        await repos.timeboxRepo.save(obj, userId, tx)
       },
-      async create(fields, userId) {
+      async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const obj = { id, ...fields, createdAt: now, updatedAt: now }
-        await repos.timeboxRepo.save(obj, userId)
+        await repos.timeboxRepo.save(obj, userId, tx)
         return obj
       },
-      async updateStatus(id, toStatus, userId) {
-        const existing = await repos.timeboxRepo.findById(id, userId)
+      async updateStatus(id, toStatus, userId, tx) {
+        const existing = await repos.timeboxRepo.findById(id, userId, tx)
         if (!existing) throw new Error('时间盒不存在')
         const now = new Date().toISOString()
         const updated = { ...existing, status: toStatus, updatedAt: now }
-        await repos.timeboxRepo.save(updated, userId)
+        await repos.timeboxRepo.save(updated, userId, tx)
         return updated
+      },
+      async updateFields(id, fields, userId, tx) {
+        return repos.timeboxRepo.updateFields(id, fields, userId, tx)
       },
     },
   }

@@ -37,6 +37,8 @@ export interface FieldMetadata {
   options?: string[]
   default_value?: unknown
   description?: string
+  /** 字段写入分类（[018] 业务事实写入口）：FactField 走写入口 / ContentField 直走 Repo / PresentationField 本地态 */
+  mutation_mode?: 'FactField' | 'ContentField' | 'PresentationField'
 }
 
 // ─── 区块 D: list_actions ───────────────────────────────────────

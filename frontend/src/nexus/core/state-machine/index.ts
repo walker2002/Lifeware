@@ -1,10 +1,14 @@
 /**
  * @file index
  * @brief 对象生命周期状态机执行器
- * 
+ *
  * 通用版：接收 LifecycleDefinition 驱动多域状态转换
  * 接收已批准的 StateProposal，执行状态转换，持久化并发布事件
- * 
+ *
+ * 事务管道（T4）：execute 支持可选 tx 句柄，向下透传给 repo 的写操作
+ * （findById/save/create/updateStatus），使 SM 可作为写入口顶层事务的子操作。
+ * 注：eventRepo.append 与 cascade 当前未纳入 tx，详见 execute 内注释。
+ *
  * @see docs/usom-design.md Section 4.2.3
  */
 
@@ -14,6 +18,7 @@ import type { ISystemEventRepository } from '@/usom/interfaces/irepository'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import type { LifecycleDefinition, FieldMetadata, LifecycleTransition } from '@/usom/types/domain-types'
 import type { ParentChildStatusRule, CascadeResult } from './cascade'
+import type { DbClient } from '@/lib/db'
 
 // ─── 通用 State Machine ────────────────────────────────────────
 
@@ -45,48 +50,73 @@ export interface GenericRepo {
    * 根据 ID 查找对象
    * @param id - 对象 ID
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 对象或 null
    */
-  findById(id: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown> | null>
+  findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
 
   /**
    * 保存对象（创建或全量更新）
    * @param obj - 对象数据（必须含 id 字段）
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    */
-  save(obj: Record<string, unknown>, userId: USOM_ID): Promise<void>
+  save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
 
   /**
    * 创建新对象，内部生成 ID，返回含 ID 的完整对象
    * @param fields - 对象字段（不含 id、createdAt、updatedAt、status）
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 含生成 ID 和默认字段的完整对象
    */
-  create(fields: Record<string, unknown>, userId: USOM_ID): Promise<Record<string, unknown>>
+  create(fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
 
   /**
    * 更新对象状态
    * @param id - 对象 ID
    * @param toStatus - 目标状态
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 更新后的完整对象
    */
-  updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID): Promise<Record<string, unknown>>
+  updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，**禁止读后写**（消除 N+1）：直接以 `update().set(fields).where(id 且 userId)`
+   * 一次完成，不先 findById。多租户 T-02：where 子句必含 userId 过滤。
+   *
+   * @param id - 对象 ID
+   * @param fields - 待更新字段（驼峰键，与 schema 列属性名一致）
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
+   * @returns 更新后的完整对象（更新后回读一次以返回最新 USOM 对象）
+   */
+  updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx?: DbClient,
+  ): Promise<Record<string, unknown>>
 
   /**
    * 删除草稿对象（可选，仅支持草稿状态删除的 Domain）
    * @param id - 对象 ID
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    */
-  deleteDraft?(id: USOM_ID, userId: USOM_ID): Promise<void>
+  deleteDraft?(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
 
   /**
    * 根据父对象 ID 查询子对象列表（用于 cascade）
    * @param parentId - 父对象 ID
    * @param userId - 用户 ID
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 子对象列表
    */
-  findByParent?(parentId: USOM_ID, userId: USOM_ID): Promise<Record<string, unknown>[]>
+  findByParent?(parentId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>[]>
 }
 
 /**
@@ -183,12 +213,16 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
      * @param proposal - 状态提案
      * @param eventBus - 事件总线
      * @param userId - 用户ID
+     * @param tx - 可选事务句柄；由写入口（domainMutationService）顶层持有并透传，
+     *             使 SM 与字段执行器作为同一事务内的子操作。缺省（undefined）时
+     *             repo 各方法回退到 db 单例，保持向后兼容。
      * @returns 执行结果
      */
     async execute(
       proposal: StateProposal,
       eventBus: EventBus,
       userId: USOM_ID,
+      tx?: DbClient,
     ): Promise<StateMachineResult> {
       const now = new Date().toISOString() as Timestamp
       const objectType = proposal.targetObject.type
@@ -207,7 +241,7 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
 
       if (objectId) {
         const repo = getRepository(objectType)
-        existingObject = await repo.findById(objectId, userId)
+        existingObject = await repo.findById(objectId, userId, tx)
         if (!existingObject) {
           return { success: false, error: '对象不存在' }
         }
@@ -234,23 +268,27 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
       const repo = getRepository(objectType)
 
       if (existingObject) {
-        // 状态转换：使用 updateStatus
-        object = await repo.updateStatus(objectId!, transition.to as string, userId)
+        // 状态转换：使用 updateStatus（透传 tx）
+        object = await repo.updateStatus(objectId!, transition.to as string, userId, tx)
 
         // 自动设置 lifecycle_timestamp 字段
         const actionTimestampMap = buildActionTimestampMap(lifecycle, fieldMeta)
         const timestampKey = actionTimestampMap[proposal.action]
         if (timestampKey && lifecycleTimestampFields.includes(timestampKey)) {
           object = { ...object, [timestampKey]: now }
-          await repo.save(object, userId)
+          await repo.save(object, userId, tx)
         }
       } else {
-        // 创建：注入目标 status，由 Repository 一次写入
+        // 创建：注入目标 status，由 Repository 一次写入（透传 tx）
         const createPayload = { ...proposal.payload, status: transition.to }
-        object = await repo.create(createPayload, userId)
+        object = await repo.create(createPayload, userId, tx)
       }
 
       // 5. 构造并持久化 SystemEvent
+      // 注：eventRepo.append 当前未纳入 tx（ISystemEventRepository 接口未定义 tx 参数，
+      // 改造会波及实现与所有调用方，超出 T4 范围）。事件为 append-only，
+      // 即使后续步骤回滚，已写入的事件不影响数据正确性（事件只是历史记录）。
+      // T5/T9 若需「事件随状态一起回滚」，应给 ISystemEventRepository.append 增加可选 tx。
       const event: SystemEvent = {
         id: crypto.randomUUID() as USOM_ID,
         type: transition.event_type as SystemEvent['type'],

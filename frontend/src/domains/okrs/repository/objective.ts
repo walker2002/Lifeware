@@ -6,7 +6,7 @@
  */
 
 import { eq, and, between, inArray, ne, like, sql } from 'drizzle-orm'
-import { db } from '../../../lib/db/index'
+import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IObjectiveRepository, ObjectiveWithKR } from '../../../usom/interfaces/irepository'
 import type { Objective } from '../../../usom/types/objects'
@@ -18,11 +18,11 @@ import { keyResultRowToUSOM } from '../../../lib/db/repositories/mappers'
  * Objective 仓储
  */
 export class ObjectiveRepository implements IObjectiveRepository {
-  async findById(id: USOM_ID, userId: USOM_ID): Promise<Objective | null> {
-    const rows = await db.select().from(s.objectives)
+  async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Objective | null> {
+    const rows = await tx.select().from(s.objectives)
       .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
     if (!rows[0]) return null
-    const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
+    const krs = await tx.select({ id: s.keyResults.id }).from(s.keyResults)
       .where(eq(s.keyResults.objectiveId, id))
     return objectiveRowToUSOM(rows[0] as any, krs.map(k => k.id))
   }
@@ -104,17 +104,38 @@ export class ObjectiveRepository implements IObjectiveRepository {
     return { ...obj, keyResults: krRows.map(r => keyResultRowToUSOM(r as any)) }
   }
 
-  async save(objective: Objective, userId: USOM_ID): Promise<void> {
+  async save(objective: Objective, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     if (!objective.objectiveNumber) {
       const prefix = this.buildNumberPrefix(objective.period.type, objective.period.start)
-      const count = await this.countByPrefix(prefix, userId)
+      const count = await this.countByPrefix(prefix, userId, tx)
       objective = { ...objective, objectiveNumber: `${prefix}-O${count + 1}` }
     }
     const row = objectiveUSOMToRow(objective, userId)
-    await db.insert(s.objectives).values(row).onConflictDoUpdate({
+    await tx.insert(s.objectives).values(row).onConflictDoUpdate({
       target: s.objectives.id,
       set: row,
     })
+  }
+
+  /**
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成。
+   * fields 的键为 schema 列属性名（驼峰）。多租户 T-02：where 必含 userId 过滤。
+   */
+  async updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<Objective> {
+    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    await tx.update(s.objectives)
+      .set(setPayload)
+      .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`Objective ${id} not found after updateFields`)
+    return updated
   }
 
   private buildNumberPrefix(periodType: string, periodStart: string): string {
@@ -129,8 +150,8 @@ export class ObjectiveRepository implements IObjectiveRepository {
     }
   }
 
-  private async countByPrefix(prefix: string, userId: USOM_ID): Promise<number> {
-    const rows = await db.select({ objectiveNumber: s.objectives.objectiveNumber })
+  private async countByPrefix(prefix: string, userId: USOM_ID, tx: DbClient = db): Promise<number> {
+    const rows = await tx.select({ objectiveNumber: s.objectives.objectiveNumber })
       .from(s.objectives)
       .where(and(
         eq(s.objectives.userId, userId),

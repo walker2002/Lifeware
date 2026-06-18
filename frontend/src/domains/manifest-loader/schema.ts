@@ -80,6 +80,8 @@ const FieldMetadataSchema = z.object({
   default_value: z.unknown().optional(),
   /** 描述 */
   description: z.string().optional(),
+  /** 字段写入分类（[018] 业务事实写入口）：FactField 走写入口 / ContentField 直走 Repo / PresentationField 本地态 */
+  mutation_mode: z.enum(['FactField', 'ContentField', 'PresentationField']).optional(),
 })
 
 /**

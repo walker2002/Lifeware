@@ -1,6 +1,11 @@
 // Habits Domain Plugin 单元测试 — TDD 先写测试
 import { describe, it, expect } from 'vitest'
 import { vi } from 'vitest'
+import type { ValidationResult } from '@/usom/types/process'
+
+/** 提取 Rejected 变体的 errors（Passed/NeedConfirm 无 errors 字段，返回空数组以支持链式断言） */
+const rejectedErrors = (r: ValidationResult): string[] =>
+  r.kind === 'Rejected' ? r.errors : []
 
 vi.mock('@/domains/manifest-loader', () => ({
   loadDomainManifest: () => ({
@@ -141,8 +146,8 @@ describe('Habits Domain Plugin — manifest', () => {
 describe('Habits Domain Plugin — onValidate', () => {
   it('合法的 createHabit 意图应返回 valid=true', async () => {
     const result = await habitsPlugin.onValidate(makeIntent(), makeSnapshot())
-    expect(result.valid).toBe(true)
-    expect(result.errors).toHaveLength(0)
+    expect(result.kind).toBe('Passed')
+    expect(rejectedErrors(result)).toHaveLength(0)
   })
 
   it('缺少 title 应返回 valid=false', async () => {
@@ -158,8 +163,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('标题'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('标题'))).toBe(true)
   })
 
   it('defaultTime 格式非法应返回 valid=false', async () => {
@@ -176,8 +181,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('默认时间'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('默认时间'))).toBe(true)
   })
 
   it('minDuration > defaultDuration 应返回 valid=false', async () => {
@@ -194,8 +199,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('最短时长'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('最短时长'))).toBe(true)
   })
 
   it('defaultDuration <= 0 应返回 valid=false', async () => {
@@ -212,8 +217,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('默认时长'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('默认时长'))).toBe(true)
   })
 
   it('frequencyType 不合法应返回 valid=false', async () => {
@@ -230,8 +235,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('频率类型'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('频率类型'))).toBe(true)
   })
 
   it('logHabit 意图缺少 habitId 应返回 valid=false', async () => {
@@ -240,8 +245,8 @@ describe('Habits Domain Plugin — onValidate', () => {
       fields: { status: 'completed' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('habitId'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('habitId'))).toBe(true)
   })
 })
 
@@ -362,8 +367,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { name: '工作日', applicableDays: [] },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('applicableDays'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('applicableDays'))).toBe(true)
   })
 
   it('createTemplate 意图 name 为空应返回 valid=false', async () => {
@@ -372,8 +377,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { name: '', applicableDays: [1, 2, 3, 4, 5] },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('name'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('name'))).toBe(true)
   })
 
   it('合法 createTemplate 意图应返回 valid=true', async () => {
@@ -382,7 +387,7 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { name: '工作日', applicableDays: [1, 2, 3, 4, 5] },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 
   it('addHabitToTemplate 意图缺少 templateId 应返回 valid=false', async () => {
@@ -391,8 +396,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { habitId: 'habit-001', timeOverride: '06:30' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('templateId'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('templateId'))).toBe(true)
   })
 
   it('addHabitToTemplate 意图缺少 habitId 应返回 valid=false', async () => {
@@ -401,8 +406,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001', timeOverride: '06:30' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('habitId'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('habitId'))).toBe(true)
   })
 
   it('addHabitToTemplate 意图 timeOverride 格式非法应返回 valid=false', async () => {
@@ -411,8 +416,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001', habitId: 'habit-001', timeOverride: 'invalid' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('timeOverride'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('timeOverride'))).toBe(true)
   })
 
   it('合法 addHabitToTemplate 意图应返回 valid=true', async () => {
@@ -421,7 +426,7 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001', habitId: 'habit-001', timeOverride: '06:30' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 
   it('removeHabitFromTemplate 意图缺少 templateId/habitId 应返回 valid=false', async () => {
@@ -430,7 +435,7 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: {},
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
+    expect(result.kind).toBe('Rejected')
   })
 
   it('合法 removeHabitFromTemplate 意图应返回 valid=true', async () => {
@@ -439,7 +444,7 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001', habitId: 'habit-001' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 
   it('applyTemplate 意图缺少 templateId 应返回 valid=false', async () => {
@@ -448,8 +453,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { date: '2026-05-09' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('templateId'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('templateId'))).toBe(true)
   })
 
   it('applyTemplate 意图缺少 date 应返回 valid=false', async () => {
@@ -458,8 +463,8 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.includes('date'))).toBe(true)
+    expect(result.kind).toBe('Rejected')
+    expect(rejectedErrors(result).some(e => e.includes('date'))).toBe(true)
   })
 
   it('合法 applyTemplate 意图应返回 valid=true', async () => {
@@ -468,6 +473,6 @@ describe('Habits Domain Plugin — onValidate (template)', () => {
       fields: { templateId: 'tpl-001', date: '2026-05-09' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())
-    expect(result.valid).toBe(true)
+    expect(result.kind).toBe('Passed')
   })
 })

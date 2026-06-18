@@ -211,7 +211,7 @@ describe('validateSemantics', () => {
 
 describe('createDomainPlugin', () => {
   const stubHooks = {
-    onValidate: () => ({ valid: true, errors: [] }),
+    onValidate: () => ({ kind: 'Passed' as const }),
     onEvent: () => ({ metrics: [], suggestions: [] }),
     onActionSurfaceRequest: () => ({ actions: [], category: 'guide' as const, weight: 0 }),
   }

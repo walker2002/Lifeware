@@ -13,6 +13,7 @@ describe('SM Cascade — parent_child_status', () => {
       save: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue({}),
       updateStatus: vi.fn(async (id, status) => ({ id, status })),
+      updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
       findByParent: vi.fn().mockResolvedValue([
         { id: 'kr-001', status: 'draft', objectiveId: 'obj-001' },
         { id: 'kr-002', status: 'draft', objectiveId: 'obj-001' },
@@ -52,6 +53,7 @@ describe('SM Cascade — parent_child_status', () => {
       save: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue({}),
       updateStatus: vi.fn().mockResolvedValue({}),
+      updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
       findByParent: vi.fn().mockResolvedValue([]),
     }
 
@@ -84,6 +86,7 @@ describe('SM Cascade — parent_child_status', () => {
       save: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue({}),
       updateStatus: vi.fn(async (id, status) => ({ id, status })),
+      updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
       findByParent: vi.fn().mockResolvedValue([
         { id: 'kr-001', status: 'active', objectiveId: 'obj-001' },
         { id: 'kr-002', status: 'discarded', objectiveId: 'obj-001' },
@@ -122,6 +125,7 @@ describe('SM Cascade — parent_child_status', () => {
       save: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue({}),
       updateStatus: vi.fn().mockResolvedValue({}),
+      updateFields: vi.fn().mockResolvedValue({ id: 'mock-id' }),
       findByParent: vi.fn().mockResolvedValue([]),
     }
 

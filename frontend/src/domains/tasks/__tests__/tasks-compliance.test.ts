@@ -151,8 +151,10 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       { id: '1', intentionId: 'i1', targetDomain: 'tasks', action: 'createTask', fields: {}, confidence: 1, resolvedBy: 'template_form', createdAt: '' },
       { currentTime: '', currentDate: '', dayOfWeek: 1, timeOfDay: 'morning', energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' }, activeObjectives: [], activeKeyResults: [], activeTasks: [], pendingHabits: [], upcomingTimeboxes: [], pendingIntentions: [] } as any,
     )
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain('任务标题必填')
+    expect(result.kind).toBe('Rejected')
+    if (result.kind === 'Rejected') {
+      expect(result.errors).toContain('任务标题必填')
+    }
   })
 })
 

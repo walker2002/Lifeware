@@ -13,7 +13,9 @@ import type {
   ActionCandidate,
   ActionSurfaceSuggestion,
   MetricUpdate,
+  ValidationResult,
 } from '../../usom/types/process'
+import { validationPassed, validationRejected } from '../../usom/types/process'
 import type { StructuredIntent } from '../../usom/types/objects'
 import type { USOM_ID, ActionCategory } from '../../usom/types/primitives'
 import type { DomainManifest } from '../../domains/manifest-loader/schema'
@@ -91,7 +93,7 @@ export function createTasksHooks(manifest: DomainManifest) {
   function onValidate(
     intent: StructuredIntent,
     _snapshot: USOMSnapshot,
-  ): { valid: boolean; errors: string[] } {
+  ): ValidationResult {
     const errors: string[] = []
     // 规范化字段值（中文→枚举、日期格式等）
     const fields = normalizeFieldValues(intent.fields)
@@ -120,7 +122,7 @@ export function createTasksHooks(manifest: DomainManifest) {
       }
     }
 
-    return { valid: errors.length === 0, errors }
+    return errors.length === 0 ? validationPassed() : validationRejected(errors)
   }
 
   /**
