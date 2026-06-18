@@ -623,9 +623,11 @@ describe('createOrchestrator — Habit 意图分发', () => {
     expect((result.object as any)?.trackable).toBe(true)
 
     // Assert: HabitRepository.create 被调用
+    // 第 3 参数为可选 tx 句柄；无事务时为 undefined（GenericRepo 透传，T4）
     expect(habitRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: '晨跑', defaultTime: '07:00', trackable: true }),
       userId,
+      undefined,
     )
 
     // Assert: SystemEvent 被记录
@@ -741,8 +743,8 @@ describe('createOrchestrator — Habit 意图分发', () => {
     expect(result.success).toBe(true)
     expect(result.object).toBeDefined()
     expect((result.object as any)?.status).toBe('active')
-    expect(habitRepo.findById).toHaveBeenCalledWith('habit-001', userId)
-    expect(habitRepo.updateStatus).toHaveBeenCalledWith('habit-001', 'active', userId)
+    expect(habitRepo.findById).toHaveBeenCalledWith('habit-001', userId, undefined)
+    expect(habitRepo.updateStatus).toHaveBeenCalledWith('habit-001', 'active', userId, undefined)
     expect(eventRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'HabitActivated' }),
       userId,
@@ -1377,6 +1379,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
     expect(taskRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: '完成报告', priority: 'high', threadId: 'thread-001' }),
       userId,
+      undefined,
     )
     expect(eventRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'TaskCreated' }),
@@ -1432,8 +1435,8 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const result = await orchestrator.executeIntent(intent, userId)
 
     expect(result.success).toBe(true)
-    expect(taskRepo.findById).toHaveBeenCalledWith('task-001', userId)
-    expect(taskRepo.updateStatus).toHaveBeenCalledWith('task-001', 'completed', userId)
+    expect(taskRepo.findById).toHaveBeenCalledWith('task-001', userId, undefined)
+    expect(taskRepo.updateStatus).toHaveBeenCalledWith('task-001', 'completed', userId, undefined)
   })
 
   it('createThread 意图 → 调用 threadRepo.create 并发布 ThreadCreated 事件', async () => {
@@ -1480,6 +1483,7 @@ describe('Orchestrator — Tasks 意图分发', () => {
     expect(threadRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({ name: '产品重构', description: 'Q3 核心主线' }),
       userId,
+      undefined,
     )
     expect(eventRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'ThreadCreated' }),
@@ -1533,8 +1537,8 @@ describe('Orchestrator — Tasks 意图分发', () => {
     const result = await orchestrator.executeIntent(intent, userId)
 
     expect(result.success).toBe(true)
-    expect(threadRepo.findById).toHaveBeenCalledWith('thread-001', userId)
-    expect(threadRepo.updateStatus).toHaveBeenCalledWith('thread-001', 'archived', userId)
+    expect(threadRepo.findById).toHaveBeenCalledWith('thread-001', userId, undefined)
+    expect(threadRepo.updateStatus).toHaveBeenCalledWith('thread-001', 'archived', userId, undefined)
     expect(eventRepo.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'ThreadArchived' }),
       userId,
