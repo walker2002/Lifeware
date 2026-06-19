@@ -46,6 +46,7 @@ import { surfaceHandlers as timeboxHandlers } from '@/domains/timebox/cnui/handl
 import { surfaceHandlers as taskHandlers } from '@/domains/tasks/cnui/handlers';
 import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
 import { recordActivity } from './activity-recorder';
+import { createHabitsMutationService } from '@/app/actions/habits/mutation-service';
 
 // ─── CNUI Handlers 注册 ───────────────────────────────────────────
 
@@ -881,14 +882,28 @@ export async function batchLogHabits(
 }
 
 /**
- * 更新习惯字段（直接 repo 调用）
+ * 更新习惯字段（业务事实写入口单事务）
  *
- * 注意：SM 只支持 create/updateStatus，不支持字段更新。
- * 字段更新不是状态转换，保留直接 repo 调用。
- * TODO: 待 SM 扩展字段更新能力后迁移至 Nexus 链路。
+ * [018-G1] G1-H：从 `habitRepo.update(整对象)` 迁移至
+ * `createHabitsMutationService().execute(聚合 Intent, userId)` 单事务写。
+ *
+ * 修复三处缺陷：
+ *  - F-1（字段覆盖）：旧 `repo.update(整对象)` 绕过 manifest field_metadata，
+ *    未声明字段（如未来扩展）会被字段执行器拒写而旧路径静默放行。新路径每个
+ *    FactField 经字段执行器字段级校验（enum/number/time 等），ContentField 直走
+ *    Repo.updateFields，均按 manifest 声明路由。
+ *  - F-3（原子性）：input 中多个字段构造为聚合 field steps，在 execute() 顶层
+ *    db.transaction 内按声明顺序写入，任一字段校验失败即抛 FieldMutationError
+ *    触发整体回滚——不再出现「部分字段落库、部分未落」的中间态。
+ *  - F-2（frequency 合并）：frequencyType/daysOfWeek 是平铺列 frequency_type/
+ *    days_of_week，单列写后 findById 经 habitRowToUSOM 重建 frequency 嵌套对象，
+ *    不会因单写一列而清空另一列（mapper 总是从两列重建）。
+ *
+ * 契约保持：签名 `(habitId, input) => HabitActionResult` 不变；返回形状
+ * 成功 `{success:true, habit}`、失败 `{success:false, error}` 不变。
  *
  * @param habitId - 习惯 ID
- * @param input - 更新数据
+ * @param input - 更新数据（仅值非 undefined 的字段落库）
  * @returns 操作结果
  */
 export async function updateHabit(
@@ -896,8 +911,44 @@ export async function updateHabit(
   input: UpdateHabitInput,
 ): Promise<HabitActionResult> {
   try {
+    // 每个「值非 undefined」的字段构造一个 field step；undefined 字段不造步，
+    // 避免误写 undefined 覆盖既有值（与旧 repo.update 的条件展开语义一致）。
+    const fieldSteps = Object.entries(input)
+      .filter(([, v]) => v !== undefined)
+      .map(([field, value]) => ({ kind: 'field' as const, field, value }));
+
+    if (fieldSteps.length === 0) {
+      // 无字段可写：直接读回当前习惯返回（保持契约——成功且有 habit）
+      const habitRepo = await getHabitRepo();
+      const habit = await habitRepo.findById(habitId as USOM_ID, MVP_USER_ID as USOM_ID);
+      if (!habit) return { success: false, error: `Habit ${habitId} not found` };
+      return { success: true, habit };
+    }
+
+    const service = createHabitsMutationService();
+    const res = await service.execute(
+      {
+        id: crypto.randomUUID() as USOM_ID,
+        domainId: 'habits',
+        objectType: 'habit',
+        targetId: habitId as USOM_ID,
+        steps: fieldSteps,
+      },
+      MVP_USER_ID as USOM_ID,
+    );
+
+    if (!res.success) {
+      return { success: false, error: res.error ?? HABIT_ERRORS.UPDATE_FAILED };
+    }
+
+    // 纯 field steps 路径下 res.object 为 undefined（execute 仅在 state step 设 lastObject），
+    // 兜底用 findById 读回更新后的习惯，满足契约 {success:true, habit}。
+    if (res.object) {
+      return { success: true, habit: res.object as Habit };
+    }
     const habitRepo = await getHabitRepo();
-    const habit = await habitRepo.update(habitId as USOM_ID, input, MVP_USER_ID as USOM_ID) as Habit;
+    const habit = await habitRepo.findById(habitId as USOM_ID, MVP_USER_ID as USOM_ID);
+    if (!habit) return { success: false, error: `Habit ${habitId} not found` };
     return { success: true, habit };
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.UPDATE_FAILED;
