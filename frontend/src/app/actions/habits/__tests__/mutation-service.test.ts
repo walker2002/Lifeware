@@ -89,6 +89,8 @@ describe('[018-G1] G1-F createHabitsMutationService — dispatch 路由', () => 
     expect(value).toBe('daily')
     expect(userId).toBe('user-1')
     expect(ctx.objectType).toBe('habit')
+    // F-6：事件名透传为 per-domain 的 HabitFieldUpdated
+    expect(ctx.fieldUpdatedEventType).toBe('HabitFieldUpdated')
     // FactField 路径不直走 repo.updateFields
     expect(habitUpdateFieldsMock).not.toHaveBeenCalled()
   })
