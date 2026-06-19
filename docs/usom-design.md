@@ -907,14 +907,18 @@ interface DerivedSignals {
 
 意图校验（`onValidate`）与规则判定（Rule Engine）统一产出
 `ValidationResult`；Orchestrator 聚合取最严格
-（`Rejected > NeedConfirm > Passed`）后路由（见宪章 §VIII 判定模型）。
-MVP 试点仅此三变体；`PassedWithWarning / NeedInput` 延后到 [025]。
+（全序 `Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed`）
+后路由（见宪章 §VIII 判定模型）。[018-G3] 起 5 变体已落地：`PassedWithWarning`
+接 Rule Engine 的 `warning`（修复「静默吞 warning」缺口）；`NeedInput` 仅类型
++ 路由预留，待独立切片 ⑥ 字段补全回环落地其生产者。
 
 ```typescript
 type ValidationResult =
   | { kind: 'Passed' }
-  | { kind: 'Rejected'; errors: string[] }
+  | { kind: 'PassedWithWarning'; warnings: string[] }   // 可通过但携带警告 → Suspend 警告卡
+  | { kind: 'NeedInput'; data: unknown }                // 需补全字段 → Suspend（G3 预留，待 ⑥）
   | { kind: 'NeedConfirm'; data: unknown }
+  | { kind: 'Rejected'; errors: string[] }
 ```
 
 #### 字段写入三分类（mutation_mode）
@@ -950,7 +954,7 @@ interface DomainPlugin {
   // 职责：Domain 内部的结构性校验（字段合法性、状态合法性）
   // 注意：个性冲突检测由 Rule Engine 自身读取 DerivedSignals 完成，不在此钩子
   // 返回：ValidationResult（见本节类型定义）；Orchestrator 与 Rule Engine
-  //        结果聚合取最严格（Rejected > NeedConfirm > Passed）后路由
+  //        结果聚合取最严格（全序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）后路由
   onValidate(
     intent:   StructuredIntent,
     snapshot: USOMSnapshot

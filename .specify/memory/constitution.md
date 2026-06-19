@@ -409,27 +409,37 @@ accuracy, Phase B tests field extraction completeness.
 
 ```typescript
 type ValidationResult =
-  | { kind: 'Passed' }                          // 进入业务事实写入口
-  | { kind: 'Rejected'; errors: string[] }      // 结构性拒绝，终止
-  | { kind: 'NeedConfirm'; data: unknown }      // 结构化确认（携带确认数据）
+  | { kind: 'Passed' }                                      // 进入业务事实写入口
+  | { kind: 'PassedWithWarning'; warnings: string[] }       // 可通过但携带警告 → Suspend 警告卡
+  | { kind: 'NeedInput'; data: unknown }                    // 需补全字段 → Suspend（G3 预留，待 ⑥ 生产者）
+  | { kind: 'NeedConfirm'; data: unknown }                  // 结构化确认（携带确认数据）
+  | { kind: 'Rejected'; errors: string[] }                  // 结构性拒绝，终止
 ```
 
-**聚合偏序（全序，取最严格）**：`Rejected > NeedConfirm > Passed`。
-Rejected 恒最高（任一方结构性拒绝即终止）。
+**聚合偏序（全序，取最严格）**：
+`Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed`。
+Rejected 恒最高（任一方结构性拒绝即终止）；语义为「硬决策 > 缺数据 > 建议性 > 干净」。
 
 **路由**：
 - `Passed` → 业务事实写入口（State Machine 或 Field Executor）
+- `PassedWithWarning` → Suspend（警告卡；复用 `needsConfirmation` surfacing，
+  用户「继续」时 `confirmed=true` 让 `ruleValidation` 降级为 `Passed` 进写入口）
+- `NeedInput` → Suspend（字段补全卡；G3 仅类型 + 路由预留，无生产者）
 - `NeedConfirm` → Suspend（结构化确认卡；吸收原散落的
   `needsCnuiConfirmation`，CNUI Surface 写确认即 NeedConfirm 的一个实例）
 - `Rejected` → end
 
-**MVP 试点范围**：仅实现 `Passed | Rejected | NeedConfirm` 三变体。
-`PassedWithWarning / NeedInput / Suspend 一等公民状态` 延后到 [025] 首个
-真实场景（如级联确认 CascadePreview、字段补全）出现时再补 —— 当前无端到端
-可验证场景，遵循 YAGNI；类型先按三变体落地，避免推测性扩展。
+**落地范围（[018-G3] 判定模型补全，2026-06-19）**：5 变体已全部落地。
+`PassedWithWarning` 接 Rule Engine 的 `warning` 作为真实生产者（修复原「静默吞
+warning」缺口：`ruleResultToValidation` 不再把 `warning` 映射为 `Passed`）；
+`NeedConfirm` 由 Rule Engine `confirm` 与 CNUI Write Confirmation 产生。
+`NeedInput` 与「Suspend 一等公民完整 CNUI 回环」（挂起 Intent 持久化 →
+Presentation 入口 → CNUI 回填 → 重生成 Intent → 续走）推迟到独立切片 ⑥ ——
+当前 `NeedInput` 仅类型 + 路由预留，无 domain/rule/cnui 生产者，遵循 YAGNI。
 
 **教练而非守门**：Rule Engine 仍是 coach 不是 gatekeeper —— 其 coaching
-关注以 `NeedConfirm`（可继续的确认卡）呈现，而非静默硬阻断；结构性
+关注以 `NeedConfirm`（可继续的确认卡）与 `PassedWithWarning`（可通过但弹
+警告卡「继续/取消」）呈现，而非静默硬阻断或吞掉 warning；结构性
 `Rejected`（如非法枚举、缺必填 FactField）来自 `onValidate` 守卫，二者各司
 其职。
 
