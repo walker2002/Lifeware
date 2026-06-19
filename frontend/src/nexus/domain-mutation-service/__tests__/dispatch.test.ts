@@ -52,6 +52,7 @@ describe('domainMutationService — update() 单字段写', () => {
       getRepository: () => repo,
       getExecutor: () => executor,
       getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
       eventBus: { publish: vi.fn() } as any,
       submitDynamicIntent,
     } as any)
@@ -62,7 +63,10 @@ describe('domainMutationService — update() 单字段写', () => {
     expect(executor.execute).toHaveBeenCalledTimes(1)
     expect(executor.execute).toHaveBeenCalledWith(
       'task-1', 'priority', 'high', 'user-1',
-      expect.objectContaining({ objectType: 'task' }),
+      expect.objectContaining({
+        objectType: 'task',
+        fieldUpdatedEventType: 'TaskFieldUpdated',
+      }),
     )
     expect(submitDynamicIntent).not.toHaveBeenCalled()
     expect(res.success).toBe(true)
@@ -77,6 +81,7 @@ describe('domainMutationService — update() 单字段写', () => {
       getRepository: () => repo,
       getExecutor: () => executor,
       getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
       eventBus: { publish: vi.fn() } as any,
       submitDynamicIntent,
     } as any)
@@ -98,6 +103,7 @@ describe('domainMutationService — update() 单字段写', () => {
       getRepository: () => repo,
       getExecutor: () => executor,
       getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
       eventBus: { publish: vi.fn() } as any,
       submitDynamicIntent,
     } as any)
@@ -129,6 +135,7 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
       getRepository: () => repo,
       getExecutor: () => executor,
       getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
       submitDynamicIntent,
       transaction,
       smExecute,
@@ -181,6 +188,7 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
       getRepository: () => repo,
       getExecutor: () => executor,
       getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
       submitDynamicIntent: vi.fn(),
       transaction,
       smExecute,

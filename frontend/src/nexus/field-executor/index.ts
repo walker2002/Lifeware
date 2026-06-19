@@ -3,7 +3,7 @@
  * @brief Field Executor — FactField 字段写的执行组件（业务事实写入口内部组件之一）
  *
  * 宪法 §III 业务事实写入口（1.11.0）：Field Executor 负责按 manifest
- * `field_metadata` 写单个 FactField 字段，并发布通用 `TaskFieldUpdated` 事件。
+ * `field_metadata` 写单个 FactField 字段，并发布域配置的字段更新事件（per-domain，F-6）。
  *
  * 职责边界（与 State Machine 并列）：
  *  - 仅写「字段」，不触碰生命周期状态（状态写归 State Machine）。
@@ -19,7 +19,7 @@
  */
 
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
-import type { SystemEvent, ValidationResult } from '@/usom/types/process'
+import type { SystemEvent, SystemEventType, ValidationResult } from '@/usom/types/process'
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { FieldMetadata } from '@/usom/types/domain-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -30,12 +30,17 @@ import type { DbClient } from '@/lib/db'
 export interface FieldExecutorContext {
   /** 目标对象的仓储适配器（GenericRepo） */
   repo: GenericRepo
-  /** 事件总线，用于发布 TaskFieldUpdated */
+  /** 事件总线，用于发布域配置的字段更新事件 */
   eventBus: EventBus
-  /** 目标对象类型（如 'task'），写入事件 payload */
+  /** 目标对象类型（如 'task' / 'habit'），写入事件 payload */
   objectType: string
   /** 字段元数据表（取自 manifest field_metadata） */
   fieldMetadata: Record<string, FieldMetadata>
+  /**
+   * 字段写完成后发布的事件类型（per-domain 显式配置，F-6 参数化）。
+   * tasks → 'TaskFieldUpdated'，habits → 'HabitFieldUpdated'。
+   */
+  fieldUpdatedEventType: SystemEventType
   /** 可选事务句柄（顶层写入口透传） */
   tx?: DbClient
 }
@@ -112,14 +117,14 @@ export function createFieldExecutor() {
     /**
      * 执行单个 FactField 字段写。
      *
-     * 流程：字段级校验 → repo.updateFields 写库 → 发 TaskFieldUpdated 事件。
+     * 流程：字段级校验 → repo.updateFields 写库 → 发 ctx.fieldUpdatedEventType 事件。
      * 任一前置校验失败立即返回 Rejected，不写库不发事件。
      *
      * @param id - 目标对象 ID
      * @param field - 字段名（须在 fieldMetadata 中声明）
      * @param value - 字段值
      * @param userId - 用户 ID（多租户 T-02）
-     * @param ctx - 运行期依赖（repo/eventBus/objectType/fieldMetadata/tx?）
+     * @param ctx - 运行期依赖（repo/eventBus/objectType/fieldMetadata/fieldUpdatedEventType/tx?）
      * @returns ValidationResult（Passed=写成功 / Rejected=校验失败）
      */
     async execute(
@@ -145,10 +150,10 @@ export function createFieldExecutor() {
       // 写库：单条 UPDATE，透传 tx（顶层事务子操作时）
       await ctx.repo.updateFields(id, { [field]: value }, userId, ctx.tx)
 
-      // 发通用 TaskFieldUpdated 事件
+      // 发域配置的字段更新事件（F-6：type 取自 ctx.fieldUpdatedEventType）
       const event: SystemEvent = {
         id: crypto.randomUUID() as USOM_ID,
-        type: 'TaskFieldUpdated',
+        type: ctx.fieldUpdatedEventType,
         occurredAt: new Date().toISOString() as Timestamp,
         triggeredBy: 'state_machine',
         payload: {

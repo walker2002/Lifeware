@@ -12,7 +12,9 @@ import { describe, it, expect, vi } from 'vitest'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import type { FieldMetadata } from '@/usom/types/domain-types'
-import { createFieldExecutor } from '../index'
+import type { SystemEventType } from '@/usom/types/process'
+import type { DbClient } from '@/lib/db'
+import { createFieldExecutor, type FieldExecutorContext } from '../index'
 
 // 构造一份与 tasks manifest field_metadata 等价的字段元数据
 const FIELD_META: Record<string, FieldMetadata> = {
@@ -72,18 +74,34 @@ function makeEventBus(): { bus: EventBus; published: any[] } {
   return { bus, published }
 }
 
+/** 构造 FieldExecutorContext 测试基线（含 F-6 必填的 fieldUpdatedEventType，默认 TaskFieldUpdated）。 */
+function makeCtx(opts: {
+  repo: GenericRepo
+  bus: EventBus
+  objectType: string
+  fieldUpdatedEventType?: SystemEventType
+  tx?: DbClient
+}): FieldExecutorContext {
+  return {
+    repo: opts.repo,
+    eventBus: opts.bus,
+    objectType: opts.objectType,
+    fieldMetadata: FIELD_META,
+    fieldUpdatedEventType: opts.fieldUpdatedEventType ?? 'TaskFieldUpdated',
+    ...(opts.tx !== undefined ? { tx: opts.tx } : {}),
+  }
+}
+
 describe('Field Executor — FactField 字段写', () => {
   it('调用 repo.updateFields 写字段（单次，透传字段值与 userId）', async () => {
     const repo = makeRepo()
     const { bus } = makeEventBus()
     const executor = createFieldExecutor()
 
-    const result = await executor.execute('task-1', 'priority', 'high', 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-    })
+    const result = await executor.execute(
+      'task-1', 'priority', 'high', 'user-1',
+      makeCtx({ repo, bus, objectType: 'task' }),
+    )
 
     expect(result.kind).toBe('Passed')
     expect(repo.updateFields).toHaveBeenCalledTimes(1)
@@ -100,12 +118,10 @@ describe('Field Executor — FactField 字段写', () => {
     const { bus, published } = makeEventBus()
     const executor = createFieldExecutor()
 
-    await executor.execute('task-1', 'priority', 'high', 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-    })
+    await executor.execute(
+      'task-1', 'priority', 'high', 'user-1',
+      makeCtx({ repo, bus, objectType: 'task' }),
+    )
 
     expect(published).toHaveLength(1)
     const evt = published[0]
@@ -121,17 +137,29 @@ describe('Field Executor — FactField 字段写', () => {
     expect(evt.triggeredBy).toBe('state_machine')
   })
 
+  it('发出的事件 type 取自 ctx.fieldUpdatedEventType（habits → HabitFieldUpdated）', async () => {
+    const repo = makeRepo()
+    const { bus, published } = makeEventBus()
+    const executor = createFieldExecutor()
+
+    await executor.execute(
+      'habit-1', 'defaultTime', '07:00', 'user-1',
+      makeCtx({ repo, bus, objectType: 'habit', fieldUpdatedEventType: 'HabitFieldUpdated' }),
+    )
+
+    expect(published).toHaveLength(1)
+    expect(published[0].type).toBe('HabitFieldUpdated')
+  })
+
   it('非法枚举值（priority=invalid）→ 返回 Rejected，不写库不发事件', async () => {
     const repo = makeRepo()
     const { bus, published } = makeEventBus()
     const executor = createFieldExecutor()
 
-    const result = await executor.execute('task-1', 'priority', 'invalid', 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-    })
+    const result = await executor.execute(
+      'task-1', 'priority', 'invalid', 'user-1',
+      makeCtx({ repo, bus, objectType: 'task' }),
+    )
 
     expect(result.kind).toBe('Rejected')
     if (result.kind === 'Rejected') {
@@ -146,12 +174,10 @@ describe('Field Executor — FactField 字段写', () => {
     const { bus } = makeEventBus()
     const executor = createFieldExecutor()
 
-    const result = await executor.execute('task-1', 'estimatedDuration', -10, 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-    })
+    const result = await executor.execute(
+      'task-1', 'estimatedDuration', -10, 'user-1',
+      makeCtx({ repo, bus, objectType: 'task' }),
+    )
 
     expect(result.kind).toBe('Rejected')
     expect(repo.updateFields).not.toHaveBeenCalled()
@@ -163,14 +189,10 @@ describe('Field Executor — FactField 字段写', () => {
     const onValidateSpy = vi.fn()
     const executor = createFieldExecutor()
 
-    await executor.execute('task-1', 'priority', 'high', 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-      // 即便外部传入 onValidate 钩子，字段执行器也不应触发
-      onValidate: onValidateSpy,
-    } as any)
+    await executor.execute(
+      'task-1', 'priority', 'high', 'user-1',
+      { ...makeCtx({ repo, bus, objectType: 'task' }), onValidate: onValidateSpy } as any,
+    )
 
     expect(onValidateSpy).not.toHaveBeenCalled()
   })
@@ -181,13 +203,10 @@ describe('Field Executor — FactField 字段写', () => {
     const executor = createFieldExecutor()
     const fakeTx = { __isTx: true } as any
 
-    await executor.execute('task-1', 'priority', 'high', 'user-1', {
-      repo,
-      eventBus: bus,
-      objectType: 'task',
-      fieldMetadata: FIELD_META,
-      tx: fakeTx,
-    } as any)
+    await executor.execute(
+      'task-1', 'priority', 'high', 'user-1',
+      makeCtx({ repo, bus, objectType: 'task', tx: fakeTx }),
+    )
 
     expect(repo.updateFields).toHaveBeenCalledWith(
       'task-1',
@@ -208,12 +227,10 @@ describe('Field Executor — FactField 字段写', () => {
       const { bus, published } = makeEventBus()
       const executor = createFieldExecutor()
 
-      const result = await executor.execute('habit-1', 'defaultTime', value, 'user-1', {
-        repo,
-        eventBus: bus,
-        objectType: 'habit',
-        fieldMetadata: FIELD_META,
-      })
+      const result = await executor.execute(
+        'habit-1', 'defaultTime', value, 'user-1',
+        makeCtx({ repo, bus, objectType: 'habit' }),
+      )
 
       expect(result.kind).toBe('Passed')
       expect(repo.updateFields).toHaveBeenCalledTimes(1)
@@ -233,12 +250,10 @@ describe('Field Executor — FactField 字段写', () => {
       const { bus, published } = makeEventBus()
       const executor = createFieldExecutor()
 
-      const result = await executor.execute('habit-1', 'defaultTime', value, 'user-1', {
-        repo,
-        eventBus: bus,
-        objectType: 'habit',
-        fieldMetadata: FIELD_META,
-      })
+      const result = await executor.execute(
+        'habit-1', 'defaultTime', value, 'user-1',
+        makeCtx({ repo, bus, objectType: 'habit' }),
+      )
 
       expect(result.kind).toBe('Rejected')
       expect(repo.updateFields).not.toHaveBeenCalled()
@@ -253,12 +268,10 @@ describe('Field Executor — FactField 字段写', () => {
       const { bus, published } = makeEventBus()
       const executor = createFieldExecutor()
 
-      const result = await executor.execute('habit-1', 'frequencyType', 'daily', 'user-1', {
-        repo,
-        eventBus: bus,
-        objectType: 'habit',
-        fieldMetadata: FIELD_META,
-      })
+      const result = await executor.execute(
+        'habit-1', 'frequencyType', 'daily', 'user-1',
+        makeCtx({ repo, bus, objectType: 'habit' }),
+      )
 
       expect(result.kind).toBe('Passed')
       expect(repo.updateFields).toHaveBeenCalledTimes(1)
@@ -270,12 +283,10 @@ describe('Field Executor — FactField 字段写', () => {
       const { bus, published } = makeEventBus()
       const executor = createFieldExecutor()
 
-      const result = await executor.execute('habit-1', 'frequencyType', 'yearly', 'user-1', {
-        repo,
-        eventBus: bus,
-        objectType: 'habit',
-        fieldMetadata: FIELD_META,
-      })
+      const result = await executor.execute(
+        'habit-1', 'frequencyType', 'yearly', 'user-1',
+        makeCtx({ repo, bus, objectType: 'habit' }),
+      )
 
       expect(result.kind).toBe('Rejected')
       expect(repo.updateFields).not.toHaveBeenCalled()

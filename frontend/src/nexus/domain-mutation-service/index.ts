@@ -7,7 +7,7 @@
  *  1. update(id, field, value, userId, domainId, objectType) —— 原子单字段写。
  *     按 manifest field_metadata.<field>.mutation_mode 路由：
  *       - FactField       → 直连注入的字段执行器（字段级校验 + updateFields +
- *                           TaskFieldUpdated 事件），与 execute() 字段路径一致。
+ *                           域配置的字段更新事件），与 execute() 字段路径一致。
  *                           **不走** submitDynamicIntent 全量 onValidate（eng-review
  *                           TENSION-4→4A：单字段 FactField 走字段级校验）。
  *       - ContentField    → 直走 Repository.updateFields（不经全链路、不发业务事件）
@@ -30,7 +30,7 @@
  */
 
 import type { USOM_ID } from '@/usom/types/primitives'
-import type { ValidationResult } from '@/usom/types/process'
+import type { ValidationResult, SystemEventType } from '@/usom/types/process'
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { FieldMetadata } from '@/usom/types/domain-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -45,7 +45,7 @@ import type { DbClient } from '@/lib/db'
  *
  * 历史背景：早期 update(FactField) 曾以薄封装调用 submitDynamicIntent 走
  * Intent→Rule→SM 全链路。eng-review TENSION-4→4A 授权改为「字段级校验」：
- * FactField 单字段写应直连字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
+ * FactField 单字段写应直连字段执行器（字段级校验 + updateFields + 域配置的字段更新事件），
  * **不**走 createTask/updateTask 的全量 onValidate。submitDynamicIntent 在写入口
  * 中已无使用方，保留为可选依赖仅为兼容旧测试/未来按需复活，删除接口会波及外部引用。
  */
@@ -90,6 +90,12 @@ export interface DomainMutationServiceDeps {
   getFieldMetadata: (domainId: string, objectType: string) => Record<string, FieldMetadata>
   /** 单字段写路径用的 submitDynamicIntent（遗留，update() 已不使用；保留兼容） */
   submitDynamicIntent?: SubmitDynamicIntentFn
+  /**
+   * FactField 字段写完成发布的事件类型（per-domain 显式配置，F-6）。
+   * tasks → 'TaskFieldUpdated'，habits → 'HabitFieldUpdated'。
+   * 透传进 FieldExecutorContext.fieldUpdatedEventType。
+   */
+  fieldUpdatedEventType: SystemEventType
   /** 事件总线（execute 路径透传给 SM） */
   eventBus: EventBus
   /** db.transaction 别名（execute 路径用）；缺省时不开启顶层事务 */
@@ -183,6 +189,7 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
     getRepository,
     getExecutor,
     getFieldMetadata,
+    fieldUpdatedEventType,
     eventBus,
     transaction,
     smExecute,
@@ -206,7 +213,7 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
      *
      * 按 mutation_mode 路由：
      *  - FactField → 直连注入的字段执行器（字段级校验 + updateFields +
-     *    TaskFieldUpdated 事件）。**不**走 submitDynamicIntent 全量 onValidate
+     *    ctx.fieldUpdatedEventType 事件）。**不**走 submitDynamicIntent 全量 onValidate
      *    （eng-review TENSION-4→4A：单字段 FactField 走字段级校验）。
      *  - ContentField → 直走 Repository.updateFields（单条 UPDATE，不发业务事件）。
      *  - PresentationField → 本地态，不落库；返回成功但 object 为 undefined。
@@ -230,7 +237,7 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
       const repo = getRepository(objectType, domainId)
       const fieldMetadata = getFieldMetadata(domainId, objectType)
 
-      // FactField：直连字段执行器（字段级校验 + updateFields + TaskFieldUpdated）
+      // FactField：直连字段执行器（字段级校验 + updateFields + 域配置的字段更新事件）
       if (mode === 'FactField') {
         const executor = getExecutor()
         try {
@@ -244,6 +251,7 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
               eventBus,
               objectType,
               fieldMetadata,
+              fieldUpdatedEventType,
               // update() 单字段写为原子单元，不开顶层事务（与 execute() 聚合路径不同）
               tx: undefined,
             },
@@ -335,6 +343,7 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
                   eventBus,
                   objectType: stepObjectType,
                   fieldMetadata,
+                  fieldUpdatedEventType,
                   tx,
                 },
               )
