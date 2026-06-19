@@ -928,6 +928,15 @@ type ValidationResult =
 | `ContentField`（不改业务事实） | 可直走 Repository |
 | `PresentationField`（纯展示态） | 本地/UI store，不入库 |
 
+**域落地状态**（写入口已接入的 Domain）：
+
+| Domain | 状态 | 落地切片 | 说明 |
+|---|---|---|---|
+| tasks | ✅ 已落地 | [018] | 业务事实写入口首切片，模板来源 |
+| habits | ✅ 已落地 | [018-G1] | manifest 扩至 14 字段全集；`createHabitsMutationService` 工厂；field-executor 增 `type:'time'` HH:MM 校验；`updateHabit` 迁移到 `service.execute` 单事务 |
+| okrs | ⏳ 待独立切片 | — | 架构债：`updateObjective` 缺字段执行器路由，非简单复制 tasks/habits 模板 |
+| timebox | ⏳ 待独立切片 | — | YAGNI：当前字段编辑路径未出现，暂不铺开 |
+
 ```typescript
 interface DomainPlugin {
   // ── 声明文件（静态配置，非运行时钩子）────────────────────────
