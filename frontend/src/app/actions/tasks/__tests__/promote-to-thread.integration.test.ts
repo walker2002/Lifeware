@@ -133,6 +133,7 @@ function buildService(opts: { failAtStateStep?: number } = {}): ReturnType<typeo
     transaction: <T,>(cb: (tx: any) => Promise<T>): Promise<T> =>
       db.transaction(cb as any) as unknown as Promise<T>,
     smExecute: smExecute as any,
+    fieldUpdatedEventType: 'TaskFieldUpdated',
   })
 }
 
