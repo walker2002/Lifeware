@@ -23,6 +23,8 @@ import {
   validationPassed,
   validationRejected,
   validationNeedConfirm,
+  validationPassedWithWarning,
+  validationNeedInput,
 } from '@/usom/types/process'
 import type { ValidationResult } from '@/usom/types/process'
 
@@ -50,7 +52,7 @@ vi.mock('@/domains/plugin-factory', () => ({
 }))
 
 // ─── 偏序聚合（纯函数）───────────────────────────────────────
-describe('aggregateValidation — 偏序 Rejected > NeedConfirm > Passed', () => {
+describe('aggregateValidation — 偏序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed', () => {
   it('Passed × Passed → Passed', () => {
     expect(aggregateValidation(validationPassed(), validationPassed())).toEqual({ kind: 'Passed' })
   })
@@ -85,6 +87,31 @@ describe('aggregateValidation — 偏序 Rejected > NeedConfirm > Passed', () =>
     expect(
       aggregateValidation(validationNeedConfirm({}), validationRejected(['fatal'])).kind,
     ).toBe('Rejected')
+  })
+
+  it('PassedWithWarning > Passed：Passed × PWW → PassedWithWarning', () => {
+    const r = aggregateValidation(validationPassed(), validationPassedWithWarning(['low disk']))
+    expect(r.kind).toBe('PassedWithWarning')
+    if (r.kind === 'PassedWithWarning') expect(r.warnings).toEqual(['low disk'])
+  })
+
+  it('NeedConfirm > PassedWithWarning：PWW × NeedConfirm → NeedConfirm', () => {
+    expect(
+      aggregateValidation(validationPassedWithWarning(['w']), validationNeedConfirm({ reason: 'rule' })).kind,
+    ).toBe('NeedConfirm')
+  })
+
+  it('NeedInput > PassedWithWarning：PWW × NeedInput → NeedInput', () => {
+    const r = aggregateValidation(validationPassedWithWarning(['w']), validationNeedInput({ missing: ['tags'] }))
+    expect(r.kind).toBe('NeedInput')
+    // NeedInput.data 为 unknown（spec §4.1 占位），断言透传时需类型断言
+    if (r.kind === 'NeedInput') expect((r.data as { missing: string[] }).missing).toEqual(['tags'])
+  })
+
+  it('NeedConfirm > NeedInput：NeedInput × NeedConfirm → NeedConfirm', () => {
+    expect(
+      aggregateValidation(validationNeedInput({ missing: ['x'] }), validationNeedConfirm({ reason: 'rule' })).kind,
+    ).toBe('NeedConfirm')
   })
 })
 

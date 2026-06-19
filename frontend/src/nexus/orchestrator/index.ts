@@ -106,11 +106,13 @@ export function ruleResultToValidation(outcome: RuleEngineOutcome): ValidationRe
   return { kind: 'Passed' }
 }
 
-/** 偏序优先级：Rejected(2) > NeedConfirm(1) > Passed(0) */
+/** 偏序优先级（全序，取最严格）：Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed */
 const VALIDATION_RANK: Record<ValidationResult['kind'], number> = {
   Passed: 0,
-  NeedConfirm: 1,
-  Rejected: 2,
+  PassedWithWarning: 1,
+  NeedInput: 2,
+  NeedConfirm: 3,
+  Rejected: 4,
 }
 
 /**
