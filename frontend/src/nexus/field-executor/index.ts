@@ -8,7 +8,7 @@
  * 职责边界（与 State Machine 并列）：
  *  - 仅写「字段」，不触碰生命周期状态（状态写归 State Machine）。
  *  - 仅做**字段级校验**（按目标字段的 FieldMetadata 校验合法性，如枚举取值、
- *    数值非负等），**不**走 createTask/updateTask 的全量 onValidate——后者由
+ *    数值非负、time HH:MM 格式等），**不**走 createTask/updateTask 的全量 onValidate——后者由
  *    写入口的 update() 经 Intent→Rule 链路完成。字段级校验独立、轻量、可单测。
  *  - 写入经 GenericRepo.updateFields（单条 UPDATE，禁读后写），遵循 R-01 仓储隔离。
  *
@@ -41,6 +41,15 @@ export interface FieldExecutorContext {
 }
 
 /**
+ * HH:MM 时间格式正则（两位时:两位分，00:00–23:59）。
+ *
+ * 与 src/domains/habits/validation.ts 的 HH_MM_REGEX 同源——为避免 Nexus 核心层
+ * 反向依赖具体 domain（Nexus 不应 import domains/habits），此处就地保留一份；
+ * 待未来「公共校验工厂」切片统一抽取到共享位置。
+ */
+const HH_MM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/**
  * 字段级校验：仅按目标字段的 FieldMetadata 校验合法性。
  *
  * 校验项（保守、最小集）：
@@ -48,7 +57,8 @@ export interface FieldExecutorContext {
  *  - enum 类型：值必须在 options 列表内。
  *  - number 类型：必须为有限数值（NaN/Infinity 拒绝）；非负数约束（预估时长等
  *    业务字段不应为负）。
- *  - 其它类型（string/date/...）当前不额外约束（MVP 保守放开）。
+ *  - time 类型：必须为合法 HH:MM（00:00–23:59，两位时分），如 "09:30"。
+ *  - 其它类型（string/date/json/boolean/...）当前不额外约束（MVP 保守放开）。
  *
  * 不走 onValidate：本函数是字段级快校验，与全量意图校验正交。
  *
@@ -76,6 +86,15 @@ function validateField(
     }
     if (value < 0) {
       return validationRejected([`字段 "${field}" 不允许为负数：${value}`])
+    }
+  }
+
+  // time 格式校验（HH:MM，00:00–23:59，两位时分）
+  if (meta.type === 'time') {
+    if (typeof value !== 'string' || !HH_MM_REGEX.test(value)) {
+      return validationRejected([
+        `字段 "${field}" 要求合法 HH:MM（00:00–23:59），得到 "${String(value)}"`,
+      ])
     }
   }
 

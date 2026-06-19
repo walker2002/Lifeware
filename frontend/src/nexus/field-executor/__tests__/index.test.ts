@@ -35,6 +35,21 @@ const FIELD_META: Record<string, FieldMetadata> = {
     required: false,
     mutation_mode: 'FactField',
   },
+  // habits 域 time 字段（defaultTime/earliestTime/latestStartTime 同类型）
+  defaultTime: {
+    type: 'time',
+    label: '默认时间',
+    required: false,
+    mutation_mode: 'FactField',
+  },
+  // habits 域 enum 字段（G1-M1 已把 frequencyType 改 enum + options）
+  frequencyType: {
+    type: 'enum',
+    label: '频率类型',
+    required: false,
+    options: ['daily', 'weekly', 'custom'],
+    mutation_mode: 'FactField',
+  },
 }
 
 function makeRepo(overrides: Partial<GenericRepo> = {}): GenericRepo {
@@ -180,5 +195,91 @@ describe('Field Executor — FactField 字段写', () => {
       'user-1',
       fakeTx,
     )
+  })
+
+  // T6: time 类型 HH:MM 校验
+  describe('time 类型字段（HH:MM 校验）', () => {
+    it.each([
+      ['09:30'],
+      ['23:59'],
+      ['00:00'],
+    ])('合法值 %s → Passed', async (value) => {
+      const repo = makeRepo()
+      const { bus, published } = makeEventBus()
+      const executor = createFieldExecutor()
+
+      const result = await executor.execute('habit-1', 'defaultTime', value, 'user-1', {
+        repo,
+        eventBus: bus,
+        objectType: 'habit',
+        fieldMetadata: FIELD_META,
+      })
+
+      expect(result.kind).toBe('Passed')
+      expect(repo.updateFields).toHaveBeenCalledTimes(1)
+      expect(published).toHaveLength(1)
+    })
+
+    it.each([
+      ['25:99'],
+      ['24:00'],
+      ['abc'],
+      ['9:5'],
+      [''],
+      ['09:3'],
+      ['9:05'],
+    ])('非法值 %s → Rejected，不写库不发事件', async (value) => {
+      const repo = makeRepo()
+      const { bus, published } = makeEventBus()
+      const executor = createFieldExecutor()
+
+      const result = await executor.execute('habit-1', 'defaultTime', value, 'user-1', {
+        repo,
+        eventBus: bus,
+        objectType: 'habit',
+        fieldMetadata: FIELD_META,
+      })
+
+      expect(result.kind).toBe('Rejected')
+      expect(repo.updateFields).not.toHaveBeenCalled()
+      expect(published).toHaveLength(0)
+    })
+  })
+
+  // T7: enum 类型 frequencyType 校验（验证 G1-M1 改 enum+options 后枚举校验激活）
+  describe('enum 类型字段 frequencyType', () => {
+    it('合法值 daily → Passed', async () => {
+      const repo = makeRepo()
+      const { bus, published } = makeEventBus()
+      const executor = createFieldExecutor()
+
+      const result = await executor.execute('habit-1', 'frequencyType', 'daily', 'user-1', {
+        repo,
+        eventBus: bus,
+        objectType: 'habit',
+        fieldMetadata: FIELD_META,
+      })
+
+      expect(result.kind).toBe('Passed')
+      expect(repo.updateFields).toHaveBeenCalledTimes(1)
+      expect(published).toHaveLength(1)
+    })
+
+    it('非法值 yearly → Rejected，不写库不发事件', async () => {
+      const repo = makeRepo()
+      const { bus, published } = makeEventBus()
+      const executor = createFieldExecutor()
+
+      const result = await executor.execute('habit-1', 'frequencyType', 'yearly', 'user-1', {
+        repo,
+        eventBus: bus,
+        objectType: 'habit',
+        fieldMetadata: FIELD_META,
+      })
+
+      expect(result.kind).toBe('Rejected')
+      expect(repo.updateFields).not.toHaveBeenCalled()
+      expect(published).toHaveLength(0)
+    })
   })
 })
