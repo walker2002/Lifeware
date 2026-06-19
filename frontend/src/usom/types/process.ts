@@ -199,6 +199,7 @@ export type SystemEventType =
   | 'GenerativeUserConfirmed' | 'GenerativeProposalRejected' | 'GenerativeBatchExecuted'
   | 'ExecutionLogged'
   | 'TaskFieldUpdated'
+  | 'HabitFieldUpdated'
 
 export interface SystemEvent {
   id: USOM_ID
@@ -377,3 +378,7 @@ export interface PriorQueryEntry {
 export type QueryResult =
   | { type: 'text'; content: string }
   | { type: 'cnui'; payload: CNUISurfacePayload }
+
+// ─── 类型断言（仅编译期）：HabitFieldUpdated 须为合法 SystemEventType ──
+const _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'HabitFieldUpdated'
+void _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
