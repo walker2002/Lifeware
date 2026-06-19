@@ -932,10 +932,12 @@ type ValidationResult =
 
 | Domain | 状态 | 落地切片 | 说明 |
 |---|---|---|---|
-| tasks | ✅ 已落地 | [018] | 业务事实写入口首切片，模板来源 |
-| habits | ✅ 已落地 | [018-G1] | manifest 扩至 14 字段全集；`createHabitsMutationService` 工厂；field-executor 增 `type:'time'` HH:MM 校验；`updateHabit` 迁移到 `service.execute` 单事务 |
+| tasks | ✅ 已落地 | [018] | 业务事实写入口首切片，模板来源；G2 抽公共工厂（`createDomainMutationServiceFactory`），工厂瘦到 ~30 行；F-6 事件名参数化（fieldUpdatedEventType=TaskFieldUpdated） |
+| habits | ✅ 已落地 | [018-G1,G2] | G1 manifest 扩至 14 字段全集；`createHabitsMutationService` 工厂；field-executor 增 `type:'time'` HH:MM 校验；`updateHabit` 迁移到 `service.execute` 单事务；G2 公共工厂已抽 + F-6 事件名已参数化（HabitFieldUpdated 修正语义错误） |
 | okrs | ⏳ 待独立切片 | — | 架构债：`updateObjective` 缺字段执行器路由，非简单复制 tasks/habits 模板 |
 | timebox | ⏳ 待独立切片 | — | YAGNI：当前字段编辑路径未出现，暂不铺开 |
+
+> **G2 公共工厂抽象**（2026-06-19）：`createDomainMutationServiceFactory` 已抽取，tasks/habits 工厂瘦到 ~30 行；field-executor 事件名 per-domain 参数化（F-6，tasks=TaskFieldUpdated 零变更，habits=HabitFieldUpdated 修正语义错误）；SystemEventType 新增 HabitFieldUpdated。
 
 ```typescript
 interface DomainPlugin {
