@@ -1,11 +1,20 @@
-// Habits Domain Compliance Test — TDD 先写测试
-// 验证 T007-T010 的合规性要求
+/**
+ * @file habits-compliance
+ * @brief Habits 域 compliance 套件 — 守护 manifest 六区块、hooks 纯函数、
+ *        transitions 一致性、插件入口，以及写入口治理（mutation_mode）完整性。
+ *
+ * T007-T010 验证既有合规要求；T011（写入口 mutation_mode 完整性）补 compliance 层
+ * 对 [018-G1] 写入口治理的覆盖 —— 字段执行器对未标 mutation_mode 的字段会拒绝写入，
+ * 故 compliance 套件须独立断言每个字段都已标注合法 mode，且 Fact/Content 两类非空。
+ */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { habitsPlugin } from '../index'
 import { createHabitsHooks } from '../hooks'
 import { habitTransitions } from '../transitions'
+import { loadDomainManifest } from '@/domains/manifest-loader'
+import type { FieldMetadata } from '@/usom/types/domain-types'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
 
@@ -84,6 +93,59 @@ describe('T007: Habits manifest.yaml 六区块完整性', () => {
 
   it('应包含 subscribed_events 区块 (F)', () => {
     expect(manifestContent).toContain('subscribed_events:')
+  })
+})
+
+/**
+ * T011：写入口治理完整性（[018-G1] compliance 层覆盖）
+ *
+ * 与 manifest-field-metadata.test.ts（G1-M1 结构层）互补：
+ * - G1-M1 精确断言「14 字段各自 mode 值对不对」（值正确性）。
+ * - T011（本块）从 compliance 视角断言「写入口治理契约不被破坏」——
+ *   (a) 每个字段都标了 mutation_mode（缺标 = 字段执行器拒绝写入 = 治理漏洞）；
+ *   (b) FactField 与 ContentField 两类都非空（防止全部错标为同一类导致分类失效）；
+ *   (c) 不出现 PresentationField（写入口只认 Fact/Content 两类）。
+ */
+describe('T011: habits field_metadata 写入口治理完整性', () => {
+  let fieldMetadata: Record<string, FieldMetadata>
+
+  beforeAll(() => {
+    const result = loadDomainManifest('habits')
+    expect(result.success).toBe(true)
+    fieldMetadata = (result.success ? result.manifest.field_metadata : {}) as Record<string, FieldMetadata>
+  })
+
+  it('manifest 应成功加载且 field_metadata 非空', () => {
+    expect(Object.keys(fieldMetadata).length).toBeGreaterThan(0)
+  })
+
+  it('每个字段都应标注 mutation_mode（缺标即写入口治理漏洞）', () => {
+    const missing: string[] = []
+    for (const [name, meta] of Object.entries(fieldMetadata)) {
+      if (meta.mutation_mode === undefined || meta.mutation_mode === null) {
+        missing.push(name)
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  it('每个字段的 mutation_mode 必须是 FactField 或 ContentField（拒绝 PresentationField）', () => {
+    const allowed: FieldMetadata['mutation_mode'][] = ['FactField', 'ContentField']
+    const offenders: string[] = []
+    for (const [name, meta] of Object.entries(fieldMetadata)) {
+      if (!allowed.includes(meta.mutation_mode)) {
+        offenders.push(`${name}=${String(meta.mutation_mode)}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('FactField 与 ContentField 两类都应非空（分类不能整体退化）', () => {
+    const modes = Object.values(fieldMetadata).map(m => m.mutation_mode)
+    const factCount = modes.filter(m => m === 'FactField').length
+    const contentCount = modes.filter(m => m === 'ContentField').length
+    expect(factCount).toBeGreaterThan(0)
+    expect(contentCount).toBeGreaterThan(0)
   })
 })
 
