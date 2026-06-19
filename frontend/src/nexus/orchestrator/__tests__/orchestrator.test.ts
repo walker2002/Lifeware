@@ -379,6 +379,62 @@ describe('createOrchestrator', () => {
     expect(timeboxRepo.save).not.toHaveBeenCalled()
   })
 
+  it('RuleEngine 返回 warning → suspend(need_warning) + needsConfirmation=true，不创建 timebox', async () => {
+    // Arrange
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('warning')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+      getRepo: () => { throw new Error('should not reach SM') },
+    })
+
+    // Act
+    const result = await orchestrator.execute('安排时间盒', userId)
+
+    // Assert：G3 ⑤ — warning 聚合为 PassedWithWarning，路由到 Suspend 警告卡
+    expect(result.success).toBe(false)
+    expect(result.suspended?.reason).toBe('need_warning')
+    expect(result.needsConfirmation).toBe(true)
+    expect(result.confirmationMessage).toBe('时间盒接近晚餐时段')
+    expect(result.warnings).toEqual(['时间盒接近晚餐时段'])
+    expect(result.object).toBeUndefined()
+
+    // Assert：没有持久化
+    expect(eventRepo.append).not.toHaveBeenCalled()
+  })
+
+  it('warning + confirmed=true → 继续创建 timebox（降级 Passed）', async () => {
+    // Arrange
+    const intentEngine = createMockIntentEngine()
+    const ruleEngine = createMockRuleEngine('warning')
+    const timeboxRepo = createMockTimeboxRepo()
+    const eventRepo = createMockEventRepo()
+
+    const orchestrator = createOrchestrator({
+      eventRepo,
+      intentEngine,
+      ruleEngine,
+      getRepo: createTimeboxGetRepo(timeboxRepo),
+    })
+
+    // Act: 传入 confirmed=true —— ruleValidation 降级为 Passed，进写入口
+    const result = await orchestrator.execute('安排时间盒', userId, true)
+
+    // Assert: 用户「继续」后管道放行，成功创建 timebox
+    expect(result.success).toBe(true)
+    expect(result.object).toBeDefined()
+    expect(result.needsConfirmation).toBeFalsy()
+
+    // Assert: 持久化被调用
+    expect(timeboxRepo.save).toHaveBeenCalled()
+    expect(eventRepo.append).toHaveBeenCalled()
+  })
+
   it('State Machine 失败 → 返回错误', async () => {
     // Arrange: 创建一个会导致状态机失败的 intent（action 不是 create）
     const badIntent = createMockIntent({ action: 'delete_timebox' })

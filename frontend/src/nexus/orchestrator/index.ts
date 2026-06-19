@@ -180,10 +180,10 @@ export interface OrchestratorResult {
   cnuiDomain?: string
   cnuiSurface?: string
   cnuiIntentFields?: Record<string, unknown>
-  // [018] T10：ValidationResult 聚合后 NeedConfirm 的 Suspend 路由产物。
-  // MVP 试点仅 Orchestrator 内部状态；完整 CNUI Suspend 回环（持久化/回填）
-  // 延后到 [025]。吸收原散落的 needsCnuiConfirmation 分支。
-  suspended?: { reason: 'need_confirm'; data: unknown }
+  // [018-G3]：ValidationResult 聚合后 Suspend 路由产物（⑤ 一等公民）。
+  // 三路 suspend：need_confirm（确认卡）/ need_warning（警告卡，PWW）/ need_input（字段补全，预留）。
+  // 仅 Orchestrator 内部状态；完整 CNUI Suspend 持久化回环延后到独立切片 ⑥。
+  suspended?: { reason: 'need_confirm' | 'need_warning' | 'need_input'; data: unknown }
   generativeResult?: GenerationResult
   queryResult?: QueryResult
 }
@@ -519,7 +519,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // 3. 聚合三方 ValidationResult：domain × rule × cnui，取最严格（Rejected > NeedConfirm > Passed）
+      // 3. 聚合三方 ValidationResult：domain × rule × cnui，取最严格（全序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）
       // Orchestrator 聚合属调度职责，不属业务逻辑，合规。
       const aggregated = aggregateValidation(
         aggregateValidation(domainValidation, ruleValidation),
@@ -528,6 +528,29 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
       if (aggregated.kind === 'Rejected') {
         return { success: false, error: aggregated.errors.join('; ') }
+      }
+
+      if (aggregated.kind === 'PassedWithWarning') {
+        // G3 ⑤：PassedWithWarning 路由到 Suspend 警告卡。复用现有确认卡 surfacing
+        // （needsConfirmation + confirmationMessage）；用户「继续」时 confirmed=true
+        // 让 ruleValidation 降级为 Passed（:498-500）进写入口，无需 ⑥ 持久化回环。
+        const warnings = aggregated.warnings
+        return {
+          success: false,
+          suspended: { reason: 'need_warning', data: { warnings } },
+          needsConfirmation: true,
+          confirmationMessage: warnings.join('; '),
+          warnings,
+        }
+      }
+
+      if (aggregated.kind === 'NeedInput') {
+        // G3 预留：本切片无生产者（domain/rule/cnui 均不产 NeedInput）。
+        // 待 ⑥ CNUI 字段补全回环落地其生产者与 surfacing 字段。
+        return {
+          success: false,
+          suspended: { reason: 'need_input', data: aggregated.data },
+        }
       }
 
       if (aggregated.kind === 'NeedConfirm') {
