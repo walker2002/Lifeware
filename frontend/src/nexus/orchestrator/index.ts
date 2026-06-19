@@ -92,17 +92,20 @@ type RuleEngineOutcome = {
 /**
  * 把 RuleEngine 结果映射为 ValidationResult。
  *
- * 映射策略（试点）：
- * - confirm → NeedConfirm({source:'rule', confirmations}) —— 需用户二次确认
- * - warning → Passed —— 试点无 PassedWithWarning，warning 不阻塞流程
- *   （[025] 引入 PassedWithWarning 后改为携带 warnings，避免静默吞掉）
- * - pass    → Passed
+ * 映射策略：
+ * - confirm  → NeedConfirm({source:'rule', confirmations}) —— 需用户二次确认
+ * - warning  → PassedWithWarning(warnings) —— 可通过但携带警告，经聚合后路由到 suspend 警告卡
+ *   （G3 修复「静默吞 warning」缺口：原 warning 被吞成 Passed，现弹「继续/取消」确认卡）
+ * - pass     → Passed
  */
 export function ruleResultToValidation(outcome: RuleEngineOutcome): ValidationResult {
   if (outcome.result === 'confirm') {
     return { kind: 'NeedConfirm', data: { source: 'rule', confirmations: outcome.confirmations ?? [] } }
   }
-  // warning / pass：试点阶段均按 Passed 处理，不阻塞。
+  if (outcome.result === 'warning') {
+    // G3：warning 不再静默吞成 Passed，映射为 PassedWithWarning → 经 Orchestrator 聚合后路由到 suspend 警告卡
+    return { kind: 'PassedWithWarning', warnings: outcome.warnings ?? [] }
+  }
   return { kind: 'Passed' }
 }
 
@@ -116,11 +119,10 @@ const VALIDATION_RANK: Record<ValidationResult['kind'], number> = {
 }
 
 /**
- * 聚合两个 ValidationResult，取最严格（偏序 Rejected > NeedConfirm > Passed）。
+ * 聚合两个 ValidationResult，取最严格（全序：Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）。
  *
  * - 任一方 Rejected → Rejected（取其 errors）
- * - 否则任一方 NeedConfirm → NeedConfirm（取首先到达的 data）
- * - 否则 Passed
+ * - 否则按 VALIDATION_RANK 取优先级更高者；同级取 a
  *
  * 这是 Orchestrator 调度职责（聚合判定结果路由），不属业务逻辑，合规。
  */

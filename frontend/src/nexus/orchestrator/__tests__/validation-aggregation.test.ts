@@ -131,10 +131,11 @@ describe('ruleResultToValidation — RuleEngine 结果映射', () => {
     }
   })
 
-  it("warning → Passed（试点无 PassedWithWarning，不阻塞；留待 [025]）", () => {
-    // 试点阶段 warning 不阻塞流程，映射为 Passed。
-    // [025] 引入 PassedWithWarning 后改为携带 warnings。
-    expect(ruleResultToValidation({ result: 'warning', warnings: ['接近晚餐'], confirmations: [] }).kind).toBe('Passed')
+  it("warning → PassedWithWarning（携带 warnings；G3 已接，不再静默吞）", () => {
+    // G3：warning 映射为 PassedWithWarning，经 Orchestrator 聚合后路由到 suspend 警告卡。
+    const r = ruleResultToValidation({ result: 'warning', warnings: ['接近晚餐'], confirmations: [] })
+    expect(r.kind).toBe('PassedWithWarning')
+    if (r.kind === 'PassedWithWarning') expect(r.warnings).toEqual(['接近晚餐'])
   })
 })
 
