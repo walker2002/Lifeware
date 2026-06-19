@@ -1,17 +1,19 @@
 /**
  * @file validation-result.test.ts
- * @brief ValidationResult 三变体判别联合与构造器的单元测试（[018] T2）
+ * @brief ValidationResult 五变体判别联合与构造器的单元测试（[018-G3] T1）
  */
 
 import { describe, it, expect } from 'vitest'
 import type { ValidationResult } from '../process'
 import {
   validationPassed,
-  validationRejected,
+  validationPassedWithWarning,
+  validationNeedInput,
   validationNeedConfirm,
+  validationRejected,
 } from '../process'
 
-describe('ValidationResult 三变体', () => {
+describe('ValidationResult 五变体', () => {
   it('validationPassed 产出 Passed 变体（kind 判别字段正确）', () => {
     const result = validationPassed()
     expect(result.kind).toBe('Passed')
@@ -36,12 +38,35 @@ describe('ValidationResult 三变体', () => {
     }
   })
 
+  it('validationPassedWithWarning 产出 PassedWithWarning 变体并携带 warnings', () => {
+    const warnings = ['字段冗余', '格式不推荐']
+    const result = validationPassedWithWarning(warnings)
+    expect(result.kind).toBe('PassedWithWarning')
+    if (result.kind === 'PassedWithWarning') {
+      expect(result.warnings).toEqual(warnings)
+    }
+  })
+
+  it('validationNeedInput 产出 NeedInput 变体并透传 data（G3 预留，待 ⑥）', () => {
+    const data = { field: 'dueDate', reason: '必填缺失' }
+    const result = validationNeedInput(data)
+    expect(result.kind).toBe('NeedInput')
+    if (result.kind === 'NeedInput') {
+      // data 按引用透传，承载未来 CNUI 字段补全回环的结构化数据
+      expect(result.data).toBe(data)
+    }
+  })
+
   it('kind 判别字段可用于 switch 窄化（Orchestrator 聚合路由前提）', () => {
     // 模拟 Orchestrator 按 kind 分流路由
     function route(result: ValidationResult): string {
       switch (result.kind) {
         case 'Passed':
           return '进入写入口'
+        case 'PassedWithWarning':
+          return 'Suspend 警告卡'
+        case 'NeedInput':
+          return 'Suspend 补全'
         case 'Rejected':
           return '终止'
         case 'NeedConfirm':
@@ -50,16 +75,26 @@ describe('ValidationResult 三变体', () => {
     }
 
     expect(route(validationPassed())).toBe('进入写入口')
+    expect(route(validationPassedWithWarning(['w']))).toBe('Suspend 警告卡')
+    expect(route(validationNeedInput({}))).toBe('Suspend 补全')
     expect(route(validationRejected(['x']))).toBe('终止')
     expect(route(validationNeedConfirm({}))).toBe('Suspend 确认')
   })
 
-  it('三个变体 kind 互斥（判别联合的判别字段唯一）', () => {
+  it('五个变体 kind 互斥（判别联合的判别字段唯一）', () => {
     const passed = validationPassed()
-    const rejected = validationRejected(['e'])
+    const passedWithWarning = validationPassedWithWarning(['w'])
+    const needInput = validationNeedInput(null)
     const needConfirm = validationNeedConfirm(null)
+    const rejected = validationRejected(['e'])
 
-    const kinds = new Set([passed.kind, rejected.kind, needConfirm.kind])
-    expect(kinds.size).toBe(3)
+    const kinds = new Set([
+      passed.kind,
+      passedWithWarning.kind,
+      needInput.kind,
+      needConfirm.kind,
+      rejected.kind,
+    ])
+    expect(kinds.size).toBe(5)
   })
 })

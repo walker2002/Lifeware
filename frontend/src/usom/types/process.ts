@@ -82,16 +82,28 @@ export interface DerivedSignals {
 
 // ─── ValidationResult（意图校验/规则判定统一产出）────────────
 // 详见宪章 §VIII 判定模型；Orchestrator 聚合 onValidate 与 Rule Engine
-// 结果取最严格（Rejected > NeedConfirm > Passed）后路由。
-// MVP 试点仅此三变体；PassedWithWarning/NeedInput 延后到 [025]。
+// 结果取最严格后路由。G3 起 5 变体：PassedWithWarning 已接 rule warning，
+// NeedInput 待 ⑥ 字段补全回环落地其生产者。
 export type ValidationResult =
   | { kind: 'Passed' }
-  | { kind: 'Rejected'; errors: string[] }
+  | { kind: 'PassedWithWarning'; warnings: string[] }
+  | { kind: 'NeedInput'; data: unknown }
   | { kind: 'NeedConfirm'; data: unknown }
+  | { kind: 'Rejected'; errors: string[] }
 
 /** 产出 Passed 变体 —— 进入业务事实写入口 */
 export function validationPassed(): ValidationResult {
   return { kind: 'Passed' }
+}
+
+/** 产出 PassedWithWarning 变体 —— 可通过但携带警告，路由到 suspend 警告卡（G3） */
+export function validationPassedWithWarning(warnings: string[]): ValidationResult {
+  return { kind: 'PassedWithWarning', warnings }
+}
+
+/** 产出 NeedInput 变体 —— 需补全字段（G3 预留，待 ⑥ CNUI 字段补全回环） */
+export function validationNeedInput(data: unknown): ValidationResult {
+  return { kind: 'NeedInput', data }
 }
 
 /** 产出 Rejected 变体 —— 结构性拒绝，携带错误信息 */
