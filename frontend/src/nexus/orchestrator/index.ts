@@ -79,8 +79,8 @@ interface RuleEngine {
 
 // ─── T10：ValidationResult 聚合与 RuleEngine 映射（纯函数）────────
 // 宪法 §VIII：onValidate 与 RuleEngine 各产 ValidationResult，Orchestrator
-// 聚合取最严格（Rejected > NeedConfirm > Passed）。MVP 试点仅三变体；
-// PassedWithWarning / NeedInput 延后到 [025]。
+// 聚合取最严格（全序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）。G3 起 5 变体；
+// PassedWithWarning 已接 rule warning，NeedInput 待 ⑥ 字段补全回环落地其生产者。
 
 /** RuleEngine 内部结果（severity 字段经 adapter 映射为 result） */
 type RuleEngineOutcome = {
@@ -457,7 +457,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       const domain = findDomain(domainId)
 
       // 1. Domain plugin validation（T3 已返回 ValidationResult）
-      // onValidate 默认 Passed；当前域仅产 Passed/Rejected，NeedConfirm 为 [025] 留口。
+      // onValidate 默认 Passed；domain onValidate 仅产 Passed/Rejected（PWW/NeedInput/NeedConfirm 由 rule/cnui 产生后聚合，见下文路由）。
       let domainValidation: ValidationResult = { kind: 'Passed' }
       if (domain) {
         domainValidation = await domain.onValidate(intent, usomSnapshot)
@@ -554,8 +554,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       }
 
       if (aggregated.kind === 'NeedConfirm') {
-        // Suspend 路由：MVP 试点仅 Orchestrator 内部状态。
-        // 完整 CNUI Suspend 回环（持久化/回填/UI 回流）延后到 [025]。
+        // Suspend 路由：仅 Orchestrator 内部状态。
+        // 完整 CNUI Suspend 回环（持久化/回填/UI 回流）延后到独立切片 ⑥。
         // 向后兼容：同时回填旧字段 needsCnuiConfirmation/needsConfirmation/confirmationMessage。
         const data = aggregated.data as Record<string, unknown>
         const confirmations =
