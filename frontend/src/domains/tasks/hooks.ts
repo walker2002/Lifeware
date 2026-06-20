@@ -15,11 +15,11 @@ import type {
   MetricUpdate,
   ValidationResult,
 } from '../../usom/types/process'
-import { validationPassed, validationRejected } from '../../usom/types/process'
 import type { StructuredIntent } from '../../usom/types/objects'
 import type { USOM_ID, ActionCategory } from '../../usom/types/primitives'
 import type { DomainManifest } from '../../domains/manifest-loader/schema'
-import { validateTaskFields, validateThreadFields } from './validation'
+import { evaluateDomainRules } from '@/nexus/rules'
+import { taskRuleRegistry } from './rules-registry'
 
 /**
  * 构建状态转换映射
@@ -85,44 +85,24 @@ export function createTasksHooks(manifest: DomainManifest) {
     : {}
 
   /**
-   * 验证意图
-   * @param intent - 结构化意图
-   * @param _snapshot - USOM 快照
-   * @returns 验证结果
+   * 验证意图（[018-G3] R2：改调 evaluateDomainRules，规则声明式化）
+   * 规则逻辑全部迁入 taskRuleRegistry（见 ./rules-registry）；本处仅薄壳委托。
+   * normalizeFieldValues 保留为预处理（中文→枚举、日期格式规范化），
+   * 规范化后的 fields 传入 evaluateDomainRules。
+   * D 模式：聚合 submit 规则在 manifest 置首，submit 聚合保持「全部 errors」逐字输出。
    */
-  function onValidate(
+  async function onValidate(
     intent: StructuredIntent,
-    _snapshot: USOMSnapshot,
-  ): ValidationResult {
-    const errors: string[] = []
-    // 规范化字段值（中文→枚举、日期格式等）
-    const fields = normalizeFieldValues(intent.fields)
-    const { action } = intent
-
-    if (action === 'createTask' || action === 'updateTask') {
-      const result = validateTaskFields(fields, action as 'createTask' | 'updateTask')
-      errors.push(...result.errors)
-    }
-
-    if (action === 'createThread' || action === 'updateThread') {
-      const result = validateThreadFields(fields, action as 'createThread' | 'updateThread')
-      errors.push(...result.errors)
-    }
-
-    // 生命周期状态转换验证
-    const targetStatus = fields['targetStatus'] as string | undefined
-    const currentStatus = fields['currentStatus'] as string | undefined
-    const targetType = fields['targetType'] as 'task' | 'thread' | undefined
-
-    if (targetStatus && currentStatus && targetType) {
-      const transitions = targetType === 'thread' ? threadTransitions : taskTransitions
-      const allowed = transitions[currentStatus] ?? []
-      if (!allowed.includes(targetStatus)) {
-        errors.push(`${currentStatus} 状态不能转换为 ${targetStatus}`)
-      }
-    }
-
-    return errors.length === 0 ? validationPassed() : validationRejected(errors)
+    snapshot: USOMSnapshot,
+  ): Promise<ValidationResult> {
+    // 规范化字段值（中文→枚举、日期格式等），保持与旧逻辑一致
+    const normalizedFields = normalizeFieldValues(intent.fields)
+    const normalizedIntent: StructuredIntent = { ...intent, fields: normalizedFields }
+    return evaluateDomainRules('tasks', normalizedIntent, {
+      repos: {},
+      userId: snapshot.userId,
+      now: snapshot.currentTime ? Date.parse(snapshot.currentTime) : 0,
+    }, taskRuleRegistry)
   }
 
   /**
