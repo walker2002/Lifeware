@@ -32,7 +32,8 @@ export function useManifestRules(
   ctx: ClientRuleCtx = {},
 ): UseManifestRulesResult {
   const [errors, setErrors] = useState<Record<string, string>>({})
-  // M3：稳定 ctx identity（ClientRuleCtx 当前无字段；未来扩展只读元数据时按需 memo 依赖）
+  // M3：稳定 ctx identity。ClientRuleCtx 当前无字段，刻意空依赖。
+  // 若 ClientRuleCtx 未来增加字段，须将依赖加入数组并移除下方 eslint-disable。
   const stableCtx = useMemo<ClientRuleCtx>(() => ctx, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const validateField = useCallback(

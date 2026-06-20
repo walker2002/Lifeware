@@ -34,6 +34,10 @@ export function validateRuleIntegrity(
 
     // phase ↔ registry 位置一致
     if (rule.phase === 'both') {
+      // phase: both 规则必须是单字段（evaluateDomainRules 只取 rule.fields[0]）
+      if (rule.fields.length !== 1) {
+        errors.push(`规则 "${rule.id}" phase:both 必须恰好包含 1 个字段，当前 ${rule.fields.length} 个（多字段规则请用 phase: submit）`)
+      }
       if (!(rule.id in registry.realtime)) {
         errors.push(`规则 "${rule.id}" phase:both 但 registry.realtime 未注册其 check（孤儿 id，将静默 no-op）`)
       }
