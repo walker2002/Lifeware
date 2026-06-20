@@ -36,8 +36,8 @@ const serverCtx = { repos: {}, userId: 'u' as USOM_ID, now: 0 }
 const clientCtx = {}
 // realtime 元数据（与 manifest both 规则一致）
 const realtimeRules: RealtimeRuleMeta[] = [
-  { id: 'habit_default_duration_positive', fields: ['defaultDuration'] },
-  { id: 'habit_default_time_format', fields: ['defaultTime'] },
+  { id: 'habit_default_duration_positive', fields: ['defaultDuration'], message: '默认时长必须大于 0' },
+  { id: 'habit_default_time_format', fields: ['defaultTime'], message: '默认时间必须是有效的 HH:MM 格式' },
 ]
 const ruleMessages: Record<string, string> = {
   habit_default_duration_positive: '默认时长必须大于 0',

@@ -8,7 +8,7 @@ import { fixtureRuleRegistry } from '@/domains/_rulefixture/rules-registry'
 
 const ctx = {}
 const fixtureBothRules: RealtimeRuleMeta[] = [
-  { id: 'fixture_name_required', fields: ['name'] },
+  { id: 'fixture_name_required', fields: ['name'], message: '名称必填' },
 ]
 
 describe('evaluateRealtimeRules — fixture', () => {

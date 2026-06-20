@@ -7,8 +7,8 @@ import { mapServerErrorsToFields } from '../server-error-mapping'
 import type { RealtimeRuleMeta } from '../realtime'
 
 const rules: RealtimeRuleMeta[] = [
-  { id: 'habit_default_duration_positive', fields: ['defaultDuration'] },
-  { id: 'habit_default_time_format', fields: ['defaultTime'] },
+  { id: 'habit_default_duration_positive', fields: ['defaultDuration'], message: '默认时长必须大于 0' },
+  { id: 'habit_default_time_format', fields: ['defaultTime'], message: '默认时间必须是有效的 HH:MM 格式' },
 ]
 // 模拟 registry 中规则的 message（映射靠 message 匹配）
 const ruleMessages: Record<string, string> = {

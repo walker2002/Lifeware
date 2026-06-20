@@ -123,13 +123,10 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       setFormErrors([])
       return
     }
-    const ruleMessages: Record<string, string> = {
-      habit_default_duration_positive: "默认时长必须大于 0",
-      habit_min_duration_positive: "最短时长必须大于 0",
-      habit_frequency_type_valid: "频率类型必须是 daily/weekly/custom",
-      habit_default_time_format: "默认时间必须是有效的 HH:MM 格式",
-      habit_earliest_time_format: "最早开始时间必须是有效的 HH:MM 格式",
-      habit_latest_time_format: "最迟开始时间必须是有效的 HH:MM 格式",
+    // ruleMessages 从 realtimeRules 元数据构建（与 manifest.yaml 保持同步，避免硬编码漂移）
+    const ruleMessages: Record<string, string> = {}
+    for (const r of realtimeRules) {
+      ruleMessages[r.id] = r.message
     }
     const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
     setServerFieldErrors(mapped.fieldErrors)

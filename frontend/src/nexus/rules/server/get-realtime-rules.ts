@@ -20,5 +20,5 @@ export async function getRealtimeRules(domainId: string): Promise<RealtimeRuleMe
   const loaded = loadDomainManifest(domainId)
   if (!loaded.success) return []
   const rules = loaded.manifest.rules ?? []
-  return rules.filter((r) => r.phase === 'both').map((r) => ({ id: r.id, fields: r.fields }))
+  return rules.filter((r) => r.phase === 'both').map((r) => ({ id: r.id, fields: r.fields, message: r.message }))
 }

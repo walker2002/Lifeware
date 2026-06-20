@@ -15,6 +15,8 @@ import type { ClientRuleCtx, DomainRuleRegistry, FieldIssue } from './types'
 export interface RealtimeRuleMeta {
   id: string
   fields: string[]
+  /** 规则 message（来自 manifest，供 mapServerErrorsToFields 回填匹配，避免 client 硬编码） */
+  message: string
 }
 
 /**

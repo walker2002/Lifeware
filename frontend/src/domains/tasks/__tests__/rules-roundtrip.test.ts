@@ -36,10 +36,10 @@ const clientCtx = {}
 
 // realtime 元数据（与 manifest both 规则一致）
 const realtimeRules: RealtimeRuleMeta[] = [
-  { id: 'task_estimated_duration_positive', fields: ['estimatedDuration'] },
-  { id: 'task_estimated_duration_max', fields: ['estimatedDuration'] },
-  { id: 'task_priority_valid', fields: ['priority'] },
-  { id: 'task_due_date_format', fields: ['dueDate'] },
+  { id: 'task_estimated_duration_positive', fields: ['estimatedDuration'], message: '预估时长必须大于 0' },
+  { id: 'task_estimated_duration_max', fields: ['estimatedDuration'], message: '预估时长不能超过 24 小时（1440 分钟）' },
+  { id: 'task_priority_valid', fields: ['priority'], message: '优先级必须是 critical/high/medium/low 之一' },
+  { id: 'task_due_date_format', fields: ['dueDate'], message: '截止日期格式必须是 YYYY-MM-DD' },
 ]
 const ruleMessages: Record<string, string> = {
   task_estimated_duration_positive: '预估时长必须大于 0',
