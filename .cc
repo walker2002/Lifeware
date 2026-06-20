@@ -1,2 +1,2 @@
-claude --dangerously-skip-permissions --debug
+claude --dangerously-skip-permissions 
 
