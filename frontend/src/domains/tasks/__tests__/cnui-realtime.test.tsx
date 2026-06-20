@@ -104,3 +104,25 @@ describe('R3 — TaskEditCard realtime 校验', () => {
     expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
   })
 })
+
+describe('R3 — ThreadCreationCard realtime 校验', () => {
+  it('color="red"（非 #RRGGBB）→ 报错"颜色格式必须是 #RRGGBB"', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'color', 'red', clientCtx, taskRuleRegistry)
+    expect(issues.some(i => i.field === 'color' && i.message === '颜色格式必须是 #RRGGBB')).toBe(true)
+  })
+
+  it('color="#FF5733" → 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'color', '#FF5733', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'color')).toEqual([])
+  })
+
+  it('color="" → 无错误（可选字段）', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'color', '', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'color')).toEqual([])
+  })
+
+  it('priority="low" → 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'low', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'priority')).toEqual([])
+  })
+})

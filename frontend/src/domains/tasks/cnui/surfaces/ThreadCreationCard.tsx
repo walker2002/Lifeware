@@ -2,12 +2,20 @@
  * @file ThreadCreationCard
  * @brief 主线创建卡片 CNUI Surface
  *
- * CNUI 表面 — 用于对话内创建主线
+ * CNUI 表面 — 用于对话内创建主线。
+ * [018-G3] R3：集成 useManifestRules 客户端 realtime blur 校验 + 服务端错误回填。
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+// [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
+import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
+import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
+import { mapServerErrorsToFields } from '@/nexus/rules/server-error-mapping'
+import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
+import { taskRuleRegistry } from '../../rules-registry'
 
 /** 预设颜色列表 */
 const PRESET_COLORS = ['#3498DB', '#2ECC71', '#E74C3C', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#6366f1']
@@ -23,6 +31,8 @@ interface ThreadCreationCardProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
+  /** [018-G3] R3：服务端 submit 失败返回的 errors（按字段标红，匹配不上走表单级） */
+  serverErrors?: string[]
 }
 
 /**
@@ -36,11 +46,39 @@ export function ThreadCreationCard({
   onCancel,
   isLoading,
   isDone,
+  serverErrors,
 }: ThreadCreationCardProps) {
   const [name, setName] = useState((dataModel.name as string) ?? '')
   const [description, setDescription] = useState((dataModel.description as string) ?? '')
   const [color, setColor] = useState((dataModel.color as string) ?? '#3498DB')
   const [priority, setPriority] = useState((dataModel.priority as string) ?? '')
+
+  // [018-G3] R3：realtime 校验状态
+  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
+  const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
+  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({})
+  const [formErrors, setFormErrors] = useState<string[]>([])
+
+  // mount 时取 phase:both 规则元数据
+  useEffect(() => {
+    let mounted = true
+    getRealtimeRules('tasks').then((r) => { if (mounted) setRealtimeRules(r) })
+    return () => { mounted = false }
+  }, [])
+
+  // 服务端错误回填
+  useEffect(() => {
+    if (!serverErrors || serverErrors.length === 0) {
+      setServerFieldErrors({})
+      setFormErrors([])
+      return
+    }
+    const ruleMessages: Record<string, string> = {}
+    for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
+    const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
+    setServerFieldErrors(mapped.fieldErrors)
+    setFormErrors(mapped.formErrors)
+  }, [serverErrors, realtimeRules])
 
   function handleConfirm() {
     if (!name.trim()) return
@@ -116,6 +154,24 @@ export function ThreadCreationCard({
               />
             ))}
           </div>
+          {/* 自定义颜色输入（R3：手动输入触发 realtime 校验） */}
+          <div className="mt-1.5">
+            <input
+              type="text"
+              value={color}
+              onChange={e => {
+                setColor(e.target.value)
+                onDataChange({ ...dataModel, color: e.target.value })
+              }}
+              onBlur={() => validateField('color', color)}
+              placeholder="#RRGGBB"
+              maxLength={7}
+              className="h-7 w-24 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+            />
+          </div>
+          {(fieldErrors.color || serverFieldErrors.color) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.color || serverFieldErrors.color}</p>
+          )}
         </div>
 
         {/* 优先级 */}
@@ -127,6 +183,7 @@ export function ThreadCreationCard({
               setPriority(e.target.value)
               onDataChange({ ...dataModel, priority: e.target.value })
             }}
+            onBlur={() => validateField('priority', priority)}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           >
             <option value="">不设置</option>
@@ -135,7 +192,17 @@ export function ThreadCreationCard({
             <option value="medium">中</option>
             <option value="low">低</option>
           </select>
+          {(fieldErrors.priority || serverFieldErrors.priority) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.priority || serverFieldErrors.priority}</p>
+          )}
         </div>
+
+        {/* 表单级错误 */}
+        {formErrors.length > 0 && (
+          <div className="rounded-md border border-error bg-error-soft px-2.5 py-1.5 text-xs text-error">
+            {formErrors.map((err, i) => <div key={i}>{err}</div>)}
+          </div>
+        )}
 
         {/* 操作按钮 */}
         <div className="flex items-center justify-end gap-2 pt-2">
