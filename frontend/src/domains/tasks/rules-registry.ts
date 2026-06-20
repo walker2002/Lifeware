@@ -4,8 +4,9 @@
  *
  * 纯 TS 模块（无 React / 无 fs），client + server 皆可 import。
  * - realtime（phase: both）：action-invariant 单字段纯函数，客户端 blur
- * - submit（phase: submit）：task_action_fields_valid 聚合规则，逐字复刻现状
- *   hooks.ts onValidate 全分支（复用 validateTaskFields / validateThreadFields），
+ * - submit（phase: submit）：task_action_fields_valid 聚合规则，复刻现状
+ *   hooks.ts onValidate 全分支（复用 validateTaskFields / validateThreadFields；
+ *   normalizeFieldValues 预处理由 hooks.ts 上游执行；transition 查找表已修正），
  *   返回 validationRejected(全部 errors)
  *
  * D 模式：聚合规则在 manifest 中置首，submit 聚合时其 Rejected 先胜出、吞掉粒度规则。
@@ -25,19 +26,21 @@ const COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
 // ── 辅助：将 Transition[] 数组转为 Record<from, to[]> 查找表 ──────────
 /** 复刻 hooks.ts buildTransitionMap 逻辑，将 transitions.ts 数组转换为查找表 */
 function buildTransitionMap(
-  transitions: Array<{ from: string | null; to: string }>,
+  transitions: Array<{ from: string | string[] | null; to: string }>,
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {}
   for (const t of transitions) {
-    if (t.from === null) continue // null from = 初始创建，不参与状态转换查找
-    if (!map[t.from]) map[t.from] = []
-    if (!map[t.from].includes(t.to)) map[t.from].push(t.to)
+    const fromList = t.from === null ? [] : Array.isArray(t.from) ? t.from : [t.from]
+    for (const f of fromList) {
+      if (!map[f]) map[f] = []
+      if (!map[f].includes(t.to)) map[f].push(t.to)
+    }
   }
   return map
 }
 
-const TASK_TRANSITION_MAP = buildTransitionMap(rawTaskTransitions as Array<{ from: string | null; to: string }>)
-const THREAD_TRANSITION_MAP = buildTransitionMap(rawThreadTransitions as Array<{ from: string | null; to: string }>)
+const TASK_TRANSITION_MAP = buildTransitionMap(rawTaskTransitions)
+const THREAD_TRANSITION_MAP = buildTransitionMap(rawThreadTransitions)
 
 // ── realtime checks（phase: both，action-invariant 单字段纯函数）──────────
 
@@ -89,7 +92,9 @@ const colorFormat: RealtimeCheck = (value) => {
   return []
 }
 
-// ── submit 聚合（phase: submit）—— 逐字复刻现状 hooks.ts onValidate body ──
+// ── submit 聚合（phase: submit）
+// normalizeFieldValues（中式枚举→英文、日期格式整理）由 hooks.ts 上游预处理，
+// 此处假定 fields 已规范化（Priority/EnergyLevel 为英文，dueDate 为 YYYY-MM-DD）
 const actionFieldsValid: SubmitCheck = async (intent) => {
   const errors: string[] = []
   const { fields, action } = intent
