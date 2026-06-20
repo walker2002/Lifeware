@@ -1,0 +1,31 @@
+# [018-G3] R0 walking-skeleton 专用 fixture 域。
+# 仅用于证明规则三层框架（manifest rules → registry → 两消费者），不是真实业务域。
+# validate-manifest.ts 的 getDomainIds() 跳过 _ 前缀，故不进生产校验；
+# 但 loadDomainManifest('_rulefixture') 可直接加载供框架测试消费。
+id: _rulefixture
+version: "0.0.1"
+name: 规则框架 fixture
+description: R0 walking-skeleton 框架验证用 fixture 域，勿用于业务
+intent_triggers: []
+lifecycle: {}
+field_metadata:
+  name:
+    type: string
+    label: 名称
+    required: true
+  count:
+    type: number
+    label: 数量
+    required: false
+list_actions: []
+required_fields: {}
+subscribed_events: []
+rules:
+  - id: fixture_name_required
+    phase: both
+    fields: [name]
+    message: 名称不能为空
+  - id: fixture_count_positive
+    phase: submit
+    fields: [count]
+    message: 数量必须为正数
