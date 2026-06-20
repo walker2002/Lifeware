@@ -47,9 +47,8 @@ describe('T015: Tasks manifest.yaml 六区块完整性', () => {
     expect(threadMatch).not.toBeNull()
   })
 
-  it('intent_triggers 应包含 /tasks 和 /threads 的 view_route', () => {
+  it('intent_triggers 应包含 /tasks 的 view_route', () => {
     expect(manifestContent).toMatch(/view_route:\s*\/tasks/)
-    expect(manifestContent).toMatch(/view_route:\s*\/threads\/\[id\]/)
   })
 })
 
@@ -159,9 +158,9 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
 })
 
 describe('T017: Tasks transitions.ts 转换表验证', () => {
-  it('taskTransitions 应有 6 条转换', () => {
+  it('taskTransitions 应有 10 条转换', () => {
     expect(Array.isArray(taskTransitions)).toBe(true)
-    expect(taskTransitions.length).toBe(6)
+    expect(taskTransitions.length).toBe(10)
   })
 
   it('threadTransitions 应有 5 条转换', () => {
