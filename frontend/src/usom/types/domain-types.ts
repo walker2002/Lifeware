@@ -61,6 +61,22 @@ export interface FieldPrompt {
 
 export interface FormField extends FieldPrompt {}
 
+// ─── 区块 G: rules（[018-G3] 规则三层架构） ──────────────────────
+/**
+ * 规则声明（manifest.yaml rules 区块；逻辑在 registry）
+ * @see docs/superpowers/specs/2026-06-20-rules-three-tier-architecture-design.md §4
+ */
+export interface Rule {
+  /** 规则 id，全域唯一，绑定 registry 检查函数 */
+  id: string
+  /** both=客户端 realtime 提示 + 服务端权威；submit=仅服务端权威 */
+  phase: 'submit' | 'both'
+  /** 该规则关注字段；both 必须单字段 */
+  fields: string[]
+  /** 面向用户的提示文案 */
+  message: string
+}
+
 // ─── 完整 DomainManifest（六区块） ──────────────────────────────
 export interface DomainManifest {
   id: string
@@ -88,4 +104,7 @@ export interface DomainManifest {
 
   /** 区块 F: 订阅事件 */
   subscribed_events: string[]
+
+  /** 区块 G: 规则声明（[018-G3]，可选） */
+  rules?: Rule[]
 }

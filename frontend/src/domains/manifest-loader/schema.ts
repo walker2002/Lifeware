@@ -236,6 +236,27 @@ const CnuiSurfaceSchema = z.object({
 })
 
 /**
+ * 规则模式（[018-G3] 规则三层架构）
+ *
+ * §4.2 不变式（Zod 层强制）：
+ * - phase ∈ {submit, both}（无 realtime-only——消灭「规则只存单层可被绕过」病灶）
+ * - phase: both ⟹ 单字段（多字段规则只能 submit：blur 单字段时其余字段未必就绪）
+ */
+const RuleSchema = z.object({
+  /** 规则 id，全域唯一，绑定 registry 检查函数 */
+  id: z.string(),
+  /** 触发时机：both=客户端 realtime 提示 + 服务端权威；submit=仅服务端权威（多字段/查库） */
+  phase: z.enum(['submit', 'both']),
+  /** 该规则关注字段；both 必须单字段 */
+  fields: z.array(z.string()).min(1),
+  /** 面向用户的提示文案（i18n 留口，以 id 为 key） */
+  message: z.string(),
+}).refine(
+  (r) => !(r.phase === 'both' && r.fields.length > 1),
+  { message: 'phase: both 规则必须单字段（§4.2 不变式：多字段规则只能 phase: submit）' },
+)
+
+/**
  * Manifest 主模式
  */
 export const ManifestSchema = z.object({
@@ -276,6 +297,8 @@ export const ManifestSchema = z.object({
   cascade_rules: z.array(CascadeRuleSchema).optional(),
   /** CNUI Surfaces */
   cnui_surfaces: z.record(z.string(), CnuiSurfaceSchema).optional(),
+  /** 规则区块（[018-G3] 规则三层架构；可选，向后兼容） */
+  rules: z.array(RuleSchema).optional(),
 })
 
 /**
