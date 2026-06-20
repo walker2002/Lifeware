@@ -108,7 +108,7 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
     expect(typeof hooks.onActionSurfaceRequest).toBe('function')
   })
 
-  it('onValidate 创建任务时 title 为空应返回错误', () => {
+  it('onValidate 创建任务时 title 为空应返回错误', async () => {
     const mockManifest = {
       id: 'tasks',
       version: '1.1.0',
@@ -147,9 +147,9 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
       subscribed_events: ['ThreadCreated', 'ThreadPaused', 'ThreadResumed', 'ThreadCompleted', 'ThreadArchived', 'TaskCreated', 'TaskPlanned', 'TaskStarted', 'TaskCompleted', 'TaskArchived'],
     }
     const { onValidate } = createTasksHooks(mockManifest as any)
-    const result = onValidate(
+    const result = await onValidate(
       { id: '1', intentionId: 'i1', targetDomain: 'tasks', action: 'createTask', fields: {}, confidence: 1, resolvedBy: 'template_form', createdAt: '' },
-      { currentTime: '', currentDate: '', dayOfWeek: 1, timeOfDay: 'morning', energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' }, activeObjectives: [], activeKeyResults: [], activeTasks: [], pendingHabits: [], upcomingTimeboxes: [], pendingIntentions: [] } as any,
+      { currentTime: '', currentDate: '', dayOfWeek: 1, timeOfDay: 'morning', energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' }, activeObjectives: [], activeKeyResults: [], activeTasks: [], pendingHabits: [], upcomingTimeboxes: [], pendingIntentions: [], userId: 'u' } as any,
     )
     expect(result.kind).toBe('Rejected')
     if (result.kind === 'Rejected') {
