@@ -34,6 +34,10 @@ route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app
 UI-DESIGN-SPEC.md        # 界面设计规范（色彩/排版/间距/组件/布局/交互/响应式/暗色模式/检查清单）
 code-commenting-guide.md # 代码注释规范（文件头、模块分隔、JSDoc、特殊标记）
 UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
+superpowers/specs/
+  2026-06-20-rules-three-tier-architecture-design.md  # [018-G3] 规则三层架构设计 v3（plan-eng-review CLEAN）
+superpowers/plans/
+  2026-06-20-018-g3-r0-rules-framework.md             # [018-G3] R0 walking-skeleton 实现计划
 ```
 
 ### 第三层：Claude 自动维护
@@ -114,3 +118,4 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 | USOM 详细设计 | 2026_06_19 | 2026_06_19 | [018-G2] 公共工厂抽象：抽 `createDomainMutationServiceFactory`（tasks/habits 工厂瘦到 ~30 行）；F-6 field-executor 事件名参数化（per-domain fieldUpdatedEventType，tasks=TaskFieldUpdated 零变更，habits=HabitFieldUpdated 修正语义错误）；SystemEventType 新增 HabitFieldUpdated |
 | 项目宪章 | 2026_06_19 | 2026_06_18 | §VIII ValidationResult 判定模型补全：三变体→五变体（+PassedWithWarning(warnings)/NeedInput(data)）；聚合偏序扩 5 路全序（Rejected>NeedConfirm>NeedInput>PWW>Passed）；路由新增 PWW→Suspend 警告卡、NeedInput→Suspend 预留；「MVP 试点范围」段重写为「落地范围」（G3 已落地 PWW 接 rule warning，NeedInput/完整 CNUI Suspend 回环待独立切片 ⑥）；「教练而非守门」补充 PWW |
 | USOM 详细设计 | 2026_06_19 | 2026_06_19 | [018-G3] 判定模型补全：ValidationResult 3→5 变体（+PassedWithWarning(warnings)/NeedInput(data)）；§4.4 偏序 5 路全序；onValidate 注释同步；ruleResultToValidation 接线 warning→PassedWithWarning（修复「静默吞 warning」缺口）；executeIntent 路由 PWW/NeedInput→Suspend（suspended.reason 联合 need_confirm/need_warning/need_input）；PWW 复用 needsConfirmation surfacing + confirmed=true 降级。NeedInput/Suspend 完整 CNUI 回环推迟独立切片 ⑥ |
+| 项目宪章 | 2026_06_20 | 2026_06_19 | v1.11.0→v1.11.1：PATCH — §VIII 新增「规则三层架构（[018-G3]）」治理小节：L1 CNUI realtime（附加提示，fail-OPEN）/ L2 Domain onValidate（权威，聚合 evaluateDomainRules）/ L3 Nexus RuleEngine（全局）；治理约束消灭「realtime-only」规则（phase ∈ {submit,both}，both⟹单字段+纯函数 RealtimeCheck）；id 完整性由 scripts/validate-manifest.ts 强制；异常不对称 realtime fail-OPEN / submit fail-CLOSED |
