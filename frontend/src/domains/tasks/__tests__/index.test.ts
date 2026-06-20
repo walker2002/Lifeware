@@ -12,27 +12,28 @@ vi.mock('@/domains/manifest-loader', () => ({
       intent_triggers: [],
       lifecycle: {
         task: {
-          states: ['draft', 'active', 'in_progress', 'completed', 'archived'],
-          initial_state: 'draft',
+          states: ['todo', 'planned', 'in_progress', 'completed', 'archived', 'deleted'],
+          initial_state: 'todo',
           transitions: [
-            { from: null, to: 'draft', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
-            { from: 'draft', to: 'active', trigger: 'intent', action: 'activate', event_type: 'TaskActivated' },
-            { from: 'active', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
-            { from: 'active', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
+            { from: null, to: 'todo', trigger: 'intent', action: 'create', event_type: 'TaskCreated' },
+            { from: 'todo', to: 'planned', trigger: 'intent', action: 'plan', event_type: 'TaskPlanned' },
+            { from: 'planned', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
+            { from: 'todo', to: 'in_progress', trigger: 'intent', action: 'start', event_type: 'TaskStarted' },
+            { from: 'in_progress', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'TaskCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'TaskArchived' },
           ],
-          terminal_states: ['completed', 'archived'],
+          terminal_states: ['completed', 'archived', 'deleted'],
         },
-        project: {
+        thread: {
           states: ['planning', 'active', 'paused', 'completed', 'archived'],
           initial_state: 'planning',
           transitions: [
-            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ProjectCreated' },
-            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ProjectActivated' },
-            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ProjectPaused' },
-            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ProjectResumed' },
-            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ProjectCompleted' },
-            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ProjectArchived' },
+            { from: null, to: 'planning', trigger: 'intent', action: 'create', event_type: 'ThreadCreated' },
+            { from: 'planning', to: 'active', trigger: 'intent', action: 'activate', event_type: 'ThreadActivated' },
+            { from: 'active', to: 'paused', trigger: 'intent', action: 'pause', event_type: 'ThreadPaused' },
+            { from: 'paused', to: 'active', trigger: 'intent', action: 'resume', event_type: 'ThreadResumed' },
+            { from: 'active', to: 'completed', trigger: 'intent', action: 'complete', event_type: 'ThreadCompleted' },
+            { from: 'completed', to: 'archived', trigger: 'intent', action: 'archive', event_type: 'ThreadArchived' },
           ],
           terminal_states: ['archived'],
         },
@@ -42,7 +43,16 @@ vi.mock('@/domains/manifest-loader', () => ({
       required_fields: { createTask: [
         { name: 'title', label: '标题', type: 'text', required: true },
       ] },
-      subscribed_events: ['TimeboxStarted', 'TimeboxEnded', 'ProjectCreated', 'ProjectActivated', 'ProjectPaused', 'ProjectResumed', 'ProjectCompleted', 'ProjectArchived', 'TaskCreated', 'TaskActivated', 'TaskCompleted', 'TaskArchived'],
+      rules: [
+        { id: 'task_action_fields_valid', phase: 'submit', fields: [], message: '任务/主线字段校验失败' },
+        { id: 'task_estimated_duration_positive', phase: 'both', fields: ['estimatedDuration'], message: '预估时长必须大于 0' },
+        { id: 'task_estimated_duration_max', phase: 'both', fields: ['estimatedDuration'], message: '预估时长不能超过 24 小时（1440 分钟）' },
+        { id: 'task_priority_valid', phase: 'both', fields: ['priority'], message: '优先级必须是 critical/high/medium/low 之一' },
+        { id: 'task_energy_required_valid', phase: 'both', fields: ['energyRequired'], message: '能量要求必须是 high/medium/low 之一' },
+        { id: 'task_due_date_format', phase: 'both', fields: ['dueDate'], message: '截止日期格式必须是 YYYY-MM-DD' },
+        { id: 'thread_color_format', phase: 'both', fields: ['color'], message: '颜色格式必须是 #RRGGBB' },
+      ],
+      subscribed_events: ['ThreadCreated', 'ThreadPaused', 'ThreadResumed', 'ThreadCompleted', 'ThreadArchived', 'TaskCreated', 'TaskStarted', 'TaskCompleted', 'TaskArchived'],
     },
   }),
 }))
@@ -83,6 +93,7 @@ function makeSnapshot(overrides = {}) {
     currentTimebox: null,
     upcomingTimeboxes: [],
     pendingIntentions: [],
+    userId: 'u',
     ...overrides,
   }
 }
@@ -90,18 +101,18 @@ function makeSnapshot(overrides = {}) {
 describe('tasksPlugin.onValidate', () => {
   const { onValidate } = tasksPlugin
 
-  it('创建项目时名称必填', async () => {
-    const intent = makeIntent({ action: 'createProject', fields: {} })
+  it('创建主线时名称必填', async () => {
+    const intent = makeIntent({ action: 'createThread', fields: {} })
     const snapshot = makeSnapshot()
     const result = await onValidate(intent, snapshot as any)
     expect(result.kind).toBe('Rejected')
     if (result.kind === 'Rejected') {
-      expect(result.errors).toContain('项目名称必填')
+      expect(result.errors).toContain('主线名称必填')
     }
   })
 
-  it('创建项目时名称不为空则通过', async () => {
-    const intent = makeIntent({ action: 'createProject', fields: { name: '测试项目' } })
+  it('创建主线时名称不为空则通过', async () => {
+    const intent = makeIntent({ action: 'createThread', fields: { name: '测试主线' } })
     const result = await onValidate(intent, makeSnapshot() as any)
     expect(result.kind).toBe('Passed')
   })
@@ -124,26 +135,26 @@ describe('tasksPlugin.onValidate', () => {
     }
   })
 
-  it('项目状态 active → paused 是合法转换', async () => {
+  it('主线状态 active → paused 是合法转换', async () => {
     const intent = makeIntent({
       action: 'updateProject',
       fields: {
         currentStatus: 'active',
         targetStatus: 'paused',
-        targetType: 'project',
+        targetType: 'thread',
       },
     })
     const result = await onValidate(intent, makeSnapshot() as any)
     expect(result.kind).toBe('Passed')
   })
 
-  it('completed 状态的项目不能重新激活', async () => {
+  it('completed 状态的线程不能重新激活', async () => {
     const intent = makeIntent({
       action: 'updateProject',
       fields: {
         currentStatus: 'completed',
         targetStatus: 'active',
-        targetType: 'project',
+        targetType: 'thread',
       },
     })
     const result = await onValidate(intent, makeSnapshot() as any)
@@ -153,11 +164,11 @@ describe('tasksPlugin.onValidate', () => {
     }
   })
 
-  it('任务状态 active → in_progress 是合法转换', async () => {
+  it('任务状态 planned → in_progress 是合法转换', async () => {
     const intent = makeIntent({
       action: 'updateTask',
       fields: {
-        currentStatus: 'active',
+        currentStatus: 'planned',
         targetStatus: 'in_progress',
         targetType: 'task',
       },
