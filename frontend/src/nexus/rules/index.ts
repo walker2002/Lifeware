@@ -13,6 +13,7 @@ export type {
 export { fieldIssuesToValidationResult } from './adapter'
 export { validateRuleIntegrity } from './integrity'
 export { evaluateDomainRules } from './evaluate'
-export { evaluateRealtimeRules } from './realtime'
+export { evaluateRealtimeRules, type RealtimeRuleMeta } from './realtime'
 export { useManifestRules } from './use-manifest-rules'
 export type { UseManifestRulesResult } from './use-manifest-rules'
+export { getRealtimeRules } from './server/get-realtime-rules'
