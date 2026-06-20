@@ -83,5 +83,7 @@ export interface CnuiSurfaceOpenResult {
 export interface CnuiSurfaceSubmitResult {
   success: boolean
   error?: string
+  /** [018-G3] R3：拆分后的字段级错误，供 surface 回填到具体字段 */
+  errors?: string[]
   data?: Record<string, unknown>
 }

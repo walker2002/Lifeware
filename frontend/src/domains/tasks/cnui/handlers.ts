@@ -1,7 +1,7 @@
 /**
  * @file handlers
- * @brief Tasks CNUI Surface 处理器
- * 
+ * @brief Tasks CNUI Surface 处理器（[018-G3] R3：errors[] 透传回填）
+ *
  * 实现 CN-UI 协议的 Surface Handler，处理任务相关的打开、提交事件
  */
 
@@ -456,7 +456,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         const ids = fields.selectedIds as string[]
         for (const id of ids) {
           const r = await submitDynamicIntent('tasks', action, { threadId: id })
-          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败`, errors: r.error ? [r.error] : undefined }
         }
         return { success: true, data: { selectedIds: ids } }
       }
@@ -466,7 +466,7 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         const ids = fields.selectedIds as string[]
         for (const id of ids) {
           const r = await submitDynamicIntent('tasks', action, { taskId: id })
-          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败` }
+          if (!r.success) return { success: false, error: r.error ?? `${id} 操作失败`, errors: r.error ? [r.error] : undefined }
         }
         return { success: true, data: { selectedIds: ids } }
       }
@@ -477,15 +477,25 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         const repo = new ThreadRepository()
         const thread = await repo.findById(fields.threadId as USOM_ID, MVP_USER_ID as USOM_ID)
         if (thread?.status === 'archived') {
-          return { success: false, error: '已归档的主线不允许添加任务' }
+          return { success: false, error: '已归档的主线不允许添加任务', errors: ['已归档的主线不允许添加任务'] }
         }
       }
 
       const result = await submitDynamicIntent('tasks', action, fields)
-      return { success: result.success, error: result.error, data: result.object ? { object: result.object } : undefined }
+      // [018-G3] R3：将 orchestrator 返回的扁平 error 拆分为 errors[] 供 surface 回填
+      let errors: string[] | undefined
+      if (!result.success && result.error) {
+        errors = result.error.split('\n').filter(Boolean)
+      }
+      return {
+        success: result.success,
+        error: result.error,
+        errors,
+        data: result.object ? { object: result.object } : undefined,
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '操作失败'
-      return { success: false, error: msg }
+      return { success: false, error: msg, errors: [msg] }
     }
   },
 }

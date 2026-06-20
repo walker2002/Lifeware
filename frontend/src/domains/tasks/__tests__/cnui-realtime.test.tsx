@@ -153,3 +153,19 @@ describe('R3 — TaskEditZone realtime 校验（page-level）', () => {
     expect(issues.filter(i => i.field === 'dueDate')).toEqual([])
   })
 })
+
+describe('R3 — CNUI handler errors[] 回填闭环', () => {
+  it('handler 返回的 errors[] 能被 mapServerErrorsToFields 正确映射', () => {
+    const serverErrors = [
+      '预估时长必须大于 0',
+      '优先级必须是 critical/high/medium/low 之一',
+      '任务标题必填',
+    ]
+    const ruleMessages: Record<string, string> = {}
+    for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
+    const result = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
+    expect(result.fieldErrors.estimatedDuration).toBe('预估时长必须大于 0')
+    expect(result.fieldErrors.priority).toBe('优先级必须是 critical/high/medium/low 之一')
+    expect(result.formErrors).toEqual(['任务标题必填'])
+  })
+})
