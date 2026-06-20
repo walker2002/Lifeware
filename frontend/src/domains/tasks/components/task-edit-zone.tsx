@@ -1,6 +1,6 @@
 /**
  * @file task-edit-zone
- * @brief A 区 — 任务信息 inline 编辑区域
+ * @brief A 区 — 任务信息 inline 编辑区域（[018-G3] R3：page-level realtime blur 校验）
  *
  * 支持字段：title、description、priority、energyRequired、tracking、
  * estimatedDuration（双输入框）、dueDate。字段变更暂存 draft，统一保存。
@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Brain, Cloud, ClipboardList, Sparkles, Flame, Pencil, Check, X } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -16,6 +16,12 @@ import type { TrackingMode } from '../../../usom/types/primitives'
 import { cn } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
 import { parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
+
+// [018-G3] R3：page-level realtime blur 校验
+import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
+import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
+import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
+import { taskRuleRegistry } from '../rules-registry'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
 
@@ -210,6 +216,16 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
   const [draft, setDraft] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
 
+  // [018-G3] R3：realtime blur 校验
+  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
+  const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
+
+  useEffect(() => {
+    let mounted = true
+    getRealtimeRules('tasks').then((r) => { if (mounted) setRealtimeRules(r) })
+    return () => { mounted = false }
+  }, [])
+
   /** 是否有未保存变更 */
   const hasChanges = Object.keys(draft).length > 0
 
@@ -299,6 +315,7 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           <select
             value={(draft.priority as string) ?? task.priority}
             onChange={e => { updateDraft('priority', e.target.value) }}
+            onBlur={() => validateField('priority', (draft.priority as string) ?? task.priority)}
             disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
@@ -307,6 +324,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
+          {(fieldErrors.priority) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.priority}</p>
+          )}
         </div>
 
         {/* 能量需求 */}
@@ -315,6 +335,7 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
           <select
             value={(draft.energyRequired as string) ?? task.energyRequired}
             onChange={e => updateDraft('energyRequired', e.target.value)}
+            onBlur={() => validateField('energyRequired', (draft.energyRequired as string) ?? task.energyRequired)}
             disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
@@ -323,6 +344,9 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
+          {(fieldErrors.energyRequired) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.energyRequired}</p>
+          )}
         </div>
 
         {/* 追踪模式 */}
@@ -348,7 +372,11 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
             value={task.estimatedDuration}
             onSave={async val => updateDraft('estimatedDuration', val)}
             saving={saving}
+            onValidate={val => validateField('estimatedDuration', val)}
           />
+          {(fieldErrors.estimatedDuration) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.estimatedDuration}</p>
+          )}
         </div>
 
         {/* 开始时间 */}
@@ -371,10 +399,14 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
             type="date"
             value={(draft.dueDate as string) ?? task.dueDate ?? ''}
             onChange={e => updateDraft('dueDate', e.target.value || undefined)}
+            onBlur={() => validateField('dueDate', (draft.dueDate as string) ?? task.dueDate ?? '')}
             disabled={saving}
             onClick={e => e.stopPropagation()}
             className="h-8 rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
           />
+          {(fieldErrors.dueDate) && (
+            <p className="text-xs text-error mt-0.5">{fieldErrors.dueDate}</p>
+          )}
         </div>
       </div>
 
@@ -416,26 +448,30 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
 // ─── 预估时长子组件 ─────────────────────────────────────────────────────
 
 /**
- * 预估时长编辑器（小时+分钟双输入框，失焦自动保存）
+ * 预估时长编辑器（小时+分钟双输入框，失焦自动保存，[018-G3] R3：支持 blur 校验回调）
  */
 function DurationEdit({
   value,
   onSave,
   saving,
+  onValidate,
 }: {
   value?: number
   onSave: (val: number | undefined) => Promise<void>
   saving: boolean
+  /** [018-G3] R3：blur 时触发 realtime 校验 */
+  onValidate?: (val: number) => void
 }) {
   const [draftHours, setDraftHours] = useState(() => durationHours(value))
   const [draftMinutes, setDraftMinutes] = useState(() => durationMinutes(value))
 
-  /** 失焦保存：值变化时调用 onSave */
+  /** 失焦保存：值变化时调用 onSave，同时触发 R3 realtime 校验 */
   const handleBlur = useCallback(() => {
     const total = parseDurationToMinutes(draftHours, draftMinutes)
     if (total === (value ?? 0)) return
+    onValidate?.(total)
     onSave(total > 0 ? total : undefined)
-  }, [draftHours, draftMinutes, value, onSave])
+  }, [draftHours, draftMinutes, value, onSave, onValidate])
 
   /** 同步外部 value 变更（如其他地方修改了时长） */
   const [prevValue, setPrevValue] = useState(value)

@@ -126,3 +126,30 @@ describe('R3 — ThreadCreationCard realtime 校验', () => {
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
 })
+
+describe('R3 — TaskEditZone realtime 校验（page-level）', () => {
+  it('energyRequired="extreme" → 报错"能量要求必须是 high/medium/low 之一"', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', 'extreme', clientCtx, taskRuleRegistry)
+    expect(issues.some(i => i.field === 'energyRequired')).toBe(true)
+  })
+
+  it('energyRequired="medium" → 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', 'medium', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'energyRequired')).toEqual([])
+  })
+
+  it('energyRequired="" → 无错误（可选字段）', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', '', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'energyRequired')).toEqual([])
+  })
+
+  it('dueDate="2026/12/31" → 报错"截止日期格式必须是 YYYY-MM-DD"', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'dueDate', '2026/12/31', clientCtx, taskRuleRegistry)
+    expect(issues.some(i => i.field === 'dueDate')).toBe(true)
+  })
+
+  it('dueDate="2026-12-31" → 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'dueDate', '2026-12-31', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'dueDate')).toEqual([])
+  })
+})
