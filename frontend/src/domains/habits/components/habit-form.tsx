@@ -12,7 +12,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useManifestRules, getRealtimeRules, mapServerErrorsToFields, type RealtimeRuleMeta } from "@/nexus/rules"
+// [018-G3] R1：client 组件不可从 barrel `@/nexus/rules` import——barrel re-export 了
+// 服务端专用的 evaluateDomainRules（→ loadDomainManifest → node:fs），会泄漏进 client bundle
+// （构建报 Can't resolve 'fs'）。client 须直接 import 各 client-safe 子模块。
+import { useManifestRules } from "@/nexus/rules/use-manifest-rules"
+import { getRealtimeRules } from "@/nexus/rules/server/get-realtime-rules"
+import { mapServerErrorsToFields } from "@/nexus/rules/server-error-mapping"
+import type { RealtimeRuleMeta } from "@/nexus/rules/realtime"
 import { habitRuleRegistry } from "../rules-registry"
 
 /**
