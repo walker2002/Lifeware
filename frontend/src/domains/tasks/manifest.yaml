@@ -481,3 +481,41 @@ cnui_surfaces:
     handler: ./cnui/handlers
   task-tree-view:
     handler: ./cnui/handlers
+
+# ─── 区块 L: rules（[018-G3] 规则三层架构，R2） ─────────────────
+# D 模式（权威合并规则前置）：task_action_fields_valid 必须置首。
+#   submit 时 evaluateDomainRules 按 manifest 顺序折叠，聚合规则先 Rejected
+#   则 aggregateValidation「首个 Rejected 胜出」吞掉后续粒度规则的 Rejected，
+#   保持「全部 errors」逐字输出（golden）。粒度 both 规则做客户端 realtime blur。
+rules:
+  # ── 权威聚合（phase: submit，复刻现状 onValidate 全分支）──
+  - id: task_action_fields_valid
+    phase: submit
+    fields: [title, description, priority, energyRequired, estimatedDuration, dueDate, threadId, parentId, name, color, targetStatus, currentStatus, targetType]
+    message: 任务/主线字段校验失败
+
+  # ── 客户端 realtime（phase: both，action-invariant 单字段纯函数）──
+  - id: task_estimated_duration_positive
+    phase: both
+    fields: [estimatedDuration]
+    message: 预估时长必须大于 0
+  - id: task_estimated_duration_max
+    phase: both
+    fields: [estimatedDuration]
+    message: 预估时长不能超过 24 小时（1440 分钟）
+  - id: task_priority_valid
+    phase: both
+    fields: [priority]
+    message: 优先级必须是 critical/high/medium/low 之一
+  - id: task_energy_required_valid
+    phase: both
+    fields: [energyRequired]
+    message: 能量要求必须是 high/medium/low 之一
+  - id: task_due_date_format
+    phase: both
+    fields: [dueDate]
+    message: 截止日期格式必须是 YYYY-MM-DD
+  - id: thread_color_format
+    phase: both
+    fields: [color]
+    message: 颜色格式必须是 #RRGGBB
