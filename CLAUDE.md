@@ -152,12 +152,33 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 
 先判断规模，再定流程深度
 
-| 任务规模 | 触发特征 | 流程 |
-|---|---|---|
-| 只读 | 分析、解释、架构、阅读 | 直接处理；真实 bug 排查用 systematic-debugging |
-| 轻量 | 单文件、明确 bug、配置 | 实现 + 定向验证，必要时 浏览器验证 /browse` |
-| 中 | 多文件、边界清晰的新功能/重构 | `头脑风暴 /brainstorming → 短 plan → 实现 → /browse+/qa → verification` |
-| 大 | 跨模块、共享逻辑、新架构、公共 API | `/office-hour → /autoplan  →  brainstorming → writing-plans → executing-plans + TDD → `/qa` → verification → code-review → finishing-branch → `/ship` → `/land-and-deploy` → `/canary` |
+####  轻量级任务（单文件、明确bug、配置）
+
+1. 直接实现
+2. 人工验证，必要是 /browse
+
+#### 普通任务（多文件、边界清晰的新功能/重构）
+
+1. `/superpowers:brainstorming`
+2. `/superpowers:writing-plans`
+3. `/superpowers:subagent-driven-dev+TDD`
+4. gstack: `/browse+/qa`
+5. `/superpowers:requesting-code-review`
+6. 人工验证 + `/superpowers:systematic-debugging`
+7. `/superpowers:finishing-a-development-branch`
+
+#### 复杂任务（跨模块、共享逻辑、架构变动、公共 API）
+
+1. gstack: `/office-hour`
+2. gstack: `/autoplan`
+3. `/superpowers:writing-plans`
+4. `/superpowers:subagent-driven-dev+TDD`
+5. gstack: `/browse+/qa`
+6. gstack: /review 
+7. 人工验证 + `/superpowers:systematic-debugging`
+8. `/lifeware-neat`
+9.  `/superpowers:finishing-a-development-branch `
+10. 如果需要部署生产环境，继续 ` /ship → /land-and-deploy → /canary`
 
 
 
