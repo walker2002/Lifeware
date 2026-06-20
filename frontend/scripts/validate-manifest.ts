@@ -346,19 +346,24 @@ function validateDomain(domainId: string): void {
   }
 
   // ── 区块 G: rules id 完整性（[018-G3]） ───────────────────────
-  // 真实域 R0 无 rules，此校验 dormant；R1+ 域加 rules 后生效。
-  // manifest 若声明 rules，其每个 id 必须在该域 rules-registry.ts 注册。
+  // M2：命名约定优先——导出名 `<domainId 去尾 s>RuleRegistry`
+  //   （habits→habitRuleRegistry；tasks→taskRuleRegistry）。
+  //   找不到再 fallback duck-typing（兼容 fixture 的 fixtureRuleRegistry）。
   const rawRules = (manifest.rules ?? []) as Array<{ id: string; phase: string; fields: string[] }>
   if (rawRules.length > 0) {
     try {
       const registryPath = path.resolve(domainDir, 'rules-registry')
       const registry = require(registryPath)
-      // registry 导出形如 { xxxRuleRegistry: DomainRuleRegistry }，取第一个 DomainRuleRegistry
-      const reg = Object.values(registry).find(
-        (v) => v && typeof v === 'object' && 'realtime' in (v as object) && 'submit' in (v as object),
-      ) as { realtime: Record<string, unknown>; submit: Record<string, unknown> } | undefined
+      const singular = domainId.endsWith('s') ? domainId.slice(0, -1) : domainId
+      const convName = `${singular}RuleRegistry`
+      let reg = registry[convName] as { realtime: Record<string, unknown>; submit: Record<string, unknown> } | undefined
       if (!reg) {
-        addError(domainId, 'G-registry-missing', `manifest 声明了 ${rawRules.length} 条 rules 但未找到 rules-registry 导出`)
+        reg = Object.values(registry).find(
+          (v) => v && typeof v === 'object' && 'realtime' in (v as object) && 'submit' in (v as object),
+        ) as { realtime: Record<string, unknown>; submit: Record<string, unknown> } | undefined
+      }
+      if (!reg) {
+        addError(domainId, 'G-registry-missing', `manifest 声明了 ${rawRules.length} 条 rules 但未找到 rules-registry 导出（约定名 ${convName}）`)
       } else {
         const { validateRuleIntegrity } = require(path.resolve(ROOT_DIR, 'src', 'nexus', 'rules', 'integrity'))
         const errs = validateRuleIntegrity({ rules: rawRules as any }, reg as any)
