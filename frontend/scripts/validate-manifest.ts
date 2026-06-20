@@ -344,6 +344,31 @@ function validateDomain(domainId: string): void {
         `query_actions["${actionKey}"] 的 cnui_surface "${qa.cnui_surface}" 在 cnui_surfaces 中不存在`)
     }
   }
+
+  // ── 区块 G: rules id 完整性（[018-G3]） ───────────────────────
+  // 真实域 R0 无 rules，此校验 dormant；R1+ 域加 rules 后生效。
+  // manifest 若声明 rules，其每个 id 必须在该域 rules-registry.ts 注册。
+  const rawRules = (manifest.rules ?? []) as Array<{ id: string; phase: string; fields: string[] }>
+  if (rawRules.length > 0) {
+    try {
+      const registryPath = path.resolve(domainDir, 'rules-registry')
+      const registry = require(registryPath)
+      // registry 导出形如 { xxxRuleRegistry: DomainRuleRegistry }，取第一个 DomainRuleRegistry
+      const reg = Object.values(registry).find(
+        (v) => v && typeof v === 'object' && 'realtime' in (v as object) && 'submit' in (v as object),
+      ) as { realtime: Record<string, unknown>; submit: Record<string, unknown> } | undefined
+      if (!reg) {
+        addError(domainId, 'G-registry-missing', `manifest 声明了 ${rawRules.length} 条 rules 但未找到 rules-registry 导出`)
+      } else {
+        const { validateRuleIntegrity } = require(path.resolve(ROOT_DIR, 'src', 'nexus', 'rules', 'integrity'))
+        const errs = validateRuleIntegrity({ rules: rawRules as any }, reg as any)
+        for (const e of errs) addError(domainId, 'G-rule-integrity', e)
+      }
+    } catch (e: unknown) {
+      const err = e as { message?: string }
+      addError(domainId, 'G-registry-load', `rules-registry 加载失败: ${err.message ?? String(e)}`)
+    }
+  }
 }
 
 // ─── 跨 domain 校验：surface type 不跨 domain 重复 ─────────────
