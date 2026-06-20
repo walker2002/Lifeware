@@ -21,6 +21,18 @@ vi.mock('@/domains/manifest-loader', () => ({
       list_actions: [],
       required_fields: {},
       subscribed_events: [],
+      // [018-G3] R1 Task5：添加 rules 区块（D 模式，聚合置首）
+      rules: [
+        // 权威聚合（phase: submit）
+        { id: 'habit_action_fields_valid', phase: 'submit', fields: ['title', 'defaultTime', 'earliestTime', 'latestStartTime', 'defaultDuration', 'minDuration', 'frequencyType', 'habitId', 'name', 'applicableDays', 'templateId', 'date', 'timeOverride'], message: '习惯字段校验失败' },
+        // 客户端 realtime（phase: both）
+        { id: 'habit_default_duration_positive', phase: 'both', fields: ['defaultDuration'], message: '默认时长必须大于 0' },
+        { id: 'habit_min_duration_positive', phase: 'both', fields: ['minDuration'], message: '最短时长必须大于 0' },
+        { id: 'habit_frequency_type_valid', phase: 'both', fields: ['frequencyType'], message: '频率类型必须是 daily/weekly/custom' },
+        { id: 'habit_default_time_format', phase: 'both', fields: ['defaultTime'], message: '默认时间必须是有效的 HH:MM 格式' },
+        { id: 'habit_earliest_time_format', phase: 'both', fields: ['earliestTime'], message: '最早开始时间必须是有效的 HH:MM 格式' },
+        { id: 'habit_latest_time_format', phase: 'both', fields: ['latestStartTime'], message: '最迟开始时间必须是有效的 HH:MM 格式' },
+      ],
     },
   }),
 }))

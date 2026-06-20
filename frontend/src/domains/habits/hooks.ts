@@ -19,7 +19,8 @@ import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
-import { validateHabitFields, isValidHHMM } from './validation'
+import { evaluateDomainRules } from '@/nexus/rules'
+import { habitRuleRegistry } from './rules-registry'
 
 /**
  * Habits onEvent 钩子可注入的仓储接口
@@ -43,99 +44,21 @@ export interface HabitsEventRepos {
  */
 export function createHabitsHooks(manifest: DomainManifest, repos?: HabitsEventRepos) {
   const subscribedEvents = new Set(manifest.subscribed_events)
-  const validFrequencyTypes = new Set(
-    manifest.field_metadata.frequencyType?.options ?? ['daily', 'weekly', 'custom']
-  )
 
   /**
-   * 验证意图
-   * @param intent - 结构化意图
-   * @param _snapshot - USOM 快照
-   * @returns 验证结果
+   * 验证意图（[018-G3] R1：改调 evaluateDomainRules，规则声明式化）
+   * 规则逻辑全部迁入 habitRuleRegistry（见 ./rules-registry）；本处仅薄壳委托。
+   * D 模式：聚合 submit 规则在 manifest 置首，submit 聚合保持「全部 errors」逐字输出。
    */
-  function onValidate(
+  async function onValidate(
     intent: StructuredIntent,
-    _snapshot: USOMSnapshot,
-  ): ValidationResult {
-    const errors: string[] = []
-    const { fields } = intent
-    const action = intent.action
-
-    if (action === 'createHabit' || action === 'updateHabit') {
-      const result = validateHabitFields(fields, action as 'createHabit' | 'updateHabit')
-      errors.push(...result.errors)
-    }
-
-    if (action === 'logHabit') {
-      const habitId = fields['habitId']
-      if (!habitId || typeof habitId !== 'string') {
-        errors.push('habitId 必填')
-      }
-    }
-
-    // lifecycle actions: activate, suspend, archive, reactivate
-    const lifecycleActions = ['activateHabit', 'suspendHabit', 'archiveHabit', 'reactivateHabit']
-    if (lifecycleActions.includes(action)) {
-      const habitId = fields['habitId']
-      if (!habitId || typeof habitId !== 'string') {
-        errors.push('habitId 必填')
-      }
-    }
-
-    if (action === 'createTemplate') {
-      const name = fields['name']
-      if (!name || (typeof name === 'string' && name.trim() === '')) {
-        errors.push('name 必填')
-      }
-
-      const applicableDays = fields['applicableDays']
-      if (!Array.isArray(applicableDays) || applicableDays.length === 0) {
-        errors.push('applicableDays 不能为空')
-      }
-    }
-
-    if (action === 'addHabitToTemplate') {
-      const templateId = fields['templateId']
-      if (!templateId || typeof templateId !== 'string') {
-        errors.push('templateId 必填')
-      }
-
-      const habitId = fields['habitId']
-      if (!habitId || typeof habitId !== 'string') {
-        errors.push('habitId 必填')
-      }
-
-      const timeOverride = fields['timeOverride']
-      if (timeOverride !== undefined && !isValidHHMM(timeOverride)) {
-        errors.push('timeOverride 必须是有效的 HH:MM 格式')
-      }
-    }
-
-    if (action === 'removeHabitFromTemplate') {
-      const templateId = fields['templateId']
-      if (!templateId || typeof templateId !== 'string') {
-        errors.push('templateId 必填')
-      }
-
-      const habitId = fields['habitId']
-      if (!habitId || typeof habitId !== 'string') {
-        errors.push('habitId 必填')
-      }
-    }
-
-    if (action === 'applyTemplate') {
-      const templateId = fields['templateId']
-      if (!templateId || typeof templateId !== 'string') {
-        errors.push('templateId 必填')
-      }
-
-      const date = fields['date']
-      if (!date || typeof date !== 'string') {
-        errors.push('date 必填')
-      }
-    }
-
-    return errors.length === 0 ? validationPassed() : validationRejected(errors)
+    snapshot: USOMSnapshot,
+  ): Promise<ValidationResult> {
+    return evaluateDomainRules('habits', intent, {
+      repos: {},
+      userId: snapshot.userId,
+      now: snapshot.currentTime ? Date.parse(snapshot.currentTime) : 0,
+    }, habitRuleRegistry)
   }
 
   /**
