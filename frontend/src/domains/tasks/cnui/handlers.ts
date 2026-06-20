@@ -483,9 +483,10 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
       const result = await submitDynamicIntent('tasks', action, fields)
       // [018-G3] R3：将 orchestrator 返回的扁平 error 拆分为 errors[] 供 surface 回填
+      // orchestrator 用 '; ' 拼接 Rejected.errors（orchestrator/index.ts:466,530）
       let errors: string[] | undefined
       if (!result.success && result.error) {
-        errors = result.error.split('\n').filter(Boolean)
+        errors = result.error.split('; ').filter(Boolean)
       }
       return {
         success: result.success,

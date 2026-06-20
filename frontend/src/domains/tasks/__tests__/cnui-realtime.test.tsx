@@ -168,4 +168,24 @@ describe('R3 — CNUI handler errors[] 回填闭环', () => {
     expect(result.fieldErrors.priority).toBe('优先级必须是 critical/high/medium/low 之一')
     expect(result.formErrors).toEqual(['任务标题必填'])
   })
+
+  // [018-G3] code review I2：验证 orchestrator error 格式契约
+  // orchestrator 用 '; ' 拼接 Rejected.errors（orchestrator/index.ts:466,530），
+  // CNUI handler 用 '; ' 拆分。此测试确保拆分契约不静默断裂。
+  it('orchestrator error 格式：; 分隔的扁平 error 可正确拆分为 errors[] 并映射', () => {
+    // 模拟 orchestrator 返回的扁平 error 字符串（errors.join('; ')）
+    const flatError = '预估时长必须大于 0; 优先级必须是 critical/high/medium/low 之一; 任务标题必填'
+    const splitErrors = flatError.split('; ').filter(Boolean)
+    expect(splitErrors).toEqual([
+      '预估时长必须大于 0',
+      '优先级必须是 critical/high/medium/low 之一',
+      '任务标题必填',
+    ])
+    const ruleMessages: Record<string, string> = {}
+    for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
+    const result = mapServerErrorsToFields(splitErrors, realtimeRules, ruleMessages)
+    expect(result.fieldErrors.estimatedDuration).toBe('预估时长必须大于 0')
+    expect(result.fieldErrors.priority).toBe('优先级必须是 critical/high/medium/low 之一')
+    expect(result.formErrors).toEqual(['任务标题必填'])
+  })
 })

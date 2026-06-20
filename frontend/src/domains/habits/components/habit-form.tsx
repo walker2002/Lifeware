@@ -15,9 +15,8 @@ import { Textarea } from "@/components/ui/textarea"
 // [018-G3] R1：client 组件不可从 barrel `@/nexus/rules` import——barrel re-export 了
 // 服务端专用的 evaluateDomainRules（→ loadDomainManifest → node:fs），会泄漏进 client bundle
 // （构建报 Can't resolve 'fs'）。client 须直接 import 各 client-safe 子模块。
-import { useManifestRules } from "@/nexus/rules/use-manifest-rules"
+import { useManifestRules, useServerErrorBackfill } from "@/nexus/rules/use-manifest-rules"
 import { getRealtimeRules } from "@/nexus/rules/server/get-realtime-rules"
-import { mapServerErrorsToFields } from "@/nexus/rules/server-error-mapping"
 import type { RealtimeRuleMeta } from "@/nexus/rules/realtime"
 import { habitRuleRegistry } from "../rules-registry"
 
@@ -104,9 +103,8 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
   const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
-  const [formErrors, setFormErrors] = useState<string[]>([])
-  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({})
   const { errors: fieldErrors, validateField, validateAll } = useManifestRules(realtimeRules, habitRuleRegistry)
+  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, realtimeRules)
   const formRef = useRef<HTMLFormElement>(null)
 
   // §4.5 method B：mount 时取 phase:both 规则元数据（server action，client-safe）
@@ -115,23 +113,6 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
     getRealtimeRules("habits").then((r) => { if (mounted) setRealtimeRules(r) })
     return () => { mounted = false }
   }, [])
-
-  // §4.4 回填：父组件传入服务端 submit 失败 errors → 按字段标红，匹配不上走表单级
-  useEffect(() => {
-    if (!serverErrors || serverErrors.length === 0) {
-      setServerFieldErrors({})
-      setFormErrors([])
-      return
-    }
-    // ruleMessages 从 realtimeRules 元数据构建（与 manifest.yaml 保持同步，避免硬编码漂移）
-    const ruleMessages: Record<string, string> = {}
-    for (const r of realtimeRules) {
-      ruleMessages[r.id] = r.message
-    }
-    const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
-    setServerFieldErrors(mapped.fieldErrors)
-    setFormErrors(mapped.formErrors)
-  }, [serverErrors, realtimeRules])
 
   // 监听外部提交触发
   useEffect(() => {
@@ -189,8 +170,8 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
     }
 
     // [018-G3] R1：客户端预检仅跑 phase: both 规则（尽力而为，服务端 onValidate 权威兜底）
-    setFormErrors([])
-    setServerFieldErrors({})
+    // 服务端错误由 useServerErrorBackfill 从 serverErrors prop 派生（useMemo），
+    // 父组件在收到新 onSubmit 时应重置 serverErrors，此处无需显式清除。
     if (!validateAll(fields as unknown as Record<string, unknown>)) {
       return
     }

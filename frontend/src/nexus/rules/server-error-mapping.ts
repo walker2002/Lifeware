@@ -35,5 +35,13 @@ export function mapServerErrorsToFields(
       formErrors.push(err)
     }
   }
+  // 诊断：若服务端返回了错误但全部未匹配到字段（可能因 manifest message 文案变更），
+  // 发出 warning 以便尽早发现映射断裂（静默降级为表单级错误不易察觉）
+  if (serverErrors.length > 0 && formErrors.length === serverErrors.length) {
+    console.warn(
+      '[rules] mapServerErrorsToFields：所有 serverErrors 均未匹配到 realtime 规则字段',
+      { serverErrors, realtimeRuleIds: realtimeRules.map((r) => r.id), ruleMessages },
+    )
+  }
   return { fieldErrors, formErrors }
 }

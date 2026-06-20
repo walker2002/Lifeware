@@ -9,14 +9,13 @@
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Circle, Play, CheckCircle2, Archive, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
-import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
+import { useManifestRules, useServerErrorBackfill } from '@/nexus/rules/use-manifest-rules'
 import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
-import { mapServerErrorsToFields } from '@/nexus/rules/server-error-mapping'
 import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
 import { taskRuleRegistry } from '../../rules-registry'
 
@@ -100,16 +99,8 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
     return () => { mounted = false }
   }, [])
 
-  // R3 回填：从 serverErrors + realtimeRules 派生字段/表单级错误（useMemo，避免 useEffect+setState）
-  const { serverFieldErrors, formErrors } = useMemo(() => {
-    if (!serverErrors || serverErrors.length === 0) {
-      return { serverFieldErrors: {} as Record<string, string>, formErrors: [] as string[] }
-    }
-    const ruleMessages: Record<string, string> = {}
-    for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
-    const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
-    return { serverFieldErrors: mapped.fieldErrors, formErrors: mapped.formErrors }
-  }, [serverErrors, realtimeRules])
+  // R3 回填：从 serverErrors + realtimeRules 派生字段/表单级错误（useServerErrorBackfill 共享 hook）
+  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, realtimeRules)
 
   // ─── 直接进入编辑模式（handler 已确定具体任务） ──────────────────
   const taskDetail = dataModel.task as Record<string, unknown> | undefined
