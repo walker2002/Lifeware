@@ -943,6 +943,31 @@ type ValidationResult =
 
 > **G2 公共工厂抽象**（2026-06-19）：`createDomainMutationServiceFactory` 已抽取，tasks/habits 工厂瘦到 ~30 行；field-executor 事件名 per-domain 参数化（F-6，tasks=TaskFieldUpdated 零变更，habits=HabitFieldUpdated 修正语义错误）；SystemEventType 新增 HabitFieldUpdated。
 
+#### 规则三层架构落地（[018-G3]）
+
+规则三层架构将 Domain 校验规则分三层执行（详见宪章 §VIII）：
+- **L1 CNUI realtime（附加提示）**：客户端 blur 即时反馈，可被绕过、不可信；仅为体验优化。
+- **L2 Domain onValidate（权威）**：服务端业务合法性，经 `evaluateDomainRules` 聚合。
+- **L3 Nexus RuleEngine（全局）**：跨域系统级一致性。
+
+**治理约束（manifest `rules:` 区块）：**
+- `phase ∈ {submit, both}`，**无 realtime-only**——每条规则都进权威层（L2/L3），realtime 是 `both` 规则的附加提示。
+- `phase: both ⟹ 单字段`；多字段规则只能 `submit`。
+- `phase: both` 的 RealtimeCheck 必须同步纯函数（不查库/不读 now）。
+- **id 完整性**：manifest 每个 `rule.id` 必须在域 registry 注册；`scripts/validate-manifest.ts`(build/CI) 强制。
+- 异常不对称：客户端 realtime fail-OPEN / 服务端 submit fail-CLOSED。
+
+**域落地状态**（规则三层架构已接入的 Domain）：
+
+| Domain | 状态 | 落地计划 | 说明 |
+|---|---|---|---|
+| habits | ✅ 已落地 | [018-G3] R1 | habits manifest 新增 `rules:` 区块（D 模式：聚合 `phase:submit` 规则 `habit_action_fields_valid` 置首 + 6 条 `phase:both` 单字段 realtime 规则）；`rules-registry.ts` 6 RealtimeCheck（both，action-invariant 单字段纯函数：duration/minDuration 正数、frequencyType 枚举、defaultTime/earliestTime/latestStartTime HH:MM 格式）+ 1 SubmitCheck（聚合，逐字复刻现状 onValidate 全分支，复用 validateHabitFields）；`hooks.ts` onValidate 改调 `evaluateDomainRules('habits', intent, serverCtx, habitRuleRegistry)`（薄壳委托）；`habit-form.tsx` 接 `useManifestRules`（method B：getRealtimeRules server action + client-safe 纯核心），mount 取规则元数据、6 字段 onBlur realtime 校验 + inline 错误、submit 前 validateAll 预检、服务端失败按字段回填（mapServerErrorsToFields）；复用底层 5 变体/aggregateValidation/suspend 管线零改动；golden 逐字保持 |
+| tasks | ⏳ 待 R2 | — | 规则迁移待 R1 sign-off 后放行 |
+| okrs | ⏳ 待 R3 | — | 规则迁移待 R1 sign-off 后放行 |
+| timebox | ⏳ 待 R4 | — | 规则迁移待 R1 sign-off 后放行 |
+
+> **R1 实际交付**（2026-06-20）：habits 域规则层已端到端接入，包括 CNUI realtime 校验、服务端聚合校验、规则元数据 client-safe 暴露、表单集成、错误回填全链路。R2-R4（tasks/okrs/timebox）待 R1 sign-off 后按同样模式放行。
+
 ```typescript
 interface DomainPlugin {
   // ── 声明文件（静态配置，非运行时钩子）────────────────────────
