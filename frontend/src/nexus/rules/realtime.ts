@@ -1,37 +1,40 @@
 /**
  * @file realtime
- * @brief [018-G3] 客户端 realtime 评估纯核心
+ * @brief [018-G3] 客户端 realtime 评估纯核心（client-safe）
  *
- * blur 单字段时，跑命中该字段的 phase: both 规则（fields 含该字段）。
- * fail-OPEN：realtime 是附加提示，check 抛错吞掉+记日志，不崩 onBlur handler（submit 权威兜底）。
+ * R1（method B）：纯核心不再调 loadDomainManifest（其 import fs 为 server-only，
+ * 进 client bundle 会构建失败）。改为接收 realtimeRules 元数据（phase:both 规则的
+ * id/fields，由 server action getRealtimeRules 取得后透传），使本模块 client-safe。
+ *
+ * blur 单字段时跑命中该字段的 phase: both 规则。fail-OPEN：check 抛错吞掉+记日志，
+ * 不崩 onBlur handler（submit 权威兜底）。
  */
-import { loadDomainManifest } from '@/domains/manifest-loader'
 import type { ClientRuleCtx, DomainRuleRegistry, FieldIssue } from './types'
+
+/** phase: both 规则元数据（client-safe，由 server action 提供） */
+export interface RealtimeRuleMeta {
+  id: string
+  fields: string[]
+}
 
 /**
  * 评估命中指定字段的所有 phase: both 规则。
- * @param domainId 域 id
+ * @param realtimeRules phase: both 规则元数据（id/fields）
  * @param field blur 的字段名
  * @param value 该字段当前值
  * @param ctx 客户端上下文（最小化，无 now）
- * @param registry 本域注册表（realtime 元数据+check 由 Server Component props 透传，见 §4.5）
+ * @param registry 本域注册表（realtime check 由 client import）
  */
 export function evaluateRealtimeRules(
-  domainId: string,
+  realtimeRules: RealtimeRuleMeta[],
   field: string,
   value: unknown,
   ctx: ClientRuleCtx,
   registry: DomainRuleRegistry,
 ): FieldIssue[] {
-  const loaded = loadDomainManifest(domainId)
-  if (!loaded.success) return []
-  const rules = loaded.manifest.rules
-  if (!rules) return []
-
   const issues: FieldIssue[] = []
-  for (const rule of rules) {
-    if (rule.phase !== 'both') continue // submit 规则不进 realtime
-    if (!rule.fields.includes(field)) continue // 未命中该字段
+  for (const rule of realtimeRules) {
+    if (!rule.fields.includes(field)) continue
     const check = registry.realtime[rule.id]
     if (!check) continue
     try {
