@@ -3,7 +3,8 @@
  * @brief [018-G3] R3 — tasks CNUI surface 客户端 realtime 校验测试
  */
 import { describe, it, expect } from 'vitest'
-import { evaluateRealtimeRules, type RealtimeRuleMeta } from '@/nexus/rules'
+import { evaluateRealtimeRules, type RealtimeRuleMeta } from '@/nexus/rules/realtime'
+import { mapServerErrorsToFields } from '@/nexus/rules/server-error-mapping'
 import { taskRuleRegistry } from '../rules-registry'
 
 // 与 manifest.yaml both 规则一致的元数据（模拟 getRealtimeRules("tasks") 返回）
@@ -48,11 +49,20 @@ describe('R3 — TaskCreationCard realtime 校验', () => {
     const issues = evaluateRealtimeRules(realtimeRules, 'priority', '', clientCtx, taskRuleRegistry)
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
+
+  it('estimatedDuration=undefined（空字段 blur）→ 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', undefined, clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
+  })
+
+  it('estimatedDuration=1440（恰好等于上限）→ 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 1440, clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
+  })
 })
 
 describe('R3 — 服务端错误回填映射', () => {
-  it('submit errors 含 realtime 文案 → 回填到字段', async () => {
-    const { mapServerErrorsToFields } = await import('@/nexus/rules/server-error-mapping')
+  it('submit errors 含 realtime 文案 → 回填到字段', () => {
     const ruleMessages: Record<string, string> = {}
     for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
     const result = mapServerErrorsToFields(
@@ -65,8 +75,7 @@ describe('R3 — 服务端错误回填映射', () => {
     expect(result.formErrors).toEqual([])
   })
 
-  it('未匹配到字段的错误走表单级', async () => {
-    const { mapServerErrorsToFields } = await import('@/nexus/rules/server-error-mapping')
+  it('未匹配到字段的错误走表单级', () => {
     const ruleMessages: Record<string, string> = {}
     for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
     const result = mapServerErrorsToFields(

@@ -30,6 +30,7 @@ const PRIORITY_OPTIONS = [
  * TaskCreationCard 组件属性
  */
 interface TaskCreationCardProps {
+  /** CNUI surface 类型标识（框架契约，组件内部不消费） */
   surfaceType: string
   dataModel: Record<string, unknown>
   onDataChange: (data: Record<string, unknown>) => void
@@ -178,7 +179,7 @@ export function TaskCreationCard({
                 onDataChange({ ...dataModel, estimatedDuration: e.target.value })
               }}
               onBlur={() => {
-                const num = estimatedDuration ? Number(estimatedDuration) : undefined
+                const num = estimatedDuration && !isNaN(Number(estimatedDuration)) ? Number(estimatedDuration) : undefined
                 validateField('estimatedDuration', num)
               }}
               placeholder="60"
