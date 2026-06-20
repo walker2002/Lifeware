@@ -324,3 +324,41 @@ cnui_surfaces:
     description: 习惯创建表单卡片
     handler: ./cnui/handlers
 
+# ─── 区块 L: rules（[018-G3] 规则三层架构，R1） ─────────────────
+# D 模式（权威合并规则前置）：habit_action_fields_valid 必须置首。
+#   submit 时 evaluateDomainRules 按 manifest 顺序折叠，聚合规则先 Rejected
+#   则 aggregateValidation「首个 Rejected 胜出」吞掉后续粒度规则的 Rejected，
+#   保持「全部 errors」逐字输出（golden）。粒度 both 规则做客户端 realtime blur。
+rules:
+  # ── 权威聚合（phase: submit，复刻现状 onValidate 全分支，返回全部 errors）──
+  - id: habit_action_fields_valid
+    phase: submit
+    fields: [title, defaultTime, earliestTime, latestStartTime, defaultDuration, minDuration, frequencyType, habitId, name, applicableDays, templateId, date, timeOverride]
+    message: 习惯字段校验失败
+
+  # ── 客户端 realtime（phase: both，action-invariant 单字段纯函数）──
+  - id: habit_default_duration_positive
+    phase: both
+    fields: [defaultDuration]
+    message: 默认时长必须大于 0
+  - id: habit_min_duration_positive
+    phase: both
+    fields: [minDuration]
+    message: 最短时长必须大于 0
+  - id: habit_frequency_type_valid
+    phase: both
+    fields: [frequencyType]
+    message: 频率类型必须是 daily/weekly/custom
+  - id: habit_default_time_format
+    phase: both
+    fields: [defaultTime]
+    message: 默认时间必须是有效的 HH:MM 格式
+  - id: habit_earliest_time_format
+    phase: both
+    fields: [earliestTime]
+    message: 最早开始时间必须是有效的 HH:MM 格式
+  - id: habit_latest_time_format
+    phase: both
+    fields: [latestStartTime]
+    message: 最迟开始时间必须是有效的 HH:MM 格式
+
