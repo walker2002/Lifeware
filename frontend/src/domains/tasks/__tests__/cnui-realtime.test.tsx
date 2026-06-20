@@ -87,3 +87,20 @@ describe('R3 — 服务端错误回填映射', () => {
     expect(result.formErrors).toEqual(['任务标题必填'])
   })
 })
+
+describe('R3 — TaskEditCard realtime 校验', () => {
+  it('estimatedDuration 为负数 → 报错', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', -10, clientCtx, taskRuleRegistry)
+    expect(issues.some(i => i.field === 'estimatedDuration' && i.message === '预估时长必须大于 0')).toBe(true)
+  })
+
+  it('priority 从 select 选 "medium" → 无错误', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'medium', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'priority')).toEqual([])
+  })
+
+  it('estimatedDuration 为空字符串 → 无错误（可选字段，Number("")=0 但 NaN guard 返回 undefined）', () => {
+    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', '', clientCtx, taskRuleRegistry)
+    expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
+  })
+})

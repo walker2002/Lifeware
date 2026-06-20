@@ -4,13 +4,21 @@
  *
  * CN-UI 表面 — 展示任务列表供选择，选中后内联展开编辑表单。
  * 列表样式参照 TaskTreeView（状态图标 + 两行布局）。
+ * [018-G3] R3：集成 useManifestRules 客户端 realtime blur 校验 + 服务端错误回填。
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Circle, Play, CheckCircle2, Archive, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+// [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
+import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
+import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
+import { mapServerErrorsToFields } from '@/nexus/rules/server-error-mapping'
+import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
+import { taskRuleRegistry } from '../../rules-registry'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────
 
@@ -33,6 +41,8 @@ interface TaskEditCardProps {
   onCancel?: () => void
   isLoading?: boolean
   isDone?: boolean
+  /** [018-G3] R3：服务端 submit 失败返回的 errors（CNUI handler 回传） */
+  serverErrors?: string[]
 }
 
 // ─── 常量 ──────────────────────────────────────────────────────────
@@ -66,7 +76,7 @@ function StatusIcon({ status }: { status: string }) {
  * 任务编辑 CNUI Surface 组件
  * @description 展示任务列表，选中后内联展开编辑表单
  */
-export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone }: TaskEditCardProps) {
+export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone, serverErrors }: TaskEditCardProps) {
   const tasks = (dataModel.tasks as TaskItem[]) ?? []
   const phase = dataModel.phase as string | undefined
 
@@ -79,6 +89,33 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   const [editThreadId, setEditThreadId] = useState<string | null>(null)
   const [showSubtaskInput, setShowSubtaskInput] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
+
+  // [018-G3] R3：realtime 校验状态
+  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
+  const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
+  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({})
+  const [formErrors, setFormErrors] = useState<string[]>([])
+
+  // mount 时取 phase:both 规则元数据
+  useEffect(() => {
+    let mounted = true
+    getRealtimeRules('tasks').then((r) => { if (mounted) setRealtimeRules(r) })
+    return () => { mounted = false }
+  }, [])
+
+  // 服务端错误回填
+  useEffect(() => {
+    if (!serverErrors || serverErrors.length === 0) {
+      setServerFieldErrors({})
+      setFormErrors([])
+      return
+    }
+    const ruleMessages: Record<string, string> = {}
+    for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
+    const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
+    setServerFieldErrors(mapped.fieldErrors)
+    setFormErrors(mapped.formErrors)
+  }, [serverErrors, realtimeRules])
 
   // ─── 直接进入编辑模式（handler 已确定具体任务） ──────────────────
   const taskDetail = dataModel.task as Record<string, unknown> | undefined
@@ -169,22 +206,33 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
             <select
               value={editPriority}
               onChange={e => setEditPriority(e.target.value)}
+              onBlur={() => validateField('priority', editPriority)}
               className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
             >
               {Object.entries(PRIORITY_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
+            {(fieldErrors.priority || serverFieldErrors.priority) && (
+              <p className="text-xs text-error mt-0.5">{fieldErrors.priority || serverFieldErrors.priority}</p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-body">预估时长（分钟）</label>
             <input
               type="number"
               min={5}
-              className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
               value={editDuration}
               onChange={e => setEditDuration(e.target.value)}
+              onBlur={() => {
+                const num = editDuration && !isNaN(Number(editDuration)) ? Number(editDuration) : undefined
+                validateField('estimatedDuration', num)
+              }}
+              className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-focus-ring"
             />
+            {(fieldErrors.estimatedDuration || serverFieldErrors.estimatedDuration) && (
+              <p className="text-xs text-error mt-0.5">{fieldErrors.estimatedDuration || serverFieldErrors.estimatedDuration}</p>
+            )}
           </div>
         </div>
 
@@ -218,6 +266,13 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
             </div>
           )}
         </div>
+
+        {/* 表单级错误 */}
+        {formErrors.length > 0 && (
+          <div className="rounded-md border border-error bg-error-soft px-2.5 py-1.5 text-xs text-error">
+            {formErrors.map((err, i) => <div key={i}>{err}</div>)}
+          </div>
+        )}
 
         {/* 操作按钮 */}
         <div className="flex items-center justify-end gap-2 pt-1">
