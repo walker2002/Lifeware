@@ -67,6 +67,7 @@ const hooks = createTasksHooks(result.manifest)
 export const tasksPlugin: DomainPlugin = createDomainPlugin(result.manifest, hooks)
 
 export { createTasksHooks } from './hooks'
+export { taskRuleRegistry } from './rules-registry'
 export { taskTransitions, threadTransitions, findTransition } from './transitions'
 export { ThreadRepository, TaskRepository } from './repository'
 export { calculateClarity, calculateComplexity, calculateDecomposition, recalculateAITags } from './tag-calculator'
