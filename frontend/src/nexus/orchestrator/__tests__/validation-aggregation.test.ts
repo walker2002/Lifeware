@@ -113,6 +113,18 @@ describe('aggregateValidation — 偏序 Rejected > NeedConfirm > NeedInput > Pa
       aggregateValidation(validationNeedInput({ missing: ['x'] }), validationNeedConfirm({ reason: 'rule' })).kind,
     ).toBe('NeedConfirm')
   })
+
+  it('同级取 a：PWW × PWW（同 rank 1）→ 返回第一个，warnings 不合并', () => {
+    // 锁定 JSDoc「同级取 a」契约（aggregateValidation 注释）：
+    // 将来 PWW 有多生产者时，聚合保留先到方的 warnings，不做 PWW+PWW 合并
+    // （spec §4.2 / D5：本切片不合并，PWW+PWW 合并推迟到 ⑥）。
+    const r = aggregateValidation(
+      validationPassedWithWarning(['w1']),
+      validationPassedWithWarning(['w2']),
+    )
+    expect(r.kind).toBe('PassedWithWarning')
+    if (r.kind === 'PassedWithWarning') expect(r.warnings).toEqual(['w1'])
+  })
 })
 
 // ─── RuleEngine 结果 → ValidationResult 映射 ──────────────────
