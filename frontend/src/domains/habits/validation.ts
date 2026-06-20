@@ -32,9 +32,9 @@ function timeToMinutes(time: string): number {
 }
 
 /**
- * 校验结果
+ * 校验结果（[018-G3] C1：改名避免与全局 5 变体 ValidationResult 碰撞）
  */
-export interface ValidationResult {
+export interface HabitFieldCheckResult {
   /** 是否有效 */
   valid: boolean
   /** 错误列表 */
@@ -53,7 +53,7 @@ export interface ValidationResult {
 export function validateHabitFields(
   fields: Record<string, unknown>,
   action: 'createHabit' | 'updateHabit',
-): ValidationResult {
+): HabitFieldCheckResult {
   const errors: string[] = []
   const warnings: string[] = []
 
