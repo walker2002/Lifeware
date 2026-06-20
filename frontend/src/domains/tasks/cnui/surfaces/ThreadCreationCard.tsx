@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 // [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
 import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
@@ -56,9 +56,6 @@ export function ThreadCreationCard({
   // [018-G3] R3：realtime 校验状态
   const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
   const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
-  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({})
-  const [formErrors, setFormErrors] = useState<string[]>([])
-
   // mount 时取 phase:both 规则元数据
   useEffect(() => {
     let mounted = true
@@ -66,18 +63,15 @@ export function ThreadCreationCard({
     return () => { mounted = false }
   }, [])
 
-  // 服务端错误回填
-  useEffect(() => {
+  // R3 回填：从 serverErrors + realtimeRules 派生字段/表单级错误（useMemo，避免 useEffect+setState）
+  const { serverFieldErrors, formErrors } = useMemo(() => {
     if (!serverErrors || serverErrors.length === 0) {
-      setServerFieldErrors({})
-      setFormErrors([])
-      return
+      return { serverFieldErrors: {} as Record<string, string>, formErrors: [] as string[] }
     }
     const ruleMessages: Record<string, string> = {}
     for (const r of realtimeRules) { ruleMessages[r.id] = r.message }
     const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
-    setServerFieldErrors(mapped.fieldErrors)
-    setFormErrors(mapped.formErrors)
+    return { serverFieldErrors: mapped.fieldErrors, formErrors: mapped.formErrors }
   }, [serverErrors, realtimeRules])
 
   function handleConfirm() {
