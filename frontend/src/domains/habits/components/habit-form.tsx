@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { validateHabitFields } from '../validation'
+import { useManifestRules, getRealtimeRules, mapServerErrorsToFields, type RealtimeRuleMeta } from "@/nexus/rules"
+import { habitRuleRegistry } from "../rules-registry"
 
 /**
  * 习惯表单字段
@@ -47,6 +48,8 @@ interface HabitFormProps {
   submitTrigger?: number
   /** CN-UI 场景下禁用回车触发表单提交 */
   disableEnterSubmit?: boolean
+  /** 服务端 submit 失败返回的 errors（R1 §4.4 回填：按字段标红，匹配不上走表单级） */
+  serverErrors?: string[]
 }
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"]
@@ -78,7 +81,7 @@ function autoComplete(
   }
 }
 
-export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChange, submitTrigger, disableEnterSubmit }: HabitFormProps) {
+export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChange, submitTrigger, disableEnterSubmit, serverErrors }: HabitFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [defaultTime, setDefaultTime] = useState(initial?.defaultTime ?? "07:00")
@@ -94,8 +97,38 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
-  const [clientErrors, setClientErrors] = useState<string[]>([])
+  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
+  const [formErrors, setFormErrors] = useState<string[]>([])
+  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({})
+  const { errors: fieldErrors, validateField, validateAll } = useManifestRules(realtimeRules, habitRuleRegistry)
   const formRef = useRef<HTMLFormElement>(null)
+
+  // §4.5 method B：mount 时取 phase:both 规则元数据（server action，client-safe）
+  useEffect(() => {
+    let mounted = true
+    getRealtimeRules("habits").then((r) => { if (mounted) setRealtimeRules(r) })
+    return () => { mounted = false }
+  }, [])
+
+  // §4.4 回填：父组件传入服务端 submit 失败 errors → 按字段标红，匹配不上走表单级
+  useEffect(() => {
+    if (!serverErrors || serverErrors.length === 0) {
+      setServerFieldErrors({})
+      setFormErrors([])
+      return
+    }
+    const ruleMessages: Record<string, string> = {
+      habit_default_duration_positive: "默认时长必须大于 0",
+      habit_min_duration_positive: "最短时长必须大于 0",
+      habit_frequency_type_valid: "频率类型必须是 daily/weekly/custom",
+      habit_default_time_format: "默认时间必须是有效的 HH:MM 格式",
+      habit_earliest_time_format: "最早开始时间必须是有效的 HH:MM 格式",
+      habit_latest_time_format: "最迟开始时间必须是有效的 HH:MM 格式",
+    }
+    const mapped = mapServerErrorsToFields(serverErrors, realtimeRules, ruleMessages)
+    setServerFieldErrors(mapped.fieldErrors)
+    setFormErrors(mapped.formErrors)
+  }, [serverErrors, realtimeRules])
 
   // 监听外部提交触发
   useEffect(() => {
@@ -152,12 +185,12 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       endDate: endDate || undefined,
     }
 
-    const validation = validateHabitFields(fields as unknown as Record<string, unknown>, 'createHabit')
-    if (!validation.valid) {
-      setClientErrors(validation.errors)
+    // [018-G3] R1：客户端预检仅跑 phase: both 规则（尽力而为，服务端 onValidate 权威兜底）
+    setFormErrors([])
+    setServerFieldErrors({})
+    if (!validateAll(fields as unknown as Record<string, unknown>)) {
       return
     }
-    setClientErrors([])
 
     onSubmit(fields)
   }
@@ -227,8 +260,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             type="time"
             value={defaultTime}
             onChange={(e) => { setDefaultTime(e.target.value); onDirtyChange?.(true) }}
-            onBlur={handleDefaultTimeBlur}
+            onBlur={() => { handleDefaultTimeBlur(); validateField("defaultTime", defaultTime) }}
           />
+          {(fieldErrors.defaultTime || serverFieldErrors.defaultTime) && (
+            <p className="text-xs text-error">{fieldErrors.defaultTime || serverFieldErrors.defaultTime}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="habit-earliest">最早开始</Label>
@@ -237,7 +273,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             type="time"
             value={earliestTime}
             onChange={(e) => { setEarliestTime(e.target.value); onDirtyChange?.(true) }}
+            onBlur={() => validateField("earliestTime", earliestTime)}
           />
+          {(fieldErrors.earliestTime || serverFieldErrors.earliestTime) && (
+            <p className="text-xs text-error">{fieldErrors.earliestTime || serverFieldErrors.earliestTime}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="habit-latest">最迟开始</Label>
@@ -246,7 +286,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             type="time"
             value={latestStartTime}
             onChange={(e) => { setLatestEndTime(e.target.value); onDirtyChange?.(true) }}
+            onBlur={() => validateField("latestStartTime", latestStartTime)}
           />
+          {(fieldErrors.latestStartTime || serverFieldErrors.latestStartTime) && (
+            <p className="text-xs text-error">{fieldErrors.latestStartTime || serverFieldErrors.latestStartTime}</p>
+          )}
         </div>
       </div>
 
@@ -261,8 +305,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             max={480}
             value={defaultDuration}
             onChange={(e) => { setDefaultDuration(Number(e.target.value)); onDirtyChange?.(true) }}
-            onBlur={handleDurationBlur}
+            onBlur={() => { handleDurationBlur(); validateField("defaultDuration", defaultDuration) }}
           />
+          {(fieldErrors.defaultDuration || serverFieldErrors.defaultDuration) && (
+            <p className="text-xs text-error">{fieldErrors.defaultDuration || serverFieldErrors.defaultDuration}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="habit-min-duration">最短时长（分钟）</Label>
@@ -273,7 +320,11 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             max={defaultDuration}
             value={minDuration}
             onChange={(e) => { setMinDuration(Number(e.target.value)); onDirtyChange?.(true) }}
+            onBlur={() => validateField("minDuration", minDuration)}
           />
+          {(fieldErrors.minDuration || serverFieldErrors.minDuration) && (
+            <p className="text-xs text-error">{fieldErrors.minDuration || serverFieldErrors.minDuration}</p>
+          )}
         </div>
       </div>
 
@@ -285,7 +336,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             <button
               key={ft}
               type="button"
-              onClick={() => { setFrequencyType(ft); onDirtyChange?.(true) }}
+              onClick={() => { setFrequencyType(ft); onDirtyChange?.(true); validateField("frequencyType", ft) }}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 frequencyType === ft
                   ? "bg-primary text-primary-foreground"
@@ -296,6 +347,9 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             </button>
           ))}
         </div>
+        {(fieldErrors.frequencyType || serverFieldErrors.frequencyType) && (
+          <p className="text-xs text-error">{fieldErrors.frequencyType || serverFieldErrors.frequencyType}</p>
+        )}
       </div>
 
       {/* 星期选择（非每天时显示） */}
@@ -344,9 +398,9 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       </div>
 
       {/* 校验错误 */}
-      {clientErrors.length > 0 && (
+      {formErrors.length > 0 && (
         <div className="rounded-lg border border-error bg-error-soft px-3 py-2 text-xs text-error">
-          {clientErrors.map((err, i) => (
+          {formErrors.map((err, i) => (
             <div key={i}>{err}</div>
           ))}
         </div>
