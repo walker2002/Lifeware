@@ -1,24 +1,158 @@
-# Lifeware Domain 注册指南 2026_05_25
+# Lifeware Domain 开发权威指南（范式 + 注册 + 治理）
 
----
-
-**本文档说明**
-
-本文档是新增 Domain 的完整操作指南，涵盖从 manifest 声明到钩子实现、页面组件、DB 注册的全流程。
-每次新增 Domain，按本指南逐步完成，不需要修改任何 Nexus 核心组件。
+> **归属**：第二层（`docs/`，协同维护，Claude 保代码一致 / 用户定义意图）。本文件是 **Domain 开发的唯一权威文档**——整合原 `mydocs/core/LW_domain_注册指南`（机械注册步骤）与 [019] Domain 开发范式（范式模型 + 治理 + CI）。后续开发者/AI 只看本文件。
+> **结构**：**Part I 范式与治理**（为什么 + 规则 + 强制）→ **Part II 注册步骤**（Step 1–13 机械指南）。`docs/route-generation-spec.md` 为**下级文件**（路由生成实现细节，本文件 Step 6 引用，内容不冲突）。
+> **宪法关系**：Part I 是 constitution §III/VI/VIII + §CN-UI 的操作展开；§IX「Domain 范式」修订提案见 `.specify/amendments/proposed-IX-domain-paradigm.md`（含对 §CN-UI 第 4 条的显式 supersede，待 Amendment Procedure）。
 
 **变更记录**：
+- **2026_06_21（Part II 对齐）**：注册步骤全面对齐 tasks 参考实现——Step 2 manifest 模板补 `rules:` 区块 / `field_metadata.mutation_mode` / `cnui_surfaces` 改 map / 根字段 `domain_id`→`id`；Step 3 hooks 改工厂函数 + onValidate 委托 `evaluateDomainRules`；Step 4 schema 位置改 `src/lib/db/schema.ts` 集中；Step 5 repository 改目录；**新增 Step 5.5 组装 mutation-service**；Step 13 cnui 注册签名对齐 tasks；概念统一 `requires_full_validate`→`mutation_mode`（FactField/ContentField/PresentationField）；编号对齐总览（页面 Step 6 / 注册 Step 7 / Markdown Step 8）。
+- **2026_06_21**：[019] 整合——原 `mydocs/core/LW_domain_注册指南` 移入 `docs/`（归属转第二层）并与 `docs/domain-paradigm.md` 合并为本权威文件；新增 **Part I 范式与治理**（写入口两合法路径适用场景/跨字段红线 `mutation_mode` 字段分类/治理 must-should+sunset 豁免/CI validator/C-DC 检查清单 [CI]/[HUMAN]/四域现状对照）；Part II Step 3/5.5/13 加 paradigm 对齐说明。经 /plan-eng-review 2026-06-21 通过。
 - **2026_05_29**：新增 CNUI Domain Surface Ownership — intent_triggers 添加 `response_type` 字段；新增区块 K（cnui_surfaces）；新增 Step 13（CNUI Surface 实现）；目录结构添加 cnui/ 目录；检查清单和常见错误模式补充 CNUI 相关条目
 - **2026_05_26**：新增构建时路由生成 — manifest.view_routes 新增 url 字段；通过 scripts/generate-routes.ts 自动生成 app/ 路由文件；package.json 集成 predev/prebuild hooks；实现 Domain 完全独立性
 - **2026_05_25**：同步代码变更 — intent_triggers 添加 `shortcut` 字段，`view_route` 改为独立属性；lifecycle transitions 添加 `action`/`event_type`；独立 `view_routes` 区块（区块 G）；`generation_actions` 改为 `contexts` (id/query/params 数组)，`cnui_surface` → `cnui_surface_type`，`session_mode` → `session_enabled`；`query_actions` 改为 `context_capabilities` (id/query/params 数组)；`templates` 改为嵌套 `markdown` 子结构；区块编号更新为 A-J
 
-
-
 关联文档：
-- `LW_overall_总体设计.md`（架构约束）
-- `LW_USOM_详细设计.md`（对象类型定义）
+- `.specify/memory/constitution.md`（架构治理 canonical — §III/VI/VIII/§CN-UI；§IX 修订提案 pending）
+- `mydocs/core/LW_overall_总体设计.md`（架构约束）/ `docs/usom-design.md`（对象类型定义）
+- `docs/route-generation-spec.md`（**下级**：路由生成实现，Step 6 引用）
 
 ---
+
+# Part I — 范式与治理
+
+## 1. 为什么有这套范式
+
+四个 Domain（tasks/habits/okrs/timebox）曾各自为政：写路径、规则、CNUI 表单策略各搞各的，部分域绕过 Nexus。[018] 只修表层。本范式把 tasks 域（最完整）抽象成规范，配 CI 强制，防重蹈覆辙。
+
+**三条 Domain 设计原则**（宪法 + 用户思考 `mydocs/dev/019`）：
+1. **松耦合**：Domain 只预知 USOM，**不在代码里硬编码其他 Domain 名字/内容**（manifest.yaml 除外）。
+2. **跨域数据经 Nexus/USOM**。
+3. **规则一票否决**：Domain 对本域数据正确性全权负责；任何修改请求**必须经本域规则校验**，规则集中统一、可分多层，Domain 把关终判。
+
+## 2. 核心模型：业务事实写入口（两条合法路径）
+
+> 对应宪法 §III Single-Writer（1.11.0）。**所有业务事实持久化写入必须经写入口**。写入口有**两条并列合法路径**；二者之外的直接 repo/db 写 = **违宪**。
+
+```
+                       业务事实写入口
+                            │
+        ┌───────────────────┴───────────────────┐
+   executeIntent                  createDomainMutationService
+  (Intent→Rule→SM)                  .update / .execute
+  生命周期状态转换/聚合写             字段写 / 多步聚合写(单事务)
+```
+
+**适用场景决策树**：
+- 单字段 inline 编辑（blur 改一个 FactField）：无跨字段不变量 → `mutationService.update`；**有**跨字段不变量 → `executeIntent`（单字段 intent）。
+- 生命周期状态转换（create/activate/pause/complete/archive/discard）→ `executeIntent`。
+- 多步/跨对象/须原子（建主线+迁子任务+软删）→ `mutationService.execute`（自开 `db.transaction`）。
+
+| 场景 | 入口 | 校验 | 事务 |
+|---|---|---|---|
+| 纯单字段 inline（无跨字段约束） | `mutationService.update` | 字段级 + ui realtime | 无 |
+| 单字段（带跨字段不变量） | `executeIntent` | 全量 onValidate + Rule | 单步 |
+| 生命周期状态转换 | `executeIntent` | 全量 onValidate + Rule + SM 守卫 | 单步 |
+| 多步跨对象聚合 | `mutationService.execute` | 字段级(step) + SM 守卫 | 自开 tx 包多步 |
+
+### 2.1 ⚠️ 跨字段红线（硬约束）+ `mutation_mode` 字段分类
+
+每个字段在 manifest `field_metadata.<field>.mutation_mode` 声明其写入分类（运行时已落地，见 `nexus/domain-mutation-service/index.ts` `update()` 路由 `resolveMutationMode`）。`mutationService.update`/`execute` 的字段路径**都不走全量 onValidate**（[018] TENSION-4→4A）。
+
+| `mutation_mode` | 写入路径（`mutationService.update`） | 校验 | 业务事件 |
+|---|---|---|---|
+| `FactField`（缺省） | 字段执行器 → `updateFields` | 字段级轻校验（realtime rule） | 发 `fieldUpdatedEventType` |
+| `ContentField` | `Repository.updateFields` | 无 | 不发 |
+| `PresentationField` | 本地态，不落库 | — | — |
+
+> **跨字段红线（硬约束）**：FactField/ContentField 路径**均不经全量 onValidate**。故**带跨字段/跨对象业务不变量的字段，禁止标 `FactField` 或 `ContentField`、禁止经 `mutationService.update`，必须经 `executeIntent` 全量校验**（或显式 rule step）。否则 inline 编辑静默绕过业务规则。
+
+**入 manifest 判定**：独立单字段（无跨字段约束）→ `FactField`；纯内容可直写（无约束）→ `ContentField`；仅展示 → `PresentationField`；**有跨字段约束 → 不走字段路径（不作为可 update 的 FactField/ContentField），其写入经 `executeIntent` 全量校验**。
+
+**强制点**：
+- `validate-manifest.ts`：`mutation_mode` 取值合法（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
+- 跨字段红线以 **HUMAN 判定**为主（「跨字段」语义无法静态断定）：C-DC 新增 `[HUMAN]`「FactField/ContentField 字段不得有跨字段约束依赖」；CI 辅助——`FactField` 字段的 realtime rule（`phase: both`）须为单字段纯函数（`fields: [单字段]`），多字段聚合规则不得挂在 FactField 字段上。
+
+> 为什么两路径不合并：对应三种**本质不同的写语义**（生命周期/单字段/多步聚合），由事务边界、校验粒度、state-vs-field 并列三条承重理由分叉（见 `nexus/domain-mutation-service/index.ts` `execute()`/`update()` 注释、`nexus/field-executor/index.ts` @file 注释）。合并 = 重开 [018] 已决。
+
+## 3. 七层范式 ↔ 注册步骤映射（去重，机械细节见 Part II Step N）
+
+| 范式层 | 角色 | 对应 Part II Step | 关键接口 |
+|---|---|---|---|
+| L1 数据 | GenericRepo + tx 透传 | Step 4 (DB Schema) + Step 5 (Repository) | `IXxxRepository`，`tx: DbClient` |
+| L2 写入口 | 公共工厂组装（仅 FactField 域） | Step 5.5 + 见 §2 | `createDomainMutationServiceFactory` |
+| L3 规则三层 | manifest `rules:` + registry + evaluate | Step 2 区块 + Step 3 onValidate | `evaluateDomainRules` 委托 |
+| L4 CNUI 表单 | 手写 surface + useManifestRules | Step 13 | `useManifestRules` + `useServerErrorBackfill` |
+| L5 页面表单 | 页面只读，非写入口 | Step 6 | （见 §4 L5 约束） |
+| L6 回填 | useServerErrorBackfill 接通 | Step 13 surface | `serverErrors` prop 透传 |
+| L7 注册 | cnuiRegistry + 生命周期 | Step 7 + Step 13 | `cnuiRegistry.register` |
+
+## 4. 治理约束（must / should + sunset 豁免）
+
+| 规则 | 级别 | 适用 |
+|---|---|---|
+| **orchestrator-溯源**（所有持久化经写入口） | **MUST，全域，零新豁免**（legacy 经 §4.1 托管） | 所有域 |
+| **rules-registry 存在**（写域必有规则三层） | **MUST，写域**（带 §4.1 豁免） | 有写路径的域 |
+| **手写 surface + useManifestRules**（禁 CnuiFormAdapter） | MUST（**待 §CN-UI 第 4 条 supersede 生效**，见 Step 13） | 有 CNUI 的域 |
+| mutation-service 存在 | **不设为门（N/A）** | 仅 FactField 域需要 |
+| 页面表单非写入口 | MUST | 所有域 |
+
+### 4.1 Sunset 豁免清单（legacy 债托管）
+
+validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期审计）：
+
+| 域 | 豁免规则 | sunset | 理由 |
+|---|---|---|---|
+| okrs | rules-registry 缺失 + updateObjective 绕过写入口 | okrs 全量 onboarding | 前范式遗产；正确修复需 mutation-service = onboarding 一部分（字段更新非状态转换）；缠 [025] 跨域事务 |
+| timebox | rules-registry 缺失（写域无规则三层） | timebox onboarding | timebox 有写路径（`startTimebox`/`endTimebox` 经 executeIntent + GenericRepo adapter），缺规则三层 → 写域 MUST 违例，托管至 onboarding |
+
+> timebox **不是**「无写路径 N/A」——它有 `startTimebox`/`endTimebox` 写动作（manifest 触发器 + `createTimeboxGenericRepo` + intent.ts executeIntent 路径），只是缺 L3 规则三层，故入豁免。
+
+## 5. CI Validator 设计（真治理 = 强制）
+
+接入点：扩展现有 `scripts/validate-manifest.ts`（纯 YAML 诊断，已在 prebuild）+ 新增 `scripts/validate-domain-structure.ts` + **husky pre-push 钩子**（仓库零远端 CI，husky 补本地 gate；远端 CI 留 TODO）。
+
+- **orchestrator-溯源（#1 MUST 门）**：每个 `use server` 写入口函数（scope = `src/app/actions/*`）持久化必须调 `executeIntent` 或 `mutationService.update/execute`；入口函数内直接 repo/db 持久化且不经白名单 = 违宪。scope rationale：actions/* = 写入口面；SM/GenericRepo 适配器/底层 repo = 写入口内部、豁免。入口函数级检查（非跨过程分析）。自测：植入 updateObjective 式绕过必被抓；tasks/habits 合规不报假阳性。
+- **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（待 supersede 生效）/禁 `FormRegistry.register`+`register-form.ts` 残留/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
+- **validate-manifest.ts 扩展**：`rules:` id ↔ registry 完整性 / `field_metadata.mutation_mode` 合法值（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
+- **取代**：`app/actions/habits/__tests__/write-entry-guard.test.ts`（habits 局部守卫）在 orchestrator-溯源 validator 上线后删。
+
+## 6. C-DC 检查清单（Domain Development Checklist，每项 [CI]/[HUMAN]）
+
+| ID | 检查项 | 判定 |
+|---|---|---|
+| L1-1 | 仓储实现接口、单条 UPDATE 禁读后写（R-01） | HUMAN |
+| L1-2 | 持久化方法透传 `tx: DbClient` | HUMAN |
+| L2-1 | FactField 域有 mutation-service 且调公共工厂 | CI（仅 FactField 域） |
+| L2-2 | FactField/ContentField 字段无跨字段约束依赖（跨字段红线） | HUMAN |
+| L3-1 | 写域有 rules-registry | CI（MUST，带豁免） |
+| L3-2 | manifest rules.id ↔ registry 处理器完整 | CI |
+| L3-3 | onValidate 委托 evaluateDomainRules（禁 ad-hoc） | CI |
+| L3-4 | realtime 单字段纯函数；多字段→submit | HUMAN |
+| L4-1 | 禁 CnuiFormAdapter（待 supersede） | CI |
+| L4-2 | 可编辑 surface 调 useManifestRules | CI |
+| L4-3 | surface 遵 UI-DESIGN-SPEC + CUC-01~12 | HUMAN |
+| L5-1 | 页面禁直接持久化（溯源扩到 pages） | CI |
+| L5-2 | 页面表单校验复用 useManifestRules | HUMAN |
+| L6-1 | 可编辑 surface 消费 serverErrors | CI |
+| L6-2 | 提交失败字段标红/surface 可编辑 | HUMAN |
+| L7-1 | manifest cnui_surfaces ↔ cnuiRegistry 注册 | CI |
+| L7-2 | 禁 FormRegistry.register/register-form 残留 | CI |
+| W-1 | 所有持久化经 executeIntent ∪ factory | CI（MUST，零新豁免） |
+
+## 7. 四域现状对照
+
+| 域 | L1 | L2 写入口 | L3 规则三层 | L4 CNUI | L5 页面 | L6 回填 | 处置 |
+|---|---|---|---|---|---|---|---|
+| **tasks** | ✅ | ✅ mutation-service | ✅ registry+evaluate | ✅ 手写 surface | ✅ 只读页 | 🟡 契约断 | 参考实现；L6 随 [019.0] 修 |
+| **habits** | ✅ | ✅ | ✅ | 🟡 CnuiFormAdapter | 🟡 HabitForm | 🟡 | [019.1] 退役 adapter，手写化 |
+| **okrs** | ✅ | ❌（扁平 okr.ts） | ❌ ad-hoc | ❌ | ❌ | — | §4.1 豁免，全量 onboarding 缠 [025] |
+| **timebox** | ✅ | ✅(走 executeIntent) | ❌ | 🟡 stub | ❌ | — | §4.1 豁免（写域缺 L3） |
+
+---
+
+# Part II — 注册步骤（机械指南）
+
+> 以下 Step 1–13 是新增 Domain 的机械操作流程。每步标注其对齐的范式层（Part I §3）。**范式约束（Part I §4）凌驾于机械步骤**——若某 Step 与范式冲突，以 Part I 为准（如 Step 6 编辑页是过渡形态，范式目标是页面只读）。
 
 ## 总览：注册一个 Domain 需要做哪几件事
 
@@ -28,7 +162,8 @@ Step 2    编写 manifest.yaml（Domain 的完整声明文件）
 Step 3    实现四个钩子函数（Reactive Track）
 Step 4    定义 Drizzle DB Schema
 Step 5    实现 Repository 接口
-Step 6  实现 Domain 页面组件（view_routes 对应实现）
+Step 5.5  组装 mutation-service（仅 FactField 域，范式层 L2）
+Step 6    实现 Domain 页面组件（view_routes 对应实现）
 Step 7    向系统注册 Domain
 Step 8    实现 Markdown 模板
 Step 9    （若生成型）实现 Handler 类（Generative Track）
@@ -46,9 +181,12 @@ Step 13   （若 CNUI 型）实现 CNUI Surface 组件、Handler，注册到 Cnu
 domains/
   {domain_id}/
     manifest.yaml          ← Step 2：Domain 完整声明
-    hooks.ts               ← Step 3：四个钩子函数（纯函数，无副作用）
-    repository.ts          ← Step 5：Repository 接口 + 阶段一实现
-    pages/                 ← Step 5.5：页面组件
+    hooks.ts               ← Step 3：钩子工厂 createXxxHooks（纯函数）
+    rules-registry.ts      ← [018] R2：规则处理器（onValidate 委托 evaluateDomainRules）
+    transitions.ts         ← lifecycle 转换查找表（可选，多状态机域）
+    validation.ts          ← rules-registry 复用的字段校验纯函数（可选）
+    repository/            ← Step 5：Repository（目录；index.ts + 各对象仓储 + generic-repo-adapter）
+    pages/                 ← Step 6：页面组件
       {Domain}ListPage.tsx
       {Domain}DetailPage.tsx
       {Domain}EditPage.tsx
@@ -56,7 +194,7 @@ domains/
       surfaces/
         {Domain}Card.tsx
       handlers.ts
-    markdown_templates/    ← Step 7（可选）：Markdown 协同编辑模板
+    markdown_templates/    ← Step 8（可选）：Markdown 协同编辑模板
       create_batch.md
     handlers/              ← Step 9（生成型）：Handler 类
       {action}-handler.ts
@@ -65,9 +203,12 @@ domains/
       {capability}-provider.ts
       index.ts
 
-db/
-  schema/
-    {domain_id}.ts         ← Step 4：Drizzle DB Schema
+src/lib/db/
+  schema.ts                ← Step 4：Drizzle DB Schema（全域集中，各域表追加到此）
+
+app/actions/
+  {domain_id}/
+    mutation-service.ts   ← Step 5.5：组装业务事实写入口（仅 FactField 域）
 
 app/                       ← Next.js 路由（薄壳，仅做导入）
   {domain_route}/
@@ -78,7 +219,7 @@ app/                       ← Next.js 路由（薄壳，仅做导入）
         page.tsx           ← 导入 {Domain}EditPage
 
 domains/
-  registry.ts              ← Step 6：Domain 注册表
+  registry.ts              ← Step 7：Domain 注册表
 
 nexus/
   context-engine/
@@ -137,7 +278,7 @@ interface MyObjectSummary {
 
 ## Step 2：编写 manifest.yaml
 
-manifest.yaml 是 Domain 的完整声明文件，包含六个区块，每个区块服务不同的消费方。
+manifest.yaml 是 Domain 的完整声明文件，声明意图路由/生命周期/字段元数据/规则/CNUI 等区块，每个区块服务不同的消费方。
 
 ### 关键定位：运行时配置，不是开发时文档
 
@@ -193,8 +334,8 @@ const requiredFields = manifest.required_fields['create_xxx']
 # ============================================================
 
 # ── 基础信息 ────────────────────────────────────────────────
-domain_id: "my_domain"          # snake_case，全局唯一
-version:   "1.0.0"
+id:       "my_domain"          # snake_case，全局唯一（根字段为 id，对齐 tasks 等现有域）
+version:  "1.0.0"
 name:       "领域中文名"
 description: >
   一段人类可读的描述，说明这个 Domain 解决什么问题，
@@ -260,27 +401,37 @@ lifecycle:
 # 注意：这里只声明业务语义，不声明视觉样式
 
 field_metadata:
+  # 每字段须声明 mutation_mode（见 Part I §2.1）：
+  #   FactField（缺省）= 走字段执行器轻校验，可经 mutationService.update 原子写
+  #   ContentField     = 直走 Repository.updateFields（无校验、无事件）
+  #   PresentationField= 本地态，不落库
+  # 带跨字段/跨对象约束的字段【不得】标 FactField/ContentField，其写入经 executeIntent。
   title:
     type: string                  # string / time / date / number / textarea /
                                   # select / boolean / json / enum / lifecycle_timestamp
     label: 标题
     required: true
-  status:
+    mutation_mode: ContentField
+  priority:
     type: enum
-    label: 状态
-    options: [draft, active, completed, archived]
+    label: 优先级
+    options: [critical, high, medium, low]
+    mutation_mode: FactField      # 独立单字段、无跨字段约束 → 可 inline 原子写
   some_date_field:
     type: time
     label: 时间
     required: false
+    mutation_mode: FactField
   some_json_field:
     type: json
     label: 元数据
     required: false
+    mutation_mode: ContentField
   computed_timestamp:
     type: lifecycle_timestamp     # 系统自动更新的时间戳字段
     label: 实际开始时间
     required: false
+    mutation_mode: PresentationField
 
 
 # ── 区块 D：列表操作（Presentation Layer 读取）─────────────
@@ -388,58 +539,68 @@ query_actions:
 
 
 # ── 区块 K：CNUI Surface 声明（CnuiSurfaceRegistry 读取）─────
-# 声明本 Domain 拥有的 CNUI surface 组件及其 handler
+# 声明本 Domain 拥有的 CNUI surface 及其 handler（map 形态，对齐 tasks）
 # 消费方：CnuiSurfaceRegistry + CnuiRenderer（公共层）
 # 作用：公共层通过此声明动态发现 surface，无需硬编码 import
+# 注：component 在域 index.ts 用 cnuiRegistry.register(domainId, surfaceType,
+#     {component, handlerModulePath}) 注册（见 Step 13），manifest 只声明映射。
 
 cnui_surfaces:
-  - surface_type: xxx-creation-card      # Surface 类型标识，全局唯一
-    component: domains/{domain_id}/cnui/surfaces/XxxCard.tsx
-    handler: domains/{domain_id}/cnui/handlers.ts
-    description: "用于创建/编辑的交互式 surface"
+  xxx-creation-card:                    # key = surface_type（全局唯一）
+    handler: ./cnui/handlers            # 同域 handler 模块（相对路径）
+
+# ── 区块 L：规则三层（[018] R2，Rule Engine 读取）──────────────
+# 声明本域校验规则，处理器在 rules-registry.ts 注册（见 Step 3 onValidate 委托）。
+# phase: submit = 聚合权威校验（提交时 evaluateDomainRules 按 manifest 顺序折叠，
+#         建议聚合规则置首）；phase: both = realtime 单字段纯函数（blur + 提交均跑）。
+rules:
+  - id: my_action_fields_valid          # 聚合规则（复刻全分支校验）
+    phase: submit
+    fields: [title, description, priority]
+    message: 字段校验失败
+  - id: my_priority_valid               # realtime 单字段纯函数
+    phase: both
+    fields: [priority]
+    message: 优先级取值非法
 ```
 
 ---
 
-## Step 3：实现四个钩子函数
+## Step 3：实现四个钩子函数（范式层 L2/L3）
+
+> **paradigm 对齐（[018] R2 已落地，tasks/habits 参考）**：`onValidate` 不再手写 ad-hoc 全分支校验——改为**薄壳委托** `evaluateDomainRules('<domain>', intent, serverCtx, <domain>RuleRegistry)`，返回 `ValidationResult`（非 `{valid, errors}`）。规则声明在 manifest `rules:` 区块（`phase: both` realtime 单字段 / `phase: submit` 聚合权威），处理器在 `rules-registry.ts`。下方示例为旧 ad-hoc 形态（仅示意钩子签名），新域须走规则三层（见 Part I §4 L3-1/2/3，CI 强制）。
 
 **文件位置**：`domains/{domain_id}/hooks.ts`
 
-所有钩子均为**纯函数**：相同输入永远产生相同输出，无副作用，不访问数据库，不调用外部 API。
+钩子以**工厂函数** `createXxxHooks(manifest)` 导出（对齐 tasks `createTasksHooks`），返回 `{ onValidate, onEvent, onActionSurfaceRequest }`（+ 可选 `onOutboundRequest`）；manifest 在闭包内复用（subscribed_events 过滤、lifecycle 转换表预建）。下方代码以独立函数示意各钩子签名，实际封装在工厂内。所有钩子均为**纯函数**：相同输入永远产生相同输出，无副作用，不访问数据库，不调用外部 API。
 
 ```typescript
 import type {
   StructuredIntent, USOMSnapshot, DerivedSignals,
   SystemEvent, MetricUpdate, ActionSurfaceSuggestion,
-  ActionCandidate, ActionCategory, ExternalPayload
-} from '@/types/usom'
+  ActionCandidate, ActionCategory, ExternalPayload, ValidationResult
+} from '@/usom/types/process'
+import { evaluateDomainRules } from '@/nexus/rules'
+import { myDomainRuleRegistry } from './rules-registry'
 
-// ── 钩子 1：意图校验 ─────────────────────────────────────────
+// ── 钩子 1：意图校验（[018] R2 规则三层：薄壳委托 evaluateDomainRules）──
 // 调用时机：StructuredIntent 进入 State Machine 之前
-// 职责：Domain 内部的结构性校验（字段合法性、业务约束）
+// 职责：Domain 内部的结构性/业务约束校验
+// 形态：不手写 ad-hoc 全分支——委托 evaluateDomainRules，返回 ValidationResult
+//       （非 {valid, errors}）。规则声明在 manifest rules: 区块（phase: submit 聚合 /
+//       phase: both realtime），处理器在 rules-registry.ts。
 // 不做：个性冲突检测（那是 Rule Engine + DerivedSignals 的工作）
 
-export function onValidate(
+export async function onValidate(
   intent:   StructuredIntent,
   snapshot: USOMSnapshot
-): { valid: boolean; errors: string[] } {
-
-  const errors: string[] = []
-
-  if (intent.action === 'create_xxx') {
-    if (!intent.fields.title) {
-      errors.push('title 不能为空')
-    }
-    // 业务约束检查
-    // e.g. 关联对象是否存在于 snapshot 中
-    if (intent.fields.objectiveId) {
-      const exists = snapshot.activeObjectives
-        .some(o => o.id === intent.fields.objectiveId)
-      if (!exists) errors.push('关联的目标不存在或已归档')
-    }
-  }
-
-  return { valid: errors.length === 0, errors }
+): Promise<ValidationResult> {
+  // 可选：字段预处理（如 normalizeFieldValues 把中文→枚举），见 tasks 参考
+  return evaluateDomainRules('<domain_id>', intent, {
+    repos: {},
+    userId: snapshot.userId,
+    now: snapshot.currentTime ? Date.parse(snapshot.currentTime) : 0,
+  }, myDomainRuleRegistry)
 }
 
 
@@ -476,12 +637,14 @@ export function onEvent(
 // 职责：返回候选行动，Action Surface Engine 统一排序
 // 注意：signals 作为独立参数，不混入 snapshot
 //
-// 签名修正说明：
+// 签名修正说明（规范原则）：
 //   每个 ActionCandidate 自带 category（'guide' | 'tile' | 'cue'），
 //   一个 Domain 可以同时返回不同类型的候选（如 OKRs Domain 同时产生
 //   guide 和 tile），因此移除顶层的 category，由 ActionCandidate 各自声明。
 //   weight 保留在顶层，作为本 Domain 所有候选的整体优先级系数，
 //   Action Surface Engine 用它做跨 Domain 排序的权重基线。
+//   ⚠️ tasks 参考实现当前仍保留顶层 category='cue'（过渡态，action surface 功能
+//      尚未真正落地），待其正式落地时迁移到本规范形态——此处记录，不视为范式违例。
 
 export function onActionSurfaceRequest(
   snapshot: USOMSnapshot,
@@ -561,9 +724,7 @@ export function onOutboundRequest(
 
 ## Step 4：定义 Drizzle DB Schema
 
-**文件位置**：`db/schema/{domain_id}.ts`
-
-所有 Domain 的 Schema 文件在同一目录，统一由 `db/schema/index.ts` 导出。
+**文件位置**：`src/lib/db/schema.ts`（**全域集中单文件**，各 Domain 的表定义追加到此，不按域拆分文件；对齐 tasks/threads 表均在 `schema.ts`）。
 
 ```typescript
 import { pgTable, text, integer, real, boolean,
@@ -617,7 +778,7 @@ export const myObjectTags = pgTable('my_object_tags', {
 
 ## Step 5：实现 Repository 接口
 
-**文件位置**：`domains/{domain_id}/repository.ts`
+**文件位置**：`domains/{domain_id}/repository/`（**目录**；单对象域可单文件，多对象域如 tasks 用目录：`index.ts` 导出 + 各对象仓储 `*.ts` + `generic-repo-adapter.ts` 组装 State Machine 消费的 `GenericRepo`）。下方示例为单对象域示意。
 
 Repository 是 USOM 对象与 DB 行对象之间的映射层，也是 Nexus 组件访问数据的唯一接口。
 
@@ -698,7 +859,82 @@ export class DrizzleMyObjectRepository implements MyObjectRepository {
 
 ---
 
-## Step 5.5：实现 Domain 页面组件
+## Step 5.5：组装 mutation-service（范式层 L2，仅 FactField 域）
+
+> **paradigm 对齐（Part I §2）**：这是第二条合法写入口（字段写/多步聚合写）的具体组装。
+> **仅 FactField 域需要**——若本域所有写入都是生命周期状态转换（经 `executeIntent`），跳过本步。
+
+**文件位置**：`app/actions/{domain_id}/mutation-service.ts`
+
+调公共工厂 `createDomainMutationServiceFactory`，只保留本域差异（`domainId` / `repos` / `fieldUpdatedEventType` / `repoLabel`），六项组装（getRepository/getFieldMetadata/smExecute/eventBus/transaction/getExecutor）已下沉工厂（对齐 tasks `createTasksMutationService`）。
+
+```typescript
+import { createDomainMutationServiceFactory } from '@/nexus/domain-mutation-service/factory'
+import { createMyDomainGenericRepo } from '@/domains/{domain_id}/repository/generic-repo-adapter'
+import { MyObjectRepository } from '@/domains/{domain_id}/repository/my-object'
+import type { DomainMutationService } from '@/nexus/domain-mutation-service'
+
+/**
+ * 组装本域业务事实写入口服务实例。
+ * 每次调用产生独立实例（独立 eventRepo/eventBus），保证事务隔离与可测试性。
+ */
+export function createMyDomainMutationService(): DomainMutationService {
+  const repos = createMyDomainGenericRepo({
+    myObjectRepo: new MyObjectRepository() as any,
+  })
+  return createDomainMutationServiceFactory({
+    domainId: 'my_domain',
+    repos,
+    fieldUpdatedEventType: 'MyObjectFieldUpdated',  // 本域 FactField 写发出的事件类型
+    repoLabel: 'MyDomain',
+  })
+}
+```
+
+**`generic-repo-adapter.ts`**（Repository → State Machine 消费的 `GenericRepo` 映射，对齐 tasks `createTasksGenericRepo`——手写委托 `findById`/`save`/`create`/`updateStatus`/`updateFields` 五方法）：
+
+```typescript
+// domains/{domain_id}/repository/generic-repo-adapter.ts
+import type { GenericRepo } from '@/nexus/core/state-machine'
+
+export function createMyDomainGenericRepo(repos: {
+  myObjectRepo: MyObjectRepository
+}): Record<string, GenericRepo> {
+  return {
+    my_object: {
+      async findById(id, userId, tx) { return repos.myObjectRepo.findById(id, userId, tx) },
+      async save(obj, userId, tx) { await repos.myObjectRepo.save(obj, userId, tx) },
+      async create(fields, userId, tx) { return repos.myObjectRepo.create(fields, userId, tx) },
+      async updateStatus(id, toStatus, userId, tx) {
+        return repos.myObjectRepo.updateStatus(id, toStatus, userId, tx)
+      },
+      async updateFields(id, fields, userId, tx) {
+        return repos.myObjectRepo.updateFields(id, fields, userId, tx)
+      },
+    },
+  }
+}
+```
+
+**何时用 mutation-service（对应 Part I §2 决策树）**：
+- 单字段 inline 编辑（blur 改一个 FactField，无跨字段约束）→ `mutationService.update(id, field, value, userId, domainId, objectType)`
+- 多步/跨对象/须原子（建主线+迁子任务+软删）→ `mutationService.execute(intent, userId)`（自开 `db.transaction` 包多步）
+- 生命周期状态转换 / 带跨字段约束的字段 → **不用** mutation-service，经 `executeIntent`
+
+**Step 5.5 检查清单**：
+
+```
+□ FactField 域才有 mutation-service（ContentField-only / 纯生命周期域跳过）
+□ 调 createDomainMutationServiceFactory，仅传域差异四参（domainId/repos/fieldUpdatedEventType/repoLabel）
+□ generic-repo-adapter 把域 Repository 适配为 GenericRepo 映射（objectType → repo）
+□ fieldUpdatedEventType 与 manifest subscribed_events / SystemEventType 一致
+```
+
+---
+
+## Step 6：实现 Domain 页面组件（范式层 L5）
+
+> **paradigm 对齐（Part I §4 L5）**：范式目标是**页面只读（列表/详情视图）**，所有写经 CNUI handler → 写入口（tasks 参考实现即此形态）。下方的「编辑页模板」是**过渡形态**——若保留，其提交**必须构造 Intent 经 Rule Engine/写入口（executeIntent 或 mutationService）**，**不得直接 repo 写**（CI `L5-1` 强制）。新域建议直接走 CNUI（Step 13）不做页面编辑表单。habits 的 `HabitForm`（经 `CnuiFormAdapter`）属待退役分叉（[019.1]）。
 
 **文件位置**：`domains/{domain_id}/pages/`
 
@@ -926,6 +1162,7 @@ npm run generate:routes:clean
 ```
 
 **注意事项**：
+
 1. 只为已存在的组件生成路由（组件不存在时跳过并警告）
 2. 默认不覆盖手动编辑的文件（除非使用 `--force`）
 3. 特殊路由（如含服务器端数据逻辑的页面）需手动维护，不在 manifest 中声明 url
@@ -943,7 +1180,7 @@ npm run generate:routes:clean
 // 然后运行 npm run generate:routes
 ```
 
-**Step 5.5 检查清单**：
+**Step 6 检查清单**：
 
 ```
 □ 每个 view_route 在 manifest.yaml 中声明 url 字段
@@ -958,6 +1195,8 @@ npm run generate:routes:clean
 ```
 
 ---
+
+## Step 7：向系统注册 Domain
 
 **文件位置**：`domains/registry.ts`
 
@@ -992,7 +1231,7 @@ export const domainRegistry: DomainPlugin[] = [
 
 ---
 
-## Step 7：（可选）实现 Markdown 模板
+## Step 8：（可选）实现 Markdown 模板
 
 适用于复杂创建场景（如一次性创建一组 OKR + 多个 KR），用户通过 AI 协同编辑 Markdown 完成录入。
 
@@ -1473,7 +1712,9 @@ export class HabitStatisticsHandler {
 
 ---
 
-## Step 13：（若 CNUI 型）实现 CNUI Surface 和 Handler
+## Step 13：（若 CNUI 型）实现 CNUI Surface 和 Handler（范式层 L4/L6/L7）
+
+> **paradigm 对齐（Part I §2/§4 L4）**：CNUI surface 组件**手写**（本 Step 的 `cnui_surfaces` 区块 K + `cnuiRegistry.register` 即此模式，tasks 参考实现）。可编辑 surface 须接 `useManifestRules`（realtime blur 校验）+ `useServerErrorBackfill`（服务端错误回填，L6），并接收 `serverErrors` prop。**禁用 `CnuiFormAdapter`**（habits 死抽象）——此禁用与现行 constitution §CN-UI 第 4 条冲突，需 supersede（见 `.specify/amendments/proposed-IX-domain-paradigm.md`，MAJOR，待 Amendment Procedure 生效）；生效前 `L4-1` CI 检查与 [019.1] 退役实施须在 supersede 获批后（或同步）进行。
 
 **判断标准**：如果 Domain 的 intent_triggers 中任何 action 的 `response_type` 为 `cnui`，或 manifest 中声明了 `cnui_surfaces` 区块，则需要实现 CNUI Surface 组件和 Handler。
 
@@ -1554,23 +1795,18 @@ export function MyDomainCard({ initialData, onSubmit, onClose }: MyDomainCardPro
 在 Domain 初始化时注册所有 surface：
 
 ```typescript
-// domains/{domain_id}/index.ts
+// domains/{domain_id}/index.ts（对齐 tasks：模块顶层注册，handlerModulePath 指向 handlers 模块）
 
-import { cnuiRegistry } from '@/nexus/cnui/registry'
-import { myDomainCnuiHandlers } from './cnui/handlers'
+import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
+import { MyDomainCard } from './cnui/surfaces/MyDomainCard'
 
-export function initMyDomain() {
-  // 注册 CNUI surfaces
-  cnuiRegistry.register({
-    domainId: 'my_domain',
-    surfaces: {
-      'my-domain-card': {
-        component: () => import('./cnui/surfaces/MyDomainCard'),
-        handler: myDomainCnuiHandlers['my-domain-card'],
-      }
-    }
-  })
-}
+const handlerModulePath = './domains/{domain_id}/cnui/handlers'
+
+// 注册 CNUI surface（签名：cnuiRegistry.register(domainId, surfaceType, {component, handlerModulePath})）
+cnuiRegistry.register('my_domain', 'my-domain-card', {
+  component: MyDomainCard,
+  handlerModulePath,
+})
 ```
 
 ### manifest 声明（区块 K）
@@ -1623,13 +1859,14 @@ USOM 层
 
 manifest.yaml
   □ A：intent_triggers 覆盖所有可能的用户输入模式
-  □ A：view_routes 覆盖所有查询/导航场景，每个 route 有对应页面组件
+  □ G：view_routes 覆盖所有查询/导航场景，每个 route 有对应页面组件
   □ B：lifecycle 声明了所有合法状态和跃迁
   □ B：terminal_states 已标记
-  □ C：field_metadata 标注了所有不可编辑字段
+  □ C：field_metadata 每字段标注 mutation_mode（FactField/ContentField/PresentationField）
   □ D：list_actions 覆盖了所有列表行操作
-  □ E：required_fields 与 USOM 对象字段名一致
+  □ H：required_fields 与 USOM 对象字段名一致
   □ F：subscribed_events 只订阅真正需要响应的事件
+  □ L：rules 区块已声明，rules.id ↔ rules-registry 处理器完整
   □ manifest.yaml 定义的运行时配置（Runtime Configuration），不是开发时文档，代码中没有硬编码
 
 钩子实现
@@ -1651,7 +1888,7 @@ Repository
   □ 方法签名无 HTTP 上下文依赖
   □ toUSOM / toSummary 映射方法已实现
 
-页面组件（Step 5.5）
+页面组件（Step 6）
   □ 每个 view_route 有对应页面组件
   □ 只读查询直接调用 Repository
   □ 写操作通过 PrebuiltIntent 进入 Rule Engine
@@ -1729,7 +1966,7 @@ CNUI Surface（Step 13，仅 CNUI 型 Domain）
 | onActionSurfaceRequest 返回顶层 category | 一个 Domain 无法同时产生多类行动切面 | category 在每个 ActionCandidate 中各自声明 |
 | 页面组件直接调 Drizzle | 数据访问层泄漏到 UI 层，阶段二换 adapter 时 UI 也要改 | 页面组件只通过 Repository 接口访问数据 |
 | 页面组件的只读查询走 Nexus 链路 | 无意义的性能损耗，Rule Engine 对只读操作没有价值 | 只读查询直接调 Repository |
-| view_route 在 manifest 声明但无对应页面组件 | 意图路由成功但导航到空页面，用户体验断裂 | Step 5.5 和 Step 7 区块 G 同步完成 |
+| view_route 在 manifest 声明但无对应页面组件 | 意图路由成功但导航到空页面，用户体验断裂 | Step 6 和 Step 8 区块 G 同步完成 |
 | intent_triggers 使用 `type: view_route` 而非 `view_route` 属性 | view_route 无法正确识别，导航失败 | 使用独立的 `view_route: /path` 属性 |
 | intent_triggers 缺少 `shortcut` 字段 | 斜杠指令无法使用 | 添加 `shortcut: /actionName` |
 | lifecycle transitions 缺少 `action`/`event_type` | State Machine 无法触发正确的事件 | 补充 `action` 和 `event_type` 字段 |
@@ -1760,5 +1997,5 @@ CNUI Surface（Step 13，仅 CNUI 型 Domain）
 
 ---
 
-*文档版本：2026_05_29*
+*文档版本：2026_06_21（Part II 对齐 tasks 参考实现）*
 *本文档在总体设计完成后作为 Domain 开发的操作手册使用*

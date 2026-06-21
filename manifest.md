@@ -21,8 +21,9 @@ LW_overall_项目开发必读_2026_05_01.md          # 项目最高解释文档
 LW_overall_总体设计_2026_05_02.md              # 架构设计-总体设计文档
 LW_overall_技术栈设计演进_2026_03_18.md        # 技术栈选型与演进路径
 LW_AI_Runtime_Architecture_Design.md           # AI Runtime 架构设计（LLMGateway/SessionManager/CN-UI Protocol/Handler 依赖注入）
-LW_domain_注册指南_2026_05_14.md               # Domain 注册操作指南（manifest/hooks/repository/schema 全流程）
 ```
+
+> **注**：`LW_domain_注册指南` 已于 [019]（2026-06-21）移入 `docs/domain-development-guide.md`（归属转第二层），与 Domain 范式整合为单一权威文件。
 
 ### 第二层：协同维护 (`docs/`)
 
@@ -34,6 +35,7 @@ route-generation-spec.md # Domain 路由生成规范（构建时自动生成 app
 UI-DESIGN-SPEC.md        # 界面设计规范（色彩/排版/间距/组件/布局/交互/响应式/暗色模式/检查清单）
 code-commenting-guide.md # 代码注释规范（文件头、模块分隔、JSDoc、特殊标记）
 UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
+domain-development-guide.md  # [019] Domain 开发权威指南（范式+注册+治理，单一权威文件）= 原 mydocs 注册指南 + domain-paradigm 整合；Part I 范式/治理/CI/C-DC，Part II Step1-13 机械指南（已对齐 tasks 参考实现）；route-generation-spec 为下级
 superpowers/specs/
   2026-06-20-rules-three-tier-architecture-design.md  # [018-G3] 规则三层架构设计 v3（plan-eng-review CLEAN）
 superpowers/plans/
@@ -75,6 +77,8 @@ superpowers/plans/
 
 | 文档 | 当前版本 | 上一版本 | 主要变更 |
 |---|---|---|---|
+| Domain 开发权威指南 | 2026_06_21 | — | [019]：原 `mydocs/core/LW_domain_注册指南` 移入 `docs/domain-development-guide.md`（归属转第二层）并与 Domain 范式整合为**单一权威文件**；Part I 范式与治理（写入口两合法路径适用场景+跨字段红线 `mutation_mode` 字段分类+治理 must/should+sunset 豁免+CI validator+C-DC [CI]/[HUMAN]+四域现状），Part II Step1-13 机械指南（Step3/5.5/13 加 paradigm 对齐）；route-generation-spec 为下级。含 §IX 修订提案（supersede §CN-UI 第 4 条）。经 /plan-eng-review 2026-06-21 通过 |
+| Domain 开发权威指南 | 2026_06_21（Part II 对齐） | 2026_06_21 | Part II 注册步骤全面对齐 tasks 参考实现：Step 2 manifest 模板补 `rules:`/`field_metadata.mutation_mode`/`cnui_surfaces` map/根字段 `id`；Step 3 hooks 工厂 + onValidate 委托 `evaluateDomainRules`；Step 4 schema 改 `src/lib/db/schema.ts` 集中；Step 5 repository 目录；新增 Step 5.5 mutation-service；Step 13 cnui 注册签名对齐；概念统一 `requires_full_validate`→`mutation_mode`；编号对齐总览（页面 Step 6 / 注册 Step 7 / Markdown Step 8） |
 | UI-DESIGN-SPEC | 2026_06_13 | 2026_05_31 | §十一 CN-UI 大幅修订：容器改单层架构（CnuiSurfaceWrapper 提供容器，Surface 用 Fragment）；标题行改为 header prop（移除静态标题）；全屏按钮移至 wrapper 标题行（⛶/↙ 小图标）；全屏模式改 CSS fixed 状态保持（删 CnuiSurfaceFullscreen Dialog）；新增 §11.10 新增 Surface 自测检查点 CUC-01~CUC-12 |
 | 总体设计 | 2026_05_02 | 2026_03_18 | 增加附录 TODO，列出可能的下一步核心扩展设计（非 MVP 考虑） |
 | 技术栈设计演进 | 2026_03_18 | 2026_02_27 | 各阶段追加 Bridge Layer 实现时序、新增约束5、风险表新增2条 |

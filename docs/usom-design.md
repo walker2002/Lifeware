@@ -962,11 +962,11 @@ type ValidationResult =
 | Domain | 状态 | 落地计划 | 说明 |
 |---|---|---|---|
 | habits | ✅ 已落地 | [018-G3] R1 | habits manifest 新增 `rules:` 区块（D 模式：聚合 `phase:submit` 规则 `habit_action_fields_valid` 置首 + 6 条 `phase:both` 单字段 realtime 规则）；`rules-registry.ts` 6 RealtimeCheck（both，action-invariant 单字段纯函数：duration/minDuration 正数、frequencyType 枚举、defaultTime/earliestTime/latestStartTime HH:MM 格式）+ 1 SubmitCheck（聚合，逐字复刻现状 onValidate 全分支，复用 validateHabitFields）；`hooks.ts` onValidate 改调 `evaluateDomainRules('habits', intent, serverCtx, habitRuleRegistry)`（薄壳委托）；`habit-form.tsx` 接 `useManifestRules`（method B：getRealtimeRules server action + client-safe 纯核心），mount 取规则元数据、6 字段 onBlur realtime 校验 + inline 错误、submit 前 validateAll 预检、服务端失败按字段回填（mapServerErrorsToFields）；复用底层 5 变体/aggregateValidation/suspend 管线零改动；golden 逐字保持 |
-| tasks | ⏳ 待 R2 | — | 规则迁移待 R1 sign-off 后放行 |
-| okrs | ⏳ 待 R3 | — | 规则迁移待 R1 sign-off 后放行 |
-| timebox | ⏳ 待 R4 | — | 规则迁移待 R1 sign-off 后放行 |
+| tasks | ✅ 已落地 | [018-G3] R2/R3 | tasks manifest `rules:` 区块（聚合 `task_action_fields_valid` phase:submit + 多条 phase:both 单字段 realtime：estimatedDuration 正数/上限、priority/energyRequired 枚举、dueDate 格式、thread color 等）；`rules-registry.ts` taskRuleRegistry；`hooks.ts` onValidate 委托 `evaluateDomainRules('tasks',...)`；tasks CNUI surface（TaskCreationCard/TaskEditCard 等）接 `useManifestRules` realtime blur 校验 + `useServerErrorBackfill` 回填（R3） |
+| okrs | ⏳ 待 R3 | — | 规则迁移待独立切片（全量 onboarding 缠 [025] 跨域事务） |
+| timebox | ⏳ 待 R4 | — | 规则迁移待 timebox onboarding |
 
-> **R1 实际交付**（2026-06-20）：habits 域规则层已端到端接入，包括 CNUI realtime 校验、服务端聚合校验、规则元数据 client-safe 暴露、表单集成、错误回填全链路。R2-R4（tasks/okrs/timebox）待 R1 sign-off 后按同样模式放行。
+> **R1/R2/R3 实际交付**（2026-06-20）：habits（R1）+ tasks（R2 规则层 + R3 surface 集成）规则三层已端到端接入——CNUI realtime 校验、服务端聚合校验、规则元数据 client-safe 暴露、表单集成、错误回填全链路。okrs/timebox 待各自 onboarding 切片按同样模式放行。
 
 ```typescript
 interface DomainPlugin {
