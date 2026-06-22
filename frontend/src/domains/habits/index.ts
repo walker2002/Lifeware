@@ -10,7 +10,6 @@ import type { DomainPlugin } from '@/usom/types/process'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { createDomainPlugin } from '@/domains/plugin-factory'
 import { createHabitsHooks } from './hooks'
-import './register-form'
 
 // ── CNUI Surface 组件导入 ─────────────────────────────────────────
 import { HabitActionPanel } from './cnui/surfaces/HabitActionPanel'
