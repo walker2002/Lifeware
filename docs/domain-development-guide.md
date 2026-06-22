@@ -112,7 +112,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 接入点：扩展现有 `scripts/validate-manifest.ts`（纯 YAML 诊断，已在 prebuild）+ 新增 `scripts/validate-domain-structure.ts` + **husky pre-push 钩子**（仓库零远端 CI，husky 补本地 gate；远端 CI 见 §5.1 显式 defer）。
 
 - **orchestrator-溯源（#1 MUST 门）**：每个 `use server` 写入口函数（scope = `src/app/actions/*`）持久化必须调 `executeIntent` 或 `mutationService.update/execute`；入口函数内直接 repo/db 持久化且不经白名单 = 违宪。scope rationale：actions/* = 写入口面；SM/GenericRepo 适配器/底层 repo = 写入口内部、豁免。入口函数级检查（非跨过程分析）。自测：植入 updateObjective 式绕过必被抓；tasks/habits 合规不报假阳性。
-- **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（§IX 已 supersede §CN-UI#4；habits 退役 [019.1] 前降级 TODO——否则对已知债假阳）/禁 `FormRegistry.register`+`register-form.ts` 残留/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
+- **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（§IX 已 supersede §CN-UI#4；[019.1] 已落地，规则 `cnui-form-adapter-forbidden`）/禁 `FormRegistry.register`+`register-form.ts` 残留（规则 `form-registry-residual`）/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
 - **validate-manifest.ts 扩展**：`rules:` id ↔ registry 完整性 / `field_metadata.mutation_mode` 合法值（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
 - **取代**：`app/actions/habits/__tests__/write-entry-guard.test.ts`（habits 局部守卫）在 orchestrator-溯源 validator 上线后删。
 
@@ -141,7 +141,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | L3-2 | manifest rules.id ↔ registry 处理器完整 | CI |
 | L3-3 | onValidate 委托 evaluateDomainRules（禁 ad-hoc） | CI |
 | L3-4 | realtime 单字段纯函数；多字段→submit | HUMAN |
-| L4-1 | 禁 CnuiFormAdapter（§IX 已 supersede；[019.1] 前降级 TODO） | CI |
+| L4-1 | 禁 CnuiFormAdapter（§IX 已 supersede；[019.1] 已落地） | CI |
 | L4-2 | 可编辑 surface 调 useManifestRules | CI |
 | L4-3 | surface 遵 UI-DESIGN-SPEC + CUC-01~12 | HUMAN |
 | L5-1 | 页面禁直接持久化（溯源扩到 pages） | CI |
@@ -149,7 +149,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | L6-1 | 可编辑 surface 消费 serverErrors | CI |
 | L6-2 | 提交失败字段标红/surface 可编辑 | HUMAN |
 | L7-1 | manifest cnui_surfaces ↔ cnuiRegistry 注册 | CI |
-| L7-2 | 禁 FormRegistry.register/register-form 残留 | CI |
+| L7-2 | 禁 FormRegistry.register/register-form 残留（[019.1] 已落地） | CI |
 | W-1 | 所有持久化经 executeIntent ∪ factory | CI（MUST，零新豁免） |
 
 ## 7. 四域现状对照
@@ -157,7 +157,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | 域 | L1 | L2 写入口 | L3 规则三层 | L4 CNUI | L5 页面 | L6 回填 | 处置 |
 |---|---|---|---|---|---|---|---|
 | **tasks** | ✅ | ✅ mutation-service | ✅ registry+evaluate | ✅ 手写 surface | ✅ 只读页 | 🟡 契约断 | 参考实现；L6 随 [019.0] 修 |
-| **habits** | ✅ | ✅ | ✅ | 🟡 CnuiFormAdapter | 🟡 HabitForm | 🟡 | [019.1] 退役 adapter，手写化 |
+| **habits** | ✅ | ✅ | ✅ | ✅ 手写 | 🟡 HabitForm | ✅ | [019.1] adapter 已退役、回填已接 |
 | **okrs** | ✅ | ❌（扁平 okr.ts） | ❌ ad-hoc | ❌ | ❌ | — | §4.1 豁免，全量 onboarding 缠 [025] |
 | **timebox** | ✅ | ✅(走 executeIntent) | ❌ | 🟡 stub | ❌ | — | §4.1 豁免（写域缺 L3） |
 
@@ -947,7 +947,7 @@ export function createMyDomainGenericRepo(repos: {
 
 ## Step 6：实现 Domain 页面组件（范式层 L5）
 
-> **paradigm 对齐（Part I §4 L5）**：范式目标是**页面只读（列表/详情视图）**，所有写经 CNUI handler → 写入口（tasks 参考实现即此形态）。下方的「编辑页模板」是**过渡形态**——若保留，其提交**必须构造 Intent 经 Rule Engine/写入口（executeIntent 或 mutationService）**，**不得直接 repo 写**（CI `L5-1` 强制）。新域建议直接走 CNUI（Step 13）不做页面编辑表单。habits 的 `HabitForm`（经 `CnuiFormAdapter`）属待退役分叉（[019.1]）。
+> **paradigm 对齐（Part I §4 L5）**：范式目标是**页面只读（列表/详情视图）**，所有写经 CNUI handler → 写入口（tasks 参考实现即此形态）。下方的「编辑页模板」是**过渡形态**——若保留，其提交**必须构造 Intent 经 Rule Engine/写入口（executeIntent 或 mutationService）**，**不得直接 repo 写**（CI `L5-1` 强制）。新域建议直接走 CNUI（Step 13）不做页面编辑表单。habits 的 CNUI 创建 surface 已手写化（[019.1] 退役 `CnuiFormAdapter`，`HabitCreationCard` 直引 `HabitForm`）；页面级 `HabitForm` 与 CNUI 的共享分叉另追踪。
 
 **文件位置**：`domains/{domain_id}/pages/`
 
@@ -1727,7 +1727,7 @@ export class HabitStatisticsHandler {
 
 ## Step 13：（若 CNUI 型）实现 CNUI Surface 和 Handler（范式层 L4/L6/L7）
 
-> **paradigm 对齐（Part I §2/§4 L4）**：CNUI surface 组件**手写**（本 Step 的 `cnui_surfaces` 区块 K + `cnuiRegistry.register` 即此模式，tasks 参考实现）。可编辑 surface 须接 `useManifestRules`（realtime blur 校验）+ `useServerErrorBackfill`（服务端错误回填，L6），并接收 `serverErrors` prop。**禁用 `CnuiFormAdapter`**（habits 死抽象）——此禁用**经 §IX（constitution v2.0.0，2026-06-22 生效）已 supersede** §CN-UI 第 4 条（修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`，MAJOR，✅ 已生效）。§IX 生效解除宪法层阻塞；但 `L4-1` CI 检查暂续降级 TODO——habits 仍用 `CnuiFormAdapter`，须待 [019.1] habits 手写化后启用（否则对已知债假阳）。
+> **paradigm 对齐（Part I §2/§4 L4）**：CNUI surface 组件**手写**（本 Step 的 `cnui_surfaces` 区块 K + `cnuiRegistry.register` 即此模式，tasks 参考实现）。可编辑 surface 须接 `useManifestRules`（realtime blur 校验）+ `useServerErrorBackfill`（服务端错误回填，L6），并接收 `serverErrors` prop。**禁用 `CnuiFormAdapter`**（habits 死抽象）——此禁用**经 §IX（constitution v2.0.0，2026-06-22 生效）已 supersede** §CN-UI 第 4 条（修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`，MAJOR，✅ 已生效）。`L4-1`/`L7-2` CI 检查已落地（[019.1]），对真实 src 零残留——作前向守卫防 re-introduction。
 
 **判断标准**：如果 Domain 的 intent_triggers 中任何 action 的 `response_type` 为 `cnui`，或 manifest 中声明了 `cnui_surfaces` 区块，则需要实现 CNUI Surface 组件和 Handler。
 
