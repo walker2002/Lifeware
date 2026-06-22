@@ -460,6 +460,7 @@ export function checkFormRegistryResidual(srcDir: string): Diagnostic[] {
 const ROOT_DIR = path.resolve(__dirname, '..')
 const ACTIONS_DIR = path.join(ROOT_DIR, 'src', 'app', 'actions')
 const DOMAINS_DIR = path.join(ROOT_DIR, 'src', 'domains')
+const SRC_DIR = path.join(ROOT_DIR, 'src')
 
 /** orchestrator-溯源 豁免（写入口绕过，带 sunset） */
 export const WRITE_ENTRY_EXEMPTIONS = [
@@ -530,6 +531,9 @@ function main(): void {
     diagnostics.push(...analyzeSourceFile(f, content, WRITE_ENTRY_EXEMPTION_SET, ACTIONS_DIR))
   }
   diagnostics.push(...checkRulesRegistry(DOMAINS_DIR, RULES_REGISTRY_EXEMPTION_SET))
+  // [019.1] L4-1/L7-2：禁 CnuiFormAdapter + FormRegistry 残留（§IX supersede §CN-UI#4）
+  diagnostics.push(...checkCnuiFormAdapter(SRC_DIR))
+  diagnostics.push(...checkFormRegistryResidual(SRC_DIR))
   printDiagnostics(diagnostics)
   process.exit(diagnostics.some(d => d.level === 'error') ? 1 : 0)
 }

@@ -409,3 +409,16 @@ describe('checkFormRegistryResidual（L7-2 文件系统）', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 })
+
+// ─── 集成测试：[019.1] L4-1/L7-2 真实 src 扫描 ────────────────────
+
+const REAL_SRC = ppath.join(FRONTEND, 'src')
+
+describe('integration: [019.1] L4-1/L7-2 真实 src 零残留', () => {
+  it('L4-1: src/** 无 CnuiFormAdapter 残留', () => {
+    expect(checkCnuiFormAdapter(REAL_SRC)).toEqual([])
+  })
+  it('L7-2: src/domains/** 无 FormRegistry.register / register-form.ts 残留', () => {
+    expect(checkFormRegistryResidual(REAL_SRC)).toEqual([])
+  })
+})
