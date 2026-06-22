@@ -17,8 +17,10 @@
     "generate:routes:force": "npx tsx scripts/generate-routes.ts --force",
     "generate:routes:clean": "npx tsx scripts/generate-routes.ts --clean",
     "validate:manifest": "npx tsx scripts/validate-manifest.ts",
+    "validate:structure": "npx tsx scripts/validate-domain-structure.ts",
+    "prepare": "husky",
     "predev": "npm run generate:routes && npm run validate:manifest",
-    "prebuild": "npm run generate:routes && npm run validate:manifest"
+    "prebuild": "npm run generate:routes && npm run validate:manifest && npm run validate:structure"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.79",
@@ -69,6 +71,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
