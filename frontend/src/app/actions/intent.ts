@@ -746,6 +746,8 @@ export interface HabitActionResult {
   habit?: Habit;
   habits?: Habit[];
   error?: string;
+  /** [019.0] Lane B：字段级服务端错误（handler.submit 拆分自 orchestrator Rejected.errors），供 surface 回填 */
+  errors?: string[];
 }
 
 async function getHabitRepo(): Promise<HabitRepository> {
@@ -1333,9 +1335,11 @@ export async function submitCnuiSurface(
 
   // 委托给 domain handler 执行提交
   const result = await handler.submit(action, mappedFields)
+  // [019.0] Lane B：转发 handler 拆分的字段级 errors（之前被丢弃，导致回填管线断）
   return {
     success: result.success,
     error: result.error,
+    errors: result.errors,
     ...(result.data ?? {}),
   }
 }
