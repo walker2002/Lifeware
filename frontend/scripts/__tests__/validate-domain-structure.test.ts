@@ -15,6 +15,9 @@ import {
   isBusinessFactRepo,
   analyzeSourceFile,
   checkRulesRegistry,
+  collectSourceFiles,
+  findCnuiFormAdapterUsage,
+  checkCnuiFormAdapter,
 } from '../validate-domain-structure'
 
 /** 内联 source → SourceFile（setParentNodes=true 供 getText 用） */
@@ -336,5 +339,22 @@ describe('integration: 真实 src/app/actions/', () => {
     )
     const okrBypass = diags.filter(d => d.file === 'okr.ts' && d.rule === 'write-entry-bypass')
     expect(okrBypass.length).toBeGreaterThan(0)
+  })
+})
+
+// ─── L4-1: checkCnuiFormAdapter 测试 ────────────────────────────
+
+describe('findCnuiFormAdapterUsage（L4-1 纯函数）', () => {
+  it('import cnui-form-adapter → 命中', () => {
+    const source = sf(`import { CnuiFormAdapter } from '@/components/cnui/cnui-form-adapter'`)
+    expect(findCnuiFormAdapterUsage(source)).not.toBeNull()
+  })
+  it('JSX 标识符 CnuiFormAdapter → 命中', () => {
+    const source = sf(`const x = <CnuiFormAdapter domainId="habits" />`)
+    expect(findCnuiFormAdapterUsage(source)).not.toBeNull()
+  })
+  it('无引用 → null', () => {
+    const source = sf(`import { HabitForm } from '@/domains/habits/components/habit-form'`)
+    expect(findCnuiFormAdapterUsage(source)).toBeNull()
   })
 })
