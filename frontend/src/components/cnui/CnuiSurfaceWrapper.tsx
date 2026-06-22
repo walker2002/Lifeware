@@ -83,6 +83,7 @@ export function CnuiSurfaceWrapper({
   const rawData = lifecycleState.surfaceData[surfaceId] ?? dataSnapshot ?? {}
   const isLoading = lifecycleState.submittingId === surfaceId
   const errors = lifecycleState.validationErrors[surfaceId]
+  const serverErrors = lifecycleState.serverErrors[surfaceId]
   const isDone = state === 'saved' || state === 'cancelled'
 
   // ── 翻页状态 ──────────────────────────────────────────────
@@ -200,6 +201,7 @@ export function CnuiSurfaceWrapper({
           onCancel={() => lifecycleActions.requestCancel(surfaceId)}
           isLoading={isLoading}
           isDone={false}
+          serverErrors={serverErrors}
         />
       </div>
     </div>

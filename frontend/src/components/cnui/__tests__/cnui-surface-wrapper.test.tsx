@@ -9,8 +9,13 @@ import { CnuiSurfaceWrapper } from '../CnuiSurfaceWrapper'
 import type { CnuiLifecycleState, CnuiLifecycleActions } from '../use-cnui-lifecycle'
 
 // 屏蔽重依赖子组件，聚焦 portal 定位行为
+// 捕获 CnuiRenderer 接收的 props，便于 [019.0] 断言 serverErrors 透传
+const rendererProps = { current: {} as Record<string, unknown> }
 vi.mock('../CnuiRenderer', () => ({
-  CnuiRenderer: () => <div data-testid="cnui-renderer" />,
+  CnuiRenderer: (props: Record<string, unknown>) => {
+    rendererProps.current = props
+    return <div data-testid="cnui-renderer" />
+  },
 }))
 vi.mock('../cnui-confirm-dialog', () => ({
   CnuiConfirmDialog: () => null,
@@ -97,5 +102,37 @@ describe('CnuiSurfaceWrapper 全屏定位', () => {
     // 内联模式：surface 在渲染容器里，不在主内容区
     expect(container).toContainElement(header)
     expect(mainArea).not.toContainElement(header)
+  })
+})
+
+describe('CnuiSurfaceWrapper [019.0] serverErrors 透传', () => {
+  afterEach(() => {
+    cleanup()
+    rendererProps.current = {}
+  })
+
+  it('把 lifecycleState.serverErrors 透传给 CnuiRenderer', () => {
+    const [state, actions] = makeLifecycle()
+    state.serverErrors = { s1: ['标题不能为空'] }
+    render(
+      <CnuiSurfaceWrapper
+        {...baseProps}
+        lifecycleState={state}
+        lifecycleActions={actions}
+      />
+    )
+    expect(rendererProps.current.serverErrors).toEqual(['标题不能为空'])
+  })
+
+  it('无 serverErrors 时传 undefined（不污染 surface）', () => {
+    const [state, actions] = makeLifecycle()
+    render(
+      <CnuiSurfaceWrapper
+        {...baseProps}
+        lifecycleState={state}
+        lifecycleActions={actions}
+      />
+    )
+    expect(rendererProps.current.serverErrors).toBeUndefined()
   })
 })
