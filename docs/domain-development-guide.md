@@ -109,12 +109,25 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 
 ## 5. CI Validator 设计（真治理 = 强制）
 
-接入点：扩展现有 `scripts/validate-manifest.ts`（纯 YAML 诊断，已在 prebuild）+ 新增 `scripts/validate-domain-structure.ts` + **husky pre-push 钩子**（仓库零远端 CI，husky 补本地 gate；远端 CI 留 TODO）。
+接入点：扩展现有 `scripts/validate-manifest.ts`（纯 YAML 诊断，已在 prebuild）+ 新增 `scripts/validate-domain-structure.ts` + **husky pre-push 钩子**（仓库零远端 CI，husky 补本地 gate；远端 CI 见 §5.1 显式 defer）。
 
 - **orchestrator-溯源（#1 MUST 门）**：每个 `use server` 写入口函数（scope = `src/app/actions/*`）持久化必须调 `executeIntent` 或 `mutationService.update/execute`；入口函数内直接 repo/db 持久化且不经白名单 = 违宪。scope rationale：actions/* = 写入口面；SM/GenericRepo 适配器/底层 repo = 写入口内部、豁免。入口函数级检查（非跨过程分析）。自测：植入 updateObjective 式绕过必被抓；tasks/habits 合规不报假阳性。
 - **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（§IX 已 supersede §CN-UI#4；habits 退役 [019.1] 前降级 TODO——否则对已知债假阳）/禁 `FormRegistry.register`+`register-form.ts` 残留/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
 - **validate-manifest.ts 扩展**：`rules:` id ↔ registry 完整性 / `field_metadata.mutation_mode` 合法值（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
 - **取代**：`app/actions/habits/__tests__/write-entry-guard.test.ts`（habits 局部守卫）在 orchestrator-溯源 validator 上线后删。
+
+### 5.1 远端 CI（T-A）— 显式 defer（2026-06-22 复审：保持 defer）
+
+**决策**：远端 CI **暂不落地**（[019] D1 决策 + ci-validator design §9.2「不做/YAGNI」）。治理强制力当前由 **husky pre-push 本地 gate** 提供（push 前跑 `validate:manifest && validate:structure`，违规 exit 1 阻断 push），覆盖单人 / 主开发机场景。
+
+**理由**：仓库零远端 CI（gitee，`.github/workflows` 空）；MVP 单人开发阶段，本地 gate 已足够；远端 CI 是「无 husky 环境」（他人 clone / CI 机器 / PR 流）的补强，非当下瓶颈。遵循 YAGNI。
+
+**revisit 触发**（任一满足即考虑落地）：
+- 转多人协作 / 外部贡献者 PR 流上线；
+- 出现「本地 gate 被绕过 → 违规入库」实案；
+- 仓库启用 GitHub mirror 或 gitee CI（Gitee Go）。
+
+**落地时待定**：平台（gitee 原生 Gitee Go / GitHub Actions mirror / 两者）、触发时机（push / PR）、是否合并 `validate:manifest` + `validate:structure` + `npm run build` + `npm test`。
 
 ## 6. C-DC 检查清单（Domain Development Checklist，每项 [CI]/[HUMAN]）
 
