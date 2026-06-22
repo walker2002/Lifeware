@@ -11,7 +11,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import type { ChatMessage, AISessionSummary, SurfaceState } from "@/usom/types/objects"
 import { validateFile } from "@/lib/task-import/file-parser"
 import { toast } from "sonner"
-import { useCnuiLifecycle } from "@/components/cnui/use-cnui-lifecycle"
+import { useCnuiLifecycle, type CnuiSubmitResult } from "@/components/cnui/use-cnui-lifecycle"
 import { CnuiSurfaceWrapper } from "@/components/cnui/CnuiSurfaceWrapper"
 import { ChatBubble } from "@/components/chat-bubble"
 import type { FrequentIntent } from "@/app/actions/activity"
@@ -55,7 +55,7 @@ interface ConversationViewProps {
   /** 频繁意图列表 */
   frequentIntents?: FrequentIntent[]
   /** CN-UI 确认回调 */
-  onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => void
+  onCnuiConfirm?: (cnuiSurfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<CnuiSubmitResult>
   /** 动作面状态变更回调 */
   onSurfaceStateChange?: (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => void
 }
@@ -101,12 +101,10 @@ export function ConversationView({ messages, sessionId, onSendMessage, isLoading
 
   const [lifecycleState, lifecycleActions] = useCnuiLifecycle(
     useCallback(
-      async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
-        // [019.0] Lane B 临时桥接：onCnuiConfirm 仍返回 void（Unit 3 将扩展为返回结果契约）
-        // 在此默认 success:true，保持旧行为（lifecycle 据此标 saved）；失败语义由 Unit 3 接入
-        if (!onCnuiConfirm) return { success: true }
-        await onCnuiConfirm(surfaceId, domainId, action, data)
-        return { success: true }
+      async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>): Promise<CnuiSubmitResult> => {
+        // [019.0] Lane B：把真实提交结果回传给 lifecycle，供其按 success 决定终态 + 透传 serverErrors
+        if (!onCnuiConfirm) return { success: false }
+        return await onCnuiConfirm(surfaceId, domainId, action, data)
       },
       [onCnuiConfirm]
     ),

@@ -36,6 +36,7 @@ import { getTraceConfig } from "@/lib/config/trace-config"
 import { resolveSlashCommand } from "@/lib/slash-command"
 import { HABIT_USER_FACING } from "@/lib/constants/habit-messages"
 import type { IntentSubmissionResult } from "@/app/actions/intent"
+import type { CnuiSubmitResult } from '@/components/cnui/use-cnui-lifecycle'
 
 /**
  * 意图处理器依赖项
@@ -368,14 +369,14 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
     }
   }
 
-  /** 处理 CN-UI 表面提交 */
+  /** 处理 CN-UI 表面提交 — [019.0] Lane B：返回结果契约供 lifecycle 决定终态 + 回填 */
   const handleCnuiConfirm = useCallback(
     async (
       cnuiSurfaceId: string,
       domainId: string,
       action: string,
       data: Record<string, unknown>
-    ) => {
+    ): Promise<CnuiSubmitResult> => {
       try {
         const result = await submitCnuiSurface(
           cnuiSurfaceId,
@@ -398,6 +399,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
             targetAction: action,
           })
         } else {
+          // [019.0] Lane B：失败仍发一条 system 消息（表单级可见），同时把字段级 errors 回传
           const msg: ChatMessage = {
             role: "system",
             content: `操作失败: ${result.error}`,
@@ -405,6 +407,8 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           }
           deps.addChatMessage(msg)
         }
+        // 回传契约：字段级 serverErrors（handler.submit 拆分自 Rejected.errors）
+        return { success: result.success, serverErrors: result.errors }
       } catch (e) {
         console.error("submitCnuiSurface failed:", e)
         const msg: ChatMessage = {
@@ -413,6 +417,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           timestamp: new Date().toISOString(),
         }
         deps.addChatMessage(msg)
+        return { success: false }
       }
     },
     []
