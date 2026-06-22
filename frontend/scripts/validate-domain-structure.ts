@@ -316,11 +316,151 @@ export function checkRulesRegistry(
   return diags
 }
 
+// ─── [019.1] L4-1：禁 CnuiFormAdapter ──────────────────────────
+
+/**
+ * 收集 dir 下所有 .ts/.tsx 源文件（排除 __tests__、.test.*、node_modules、点前缀目录）。
+ * 复用 collectActionFiles 的遍历风格，扩展到 .tsx 与全域 src。
+ */
+export function collectSourceFiles(dir: string): string[] {
+  const out: string[] = []
+  const walk = (d: string) => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (e.name === '__tests__' || e.name === 'node_modules' || e.name.startsWith('.')) continue
+      const p = path.join(d, e.name)
+      if (e.isDirectory()) {
+        walk(p)
+      } else if (
+        e.isFile() &&
+        (e.name.endsWith('.ts') || e.name.endsWith('.tsx')) &&
+        !e.name.endsWith('.test.ts') &&
+        !e.name.endsWith('.test.tsx')
+      ) {
+        out.push(p)
+      }
+    }
+  }
+  walk(dir)
+  return out
+}
+
+/**
+ * 在单个 sourceFile 中检测 CnuiFormAdapter 残留（import 模块路径含 cnui-form-adapter，
+ * 或标识符 CnuiFormAdapter）。返回首个命中位置，便于按文件报一条诊断。
+ */
+export function findCnuiFormAdapterUsage(sf: ts.SourceFile): { line: number } | null {
+  let found: { line: number } | null = null
+  const visit = (node: ts.Node) => {
+    if (found) return
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.moduleSpecifier.text.includes('cnui-form-adapter')
+    ) {
+      const { line } = sf.getLineAndCharacterOfPosition(node.getStart())
+      found = { line: line + 1 }
+      return
+    }
+    if (ts.isIdentifier(node) && node.text === 'CnuiFormAdapter') {
+      const { line } = sf.getLineAndCharacterOfPosition(node.getStart())
+      found = { line: line + 1 }
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return found
+}
+
+/**
+ * L4-1：扫 src/** 下 CnuiFormAdapter 残留（零豁免——退役后无债务人）。
+ * @param srcDir - frontend/src 绝对路径
+ */
+export function checkCnuiFormAdapter(srcDir: string): Diagnostic[] {
+  const diags: Diagnostic[] = []
+  for (const f of collectSourceFiles(srcDir)) {
+    const content = fs.readFileSync(f, 'utf-8')
+    const sf = ts.createSourceFile(f, content, ts.ScriptTarget.Latest, true)
+    const hit = findCnuiFormAdapterUsage(sf)
+    if (hit) {
+      diags.push({
+        file: path.relative(srcDir, f),
+        level: 'error',
+        rule: 'cnui-form-adapter-forbidden',
+        message: `第 ${hit.line} 行：禁止使用 CnuiFormAdapter（§IX 已 supersede §CN-UI#4；L4-1）— surface 须手写 + 直接接收 serverErrors（见 domain-development-guide Step 13）`,
+      })
+    }
+  }
+  return diags
+}
+
+// ─── [019.1] L7-2：禁 FormRegistry.register + register-form.ts 残留 ─────────
+
+/** 在单个 sourceFile 中检测 FormRegistry.register( 调用，返回首个命中位置。 */
+export function findFormRegistryRegisterCall(sf: ts.SourceFile): { line: number } | null {
+  let found: { line: number } | null = null
+  const visit = (node: ts.Node) => {
+    if (found) return
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText() === 'FormRegistry' &&
+      node.expression.name.text === 'register'
+    ) {
+      const { line } = sf.getLineAndCharacterOfPosition(node.getStart())
+      found = { line: line + 1 }
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return found
+}
+
+/**
+ * L7-2：扫 src/domains/** 下 FormRegistry.register 调用 + register-form.ts 文件残留（零豁免）。
+ * @param srcDir - frontend/src 绝对路径（内部 join 'domains'）
+ */
+export function checkFormRegistryResidual(srcDir: string): Diagnostic[] {
+  const diags: Diagnostic[] = []
+  const domainsDir = path.join(srcDir, 'domains')
+  for (const f of collectSourceFiles(domainsDir)) {
+    if (path.basename(f) === 'register-form.ts') {
+      diags.push({
+        file: path.relative(srcDir, f),
+        level: 'error',
+        rule: 'form-registry-residual',
+        message: `禁止存在 register-form.ts（§IX 已 supersede；L7-2）— 表单注册中心已退役，surface 须手写`,
+      })
+      continue
+    }
+    const content = fs.readFileSync(f, 'utf-8')
+    const sf = ts.createSourceFile(f, content, ts.ScriptTarget.Latest, true)
+    const hit = findFormRegistryRegisterCall(sf)
+    if (hit) {
+      diags.push({
+        file: path.relative(srcDir, f),
+        level: 'error',
+        rule: 'form-registry-residual',
+        message: `第 ${hit.line} 行：禁止 FormRegistry.register（§IX 已 supersede；L7-2）— 表单注册中心已退役`,
+      })
+    }
+  }
+  return diags
+}
+
 // ─── 常量实例 + CLI ──────────────────────────────────────────
 
 const ROOT_DIR = path.resolve(__dirname, '..')
 const ACTIONS_DIR = path.join(ROOT_DIR, 'src', 'app', 'actions')
 const DOMAINS_DIR = path.join(ROOT_DIR, 'src', 'domains')
+const SRC_DIR = path.join(ROOT_DIR, 'src')
 
 /** orchestrator-溯源 豁免（写入口绕过，带 sunset） */
 export const WRITE_ENTRY_EXEMPTIONS = [
@@ -391,6 +531,9 @@ function main(): void {
     diagnostics.push(...analyzeSourceFile(f, content, WRITE_ENTRY_EXEMPTION_SET, ACTIONS_DIR))
   }
   diagnostics.push(...checkRulesRegistry(DOMAINS_DIR, RULES_REGISTRY_EXEMPTION_SET))
+  // [019.1] L4-1/L7-2：禁 CnuiFormAdapter + FormRegistry 残留（§IX supersede §CN-UI#4）
+  diagnostics.push(...checkCnuiFormAdapter(SRC_DIR))
+  diagnostics.push(...checkFormRegistryResidual(SRC_DIR))
   printDiagnostics(diagnostics)
   process.exit(diagnostics.some(d => d.level === 'error') ? 1 : 0)
 }

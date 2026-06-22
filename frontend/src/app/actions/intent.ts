@@ -30,7 +30,6 @@ import { createAIRuntime } from "../../nexus/ai-runtime";
 import { parseTemplateForm, parseDynamicForm } from "../../nexus/core/intent-engine/template-parser";
 import type { TemplateFormFields } from "../../nexus/core/intent-engine/template-parser";
 import { getRequiredFields, getActionDescription, getIntentTriggerViewRoute, getViewRoute, getFullManifest } from "@/domains/registry";
-import { FormRegistry } from "@/lib/form-registry";
 import { HABIT_ERRORS } from "@/lib/constants/habit-messages";
 import { createActionSurfaceEngine } from "../../nexus/core/action-surface-engine";
 import { TaskRepository } from "@/domains/tasks/repository/task";
@@ -1316,25 +1315,13 @@ export async function submitCnuiSurface(
     return { success: false, error: `Unknown CN-UI action: ${domainId}/${action}` }
   }
 
-  // FormRegistry 的字段映射（保留下层映射逻辑）
-  const config = FormRegistry.get(domainId, action)
-  let mappedFields = fields
-  if (config) {
-    mappedFields = {}
-    for (const [cnuiKey, formKey] of Object.entries(config.fieldMapping)) {
-      if (cnuiKey in fields) {
-        mappedFields[formKey] = fields[cnuiKey]
-      }
-    }
-  }
-
   const handler = CNUI_HANDLERS[surfaceType]
   if (!handler) {
     return { success: false, error: `Handler 未找到: ${surfaceType}` }
   }
 
-  // 委托给 domain handler 执行提交
-  const result = await handler.submit(action, mappedFields)
+  // 委托给 domain handler 执行提交（[019.1] fieldMapping 恒等已退役，fields 直传）
+  const result = await handler.submit(action, fields)
   // [019.0] Lane B：转发 handler 拆分的字段级 errors（之前被丢弃，导致回填管线断）
   return {
     success: result.success,

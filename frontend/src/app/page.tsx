@@ -29,7 +29,6 @@ import { Button } from "@/components/ui/button"
 import { CommandMenu } from "@/components/search/command-menu"
 import { CheckSquare, Clock, MessageSquare, Repeat, Target } from "lucide-react"
 import { usePageView } from "@/hooks/use-page-view"
-import "@/domains/habits/register-form"
 import type { PanelTab } from "@/components/layout/main-view-state"
 
 /**
