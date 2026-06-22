@@ -13,6 +13,16 @@ import type { SurfaceState } from '@/usom/types/objects'
 export type { SurfaceState }
 
 /**
+ * CNUI 提交结果契约（[019.0] Lane B 回填）。
+ * lifecycle 据此决定终态：success→saved；否则存 serverErrors、surface 保持可编辑。
+ */
+export interface CnuiSubmitResult {
+  success: boolean
+  /** 服务端字段级错误（handler 拆分自 Rejected.errors），透传给 surface 回填；空/缺省表成功 */
+  serverErrors?: string[]
+}
+
+/**
  * CN-UI 生命周期状态
  */
 export interface CnuiLifecycleState {
@@ -24,6 +34,8 @@ export interface CnuiLifecycleState {
   submittingId: string | null
   /** 各动作面的验证错误 */
   validationErrors: Record<string, string[]>
+  /** 各动作面的服务端字段错误（[019.0] Lane B 回填，供 surface 标红） */
+  serverErrors: Record<string, string[]>
   /** 确认对话框状态 */
   confirmDialog: {
     /** 是否打开 */
@@ -72,7 +84,7 @@ export interface CnuiLifecycleActions {
  * @returns [状态, 操作] 元组
  */
 export function useCnuiLifecycle(
-  onSubmit: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<void>,
+  onSubmit: (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => Promise<CnuiSubmitResult>,
   initialStates?: Record<string, SurfaceState>,
   onStateChange?: (surfaceId: string, state: SurfaceState, data?: Record<string, unknown>) => void,
 ): [CnuiLifecycleState, CnuiLifecycleActions] {
@@ -98,6 +110,7 @@ export function useCnuiLifecycle(
   const [surfaceData, setSurfaceData] = useState<Record<string, Record<string, unknown>>>({})
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
+  const [serverErrors, setServerErrors] = useState<Record<string, string[]>>({})
   const [confirmDialog, setConfirmDialog] = useState<CnuiLifecycleState['confirmDialog']>({
     open: false,
     type: 'save',
@@ -120,6 +133,7 @@ export function useCnuiLifecycle(
 
   const requestSave = useCallback((surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
     clearValidationErrors(surfaceId)
+    setServerErrors(prev => { const next = { ...prev }; delete next[surfaceId]; return next })
 
     setConfirmDialog({
       open: true,
@@ -160,10 +174,20 @@ export function useCnuiLifecycle(
     setSubmittingId(surfaceId)
 
     try {
-      await onSubmit(surfaceId, domainId, action, pendingData)
-      setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'saved' }))
-      onStateChange?.(surfaceId, 'saved', pendingData)
+      const result = await onSubmit(surfaceId, domainId, action, pendingData)
+      // [019.0] Lane B：按结果契约决定终态——成功才 saved；失败存 serverErrors、保持可编辑
+      if (result.success) {
+        setSurfaceStates(prev => ({ ...prev, [surfaceId]: 'saved' }))
+        onStateChange?.(surfaceId, 'saved', pendingData)
+        setServerErrors(prev => { const next = { ...prev }; delete next[surfaceId]; return next })
+      } else {
+        const errs = result.serverErrors && result.serverErrors.length > 0
+          ? result.serverErrors
+          : ['保存失败，请稍后重试']
+        setServerErrors(prev => ({ ...prev, [surfaceId]: errs }))
+      }
     } catch {
+      // 网络/未知异常走表单级 validationErrors（wrapper banner），不混入字段级
       setValidationErrors(prev => ({ ...prev, [surfaceId]: ['保存失败，请稍后重试'] }))
     } finally {
       setSubmittingId(null)
@@ -179,6 +203,7 @@ export function useCnuiLifecycle(
     surfaceData,
     submittingId,
     validationErrors,
+    serverErrors,
     confirmDialog,
   }
 

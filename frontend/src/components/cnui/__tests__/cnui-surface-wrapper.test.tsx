@@ -26,6 +26,7 @@ function makeLifecycle(): [CnuiLifecycleState, CnuiLifecycleActions] {
     surfaceData: {},
     submittingId: null,
     validationErrors: {},
+    serverErrors: {},
     confirmDialog: { open: false, type: 'save', surfaceId: '', title: '', message: '' },
   }
   const actions: CnuiLifecycleActions = {

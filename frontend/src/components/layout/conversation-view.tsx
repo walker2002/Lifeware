@@ -102,8 +102,11 @@ export function ConversationView({ messages, sessionId, onSendMessage, isLoading
   const [lifecycleState, lifecycleActions] = useCnuiLifecycle(
     useCallback(
       async (surfaceId: string, domainId: string, action: string, data: Record<string, unknown>) => {
-        if (!onCnuiConfirm) return
+        // [019.0] Lane B 临时桥接：onCnuiConfirm 仍返回 void（Unit 3 将扩展为返回结果契约）
+        // 在此默认 success:true，保持旧行为（lifecycle 据此标 saved）；失败语义由 Unit 3 接入
+        if (!onCnuiConfirm) return { success: true }
         await onCnuiConfirm(surfaceId, domainId, action, data)
+        return { success: true }
       },
       [onCnuiConfirm]
     ),
