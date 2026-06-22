@@ -169,16 +169,16 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 
 #### 复杂任务（跨模块、共享逻辑、架构变动、公共 API）
 
-1. gstack: `/office-hour`
-2. gstack: `/autoplan`
-3. `/superpowers:writing-plans`
+1. gstack: `/office-hours`（战略拷问 → 产出 design doc 到 `~/.gstack/`；随后 `cd frontend && npm run adopt:design -- <topic>` 拷入 `docs/superpowers/specs/` 作为 SSOT）
+2. `/superpowers:writing-plans`（design doc + 代码现状 → 产出 spec + plan）
+3. gstack: `/autoplan` 或 `/plan-eng-review`（评审上一步的 spec/plan → 追加 GSTACK REVIEW REPORT）
 4. `/superpowers:subagent-driven-dev+TDD`
 5. gstack: `/browse+/qa`
-6. gstack: /review 
+6. gstack: `/review`
 7. 人工验证 + `/superpowers:systematic-debugging`
 8. `/lifeware-neat`
-9.  `/superpowers:finishing-a-development-branch `
-10. 如果需要部署生产环境，继续 ` /ship → /land-and-deploy → /canary`
+9. `/superpowers:finishing-a-development-branch`
+10. 如果需要部署生产环境，继续 `/ship → /land-and-deploy → /canary`
 
 
 

@@ -18,6 +18,7 @@
     "generate:routes:clean": "npx tsx scripts/generate-routes.ts --clean",
     "validate:manifest": "npx tsx scripts/validate-manifest.ts",
     "validate:structure": "npx tsx scripts/validate-domain-structure.ts",
+    "adopt:design": "npx tsx scripts/adopt-gstack-design.ts",
     "prepare": "husky",
     "predev": "npm run generate:routes && npm run validate:manifest",
     "prebuild": "npm run generate:routes && npm run validate:manifest && npm run validate:structure"
