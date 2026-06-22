@@ -29,9 +29,11 @@ interface CnuiRendererProps {
   isLoading?: boolean
   /** 是否已完成 */
   isDone?: boolean
+  /** [019.0] Lane B：服务端字段错误，透传给 surface 组件回填 */
+  serverErrors?: string[]
 }
 
-export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: CnuiRendererProps) {
+export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone, serverErrors }: CnuiRendererProps) {
   const reg = cnuiRegistry.get(surfaceType)
 
   if (!reg) {
@@ -52,6 +54,7 @@ export function CnuiRenderer({ surfaceType, dataModel, onDataChange, onConfirm, 
       onCancel={onCancel}
       isLoading={isLoading}
       isDone={isDone}
+      serverErrors={serverErrors}
     />
   )
 }
