@@ -1,6 +1,6 @@
 # 宪法修订提案：§IX Domain 开发范式
 
-> **状态**：PROPOSED — 待 constitution.md「Amendment Procedure」章节审议生效。本文件是流程**输入**，非已生效条款。生效前以 `docs/domain-paradigm.md` 为操作展开、以现有 §I–§VIII + §CN-UI 为 canonical。
+> **状态**：✅ **EFFECTIVE（2026-06-22）** — 已经 constitution.md「Amendment Procedure」审议通过并生效，并入 constitution **v2.0.0** §IX（supersede §CN-UI 第 4 条同步生效）。本文件留存为**修订记录**——条款权威文本已在 constitution §IX，操作展开以 `docs/domain-development-guide.md`（Tier-2）+ constitution §I–§IX 为 canonical。
 > **来源**：[019] Domain 开发范式（design doc `walker-main-design-20260620-234549.md`，/plan-eng-review 2026-06-21 通过）。
 > **版本影响**：**MAJOR**——本提案新增 §IX（MINOR 性质）**且显式 supersede** 现行 §CN-UI Protocol Constraints 第 4 条「Form Component Reuse Constraint」（向后不兼容的治理变更：废除 CnuiFormAdapter 强制复用）。supersede 主导版本定级，故 MAJOR。
 
@@ -25,7 +25,7 @@
 
 5. **页面表单非写入口**：页面表单禁止作为业务事实写入口；持久化必经 CNUI handler → 写入口。存活页面表单的校验须复用 `useManifestRules`。
 
-**Cross-ref**：操作展开（七层接入指南「建什么文件/接什么接口」+ tasks 模板 + C-DC 检查清单 `[CI]`/`[HUMAN]` + CI validator 设计 + 四域现状对照）见 `docs/domain-paradigm.md`（Tier-2，与代码同步）。
+**Cross-ref**：操作展开（七层接入指南「建什么文件/接什么接口」+ tasks 模板 + C-DC 检查清单 `[CI]`/`[HUMAN]` + CI validator 设计 + 四域现状对照）见 `docs/domain-development-guide.md`（Tier-2，与代码同步）。
 
 ## Superseding Language（Amendment Procedure 步骤 2 — 显式废止）
 
@@ -33,12 +33,12 @@
 
 **废止理由**：该约束的前提是「Domain 页面存在编辑表单，CN-UI 须复用以避免重复字段定义/校验」。§IX 范式转变此前提——**CN-UI surface 是表单层本身（手写 surface + `useManifestRules`），页面退化为只读列表/详情视图**（§IX 约束 5 + L5）。页面既无写表单，「复用页面表单到 CN-UI」的前提消失，CnuiFormAdapter（及其依赖的 `FormRegistry` 字段映射、`register-form.ts`）失去存在理由——实测 habits 仅 1 消费者（死抽象），tasks 参考实现完全不用。
 
-**取代规定**（§IX 约束 + `docs/domain-paradigm.md` L4）：
+**取代规定**（§IX 约束 + `docs/domain-development-guide.md` L4）：
 - CN-UI 表单 = 手写 surface 组件 + `useManifestRules`（realtime 校验）+ `useServerErrorBackfill`（回填），**不再经 CnuiFormAdapter 复用页面 Form**。
 - 字段定义/校验的唯一来源是 manifest `field_metadata` + `rules:` + `rules-registry`（规则三层），非 Domain Form 组件。
 - `CnuiFormAdapter` / `FormRegistry` / `register-form.ts` 退役删除（[019.1] habits 迁移执行）；CI validator（`validate-domain-structure.ts`）禁其残留。
 
-> 生效条件：本 supersede 随 §IX 一并按 Amendment Procedure 审议。**生效前**，现行 §CN-UI 第 4 条仍为 canonical——故 [019.1] 退役 adapter 的实施须在本提案获批后（或与获批同步）进行；spec/CI validator 设计可先行（描述目标态）。
+> 生效状态：**已生效（2026-06-22, constitution v2.0.0）**。本 supersede 随 §IX 一并按 Amendment Procedure 审议通过；现行 §CN-UI 第 4 条已标注 SUPERSEDED、不再 canonical。[019.1] 退役 adapter 的实施现已解锁（宪法层无阻塞）；CI validator 的 L4-1 检查须待 [019.1] 退役 habits adapter 后启用（否则对已知债假阳）。
 
 ## Rationale（Amendment Procedure 步骤 1）
 
@@ -57,6 +57,6 @@
 - **工具链**：扩 `scripts/validate-manifest.ts` + 新 `scripts/validate-domain-structure.ts` + husky pre-push（[019.ci-validator]）。
 - **Tier-2 同步**：`docs/domain-paradigm.md` 随代码同步；本提案生效后 constitution.md 增 §IX，manifest.md 版本历史递增。
 
-## 生效条件（不阻塞 [019] spec/实施）
+## 生效状态（已生效，2026-06-22）
 
-本提案按 §Amendment Procedure 审议：书面 rationale（上）+ 无原则冲突核验（上）+ 版本递增（MINOR）+ Spec Kit 模板一致性传播 + manifest.md 更新。在生效前，`docs/domain-paradigm.md` + 现有 §I–§VIII 为权威；CI validator 按 `docs/domain-paradigm.md` §4 实施。
+本提案已经 §Amendment Procedure 审议通过并生效：书面 rationale（上）✅ + 无原则冲突核验（上，唯一冲突项 §CN-UI#4 经显式 supersede 语言处理）✅ + 版本递增（**MAJOR** 1.11.1→2.0.0，因 supersede 属向后不兼容治理变更，主导版本定级）✅ + Spec Kit 模板一致性传播（`constitution-template.md` 纯占位符，无需改动）✅ + `manifest.md` 版本历史更新 ✅。constitution §IX + `docs/domain-development-guide.md` 为权威；CI validator 按 `docs/domain-development-guide.md` §4 实施。

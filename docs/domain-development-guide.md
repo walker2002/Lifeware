@@ -2,7 +2,7 @@
 
 > **归属**：第二层（`docs/`，协同维护，Claude 保代码一致 / 用户定义意图）。本文件是 **Domain 开发的唯一权威文档**——整合原 `mydocs/core/LW_domain_注册指南`（机械注册步骤）与 [019] Domain 开发范式（范式模型 + 治理 + CI）。后续开发者/AI 只看本文件。
 > **结构**：**Part I 范式与治理**（为什么 + 规则 + 强制）→ **Part II 注册步骤**（Step 1–13 机械指南）。`docs/route-generation-spec.md` 为**下级文件**（路由生成实现细节，本文件 Step 6 引用，内容不冲突）。
-> **宪法关系**：Part I 是 constitution §III/VI/VIII + §CN-UI 的操作展开；§IX「Domain 范式」修订提案见 `.specify/amendments/proposed-IX-domain-paradigm.md`（含对 §CN-UI 第 4 条的显式 supersede，待 Amendment Procedure）。
+> **宪法关系**：Part I 是 constitution §III/VI/VIII + §CN-UI（第 4 条已 supersede）+ **§IX Domain Development Paradigm**（v2.0.0，2026-06-22 生效）的操作展开；§IX 修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`（含对 §CN-UI 第 4 条的显式 supersede，✅ 已生效）。
 
 **变更记录**：
 - **2026_06_21（Part II 对齐）**：注册步骤全面对齐 tasks 参考实现——Step 2 manifest 模板补 `rules:` 区块 / `field_metadata.mutation_mode` / `cnui_surfaces` 改 map / 根字段 `domain_id`→`id`；Step 3 hooks 改工厂函数 + onValidate 委托 `evaluateDomainRules`；Step 4 schema 位置改 `src/lib/db/schema.ts` 集中；Step 5 repository 改目录；**新增 Step 5.5 组装 mutation-service**；Step 13 cnui 注册签名对齐 tasks；概念统一 `requires_full_validate`→`mutation_mode`（FactField/ContentField/PresentationField）；编号对齐总览（页面 Step 6 / 注册 Step 7 / Markdown Step 8）。
@@ -112,7 +112,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 接入点：扩展现有 `scripts/validate-manifest.ts`（纯 YAML 诊断，已在 prebuild）+ 新增 `scripts/validate-domain-structure.ts` + **husky pre-push 钩子**（仓库零远端 CI，husky 补本地 gate；远端 CI 留 TODO）。
 
 - **orchestrator-溯源（#1 MUST 门）**：每个 `use server` 写入口函数（scope = `src/app/actions/*`）持久化必须调 `executeIntent` 或 `mutationService.update/execute`；入口函数内直接 repo/db 持久化且不经白名单 = 违宪。scope rationale：actions/* = 写入口面；SM/GenericRepo 适配器/底层 repo = 写入口内部、豁免。入口函数级检查（非跨过程分析）。自测：植入 updateObjective 式绕过必被抓；tasks/habits 合规不报假阳性。
-- **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（待 supersede 生效）/禁 `FormRegistry.register`+`register-form.ts` 残留/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
+- **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（§IX 已 supersede §CN-UI#4；habits 退役 [019.1] 前降级 TODO——否则对已知债假阳）/禁 `FormRegistry.register`+`register-form.ts` 残留/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
 - **validate-manifest.ts 扩展**：`rules:` id ↔ registry 完整性 / `field_metadata.mutation_mode` 合法值（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
 - **取代**：`app/actions/habits/__tests__/write-entry-guard.test.ts`（habits 局部守卫）在 orchestrator-溯源 validator 上线后删。
 
@@ -128,7 +128,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | L3-2 | manifest rules.id ↔ registry 处理器完整 | CI |
 | L3-3 | onValidate 委托 evaluateDomainRules（禁 ad-hoc） | CI |
 | L3-4 | realtime 单字段纯函数；多字段→submit | HUMAN |
-| L4-1 | 禁 CnuiFormAdapter（待 supersede） | CI |
+| L4-1 | 禁 CnuiFormAdapter（§IX 已 supersede；[019.1] 前降级 TODO） | CI |
 | L4-2 | 可编辑 surface 调 useManifestRules | CI |
 | L4-3 | surface 遵 UI-DESIGN-SPEC + CUC-01~12 | HUMAN |
 | L5-1 | 页面禁直接持久化（溯源扩到 pages） | CI |
@@ -1714,7 +1714,7 @@ export class HabitStatisticsHandler {
 
 ## Step 13：（若 CNUI 型）实现 CNUI Surface 和 Handler（范式层 L4/L6/L7）
 
-> **paradigm 对齐（Part I §2/§4 L4）**：CNUI surface 组件**手写**（本 Step 的 `cnui_surfaces` 区块 K + `cnuiRegistry.register` 即此模式，tasks 参考实现）。可编辑 surface 须接 `useManifestRules`（realtime blur 校验）+ `useServerErrorBackfill`（服务端错误回填，L6），并接收 `serverErrors` prop。**禁用 `CnuiFormAdapter`**（habits 死抽象）——此禁用与现行 constitution §CN-UI 第 4 条冲突，需 supersede（见 `.specify/amendments/proposed-IX-domain-paradigm.md`，MAJOR，待 Amendment Procedure 生效）；生效前 `L4-1` CI 检查与 [019.1] 退役实施须在 supersede 获批后（或同步）进行。
+> **paradigm 对齐（Part I §2/§4 L4）**：CNUI surface 组件**手写**（本 Step 的 `cnui_surfaces` 区块 K + `cnuiRegistry.register` 即此模式，tasks 参考实现）。可编辑 surface 须接 `useManifestRules`（realtime blur 校验）+ `useServerErrorBackfill`（服务端错误回填，L6），并接收 `serverErrors` prop。**禁用 `CnuiFormAdapter`**（habits 死抽象）——此禁用**经 §IX（constitution v2.0.0，2026-06-22 生效）已 supersede** §CN-UI 第 4 条（修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`，MAJOR，✅ 已生效）。§IX 生效解除宪法层阻塞；但 `L4-1` CI 检查暂续降级 TODO——habits 仍用 `CnuiFormAdapter`，须待 [019.1] habits 手写化后启用（否则对已知债假阳）。
 
 **判断标准**：如果 Domain 的 intent_triggers 中任何 action 的 `response_type` 为 `cnui`，或 manifest 中声明了 `cnui_surfaces` 区块，则需要实现 CNUI Surface 组件和 Handler。
 

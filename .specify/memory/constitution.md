@@ -1,6 +1,35 @@
 <!--
   Sync Impact Report
   ==================
+  Version change: 1.11.1 → 2.0.0
+  Rationale: MAJOR — 新增 §IX Domain Development Paradigm（七层范式：数据/写入口/规则三层/CNUI 表单/页面表单/回填/注册）
+    + 显式 supersede §CN-UI Protocol Constraints 第 4 条「Form Component Reuse Constraint」
+    （CnuiFormAdapter 强制复用 → 手写 surface + useManifestRules + useServerErrorBackfill）。
+    supersede 属向后不兼容治理变更，主导版本定级 MAJOR。
+
+  Modified sections:
+    - Core Principles 新增 ### IX. Domain Development Paradigm（5 constraints）
+    - CN-UI Protocol Constraints 第 4 条标注 SUPERSEDED by §IX
+
+  Superseded principles:
+    - §CN-UI #4 Form Component Reuse Constraint（CnuiFormAdapter 强制复用）→ §IX
+
+  Templates requiring updates:
+    - .specify/templates/constitution-template.md        ✅ 无需改动（纯占位符模板，未硬编码原则列表/§CN-UI#4，已核查）
+
+  Follow-up documents requiring updates:
+    - docs/domain-development-guide.md                  （§IX 生效：Step 13/L4-1/[019.1] 状态由「待 supersede 获批」改「已生效」）
+    - manifest.md                                       （版本历史同步：项目宪章 v2.0.0）
+    - .specify/amendments/proposed-IX-domain-paradigm.md（提案状态 PROPOSED → EFFECTIVE）
+    - scripts/validate-domain-structure.ts              （L4-1 CnuiFormAdapter 检查仍降级 TODO——须待 [019.1] 退役 habits adapter 后启用；§IX 仅解除宪法层阻塞）
+
+  Post-acceptance unblocked:
+    - [019.1] CnuiFormAdapter / FormRegistry / register-form.ts 退役（habits 手写化）
+-->
+
+<!--
+  Sync Impact Report
+  ==================
   Version change: 1.10.0 → 1.11.0
   Rationale: MINOR — 新增「业务事实写入口」治理原则 + SM 重定位 + ValidationResult 判定模型
 
@@ -483,6 +512,44 @@ Rule Engine → State Machine 流水线。
 - `response_type === 'page'`: 页面导航
 - `response_type === 'text'`: 纯文本响应
 
+### IX. Domain Development Paradigm
+
+**Principle**: 每个 Domain 遵循统一的七层开发范式（数据 / 写入口 / 规则三层 /
+CNUI 表单 / 页面表单 / 回填 / 注册），使各 Domain 在写路径、规则、表单策略上
+不分叉。本节是 Principle III、VI、VIII 的**操作收敛**，不引入与之冲突的新原则。
+
+**Constraints**:
+
+1. **写入口两条合法路径**（III 操作化）：所有业务事实持久化写入必须经其一——
+   `executeIntent`（Intent→Rule→SM，生命周期状态转换/聚合写），或
+   `createDomainMutationService.{update,execute}`（field-executor + tx-bound SM，
+   单字段原子写/多步聚合写）。二者之外的直接 repo/db 写入 = 违反 Single-Writer
+   Invariant（III）。
+
+2. **跨字段红线**：带跨字段/跨对象业务不变量的写入，禁止走字段路径（其不经全量
+   `onValidate`）；必须经 `executeIntent`（或显式 rule 校验 step）。否则 inline
+   编辑静默绕过业务规则。
+
+3. **规则三层**（见「规则三层架构」治理小节）：每个**有写路径**的 Domain 必须在
+   manifest `rules:` 声明规则 + `rules-registry` 注册处理器 + `onValidate` 委托
+   `evaluateDomainRules`。`mutation-service` 是能力（FactField 域需要），**非通用门**。
+
+4. **治理 CI 强制**：范式约束落 fitness function（build/CI validator），非
+   honor-system。`orchestrator-溯源` = 全域 MUST（零豁免）。遗留债经**显式、有
+   sunset 的豁免清单**托管（每条带截止条件，定期审计）。
+
+5. **页面表单非写入口**：页面表单禁止作为业务事实写入口；持久化必经 CNUI handler
+   → 写入口。存活页面表单的校验须复用 `useManifestRules`。
+
+> **本条 supersede**：本条取代原 §CN-UI Protocol Constraints 第 4 条「Form
+> Component Reuse Constraint」（CnuiFormAdapter 强制复用）——见该条 SUPERSEDED
+> 标注。CN-UI 表单 = 手写 surface + `useManifestRules`（realtime 校验）+
+> `useServerErrorBackfill`（回填），不再经 `CnuiFormAdapter` 复用页面 Form。
+
+**Cross-ref**：操作展开（七层接入指南「建什么文件/接什么接口」+ tasks 模板 +
+C-DC 检查清单 `[CI]`/`[HUMAN]` + CI validator 设计 + 四域现状对照）见
+`docs/domain-development-guide.md`（Tier-2，与代码同步）。
+
 ## Architecture Constraints
 
 ### Multi-Tenancy (From Day One)
@@ -811,10 +878,13 @@ conversation flow.
    and result in structured data entering Rule Engine → State Machine.
    CN-UI MUST NOT navigate users to separate pages.
 
-4. **Form Component Reuse Constraint**: 当 CN-UI 表面需要渲染与 Domain 页面编辑面板相同的表单时，
-   MUST 通过适配层（CnuiFormAdapter）复用 Domain 的 Form 组件，MUST NOT 维护独立的字段定义和验证逻辑。
-   Domain 的 Form 组件是表单实现的唯一来源。新 Domain 只需注册 FormAdapterConfig 即可在三种上下文
-   （页面编辑面板、GrowthMenu 入口、AI 助手 CN-UI）中复用同一表单实现。
+4. **⚠️ SUPERSEDED（2026-06-22, v2.0.0）— Form Component Reuse Constraint（已废止）**:
+   本条已被 **§IX Domain Development Paradigm** 取代，**不再生效**。废止理由：§IX 范式转变本条前提——
+   CN-UI surface 是表单层本身（手写 surface + `useManifestRules` + `useServerErrorBackfill`），页面退化为
+   只读列表/详情视图（§IX 约束 5），「复用页面表单到 CN-UI」的前提消失；`CnuiFormAdapter` /
+   `FormRegistry` / `register-form.ts` 退役（[019.1] habits 手写化）。原文（仅历史参考，不具约束力）：
+   ~~当 CN-UI 表面需要渲染与 Domain 页面编辑面板相同的表单时，MUST 通过适配层（CnuiFormAdapter）复用
+   Domain 的 Form 组件，MUST NOT 维护独立的字段定义和验证逻辑。Domain 的 Form 组件是表单实现的唯一来源。~~
 
 5. **Domain Surface Ownership**：CN-UI surface 组件（panels、cards、lists）
    若属于特定 Domain，MUST 置于该 Domain 的目录内
@@ -1197,4 +1267,4 @@ tokens is DESIGN.md; the downstream implementation is `globals.css`.
 MVP scope is Web only; mobile layout specifications are pre-designed
 for future iteration.
 
-**Version**: 1.11.1 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-20
+**Version**: 2.0.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-22
