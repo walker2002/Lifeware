@@ -110,7 +110,7 @@ export function AppShell({
               <ResizableSplitter onMouseDown={handleMouseDown} />
             </>
           )}
-          <div className="min-h-0 flex-1 flex flex-col">
+          <div data-lw-main-area className="relative min-h-0 flex-1 flex flex-col">
             <MainContent viewKey={viewKey}>{mainContent}</MainContent>
           </div>
         </div>
@@ -128,7 +128,7 @@ export function AppShell({
         )}
 
         {/* 平板端 + 移动端：主内容 */}
-        <div className="min-h-0 flex-1 flex flex-col lg:hidden">
+        <div data-lw-main-area className="relative min-h-0 flex-1 flex flex-col lg:hidden">
           <MainContent viewKey={viewKey}>{mainContent}</MainContent>
         </div>
       </div>
