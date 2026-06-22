@@ -18,6 +18,8 @@ import {
   collectSourceFiles,
   findCnuiFormAdapterUsage,
   checkCnuiFormAdapter,
+  findFormRegistryRegisterCall,
+  checkFormRegistryResidual,
 } from '../validate-domain-structure'
 
 /** 内联 source → SourceFile（setParentNodes=true 供 getText 用） */
@@ -356,5 +358,54 @@ describe('findCnuiFormAdapterUsage（L4-1 纯函数）', () => {
   it('无引用 → null', () => {
     const source = sf(`import { HabitForm } from '@/domains/habits/components/habit-form'`)
     expect(findCnuiFormAdapterUsage(source)).toBeNull()
+  })
+})
+
+// ─── L7-2: checkFormRegistryResidual 测试 ──────────────────────
+
+describe('findFormRegistryRegisterCall（L7-2 纯函数）', () => {
+  it('FormRegistry.register( 调用 → 命中', () => {
+    const source = sf(`FormRegistry.register('habits', 'createHabit', {} as any)`)
+    expect(findFormRegistryRegisterCall(source)).not.toBeNull()
+  })
+  it('FormRegistry.get( 不命中（仅禁 register）', () => {
+    const source = sf(`const c = FormRegistry.get('habits', 'createHabit')`)
+    expect(findFormRegistryRegisterCall(source)).toBeNull()
+  })
+  it('无 FormRegistry → null', () => {
+    const source = sf(`const x = otherRegistry.register('a')`)
+    expect(findFormRegistryRegisterCall(source)).toBeNull()
+  })
+})
+
+describe('checkFormRegistryResidual（L7-2 文件系统）', () => {
+  it('存在 register-form.ts 文件 → 报 form-registry-residual', () => {
+    const dir = fs.mkdtempSync(ppath.join(os.tmpdir(), 'src-'))
+    fs.mkdirSync(ppath.join(dir, 'domains', 'habits'), { recursive: true })
+    fs.writeFileSync(ppath.join(dir, 'domains', 'habits', 'register-form.ts'), 'export {}')
+    const diags = checkFormRegistryResidual(dir)
+    expect(diags).toHaveLength(1)
+    expect(diags[0].rule).toBe('form-registry-residual')
+    expect(diags[0].file).toContain('register-form.ts')
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+  it('含 FormRegistry.register 调用的域文件 → 报', () => {
+    const dir = fs.mkdtempSync(ppath.join(os.tmpdir(), 'src-'))
+    fs.mkdirSync(ppath.join(dir, 'domains', 'habits'), { recursive: true })
+    fs.writeFileSync(
+      ppath.join(dir, 'domains', 'habits', 'foo.ts'),
+      `FormRegistry.register('habits', 'createHabit', {} as any)`,
+    )
+    const diags = checkFormRegistryResidual(dir)
+    expect(diags).toHaveLength(1)
+    expect(diags[0].rule).toBe('form-registry-residual')
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+  it('干净域 → 零诊断', () => {
+    const dir = fs.mkdtempSync(ppath.join(os.tmpdir(), 'src-'))
+    fs.mkdirSync(ppath.join(dir, 'domains', 'tasks'), { recursive: true })
+    fs.writeFileSync(ppath.join(dir, 'domains', 'tasks', 'surface.ts'), 'export const x = 1')
+    expect(checkFormRegistryResidual(dir)).toEqual([])
+    fs.rmSync(dir, { recursive: true, force: true })
   })
 })

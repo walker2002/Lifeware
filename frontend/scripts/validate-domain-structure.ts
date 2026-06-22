@@ -400,6 +400,61 @@ export function checkCnuiFormAdapter(srcDir: string): Diagnostic[] {
   return diags
 }
 
+// ─── [019.1] L7-2：禁 FormRegistry.register + register-form.ts 残留 ─────────
+
+/** 在单个 sourceFile 中检测 FormRegistry.register( 调用，返回首个命中位置。 */
+export function findFormRegistryRegisterCall(sf: ts.SourceFile): { line: number } | null {
+  let found: { line: number } | null = null
+  const visit = (node: ts.Node) => {
+    if (found) return
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText() === 'FormRegistry' &&
+      node.expression.name.text === 'register'
+    ) {
+      const { line } = sf.getLineAndCharacterOfPosition(node.getStart())
+      found = { line: line + 1 }
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return found
+}
+
+/**
+ * L7-2：扫 src/domains/** 下 FormRegistry.register 调用 + register-form.ts 文件残留（零豁免）。
+ * @param srcDir - frontend/src 绝对路径（内部 join 'domains'）
+ */
+export function checkFormRegistryResidual(srcDir: string): Diagnostic[] {
+  const diags: Diagnostic[] = []
+  const domainsDir = path.join(srcDir, 'domains')
+  for (const f of collectSourceFiles(domainsDir)) {
+    if (path.basename(f) === 'register-form.ts') {
+      diags.push({
+        file: path.relative(srcDir, f),
+        level: 'error',
+        rule: 'form-registry-residual',
+        message: `禁止存在 register-form.ts（§IX 已 supersede；L7-2）— 表单注册中心已退役，surface 须手写`,
+      })
+      continue
+    }
+    const content = fs.readFileSync(f, 'utf-8')
+    const sf = ts.createSourceFile(f, content, ts.ScriptTarget.Latest, true)
+    const hit = findFormRegistryRegisterCall(sf)
+    if (hit) {
+      diags.push({
+        file: path.relative(srcDir, f),
+        level: 'error',
+        rule: 'form-registry-residual',
+        message: `第 ${hit.line} 行：禁止 FormRegistry.register（§IX 已 supersede；L7-2）— 表单注册中心已退役`,
+      })
+    }
+  }
+  return diags
+}
+
 // ─── 常量实例 + CLI ──────────────────────────────────────────
 
 const ROOT_DIR = path.resolve(__dirname, '..')
