@@ -9,7 +9,9 @@
  * 架构说明（宪法 §III 1.11.0 业务事实写入口）：
  * - 读操作：直接调用 Repository（设计规格允许）
  * - 写操作（创建/状态转换）：通过 submitDynamicIntent 走完整 Nexus 链路（SM lifecycle）
- * - 字段写（updateTask/updateThread）：经 createTasksMutationService 写入口，
+ * - 字段写（updateTask/updateThread）：经 createTasksMutationService.execute
+ *   单事务聚合写——所有非 undefined 字段构造为 field steps 原子写入，任一字段校验
+ *   失败整体回滚（修复「逐字段 service.update 无事务」半截改动 bug）。字段步内部
  *   FactField 走字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
  *   ContentField 直走 repo.updateFields；不再直接 repo.update 写 FactField。
  * - 完成任务（completeTask）：字段（actualDuration/notes）+ 状态（complete）在
@@ -94,34 +96,51 @@ export async function createTask(input: CreateTaskInput & { title: string }): Pr
 }
 
 /**
- * 更新任务字段（经业务事实写入口）
+ * 更新任务字段（经业务事实写入口，单事务聚合写）
  *
- * 按字段逐一经写入口写：FactField（priority/energyRequired/estimatedDuration/
- * dueDate/threadId 等）走字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
- * ContentField（title/description/color 等）直走 repo.updateFields。
- * 不再直接 repo.update 写 FactField（消除 repo-bypass 违宪）。
+ * 把 input 的所有非 undefined 字段构造为 field steps，在 service.execute 单事务内
+ * 原子写入（对齐 updateHabit intent.ts:910）。任一字段校验失败 → 整体回滚，不留
+ * 半截改动（修复「逐字段 service.update 无事务」bug，revisit 存档案题1 实案）。
+ *
+ * 字段写均经字段执行器（字段级校验 + updateFields + TaskFieldUpdated），不直接
+ * repo.update 写 FactField（消除 repo-bypass 违宪）。
  *
  * @param taskId - 任务 ID
- * @param input - 更新数据
+ * @param input - 更新数据（仅值非 undefined 的字段落库）
  * @returns 更新后的任务
  */
 export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
-  const service = createTasksMutationService()
-  for (const [field, value] of Object.entries(input)) {
-    if (value === undefined) continue
-    const res = await service.update(
-      taskId as USOM_ID,
-      field,
-      value,
-      MVP_USER_ID as USOM_ID,
-      'tasks',
-      'task',
-    )
-    if (!res.success) {
-      throw new Error(res.error ?? `更新字段 "${field}" 失败`)
-    }
+  // 每个值非 undefined 的字段构造一个 field step，单事务原子写
+  const fieldSteps = Object.entries(input)
+    .filter(([, v]) => v !== undefined)
+    .map(([field, value]) => ({ kind: 'field' as const, field, value }))
+
+  // 无字段可写：直接读回当前任务
+  if (fieldSteps.length === 0) {
+    const repo = new TaskRepository()
+    const task = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!task) throw new Error('任务不存在')
+    return task
   }
-  // 读回最新对象（读操作允许直接 repo 调用）
+
+  const service = createTasksMutationService()
+  const res = await service.execute(
+    {
+      id: crypto.randomUUID() as USOM_ID,
+      domainId: 'tasks',
+      objectType: 'task',
+      targetId: taskId as USOM_ID,
+      steps: fieldSteps,
+    },
+    MVP_USER_ID as USOM_ID,
+  )
+
+  if (!res.success) {
+    throw new Error(res.error ?? '更新任务失败')
+  }
+
+  // 纯 field steps 路径下 res.object 为 undefined（execute 仅 state step 设 lastObject），
+  // 兜底 findById 读回更新后的任务
   const repo = new TaskRepository()
   const updated = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!updated) throw new Error('任务不存在')
@@ -341,32 +360,49 @@ export async function createThread(input: CreateThreadInput & { name: string }):
 }
 
 /**
- * 更新主线字段（经业务事实写入口）
+ * 更新主线字段（经业务事实写入口，单事务聚合写）
  *
- * 按字段逐一经写入口写：FactField（priority）走字段执行器，
- * ContentField（name/description/color 等）直走 repo.updateFields。
- * 不再直接 repo.update 写 FactField（消除 repo-bypass 违宪）。
+ * 把 input 的所有非 undefined 字段构造为 field steps，在 service.execute 单事务内
+ * 原子写入（对齐 updateTask tasks.ts:110）。任一字段校验失败 → 整体回滚，不留
+ * 半截改动（修复「逐字段 service.update 无事务」bug，revisit 存档案题1 实案，
+ * 与 updateTask 同病）。objectType='thread' 使字段步路由到 thread 仓储 + 字段执行器。
  *
  * @param threadId - 主线 ID
- * @param input - 更新数据
+ * @param input - 更新数据（仅值非 undefined 的字段落库）
  * @returns 更新后的主线
  */
 export async function updateThread(threadId: string, input: UpdateThreadInput): Promise<Thread> {
-  const service = createTasksMutationService()
-  for (const [field, value] of Object.entries(input)) {
-    if (value === undefined) continue
-    const res = await service.update(
-      threadId as USOM_ID,
-      field,
-      value,
-      MVP_USER_ID as USOM_ID,
-      'tasks',
-      'thread',
-    )
-    if (!res.success) {
-      throw new Error(res.error ?? `更新字段 "${field}" 失败`)
-    }
+  // 每个值非 undefined 的字段构造一个 field step，单事务原子写
+  const fieldSteps = Object.entries(input)
+    .filter(([, v]) => v !== undefined)
+    .map(([field, value]) => ({ kind: 'field' as const, field, value }))
+
+  // 无字段可写：直接读回当前主线
+  if (fieldSteps.length === 0) {
+    const repo = new ThreadRepository()
+    const thread = await repo.findById(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!thread) throw new Error('主线不存在')
+    return thread
   }
+
+  const service = createTasksMutationService()
+  const res = await service.execute(
+    {
+      id: crypto.randomUUID() as USOM_ID,
+      domainId: 'tasks',
+      objectType: 'thread',
+      targetId: threadId as USOM_ID,
+      steps: fieldSteps,
+    },
+    MVP_USER_ID as USOM_ID,
+  )
+
+  if (!res.success) {
+    throw new Error(res.error ?? '更新主线失败')
+  }
+
+  // 纯 field steps 路径下 res.object 为 undefined（execute 仅 state step 设 lastObject），
+  // 兜底 findById 读回更新后的主线
   const repo = new ThreadRepository()
   const updated = await repo.findById(threadId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!updated) throw new Error('主线不存在')

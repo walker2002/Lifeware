@@ -3,7 +3,10 @@
  * @brief T7 — tasks.ts 迁移到业务事实写入口的行为测试
  *
  * 验证违宪写法已消除、改走写入口：
- *  - updateTask(priority) → 经 service.update（字段执行器路径），不直写 repo.update
+ *  - updateTask(priority) → 经 service.execute 单事务聚合写（不逐字段、不直写 repo.update，
+ *    修复「逐字段 service.update 无事务」半截改动 bug）
+ *  - updateThread(name) → 同走 service.execute 单事务聚合写（objectType='thread'，
+ *    与 updateTask 同病同修）
  *  - completeTask → 经 service.execute 单事务（字段先 + 状态后），不两阶段 repo.update
  *  - promoteToThread → 经 service.execute 聚合事务（create thread + 迁子任务 + 删原任务），
  *    不直写 repo.update(status='deleted')
@@ -63,25 +66,36 @@ describe('T7 tasks.ts 迁移 — 写入口路径', () => {
     submitDynamicIntentMock.mockResolvedValue({ success: true, object: { id: 'thread-1' } })
   })
 
-  it('updateTask(priority) 经 service.update（不直写 repo.update）', async () => {
+  it('updateTask(priority) 经 service.execute 单事务聚合写（不逐字段、不直写 repo.update）', async () => {
     taskFindByIdMock.mockResolvedValue({ id: 'task-1', priority: 'high' })
 
     await updateTask('task-1', { priority: 'high' } as any)
 
-    // 经写入口 update，objectType='task'，字段 priority
-    expect(updateMock).toHaveBeenCalledWith(
-      'task-1', 'priority', 'high', expect.any(String), 'tasks', 'task',
-    )
+    // 经写入口 execute 单事务聚合写（修复逐字段无事务 bug），objectType='task'
+    expect(executeMock).toHaveBeenCalledTimes(1)
+    const [intent] = executeMock.mock.calls[0]
+    expect(intent.objectType).toBe('task')
+    expect(intent.targetId).toBe('task-1')
+    // priority 作为单个 field step（聚合写，非逐字段多次 update）
+    expect(intent.steps.map((s: any) => s.field)).toEqual(['priority'])
+    // 不再走逐字段 service.update
+    expect(updateMock).not.toHaveBeenCalled()
   })
 
-  it('updateThread(name) 经 service.update（objectType=thread）', async () => {
+  it('updateThread(name) 经 service.execute 单事务聚合写（objectType=thread，不逐字段）', async () => {
     threadFindByIdMock.mockResolvedValue({ id: 'thread-1', name: '新名称' })
 
     await updateThread('thread-1', { name: '新名称' } as any)
 
-    expect(updateMock).toHaveBeenCalledWith(
-      'thread-1', 'name', '新名称', expect.any(String), 'tasks', 'thread',
-    )
+    // 经写入口 execute 单事务聚合写，objectType='thread'
+    expect(executeMock).toHaveBeenCalledTimes(1)
+    const [intent] = executeMock.mock.calls[0]
+    expect(intent.objectType).toBe('thread')
+    expect(intent.targetId).toBe('thread-1')
+    // name 作为单个 field step（聚合写，非逐字段多次 update）
+    expect(intent.steps.map((s: any) => s.field)).toEqual(['name'])
+    // 不再走逐字段 service.update
+    expect(updateMock).not.toHaveBeenCalled()
   })
 
   it('completeTask 字段+状态在 service.execute 单事务内（先字段后状态）', async () => {
