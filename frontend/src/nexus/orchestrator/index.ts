@@ -28,7 +28,7 @@ import type {
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOMSnapshot } from '@/usom/types/process'
-import { createGenericStateMachine } from '../core/state-machine'
+import { createGenericStateMachine } from '@/nexus/core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain, findHandler } from '@/domains/registry'
 import { buildActionMap, resolveObjectType, getLifecycleFromManifest } from './lifecycle-configs'
