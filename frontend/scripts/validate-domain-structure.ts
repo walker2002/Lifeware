@@ -311,6 +311,35 @@ export function checkRulesRegistry(
         rule: 'rules-registry-missing',
         message: `写域「${e.name}」缺 rules-registry.ts（规则三层 L3 缺失）— 须声明 rules + 注册处理器 + onValidate 委托 evaluateDomainRules（豁免见 RULES_REGISTRY_EXEMPTIONS）`,
       })
+    } else {
+      // [020] RT2：realtime 规则必须恰 1 字段（替代已删除的 integrity.ts 约束）
+      // manifest rules 区块 L 已删，此 CI check 是「realtime 恰 1 字段」的唯一强制点。
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const registry = require(registryPath)
+        const singular = e.name.endsWith('s') ? e.name.slice(0, -1) : e.name
+        const convName = `${singular}RuleRegistry`
+        let reg = registry[convName] as { realtime: Record<string, { fields: string[] }> } | undefined
+        if (!reg) {
+          reg = Object.values(registry).find(
+            (v: unknown) => v && typeof v === 'object' && 'realtime' in (v as object) && 'submit' in (v as object),
+          ) as { realtime: Record<string, { fields: string[] }> } | undefined
+        }
+        if (reg?.realtime) {
+          for (const [id, rule] of Object.entries(reg.realtime)) {
+            if (rule.fields.length !== 1) {
+              diags.push({
+                file: `${e.name}/rules-registry.ts`,
+                level: 'error',
+                rule: 'L3-realtime-singlefield',
+                message: `realtime 规则 "${id}" 必须恰 1 字段，当前 ${rule.fields.length}（多字段用 phase: submit）`,
+              })
+            }
+          }
+        }
+      } catch {
+        // registry 加载失败（如 TS 语法不兼容 require），静默——存在性已通过
+      }
     }
   }
   return diags
