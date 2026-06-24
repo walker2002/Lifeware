@@ -1,6 +1,6 @@
 /**
  * @file rules-registry
- * @brief [018-G3] R2 tasks 域规则注册表（命令式处理器）
+ * @brief tasks 域规则注册表（命令式处理器）。
  *
  * 纯 TS 模块（无 React / 无 fs），client + server 皆可 import。
  * - realtime（phase: both）：action-invariant 单字段纯函数，客户端 blur
@@ -9,13 +9,15 @@
  *   normalizeFieldValues 预处理由 hooks.ts 上游执行；transition 查找表已修正），
  *   返回 validationRejected(全部 errors)
  *
- * D 模式：聚合规则在 manifest 中置首，submit 聚合时其 Rejected 先胜出、吞掉粒度规则。
+ * [020] registry 即 SSOT：每条 rule 自带 { check, fields, message } meta，
+ * realtime rule 的 message 引用 TASK_RULE_MESSAGES 单源常量（与 validation.ts 共用），
+ * manifest 不再声明 rules。D 模式：聚合规则置首，submit 聚合时其 Rejected 先胜出、吞掉粒度规则。
  * @see docs/superpowers/specs/2026-06-20-rules-three-tier-architecture-design.md §4
  */
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { DomainRuleRegistry, RealtimeCheck, SubmitCheck } from '@/nexus/rules/types'
 import { Priority, EnergyLevel } from '@/usom/types/primitives'
-import { validateTaskFields, validateThreadFields } from './validation'
+import { validateTaskFields, validateThreadFields, TASK_RULE_MESSAGES } from './validation'
 import { taskTransitions as rawTaskTransitions, threadTransitions as rawThreadTransitions } from './transitions'
 
 const VALID_PRIORITIES = Object.values(Priority)
@@ -47,28 +49,28 @@ const THREAD_TRANSITION_MAP = buildTransitionMap(rawThreadTransitions)
 /** 仅在值「存在且为 number 且 ≤0」时报错（允许 update 部分更新时不传该字段） */
 const estimatedDurationPositive: RealtimeCheck = (value) => {
   if (typeof value === 'number' && value <= 0) {
-    return [{ field: 'estimatedDuration', message: '预估时长必须大于 0' }]
+    return [{ field: 'estimatedDuration', message: TASK_RULE_MESSAGES.estimatedDurationPositive }]
   }
   return []
 }
 
 const estimatedDurationMax: RealtimeCheck = (value) => {
   if (typeof value === 'number' && value > 1440) {
-    return [{ field: 'estimatedDuration', message: '预估时长不能超过 24 小时（1440 分钟）' }]
+    return [{ field: 'estimatedDuration', message: TASK_RULE_MESSAGES.estimatedDurationMax }]
   }
   return []
 }
 
 const priorityValid: RealtimeCheck = (value) => {
   if (typeof value === 'string' && value !== '' && !VALID_PRIORITIES.includes(value as Priority)) {
-    return [{ field: 'priority', message: '优先级必须是 critical/high/medium/low 之一' }]
+    return [{ field: 'priority', message: TASK_RULE_MESSAGES.priorityValid }]
   }
   return []
 }
 
 const energyRequiredValid: RealtimeCheck = (value) => {
   if (typeof value === 'string' && value !== '' && !VALID_ENERGY_LEVELS.includes(value as EnergyLevel)) {
-    return [{ field: 'energyRequired', message: '能量要求必须是 high/medium/low 之一' }]
+    return [{ field: 'energyRequired', message: TASK_RULE_MESSAGES.energyRequiredValid }]
   }
   return []
 }
@@ -77,7 +79,7 @@ const energyRequiredValid: RealtimeCheck = (value) => {
 const dueDateFormat: RealtimeCheck = (value) => {
   if (value !== undefined && value !== null && value !== '') {
     if (typeof value !== 'string' || !DATE_REGEX.test(value)) {
-      return [{ field: 'dueDate', message: '截止日期格式必须是 YYYY-MM-DD' }]
+      return [{ field: 'dueDate', message: TASK_RULE_MESSAGES.dueDateFormat }]
     }
   }
   return []
@@ -86,7 +88,7 @@ const dueDateFormat: RealtimeCheck = (value) => {
 const colorFormat: RealtimeCheck = (value) => {
   if (value !== undefined && value !== null && value !== '') {
     if (typeof value !== 'string' || !COLOR_REGEX.test(value)) {
-      return [{ field: 'color', message: '颜色格式必须是 #RRGGBB' }]
+      return [{ field: 'color', message: TASK_RULE_MESSAGES.colorFormat }]
     }
   }
   return []
@@ -125,14 +127,42 @@ const actionFieldsValid: SubmitCheck = async (intent) => {
 
 export const taskRuleRegistry: DomainRuleRegistry = {
   realtime: {
-    task_estimated_duration_positive: estimatedDurationPositive,
-    task_estimated_duration_max: estimatedDurationMax,
-    task_priority_valid: priorityValid,
-    task_energy_required_valid: energyRequiredValid,
-    task_due_date_format: dueDateFormat,
-    thread_color_format: colorFormat,
+    task_estimated_duration_positive: {
+      check: estimatedDurationPositive,
+      fields: ['estimatedDuration'],
+      message: TASK_RULE_MESSAGES.estimatedDurationPositive,
+    },
+    task_estimated_duration_max: {
+      check: estimatedDurationMax,
+      fields: ['estimatedDuration'],
+      message: TASK_RULE_MESSAGES.estimatedDurationMax,
+    },
+    task_priority_valid: {
+      check: priorityValid,
+      fields: ['priority'],
+      message: TASK_RULE_MESSAGES.priorityValid,
+    },
+    task_energy_required_valid: {
+      check: energyRequiredValid,
+      fields: ['energyRequired'],
+      message: TASK_RULE_MESSAGES.energyRequiredValid,
+    },
+    task_due_date_format: {
+      check: dueDateFormat,
+      fields: ['dueDate'],
+      message: TASK_RULE_MESSAGES.dueDateFormat,
+    },
+    thread_color_format: {
+      check: colorFormat,
+      fields: ['color'],
+      message: TASK_RULE_MESSAGES.colorFormat,
+    },
   },
   submit: {
-    task_action_fields_valid: actionFieldsValid,
+    task_action_fields_valid: {
+      check: actionFieldsValid,
+      fields: ['title', 'description', 'priority', 'energyRequired', 'estimatedDuration', 'dueDate', 'threadId', 'parentId', 'name', 'color', 'targetStatus', 'currentStatus', 'targetType'],
+      message: '任务/主线字段校验失败',
+    },
   },
 }

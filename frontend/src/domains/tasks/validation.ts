@@ -2,10 +2,25 @@
  * @file validation
  * @brief Tasks Domain 字段验证规则
  *
- * 遵循 Constitution：Domain 层的纯函数验证，无副作用
+ * 遵循 Constitution：Domain 层的纯函数验证，无副作用。
+ * [020] RT1：realtime 单字段规则的 message 在此单源定义（TASK_RULE_MESSAGES），
+ * 供 rules-registry.ts 与本文件 submit 聚合校验共用，防漂移致回填失配。
  */
 
 import { Priority, EnergyLevel } from '../../usom/types/primitives'
+
+/**
+ * [020] F1：rule message 单源，registry realtime 与 submit 校验共用，防漂移致回填失配。
+ * 文本逐字取自原 manifest L 区 rules 声明。
+ */
+export const TASK_RULE_MESSAGES = {
+  estimatedDurationPositive: '预估时长必须大于 0',
+  estimatedDurationMax: '预估时长不能超过 24 小时（1440 分钟）',
+  priorityValid: '优先级必须是 critical/high/medium/low 之一',
+  energyRequiredValid: '能量要求必须是 high/medium/low 之一',
+  dueDateFormat: '截止日期格式必须是 YYYY-MM-DD',
+  colorFormat: '颜色格式必须是 #RRGGBB',
+} as const
 
 // ─── 任务字段验证 ────────────────────────────────────────────────
 
@@ -42,10 +57,10 @@ export function validateTaskFields(
   const estimatedDuration = fields['estimatedDuration']
   if (estimatedDuration !== undefined) {
     if (typeof estimatedDuration !== 'number' || estimatedDuration <= 0) {
-      errors.push('预估时长必须大于 0')
+      errors.push(TASK_RULE_MESSAGES.estimatedDurationPositive)
     }
     if (typeof estimatedDuration === 'number' && estimatedDuration > 1440) {
-      errors.push('预估时长不能超过 24 小时（1440 分钟）')
+      errors.push(TASK_RULE_MESSAGES.estimatedDurationMax)
     }
   }
 
@@ -54,7 +69,7 @@ export function validateTaskFields(
   if (priority !== undefined) {
     const validPriorities = Object.values(Priority)
     if (!validPriorities.includes(priority as Priority)) {
-      errors.push('优先级必须是 critical/high/medium/low 之一')
+      errors.push(TASK_RULE_MESSAGES.priorityValid)
     }
   }
 
@@ -63,7 +78,7 @@ export function validateTaskFields(
   if (energyRequired !== undefined) {
     const validLevels = Object.values(EnergyLevel)
     if (!validLevels.includes(energyRequired as EnergyLevel)) {
-      errors.push('能量要求必须是 high/medium/low 之一')
+      errors.push(TASK_RULE_MESSAGES.energyRequiredValid)
     }
   }
 
@@ -71,7 +86,7 @@ export function validateTaskFields(
   const dueDate = fields['dueDate']
   if (dueDate !== undefined && dueDate !== null) {
     if (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-      errors.push('截止日期格式必须是 YYYY-MM-DD')
+      errors.push(TASK_RULE_MESSAGES.dueDateFormat)
     }
   }
 
@@ -107,7 +122,7 @@ export function validateThreadFields(
   const color = fields['color']
   if (color !== undefined && color !== null) {
     if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
-      errors.push('颜色格式必须是 #RRGGBB')
+      errors.push(TASK_RULE_MESSAGES.colorFormat)
     }
   }
 
