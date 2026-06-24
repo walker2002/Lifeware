@@ -243,6 +243,10 @@ describe('[025] 任务级联处理', () => {
       expect(preview.cascadeAction).toBe('cascade_complete')
       expect(preview.allDescendants).toHaveLength(1)
       expect(preview.allDescendants[0].id).toBe('t2')
+      // [025] D2 — 需正确 surfacing 出 needsConfirmation 信号 + 透传中文确认消息
+      expect(result.needsConfirmation).toBe(true)
+      expect(result.confirmationMessage).toContain('连带')
+      expect(result.confirmationMessage).toContain('完成')
       expect(mockSmExecute).not.toHaveBeenCalled()
     })
 
@@ -271,6 +275,12 @@ describe('[025] 任务级联处理', () => {
       expect(preview.allDescendants).toHaveLength(5)
       const ids = preview.allDescendants.map((d: any) => d.id)
       expect(ids).toEqual(expect.arrayContaining(['t2', 't3', 't4', 't5', 't6']))
+      // [025] D2 — 有孙级时确认消息应含孙级数量与直接子任务数量
+      expect(result.needsConfirmation).toBe(true)
+      expect(result.confirmationMessage).toContain('连带')
+      expect(result.confirmationMessage).toContain('5 个下级任务')
+      expect(result.confirmationMessage).toContain('2 个直接子任务')
+      expect(result.confirmationMessage).toContain('3 个孙级')
     })
   })
 

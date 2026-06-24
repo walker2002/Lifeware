@@ -413,9 +413,17 @@ async function cascadeCheck(
       allDescendants,
     }
 
+    // 构造级联确认提示消息：根据父动作类型给出动词，区分直接子任务与孙级数量
+    const grandchildCount = Math.max(0, cascadePreview.totalCount - cascadePreview.directCount)
+    const actionLabel = action.startsWith('complete') ? '完成'
+      : action.startsWith('archive') ? '归档' : '删除'
+    const confirmationMessage = `将连带${actionLabel} ${cascadePreview.totalCount} 个下级任务` +
+      (grandchildCount > 0 ? `（${cascadePreview.directCount} 个直接子任务 + ${grandchildCount} 个孙级）` : '') +
+      `。确定连带处理？`
+
     return {
       kind: 'NeedConfirm',
-      data: { source: 'cascade', cascadePreview },
+      data: { source: 'cascade', cascadePreview, confirmationMessage },
     }
   } catch {
     // DB 查询失败（测试环境非 UUID ID / 连接异常等）→ 降级为无级联，放行
@@ -756,9 +764,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
             success: false,
             suspended: { reason: 'need_confirm', data: aggregated.data },
             // 兼容旧消费方（intent.ts 透传字段）
-            needsConfirmation: data?.source === 'rule' ? true : false,
+            // [025] cascade 同样需要触发确认卡，且透传 cascadeCheck 构造的中文消息
+            needsConfirmation: data?.source === 'rule' || data?.source === 'cascade' ? true : false,
             needsCnuiConfirmation: data?.source === 'cnui' ? true : false,
-            confirmationMessage: confirmations?.join('; '),
+            confirmationMessage: data?.source === 'cascade' ? (data.confirmationMessage as string) : confirmations?.join('; '),
             cnuiAction: data?.source === 'cnui' ? (data.cnuiAction as string) : undefined,
             cnuiDomain: data?.source === 'cnui' ? (data.cnuiDomain as string) : undefined,
             cnuiSurface: data?.source === 'cnui' ? (data.cnuiSurface as string) : undefined,
