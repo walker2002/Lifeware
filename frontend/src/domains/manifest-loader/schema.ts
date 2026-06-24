@@ -65,22 +65,16 @@ const LifecycleDefinitionSchema = z.object({
 })
 
 /**
- * 字段元数据模式
+ * 字段元数据模式（[020] 仅保留运行时消费字段：type/options/mutation_mode。
+ * label/required/default_value/description 已删——前端表单手写硬编码，零运行时消费。
+ * ManifestSchema 非 strict，旧域（okrs/timebox）残留的 label/required 会被 strip 不报错。）
  */
 const FieldMetadataSchema = z.object({
-  /** 字段类型 */
+  /** 字段类型（field-executor 校验消费） */
   type: z.enum(['string', 'number', 'boolean', 'date', 'time', 'enum', 'json', 'lifecycle_timestamp']),
-  /** 显示标签 */
-  label: z.string(),
-  /** 是否必填 */
-  required: z.boolean(),
-  /** 枚举选项 */
+  /** 枚举选项（field-executor enum 校验消费） */
   options: z.array(z.string()).optional(),
-  /** 默认值 */
-  default_value: z.unknown().optional(),
-  /** 描述 */
-  description: z.string().optional(),
-  /** 字段写入分类（[018] 业务事实写入口）：FactField 走写入口 / ContentField 直走 Repo / PresentationField 本地态 */
+  /** 字段写入分类（resolveMutationMode 消费）：FactField 走写入口 / ContentField 直走 Repo / PresentationField 本地态 */
   mutation_mode: z.enum(['FactField', 'ContentField', 'PresentationField']).optional(),
 })
 
