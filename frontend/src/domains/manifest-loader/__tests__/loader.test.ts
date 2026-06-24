@@ -187,4 +187,17 @@ subscribed_events: []
       expect(result.manifest.field_metadata['title'].mutation_mode).toBeUndefined()
     }
   })
+
+  it('[020] okrs 旧 C 残留 label/required 被 strip，load 成功', () => {
+    const realDir = path.resolve(__dirname, '../../okrs')
+    const loaded = loadDomainManifest(realDir)
+    expect(loaded.success).toBe(true)
+    // zod 非 strict strip：旧域 field_metadata 中 label/required/default_value/description 被剥离
+    if (loaded.success) {
+      const titleMeta = loaded.manifest.field_metadata?.title as Record<string, unknown> | undefined
+      expect(titleMeta).toBeDefined()
+      expect(titleMeta).not.toHaveProperty('label')
+      expect(titleMeta).not.toHaveProperty('required')
+    }
+  })
 })

@@ -309,7 +309,7 @@ export function checkRulesRegistry(
         file: `${e.name}/rules-registry.ts`,
         level: 'error',
         rule: 'rules-registry-missing',
-        message: `写域「${e.name}」缺 rules-registry.ts（规则三层 L3 缺失）— 须声明 rules + 注册处理器 + onValidate 委托 evaluateDomainRules（豁免见 RULES_REGISTRY_EXEMPTIONS）`,
+        message: `写域「${e.name}」缺 rules-registry.ts（规则三层 L3 缺失）— 须注册 rules-registry 处理器 + onValidate 委托 evaluateDomainRules（registry 即 SSOT）`,
       })
     } else {
       // [020] RT2：realtime 规则必须恰 1 字段（替代已删除的 integrity.ts 约束）
@@ -500,10 +500,10 @@ export const WRITE_ENTRY_EXEMPTIONS = [
   },
 ] as const
 
-/** rules-registry 豁免（缺 L3，带 sunset） */
+/** rules-registry 豁免（缺 L3 + [020] C/L 旧范式，带 sunset） */
 export const RULES_REGISTRY_EXEMPTIONS = [
-  { domain: 'okrs', reason: '无 rules-registry（前范式遗产）', sunset: 'okrs 全量 onboarding' },
-  { domain: 'timebox', reason: '写域缺 L3 规则三层', sunset: 'timebox L3 补齐' },
+  { domain: 'okrs', reason: '无 rules-registry + C 区 field_metadata 仍带旧范式（[020] 未迁，registry 即 SSOT 的例外）', sunset: 'okrs 全量 onboarding' },
+  { domain: 'timebox', reason: '写域缺 L3 规则三层 + C 区 field_metadata 仍带旧范式（[020] 未迁）', sunset: 'timebox L3 补齐 + 全量 onboarding' },
 ] as const
 
 const WRITE_ENTRY_EXEMPTION_SET = new Set(WRITE_ENTRY_EXEMPTIONS.map(e => e.file))
