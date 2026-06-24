@@ -1,6 +1,6 @@
 # 宪法修订提案：§IX 规则三层范式收敛（registry 即 SSOT）+ 字段三分类澄清
 
-> **状态**：🟡 **PROPOSED（2026-06-24）** — 待 §Amendment Procedure 审议
+> **状态**：✅ **EFFECTIVE（2026-06-24）** — 已实施，constitution v2.1.0
 > **来源**：[020] 去 manifest C/L 范式重构（design doc `docs/superpowers/specs/2026-06-23-020-rules-management-redesign.md`）
 > **版本影响**：**MINOR**——manifest `rules:` 声明层移除、registry 升为 SSOT（实质性治理扩展），2.0.0 → 2.1.0。
 
@@ -33,9 +33,9 @@
 - 工具链：`scripts/validate-manifest.ts` 删区块 G；`integrity.ts` 删除。
 - Tier-2 同步：`docs/domain-development-guide.md` 规则三层描述同步。
 
-## 生效状态（待审议）
-- [ ] 书面 rationale + impact analysis（上）✅
-- [ ] 无原则冲突核验（上）✅
-- [ ] 版本递增 MINOR 2.0.0→2.1.0 ⏳
-- [ ] constitution.md 更新 + Spec Kit 模板一致性传播 ⏳
-- [ ] manifest.md 版本历史更新 ⏳
+## 生效状态（✅ EFFECTIVE 2026-06-24）
+- [x] 书面 rationale + impact analysis（上）✅
+- [x] 无原则冲突核验（上）✅
+- [x] 版本递增 MINOR 2.0.0→2.1.0 ✅（constitution.md 5e880fb）
+- [x] constitution.md 更新 + Spec Kit 模板一致性传播 ✅
+- [x] manifest.md 版本历史更新 ✅（Task 6.3）
