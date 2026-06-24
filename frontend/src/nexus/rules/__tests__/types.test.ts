@@ -56,3 +56,39 @@ describe('RuleSchema 不变式', () => {
     if (r.success) expect(r.data.rules).toBeUndefined()
   })
 })
+
+// ─── [020] registry rule 自带 meta（Phase 1：registry 即 SSOT）──────────────
+import type { DomainRuleRegistry, RealtimeRule, SubmitRule } from '../types'
+import { validationPassed } from '@/usom/types/process'
+
+describe('[020] registry rule 自带 meta', () => {
+  it('RealtimeRule 含 check/fields/message', () => {
+    const rule: RealtimeRule = {
+      check: () => [],
+      fields: ['estimatedDuration'],
+      message: '预估时长必须大于 0',
+    }
+    expect(rule.fields).toEqual(['estimatedDuration'])
+    expect(rule.message).toBe('预估时长必须大于 0')
+    expect(rule.check(5, {})).toEqual([])
+  })
+
+  it('SubmitRule 含 check/fields/message', () => {
+    const rule: SubmitRule = {
+      check: async () => validationPassed(),
+      fields: ['title'],
+      message: '字段校验失败',
+    }
+    expect(rule.fields).toEqual(['title'])
+    expect(typeof rule.check).toBe('function')
+  })
+
+  it('DomainRuleRegistry 接受自带 meta 的 rule 结构', () => {
+    const reg: DomainRuleRegistry = {
+      realtime: { r1: { check: () => [], fields: ['a'], message: 'm' } },
+      submit: { s1: { check: async () => validationPassed(), fields: ['a'], message: 'm' } },
+    }
+    expect(reg.realtime.r1.fields).toEqual(['a'])
+    expect(reg.submit.s1.message).toBe('m')
+  })
+})
