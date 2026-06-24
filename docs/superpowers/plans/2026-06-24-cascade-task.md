@@ -20,10 +20,8 @@
 | `src/domains/tasks/transitions.ts` | 修改 | +3 条 cascade_ 转换定义 |
 | `src/domains/manifest-loader/schema.ts` | 修改 | CascadeChildRuleSchema +cascade_action 可选字段 |
 | `src/nexus/orchestrator/index.ts` | 修改 | +cascadeCheck +parentConstraintCheck +拆分执行；tasks 域跳过 SM cascade |
-| `src/domains/tasks/repository/generic-repo-adapter.ts` | 修改 | task GenericRepo +findByParent +findByThread |
 | `src/nexus/core/state-machine/cascade.ts` | 不修改 | 保留（okrs 域未来复用） |
-| `src/nexus/orchestrator/__tests__/cascade-check.test.ts` | 新建 | 11 个测试场景 |
-| `src/domains/tasks/__tests__/cascade-lifecycle.test.ts` | 新建 | cascade_ transition 合规测试 |
+| `src/nexus/orchestrator/__tests__/cascade-check.test.ts` | 新建 | 15 个测试场景（T1-T15） |
 
 ---
 
@@ -183,57 +181,6 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
-
-### Task 2: GenericRepo adapter 扩展 — task 增加 findByParent + findByThread
-
-**Files:**
-- Modify: `frontend/src/domains/tasks/repository/generic-repo-adapter.ts`
-
-- [ ] **Step 1: TasksRepoPair 接口新增 findByParent + findByThread 签名**
-
-修改 `frontend/src/domains/tasks/repository/generic-repo-adapter.ts`，在 `TasksRepoPair.taskRepo` 接口中添加：
-
-```typescript
-interface TasksRepoPair {
-  taskRepo: {
-    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
-    create(fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
-    updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
-    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
-    findByParent(parentId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>[]>
-    findByUserId(userId: USOM_ID, filters?: Record<string, unknown>): Promise<Record<string, unknown>[]>
-  }
-  // ... threadRepo 保持不变
-}
-```
-
-- [ ] **Step 2: createTasksGenericRepo 的 task 对象新增 findByParent + findByThread**
-
-在 `createTasksGenericRepo` 返回的 `task` 对象中添加两个方法：
-
-```typescript
-task: {
-  // ... 现有方法保持不变 ...
-  async findByParent(parentId, userId, tx) {
-    const tasks = await repos.taskRepo.findByUserId(userId, { parentId })
-    return tasks
-  },
-  async findByThread(threadId, userId, tx) {
-    const tasks = await repos.taskRepo.findByUserId(userId, { threadId })
-    return tasks
-  },
-},
-```
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add frontend/src/domains/tasks/repository/generic-repo-adapter.ts
-git commit -m "feat(cascade): [025] GenericRepo adapter — task +findByParent +findByThread
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-```
 
 ---
 
@@ -463,25 +410,24 @@ async function parentConstraintCheck(
 
 - [ ] **Step 7: 在 NeedConfirm 处理中新增 cascade 路由**
 
-在 `executeIntent` 的 `if (aggregated.kind === 'NeedConfirm')` 块（约第 556 行）中，在现有 `return` 之前插入 cascade 特殊处理。找到该块开头：
+在 `executeIntent` 函数开头（`const snapshot = createStubSnapshot(userId)` 之后）声明级联局部变量：
 
 ```typescript
-      if (aggregated.kind === 'NeedConfirm') {
-        const data = aggregated.data as Record<string, unknown>
+      // [025] 级联拆分计划：在 NeedConfirm 块中赋值，在 SM 执行后消费
+      let cascadeSplitPlan: CascadePreview | undefined
 ```
 
-在 `const data = ...` 之后、兼容旧消费方代码之前，插入：
+在 `executeIntent` 的 `if (aggregated.kind === 'NeedConfirm')` 块中找到 `const data = aggregated.data as Record<string, unknown>` 之后，插入：
 
 ```typescript
-        // [025] 级联确认：若已确认，执行父 Intent + 拆分子 Intent
+        // [025] 级联确认：若已确认，设置拆分计划并 fall through 到 SM 执行
         if (data?.source === 'cascade' && confirmed) {
-          const preview = data.cascadePreview as CascadePreview
-          // 父 Intent 先执行（走完整 SM + 写入口）
-          // ... 继续走下面的 SM 路径（fall through 到通用 SM 处理）
-          // 将 cascadePreview 存到局部变量，供 SM 执行后使用
-          ;(intent as any).__cascadePreview = preview
+          cascadeSplitPlan = data.cascadePreview as CascadePreview
+          // fall through — 不 return，继续走下面的 SM 路径
         }
 ```
+
+注意：当 `source === 'cascade' && confirmed` 时，不要 return——让代码 fall through 到通用 SM 处理。当 `source === 'cascade' && !confirmed` 时，走现有 return（返回确认卡给用户）。
 
 - [ ] **Step 8: 在 SM 执行成功后添加子 Intent 拆分逻辑**
 
@@ -508,15 +454,14 @@ async function parentConstraintCheck(
         }
 
         // [025] 级联拆分执行
-        const cascadePreview = (intent as any).__cascadePreview as CascadePreview | undefined
-        if (cascadePreview && cascadePreview.allDescendants.length > 0) {
+        if (cascadeSplitPlan && cascadeSplitPlan.allDescendants.length > 0) {
           const childResults: Array<{ id: string; success: boolean; error?: string }> = []
-          for (const child of cascadePreview.allDescendants) {
+          for (const child of cascadeSplitPlan.allDescendants) {
             const childIntent: StructuredIntent = {
               id: crypto.randomUUID() as USOM_ID,
               intentionId: intent.intentionId,
               targetDomain: 'tasks',
-              action: cascadePreview.cascadeAction,
+              action: cascadeSplitPlan.cascadeAction,
               fields: {
                 taskId: child.id,
                 title: child.title,
@@ -541,7 +486,7 @@ async function parentConstraintCheck(
           const failedCount = childResults.filter(r => !r.success).length
           const warnings = [
             ...(ruleResult.warnings ?? []),
-            `级联操作完成：${cascadePreview.totalCount} 个子任务已处理` +
+            `级联操作完成：${cascadeSplitPlan.totalCount} 个子任务已处理` +
               (failedCount > 0 ? `，${failedCount} 个失败` : ''),
           ]
 
@@ -551,7 +496,7 @@ async function parentConstraintCheck(
             objectType: smObjectType,
             warnings,
             error: failedCount > 0
-              ? `${failedCount}/${cascadePreview.totalCount} 个子任务级联失败`
+              ? `${failedCount}/${cascadeSplitPlan.totalCount} 个子任务级联失败`
               : undefined,
           }
         }
@@ -746,7 +691,7 @@ describe('[025] parentConstraintCheck — createTask 双重约束', () => {
 })
 ```
 
-- [ ] **Step 6: 编写 T11: 确认取消 + T12: confirmed 执行全链路**
+- [ ] **Step 6: 编写 T11-T12: 确认取消 / confirmed 全链路 + T13-T15: 边缘场景**
 
 ```typescript
 describe('[025] 级联确认与执行', () => {
@@ -762,13 +707,38 @@ describe('[025] 级联确认与执行', () => {
   it('T12: confirmed=true → 父+子全部执行成功', async () => {
     // 构造 intent: completeTask, confirmed=true
     // cascadeCheck → NeedConfirm(CascadePreview)
-    // Orchestrator 处理 NeedConfirm + confirmed → 执行父 Intent
+    // Orchestrator 处理 NeedConfirm + confirmed → 设置 cascadeSplitPlan
     //   父 SM transition → success
     //   然后逐个执行子 Intent（cascade_complete）→ 走独立 executeIntent
     //   子 cascade_complete 经 cascadeCheck → Passed（前缀识别）
     // 预期: result.success === true
     //       所有子任务 updateStatus 被调用（completed）
     //       result.warnings 含 "级联操作完成：N 个子任务已处理"
+  })
+
+  it('T13: 父 SM 执行失败 → 子任务不执行级联', async () => {
+    // 构造 intent: completeTask, confirmed=true，有子任务
+    // Mock SM execute → { success: false, error: '非法状态转换' }
+    // cascadeSplitPlan 已设置，但 SM 失败先 return error
+    // 预期: result.success === false, result.error 含 SM 错误
+    //       cascadeSplitPlan 未被消费（子任务 updateStatus 未被调用）
+  })
+
+  it('T14: 部分子任务级联失败 → warnings 含失败计数', async () => {
+    // 构造: 3 个子任务，第 2 个 executeIntent 抛错
+    // Mock 第 1 个 → success, 第 2 个 → throw, 第 3 个 → success
+    // 预期: result.success === false
+    //       result.warnings 含 "1/3 个子任务级联失败"
+    //       result.error === "1/3 个子任务级联失败"
+  })
+
+  it('T15: threadId + parentId 同时违规 → 两个错误都报告', async () => {
+    // 构造 intent: { action: 'createTask', fields: { threadId: 'th1', parentId: 't1' } }
+    // Mock ThreadRepository.findById('th1') → { status:'completed' }
+    // Mock TaskRepository.findById('t1') → { status:'archived' }
+    // 执行 orchestrator.executeIntent(intent, userId)
+    // 预期: result.success === false
+    //       result.error 包含两个错误消息（分号分隔）
   })
 })
 ```
@@ -778,13 +748,13 @@ describe('[025] 级联确认与执行', () => {
 ```bash
 cd frontend && npx vitest run src/nexus/orchestrator/__tests__/cascade-check.test.ts --reporter=verbose
 ```
-Expected: 11 passed
+Expected: 15 passed
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add frontend/src/nexus/orchestrator/__tests__/cascade-check.test.ts
-git commit -m "test(cascade): [025] S5 — cascadeCheck + 双重约束 11 集成测试
+git commit -m "test(cascade): [025] S5 — cascadeCheck + 双重约束 15 集成测试
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -843,8 +813,29 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - [x] Spec §5.2 (Orchestrator cascadeCheck) → Task 3
 - [x] Spec §5.3 (双重约束) → Task 3 Step 4
 - [x] Spec §5.4 (清理旧 cascade) → Task 3 Step 9
-- [x] Spec §5.5 (集成测试) → Task 4
-- [x] GenericRepo 扩展 → Task 2
+- [x] Spec §5.5 (集成测试) → Task 4（15 场景含 T13-T15 边缘）
+- [x] ~~GenericRepo 扩展~~ → 已移除（eng-review D1：cascadeCheck 直接实例化 TaskRepository）
+- [x] `__cascadePreview` side channel → 改为局部变量 `cascadeSplitPlan`（eng-review D2-D3）
 - [x] 无 TBD/TODO 占位
 - [x] 所有 import 路径使用 `@/` 映射
 - [x] 所有代码在 `frontend/` cwd 下运行
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 4 issues, 0 unresolved |
+
+**VERDICT:** ENG CLEARED — ready to implement.
+
+**Architecture:** 1 finding — Task 2 (GenericRepo adapter) removed (dead code, cascadeCheck directly instantiates TaskRepository).
+
+**Code Quality:** 2 findings — `__cascadePreview` intent mutation replaced with `cascadeSplitPlan` local variable; NeedConfirm fall-through logic clarified.
+
+**Tests:** 1 finding — coverage expanded from 11→15 scenarios, added T13 (parent SM failure), T14 (partial child failure), T15 (dual constraint simultaneous). Test code to be implemented as full vi.mock + expect assertions, not comments.
+
+**Performance:** No issues.
+
+NO UNRESOLVED DECISIONS
