@@ -208,6 +208,26 @@ export interface OrchestratorDeps {
   /** 通用仓储获取工厂 */
   getRepo: (domainId: string, objectType: string) => GenericRepo
   onTrace?: (step: TraceStep) => void
+  /**
+   * [025] D1：带字段 payload 的状态写（复用域业务事实写入口原子字段+状态写）。
+   *
+   * 当 intent 携带 manifest field_metadata 声明的非路由键字段、且目标对象已存在
+   * （targetId 非空）时，Orchestrator 契约路径改走本回调，在单事务内原子完成
+   * 「字段写 + 状态转换」，避免 SM updateStatus 丢弃 proposal.payload 字段
+   * （state-machine/index.ts:272）。典型场景：completeTask 携带 actualDuration/notes。
+   *
+   * 缺省（未注入）→ 全部走 sm.execute（向后兼容，createTask/createThread 等创建
+   * 路径不依赖此回调）。
+   */
+  executeFieldStateWrite?: (params: {
+    domainId: string
+    objectType: string
+    targetId: USOM_ID
+    intentId: USOM_ID
+    fieldSteps: Array<{ field: string; value: unknown }>
+    stateAction: string
+    userId: USOM_ID
+  }) => Promise<{ success: boolean; object?: Record<string, unknown>; error?: string }>
 }
 
 /**
@@ -791,42 +811,93 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           ? (manifestResult.manifest.cascade_rules?.filter((r: any) => r.type === 'parent_child_status') ?? [])
           : []
 
-        const sm = createGenericStateMachine({
-          getRepository: () => repo,
-          eventRepo: deps.eventRepo,
-          getLifecycle: (dId, objType) => {
-            const lc = getLifecycleFromManifest(dId, objType)
-            if (!lc) throw new Error(`未找到 lifecycle: ${dId}/${objType}`)
-            return lc
-          },
-          domainId,
-          getCascadeRules: cascadeRules.length > 0 ? () => cascadeRules as any : undefined,
-        })
+        // [025] D1：带字段 payload 的状态写复用 mutation service（原子字段+状态）。
+        // 判定 intent 是否携带 manifest field_metadata 声明的非路由键字段：
+        //  - 有字段 + 已注入 executeFieldStateWrite + 目标对象已存在（targetId 非空）
+        //    → 走 mutation service 单事务原子写字段+状态（修复 SM updateStatus 丢弃
+        //      proposal.payload 字段的问题，state-machine/index.ts:272）
+        //  - 否则 → 走现有 sm.execute（保持 createTask/createThread 创建路径与无字段
+        //    状态转换行为不变；亦兼容未注入回调的旧调用方）
+        //
+        // 路由键约定：objectId / {camelCase objectType}Id（如 taskId/threadId），
+        // 这些是定位用、非业务字段写，必须排除。cascade_ 子任务 intent 仅传 taskId
+        // （见下方拆分块，已去掉 title），故递归路径必走 else 分支，不会被误接管。
+        const manifestFieldMeta = manifest?.field_metadata as Record<string, unknown> | undefined
+        const routingKeys = new Set(['objectId', `${smObjectType.replace(/_([a-z])/g, (_, c) => c.toUpperCase())}Id`])
+        const targetId = resolveObjectId(intent.fields, smObjectType)
+        const fieldSteps = Object.entries(intent.fields)
+          .filter(([k, v]) =>
+            !routingKeys.has(k) &&
+            v !== undefined &&
+            !!manifestFieldMeta &&
+            k in manifestFieldMeta,
+          )
+          .map(([field, value]) => ({ field, value }))
 
-        const proposal: StateProposal = {
-          id: crypto.randomUUID() as USOM_ID,
-          intentId: intent.id,
-          targetObject: {
-            type: smObjectType as USOMObjectType,
-            id: resolveObjectId(intent.fields, smObjectType),
-          },
-          action,
-          payload: intent.fields,
-          approvedAt: new Date().toISOString() as Timestamp,
-          approvedBy: 'rule_engine',
+        // 统一写入结果：两种写来源都产 { success, object? }；sm.execute 另产 event?
+        // （用于 domain.onEvent）。executeFieldStateWrite 路径不调 domain.onEvent：
+        // mutation service 内部 SM 已将事件落库到 eventRepo，与 completeTask 现状
+        // （此前绕过 Orchestrator）一致，不构成回归。
+        let writeResult: { success: boolean; object?: Record<string, unknown>; error?: string; event?: SystemEvent }
+
+        if (fieldSteps.length > 0 && deps.executeFieldStateWrite && targetId) {
+          // 带字段 → 走 mutation service（原子字段+状态写，单事务）
+          const wr = await deps.executeFieldStateWrite({
+            domainId,
+            objectType: smObjectType,
+            targetId,
+            intentId: intent.id,
+            fieldSteps,
+            stateAction: action,
+            userId,
+          })
+          if (!wr.success) {
+            return { success: false, error: wr.error }
+          }
+          writeResult = { success: true, object: wr.object }
+        } else {
+          // 无字段 / 未注入回调 / 创建路径（targetId 为空）→ 现有 sm.execute 路径
+          const sm = createGenericStateMachine({
+            getRepository: () => repo,
+            eventRepo: deps.eventRepo,
+            getLifecycle: (dId, objType) => {
+              const lc = getLifecycleFromManifest(dId, objType)
+              if (!lc) throw new Error(`未找到 lifecycle: ${dId}/${objType}`)
+              return lc
+            },
+            domainId,
+            getCascadeRules: cascadeRules.length > 0 ? () => cascadeRules as any : undefined,
+          })
+
+          const proposal: StateProposal = {
+            id: crypto.randomUUID() as USOM_ID,
+            intentId: intent.id,
+            targetObject: {
+              type: smObjectType as USOMObjectType,
+              id: targetId,
+            },
+            action,
+            payload: intent.fields,
+            approvedAt: new Date().toISOString() as Timestamp,
+            approvedBy: 'rule_engine',
+          }
+
+          const smResult = await sm.execute(proposal, eventBus, userId)
+
+          if (!smResult.success) {
+            return { success: false, error: smResult.error }
+          }
+
+          if (domain && smResult.event) {
+            await domain.onEvent(smResult.event, usomSnapshot)
+          }
+
+          writeResult = { success: true, object: smResult.object, event: smResult.event }
         }
 
-        const smResult = await sm.execute(proposal, eventBus, userId)
-
-        if (!smResult.success) {
-          return { success: false, error: smResult.error }
-        }
-
-        if (domain && smResult.event) {
-          await domain.onEvent(smResult.event, usomSnapshot)
-        }
-
-        // [025] 级联拆分执行
+        // [025] 级联拆分执行（复用 writeResult.object —— 无论写来自 sm.execute 还是
+        // executeFieldStateWrite）。注：级联仅 tasks 域，父对象走 else 分支（sm.execute），
+        // 因 completeTask/archiveTask/deleteTask 的 intent 不带 manifest 业务字段。
         if (cascadeSplitPlan && cascadeSplitPlan.allDescendants.length > 0) {
           const childResults: Array<{ id: string; success: boolean; error?: string }> = []
           for (const child of cascadeSplitPlan.allDescendants) {
@@ -835,9 +906,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
               intentionId: intent.intentionId,
               targetDomain: 'tasks',
               action: cascadeSplitPlan.cascadeAction,
+              // [025] 仅传 taskId 路由键，不传 title —— title 虽在 field_metadata，
+              // 但级联子任务无需写字段（只做状态转换）；避免误命中 executeFieldStateWrite
               fields: {
                 taskId: child.id,
-                title: child.title,
               },
               confidence: 1.0,
               resolvedBy: 'template_form',
@@ -865,7 +937,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           return {
             success: failedCount === 0,
-            object: smResult.object,
+            object: writeResult.object,
             objectType: smObjectType,
             warnings,
             error: failedCount > 0
@@ -876,7 +948,7 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
         return {
           success: true,
-          object: smResult.object,
+          object: writeResult.object,
           objectType: smObjectType,
           warnings: ruleResult.warnings,
         }

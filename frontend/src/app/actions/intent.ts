@@ -46,6 +46,7 @@ import { surfaceHandlers as taskHandlers } from '@/domains/tasks/cnui/handlers';
 import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
 import { recordActivity } from './activity-recorder';
 import { createHabitsMutationService } from '@/app/actions/habits/mutation-service';
+import { createTasksMutationService } from '@/app/actions/tasks/mutation-service';
 
 // ─── CNUI Handlers 注册 ───────────────────────────────────────────
 
@@ -313,6 +314,34 @@ async function executePipeline(
           return repo
         }
         throw new Error(`getRepo: 不支持的域 ${domainId}`)
+      },
+      // [025] D1：Orchestrator 契约路径带字段状态写复用 Tasks 域业务事实写入口。
+      // 当 intent 携带 manifest field_metadata 声明的非路由键字段、且目标对象已存在时，
+      // 由 Orchestrator 契约路径调用本回调，在 mutation service 单事务内原子完成
+      // 「字段写 + 状态转换」（修复 SM updateStatus 丢弃 actualDuration/notes 的问题）。
+      // 仅绑定 tasks 域；其他域命中时返回失败（当前无生产方）。
+      executeFieldStateWrite: async ({ domainId, objectType, targetId, intentId, fieldSteps, stateAction, userId }) => {
+        if (domainId !== 'tasks') {
+          return { success: false, error: `executeFieldStateWrite 暂仅支持 tasks 域，收到: ${domainId}` }
+        }
+        const service = createTasksMutationService()
+        const res = await service.execute(
+          {
+            id: crypto.randomUUID() as USOM_ID,
+            domainId,
+            objectType,
+            targetId,
+            steps: [
+              ...fieldSteps.map(f => ({ kind: 'field' as const, field: f.field, value: f.value })),
+              { kind: 'state' as const, action: stateAction },
+            ],
+          },
+          userId,
+        )
+        // 聚合写的 intent.id 仅供审计追踪，此处不复用入参 intentId（mutation service
+        // 内部 SM 自行生成 proposal.id 与 intentId 映射）。
+        void intentId
+        return { success: res.success, object: res.object as Record<string, unknown> | undefined, error: res.error }
       },
       onTrace: logger?.onTrace,
     });
