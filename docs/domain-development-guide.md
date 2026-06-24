@@ -5,6 +5,7 @@
 > **宪法关系**：Part I 是 constitution §III/VI/VIII + §CN-UI（第 4 条已 supersede）+ **§IX Domain Development Paradigm**（v2.0.0，2026-06-22 生效）的操作展开；§IX 修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`（含对 §CN-UI 第 4 条的显式 supersede，✅ 已生效）。
 
 **变更记录**：
+- **2026_06_24（[020] registry 即 SSOT）**：规则三层范式收敛 —— manifest 不再声明 `rules:` 区块（删除 C 区 label/required + L 区 rules）；registry 即 SSOT（每条规则自带 `{check, fields, message}` meta）；evaluateDomainRules/useManifestRules/realtime 改读 registry 参数（删 get-realtime-rules 中转）；validator 删 integrity.ts + validate-manifest 区块 G + 补 L3-realtime-singlefield CI check；constitution v2.1.0 MINOR（§IX/§VIII/§III 修正）。Step 2 manifest 模板 区块 L 注释化。Part I 治理表 L3-2 更新。
 - **2026_06_21（Part II 对齐）**：注册步骤全面对齐 tasks 参考实现——Step 2 manifest 模板补 `rules:` 区块 / `field_metadata.mutation_mode` / `cnui_surfaces` 改 map / 根字段 `domain_id`→`id`；Step 3 hooks 改工厂函数 + onValidate 委托 `evaluateDomainRules`；Step 4 schema 位置改 `src/lib/db/schema.ts` 集中；Step 5 repository 改目录；**新增 Step 5.5 组装 mutation-service**；Step 13 cnui 注册签名对齐 tasks；概念统一 `requires_full_validate`→`mutation_mode`（FactField/ContentField/PresentationField）；编号对齐总览（页面 Step 6 / 注册 Step 7 / Markdown Step 8）。
 - **2026_06_21**：[019] 整合——原 `mydocs/core/LW_domain_注册指南` 移入 `docs/`（归属转第二层）并与 `docs/domain-paradigm.md` 合并为本权威文件；新增 **Part I 范式与治理**（写入口两合法路径适用场景/跨字段红线 `mutation_mode` 字段分类/治理 must-should+sunset 豁免/CI validator/C-DC 检查清单 [CI]/[HUMAN]/四域现状对照）；Part II Step 3/5.5/13 加 paradigm 对齐说明。经 /plan-eng-review 2026-06-21 通过。
 - **2026_05_29**：新增 CNUI Domain Surface Ownership — intent_triggers 添加 `response_type` 字段；新增区块 K（cnui_surfaces）；新增 Step 13（CNUI Surface 实现）；目录结构添加 cnui/ 目录；检查清单和常见错误模式补充 CNUI 相关条目
@@ -80,7 +81,7 @@
 |---|---|---|---|
 | L1 数据 | GenericRepo + tx 透传 | Step 4 (DB Schema) + Step 5 (Repository) | `IXxxRepository`，`tx: DbClient` |
 | L2 写入口 | 公共工厂组装（仅 FactField 域） | Step 5.5 + 见 §2 | `createDomainMutationServiceFactory` |
-| L3 规则三层 | manifest `rules:` + registry + evaluate | Step 2 区块 + Step 3 onValidate | `evaluateDomainRules` 委托 |
+| L3 规则三层 | registry 即 SSOT（自带 phase/fields/message meta）+ evaluate | Step 2 + Step 3 onValidate | `evaluateDomainRules` 委托 |
 | L4 CNUI 表单 | 手写 surface + useManifestRules | Step 13 | `useManifestRules` + `useServerErrorBackfill` |
 | L5 页面表单 | 页面只读，非写入口 | Step 6 | （见 §4 L5 约束） |
 | L6 回填 | useServerErrorBackfill 接通 | Step 13 surface | `serverErrors` prop 透传 |
@@ -113,7 +114,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 
 - **orchestrator-溯源（#1 MUST 门）**：每个 `use server` 写入口函数（scope = `src/app/actions/*`）持久化必须调 `executeIntent` 或 `mutationService.update/execute`；入口函数内直接 repo/db 持久化且不经白名单 = 违宪。scope rationale：actions/* = 写入口面；SM/GenericRepo 适配器/底层 repo = 写入口内部、豁免。入口函数级检查（非跨过程分析）。自测：植入 updateObjective 式绕过必被抓；tasks/habits 合规不报假阳性。
 - **validate-domain-structure.ts**：禁 `CnuiFormAdapter`（§IX 已 supersede §CN-UI#4；[019.1] 已落地，规则 `cnui-form-adapter-forbidden`）/禁 `FormRegistry.register`+`register-form.ts` 残留（规则 `form-registry-residual`）/写域必有 `rules-registry`（带 §4.1 豁免）/FactField 字段的 realtime rule（`phase: both`）须单字段纯函数（跨字段红线 CI 辅助）。**不查** mutation-service。
-- **validate-manifest.ts 扩展**：`rules:` id ↔ registry 完整性 / `field_metadata.mutation_mode` 合法值（`FactField`/`ContentField`/`PresentationField` 三选一或缺省）。
+- **validate-manifest.ts**：验证 manifest YAML 结构与 Zod Schema 一致 + 字段 mutation_mode 合法值（[020] 已删区块 G rules id 完整性 cross-check——manifest rules 已去除）。
 - **取代**：`app/actions/habits/__tests__/write-entry-guard.test.ts`（habits 局部守卫）在 orchestrator-溯源 validator 上线后删。
 
 ### 5.1 远端 CI（T-A）— 显式 defer（2026-06-22 复审：保持 defer）
@@ -138,7 +139,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | L2-1 | FactField 域有 mutation-service 且调公共工厂 | CI（仅 FactField 域） |
 | L2-2 | FactField/ContentField 字段无跨字段约束依赖（跨字段红线） | HUMAN |
 | L3-1 | 写域有 rules-registry | CI（MUST，带豁免） |
-| L3-2 | manifest rules.id ↔ registry 处理器完整 | CI |
+| L3-2 | registry 每条 realtime rule fields.length=1（L3-realtime-singlefield） | CI |
 | L3-3 | onValidate 委托 evaluateDomainRules（禁 ad-hoc） | CI |
 | L3-4 | realtime 单字段纯函数；多字段→submit | HUMAN |
 | L4-1 | 禁 CnuiFormAdapter（§IX 已 supersede；[019.1] 已落地） | CI |
@@ -562,26 +563,20 @@ cnui_surfaces:
   xxx-creation-card:                    # key = surface_type（全局唯一）
     handler: ./cnui/handlers            # 同域 handler 模块（相对路径）
 
-# ── 区块 L：规则三层（[018] R2，Rule Engine 读取）──────────────
-# 声明本域校验规则，处理器在 rules-registry.ts 注册（见 Step 3 onValidate 委托）。
-# phase: submit = 聚合权威校验（提交时 evaluateDomainRules 按 manifest 顺序折叠，
-#         建议聚合规则置首）；phase: both = realtime 单字段纯函数（blur + 提交均跑）。
-rules:
-  - id: my_action_fields_valid          # 聚合规则（复刻全分支校验）
-    phase: submit
-    fields: [title, description, priority]
-    message: 字段校验失败
-  - id: my_priority_valid               # realtime 单字段纯函数
-    phase: both
-    fields: [priority]
-    message: 优先级取值非法
+# ── 区块 L: rules（[020] registry 即 SSOT，manifest 不再声明）──
+# 规则定义在 rules-registry.ts（自带 {check,fields,message} meta），
+# 不在 manifest 声明。evaluateDomainRules 读 registry 参数，
+# manifest 此区块保留仅为向后兼容（ManifestSchema rules: optional）。
+# rules:
+#   - id: my_action_fields_valid
+#     ...
 ```
 
 ---
 
 ## Step 3：实现四个钩子函数（范式层 L2/L3）
 
-> **paradigm 对齐（[018] R2 已落地，tasks/habits 参考）**：`onValidate` 不再手写 ad-hoc 全分支校验——改为**薄壳委托** `evaluateDomainRules('<domain>', intent, serverCtx, <domain>RuleRegistry)`，返回 `ValidationResult`（非 `{valid, errors}`）。规则声明在 manifest `rules:` 区块（`phase: both` realtime 单字段 / `phase: submit` 聚合权威），处理器在 `rules-registry.ts`。下方示例为旧 ad-hoc 形态（仅示意钩子签名），新域须走规则三层（见 Part I §4 L3-1/2/3，CI 强制）。
+> **paradigm 对齐（[020] registry 即 SSOT，tasks/habits 参考）**：`onValidate` 不再手写 ad-hoc 全分支校验——改为**薄壳委托** `evaluateDomainRules('<domain>', intent, serverCtx, <domain>RuleRegistry)`，返回 `ValidationResult`（非 `{valid, errors}`）。规则定义在 `rules-registry.ts`（registry 即 SSOT，每条规则自带 `{check, fields, message}` meta，manifest 不再声明 rules）。下方示例为旧 ad-hoc 形态（仅示意钩子签名），新域须走规则三层（见 Part I §4 L3-1/2/3，CI 强制）。
 
 **文件位置**：`domains/{domain_id}/hooks.ts`
 
@@ -600,7 +595,7 @@ import { myDomainRuleRegistry } from './rules-registry'
 // 调用时机：StructuredIntent 进入 State Machine 之前
 // 职责：Domain 内部的结构性/业务约束校验
 // 形态：不手写 ad-hoc 全分支——委托 evaluateDomainRules，返回 ValidationResult
-//       （非 {valid, errors}）。规则声明在 manifest rules: 区块（phase: submit 聚合 /
+//       （非 {valid, errors}）。规则定义在 rules-registry.ts（registry 即 SSOT，每条规则自带 {check, fields, message} meta；manifest 不再声明 rules）。
 //       phase: both realtime），处理器在 rules-registry.ts。
 // 不做：个性冲突检测（那是 Rule Engine + DerivedSignals 的工作）
 
@@ -1879,7 +1874,7 @@ manifest.yaml
   □ D：list_actions 覆盖了所有列表行操作
   □ H：required_fields 与 USOM 对象字段名一致
   □ F：subscribed_events 只订阅真正需要响应的事件
-  □ L：rules 区块已声明，rules.id ↔ rules-registry 处理器完整
+  □ L：rules-registry 已注册（registry 即 SSOT，每条规则自带 {check, fields, message} meta；manifest 不再声明 rules）
   □ manifest.yaml 定义的运行时配置（Runtime Configuration），不是开发时文档，代码中没有硬编码
 
 钩子实现
