@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Brain, Cloud, ClipboardList, Sparkles, Flame, Pencil, Check, X } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -19,8 +19,6 @@ import { parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/fo
 
 // [018-G3] R3：page-level realtime blur 校验
 import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
-import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
-import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
 import { taskRuleRegistry } from '../rules-registry'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────
@@ -216,15 +214,8 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
   const [draft, setDraft] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
 
-  // [018-G3] R3：realtime blur 校验
-  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
-  const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
-
-  useEffect(() => {
-    let mounted = true
-    getRealtimeRules('tasks').then((r) => { if (mounted) setRealtimeRules(r) })
-    return () => { mounted = false }
-  }, [])
+  // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
+  const { errors: fieldErrors, validateField } = useManifestRules(taskRuleRegistry)
 
   /** 是否有未保存变更 */
   const hasChanges = Object.keys(draft).length > 0

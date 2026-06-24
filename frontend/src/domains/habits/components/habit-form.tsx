@@ -16,8 +16,6 @@ import { Textarea } from "@/components/ui/textarea"
 // 服务端专用的 evaluateDomainRules（→ loadDomainManifest → node:fs），会泄漏进 client bundle
 // （构建报 Can't resolve 'fs'）。client 须直接 import 各 client-safe 子模块。
 import { useManifestRules, useServerErrorBackfill } from "@/nexus/rules/use-manifest-rules"
-import { getRealtimeRules } from "@/nexus/rules/server/get-realtime-rules"
-import type { RealtimeRuleMeta } from "@/nexus/rules/realtime"
 import { habitRuleRegistry } from "../rules-registry"
 
 /**
@@ -102,17 +100,10 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
-  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
-  const { errors: fieldErrors, validateField, validateAll } = useManifestRules(realtimeRules, habitRuleRegistry)
-  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, realtimeRules)
+  // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
+  const { errors: fieldErrors, validateField, validateAll } = useManifestRules(habitRuleRegistry)
+  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, habitRuleRegistry)
   const formRef = useRef<HTMLFormElement>(null)
-
-  // §4.5 method B：mount 时取 phase:both 规则元数据（server action，client-safe）
-  useEffect(() => {
-    let mounted = true
-    getRealtimeRules("habits").then((r) => { if (mounted) setRealtimeRules(r) })
-    return () => { mounted = false }
-  }, [])
 
   // 监听外部提交触发
   useEffect(() => {

@@ -15,8 +15,6 @@ import { cn } from '@/lib/utils'
 
 // [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
 import { useManifestRules, useServerErrorBackfill } from '@/nexus/rules/use-manifest-rules'
-import { getRealtimeRules } from '@/nexus/rules/server/get-realtime-rules'
-import type { RealtimeRuleMeta } from '@/nexus/rules/realtime'
 import { taskRuleRegistry } from '../../rules-registry'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────
@@ -89,18 +87,11 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   const [showSubtaskInput, setShowSubtaskInput] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
 
-  // [018-G3] R3：realtime 校验状态
-  const [realtimeRules, setRealtimeRules] = useState<RealtimeRuleMeta[]>([])
-  const { errors: fieldErrors, validateField } = useManifestRules(realtimeRules, taskRuleRegistry)
-  // mount 时取 phase:both 规则元数据
-  useEffect(() => {
-    let mounted = true
-    getRealtimeRules('tasks').then((r) => { if (mounted) setRealtimeRules(r) })
-    return () => { mounted = false }
-  }, [])
+  // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
+  const { errors: fieldErrors, validateField } = useManifestRules(taskRuleRegistry)
 
-  // R3 回填：从 serverErrors + realtimeRules 派生字段/表单级错误（useServerErrorBackfill 共享 hook）
-  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, realtimeRules)
+  // R3 回填：从 serverErrors + registry 派生字段/表单级错误（useServerErrorBackfill 共享 hook）
+  const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, taskRuleRegistry)
 
   // ─── 直接进入编辑模式（handler 已确定具体任务） ──────────────────
   const taskDetail = dataModel.task as Record<string, unknown> | undefined
