@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { taskRuleRegistry } from '../rules-registry'
+import { TASK_RULE_MESSAGES } from '../validation'
 
 const { realtime } = taskRuleRegistry
 
@@ -232,5 +233,14 @@ describe('[020] tasks registry rule 自带 meta', () => {
     expect(taskRuleRegistry.realtime.task_energy_required_valid.message).toBe('能量要求必须是 high/medium/low 之一')
     expect(taskRuleRegistry.realtime.task_due_date_format.message).toBe('截止日期格式必须是 YYYY-MM-DD')
     expect(taskRuleRegistry.realtime.thread_color_format.message).toBe('颜色格式必须是 #RRGGBB')
+  })
+
+  it('RT1: 每条 realtime message 与 TASK_RULE_MESSAGES 常量同源（防漂移）', () => {
+    expect(taskRuleRegistry.realtime.task_estimated_duration_positive.message).toBe(TASK_RULE_MESSAGES.estimatedDurationPositive)
+    expect(taskRuleRegistry.realtime.task_estimated_duration_max.message).toBe(TASK_RULE_MESSAGES.estimatedDurationMax)
+    expect(taskRuleRegistry.realtime.task_priority_valid.message).toBe(TASK_RULE_MESSAGES.priorityValid)
+    expect(taskRuleRegistry.realtime.task_energy_required_valid.message).toBe(TASK_RULE_MESSAGES.energyRequiredValid)
+    expect(taskRuleRegistry.realtime.task_due_date_format.message).toBe(TASK_RULE_MESSAGES.dueDateFormat)
+    expect(taskRuleRegistry.realtime.thread_color_format.message).toBe(TASK_RULE_MESSAGES.colorFormat)
   })
 })

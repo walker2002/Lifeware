@@ -9,6 +9,7 @@ import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
 import { habitRuleRegistry } from '../rules-registry'
 import type { ServerRuleCtx, ClientRuleCtx } from '@/nexus/rules/types'
+import { HABIT_RULE_MESSAGES } from '../validation'
 
 function intent(action: string, fields: Record<string, unknown>): StructuredIntent {
   return {
@@ -116,5 +117,14 @@ describe('[020] habits registry rule 自带 meta', () => {
     expect(habitRuleRegistry.realtime.habit_default_time_format.message).toBe('默认时间必须是有效的 HH:MM 格式')
     expect(habitRuleRegistry.realtime.habit_earliest_time_format.message).toBe('最早开始时间必须是有效的 HH:MM 格式')
     expect(habitRuleRegistry.realtime.habit_latest_time_format.message).toBe('最迟开始时间必须是有效的 HH:MM 格式')
+  })
+
+  it('RT1: 每条 realtime message 与 HABIT_RULE_MESSAGES 常量同源（防漂移）', () => {
+    expect(habitRuleRegistry.realtime.habit_default_duration_positive.message).toBe(HABIT_RULE_MESSAGES.defaultDurationPositive)
+    expect(habitRuleRegistry.realtime.habit_min_duration_positive.message).toBe(HABIT_RULE_MESSAGES.minDurationPositive)
+    expect(habitRuleRegistry.realtime.habit_frequency_type_valid.message).toBe(HABIT_RULE_MESSAGES.frequencyTypeValid)
+    expect(habitRuleRegistry.realtime.habit_default_time_format.message).toBe(HABIT_RULE_MESSAGES.defaultTimeFormat)
+    expect(habitRuleRegistry.realtime.habit_earliest_time_format.message).toBe(HABIT_RULE_MESSAGES.earliestTimeFormat)
+    expect(habitRuleRegistry.realtime.habit_latest_time_format.message).toBe(HABIT_RULE_MESSAGES.latestTimeFormat)
   })
 })
