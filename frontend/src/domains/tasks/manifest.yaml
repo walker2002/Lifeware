@@ -207,6 +207,22 @@ lifecycle:
         trigger: intent
         action: delete
         event_type: TaskDeleted
+      # 级联转换（cascade_*）：父对象状态变更时，子任务走此专用 action 避免线性约束
+      - from: [todo, planned, in_progress]
+        to: completed
+        trigger: intent
+        action: cascade_complete
+        event_type: TaskCascadeCompleted
+      - from: [todo, planned, in_progress, completed]
+        to: archived
+        trigger: intent
+        action: cascade_archive
+        event_type: TaskCascadeArchived
+      - from: [todo, planned, in_progress, completed, archived]
+        to: deleted
+        trigger: intent
+        action: cascade_delete
+        event_type: TaskCascadeDeleted
     terminal_states: [deleted]
 
   thread:
@@ -244,6 +260,52 @@ lifecycle:
         action: delete
         event_type: ThreadDeleted
     terminal_states: [deleted]
+
+# ─── 级联规则（[025] Plan C）───────────────────────────────────────
+cascade_rules:
+  # Thread 级联到其下所有 Task
+  - type: parent_child_status
+    parent_object: thread
+    child_object: task
+    child_query: findByThread
+    rules:
+      - parent_action: completeThread
+        child_filter: "status in ['todo','planned','in_progress']"
+        child_to_status: completed
+        cascade_action: cascade_complete
+        event_type: TaskCascadeCompleted
+      - parent_action: archiveThread
+        child_filter: "status not in ['archived','deleted']"
+        child_to_status: archived
+        cascade_action: cascade_archive
+        event_type: TaskCascadeArchived
+      - parent_action: deleteThread
+        child_filter: "status not in ['deleted']"
+        child_to_status: deleted
+        cascade_action: cascade_delete
+        event_type: TaskCascadeDeleted
+
+  # Task 级联到其子孙 Task
+  - type: parent_child_status
+    parent_object: task
+    child_object: task
+    child_query: findByParent
+    rules:
+      - parent_action: completeTask
+        child_filter: "status in ['todo','planned','in_progress']"
+        child_to_status: completed
+        cascade_action: cascade_complete
+        event_type: TaskCascadeCompleted
+      - parent_action: archiveTask
+        child_filter: "status not in ['archived','deleted']"
+        child_to_status: archived
+        cascade_action: cascade_archive
+        event_type: TaskCascadeArchived
+      - parent_action: deleteTask
+        child_filter: "status not in ['deleted']"
+        child_to_status: deleted
+        cascade_action: cascade_delete
+        event_type: TaskCascadeDeleted
 
 # ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode 供 field-executor 消费；label/required 移除——前端表单手写硬编码）──
 field_metadata:
@@ -425,6 +487,9 @@ subscribed_events:
   - TaskArchived
   - TaskDeleted
   - ExecutionLogged
+  - TaskCascadeCompleted
+  - TaskCascadeArchived
+  - TaskCascadeDeleted
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:

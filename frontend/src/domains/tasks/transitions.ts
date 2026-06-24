@@ -37,6 +37,19 @@ export const taskTransitions: Transition<TaskStatus>[] = [
   { from: 'planned',     to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
   { from: 'in_progress', to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
   { from: 'completed',   to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
+  // 级联转换（cascade_*）：父对象完成/归档/删除时子任务走此专用 action
+  { from: 'todo',        to: 'completed', action: 'cascade_complete', eventType: 'TaskCascadeCompleted' },
+  { from: 'planned',     to: 'completed', action: 'cascade_complete', eventType: 'TaskCascadeCompleted' },
+  { from: 'in_progress', to: 'completed', action: 'cascade_complete', eventType: 'TaskCascadeCompleted' },
+  { from: 'todo',        to: 'archived',  action: 'cascade_archive',  eventType: 'TaskCascadeArchived' },
+  { from: 'planned',     to: 'archived',  action: 'cascade_archive',  eventType: 'TaskCascadeArchived' },
+  { from: 'in_progress', to: 'archived',  action: 'cascade_archive',  eventType: 'TaskCascadeArchived' },
+  { from: 'completed',   to: 'archived',  action: 'cascade_archive',  eventType: 'TaskCascadeArchived' },
+  { from: 'todo',        to: 'deleted',   action: 'cascade_delete',   eventType: 'TaskCascadeDeleted' },
+  { from: 'planned',     to: 'deleted',   action: 'cascade_delete',   eventType: 'TaskCascadeDeleted' },
+  { from: 'in_progress', to: 'deleted',   action: 'cascade_delete',   eventType: 'TaskCascadeDeleted' },
+  { from: 'completed',   to: 'deleted',   action: 'cascade_delete',   eventType: 'TaskCascadeDeleted' },
+  { from: 'archived',    to: 'deleted',   action: 'cascade_delete',   eventType: 'TaskCascadeDeleted' },
 ]
 
 // ─── Thread 状态转换 ─────────────────────────────────────────────

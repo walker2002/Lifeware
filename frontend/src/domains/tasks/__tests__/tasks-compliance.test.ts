@@ -158,9 +158,9 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
 })
 
 describe('T017: Tasks transitions.ts 转换表验证', () => {
-  it('taskTransitions 应有 10 条转换', () => {
+  it('taskTransitions 应有 22 条转换（含级联）', () => {
     expect(Array.isArray(taskTransitions)).toBe(true)
-    expect(taskTransitions.length).toBe(10)
+    expect(taskTransitions.length).toBe(22)
   })
 
   it('threadTransitions 应有 5 条转换', () => {

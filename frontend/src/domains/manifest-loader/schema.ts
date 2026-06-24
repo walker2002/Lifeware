@@ -190,6 +190,7 @@ const CascadeChildRuleSchema = z.object({
   child_filter: z.string(),
   child_to_status: z.string(),
   event_type: z.string(),
+  cascade_action: z.string().optional(),
 })
 
 /**
