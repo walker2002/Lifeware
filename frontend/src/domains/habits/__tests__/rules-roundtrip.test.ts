@@ -46,7 +46,7 @@ const ruleMessages: Record<string, string> = {
 
 describe('[roundtrip] realtime 抓得到 → submit 权威也抓', () => {
   it('defaultDuration=0：realtime 抓到 + submit Rejected 含同一文案', async () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'defaultDuration', 0, clientCtx, habitRuleRegistry)
+    const issues = evaluateRealtimeRules(habitRuleRegistry, 'defaultDuration', 0, clientCtx)
     expect(issues.some((i) => i.message === '默认时长必须大于 0')).toBe(true)
     const result = await evaluateDomainRules('habits', intent({ title: 't', defaultDuration: 0 }), serverCtx, habitRuleRegistry)
     expect(result.kind === 'Rejected' && result.errors.includes('默认时长必须大于 0')).toBe(true)

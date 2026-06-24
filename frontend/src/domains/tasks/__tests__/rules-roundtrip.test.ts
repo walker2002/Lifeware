@@ -50,28 +50,28 @@ const ruleMessages: Record<string, string> = {
 
 describe('[roundtrip] realtime 抓得到 → submit 权威也抓', () => {
   it('estimatedDuration=0：realtime 抓到 + submit Rejected 含同一文案', async () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 0, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 0, clientCtx)
     expect(issues.some((i) => i.message === '预估时长必须大于 0')).toBe(true)
     const result = await evaluateDomainRules('tasks', intent({ title: 't', estimatedDuration: 0 }), serverCtx, taskRuleRegistry)
     expect(result.kind === 'Rejected' && result.errors.includes('预估时长必须大于 0')).toBe(true)
   })
 
   it('priority 非法：realtime 抓到 + submit Rejected 含同一文案', async () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'urgent', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', 'urgent', clientCtx)
     expect(issues.some((i) => i.message === '优先级必须是 critical/high/medium/low 之一')).toBe(true)
     const result = await evaluateDomainRules('tasks', intent({ title: 't', priority: 'urgent' }), serverCtx, taskRuleRegistry)
     expect(result.kind === 'Rejected' && result.errors.includes('优先级必须是 critical/high/medium/low 之一')).toBe(true)
   })
 
   it('dueDate 格式非法：realtime 抓到 + submit Rejected 含同一文案', async () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'dueDate', '2026/12/31', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'dueDate', '2026/12/31', clientCtx)
     expect(issues.some((i) => i.message === '截止日期格式必须是 YYYY-MM-DD')).toBe(true)
     const result = await evaluateDomainRules('tasks', intent({ title: 't', dueDate: '2026/12/31' }), serverCtx, taskRuleRegistry)
     expect(result.kind === 'Rejected' && result.errors.includes('截止日期格式必须是 YYYY-MM-DD')).toBe(true)
   })
 
   it('estimatedDuration=2000（超上限）：realtime 抓到 + submit 也抓到', async () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 2000, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 2000, clientCtx)
     // estimatedDuration 命中两条 both 规则：positive（通过，>0） + max（失败，>1440）
     expect(issues.some((i) => i.message === '预估时长不能超过 24 小时（1440 分钟）')).toBe(true)
     const result = await evaluateDomainRules('tasks', intent({ title: 't', estimatedDuration: 2000 }), serverCtx, taskRuleRegistry)

@@ -21,42 +21,42 @@ const clientCtx = {}
 
 describe('R3 — TaskCreationCard realtime 校验', () => {
   it('estimatedDuration=0 → 报错"预估时长必须大于 0"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 0, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 0, clientCtx)
     expect(issues.some(i => i.field === 'estimatedDuration' && i.message === '预估时长必须大于 0')).toBe(true)
   })
 
   it('estimatedDuration=2000 → 报错"不能超过 24 小时"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 2000, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 2000, clientCtx)
     expect(issues.some(i => i.message === '预估时长不能超过 24 小时（1440 分钟）')).toBe(true)
   })
 
   it('estimatedDuration=30 → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 30, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 30, clientCtx)
     expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
   })
 
   it('priority="urgent" → 报错"优先级必须是 critical/high/medium/low 之一"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'urgent', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', 'urgent', clientCtx)
     expect(issues.some(i => i.field === 'priority')).toBe(true)
   })
 
   it('priority="high" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'high', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', 'high', clientCtx)
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
 
   it('priority=""（未选择）→ 无错误（可选字段）', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', '', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', '', clientCtx)
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
 
   it('estimatedDuration=undefined（空字段 blur）→ 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', undefined, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', undefined, clientCtx)
     expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
   })
 
   it('estimatedDuration=1440（恰好等于上限）→ 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', 1440, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', 1440, clientCtx)
     expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
   })
 })
@@ -90,66 +90,66 @@ describe('R3 — 服务端错误回填映射', () => {
 
 describe('R3 — TaskEditCard realtime 校验', () => {
   it('estimatedDuration 为负数 → 报错', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', -10, clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', -10, clientCtx)
     expect(issues.some(i => i.field === 'estimatedDuration' && i.message === '预估时长必须大于 0')).toBe(true)
   })
 
   it('priority 从 select 选 "medium" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'medium', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', 'medium', clientCtx)
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
 
   it('estimatedDuration 为空字符串 → 无错误（可选字段，Number("")=0 但 NaN guard 返回 undefined）', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'estimatedDuration', '', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'estimatedDuration', '', clientCtx)
     expect(issues.filter(i => i.field === 'estimatedDuration')).toEqual([])
   })
 })
 
 describe('R3 — ThreadCreationCard realtime 校验', () => {
   it('color="red"（非 #RRGGBB）→ 报错"颜色格式必须是 #RRGGBB"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'color', 'red', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'color', 'red', clientCtx)
     expect(issues.some(i => i.field === 'color' && i.message === '颜色格式必须是 #RRGGBB')).toBe(true)
   })
 
   it('color="#FF5733" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'color', '#FF5733', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'color', '#FF5733', clientCtx)
     expect(issues.filter(i => i.field === 'color')).toEqual([])
   })
 
   it('color="" → 无错误（可选字段）', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'color', '', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'color', '', clientCtx)
     expect(issues.filter(i => i.field === 'color')).toEqual([])
   })
 
   it('priority="low" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'priority', 'low', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'priority', 'low', clientCtx)
     expect(issues.filter(i => i.field === 'priority')).toEqual([])
   })
 })
 
 describe('R3 — TaskEditZone realtime 校验（page-level）', () => {
   it('energyRequired="extreme" → 报错"能量要求必须是 high/medium/low 之一"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', 'extreme', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'energyRequired', 'extreme', clientCtx)
     expect(issues.some(i => i.field === 'energyRequired')).toBe(true)
   })
 
   it('energyRequired="medium" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', 'medium', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'energyRequired', 'medium', clientCtx)
     expect(issues.filter(i => i.field === 'energyRequired')).toEqual([])
   })
 
   it('energyRequired="" → 无错误（可选字段）', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'energyRequired', '', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'energyRequired', '', clientCtx)
     expect(issues.filter(i => i.field === 'energyRequired')).toEqual([])
   })
 
   it('dueDate="2026/12/31" → 报错"截止日期格式必须是 YYYY-MM-DD"', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'dueDate', '2026/12/31', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'dueDate', '2026/12/31', clientCtx)
     expect(issues.some(i => i.field === 'dueDate')).toBe(true)
   })
 
   it('dueDate="2026-12-31" → 无错误', () => {
-    const issues = evaluateRealtimeRules(realtimeRules, 'dueDate', '2026-12-31', clientCtx, taskRuleRegistry)
+    const issues = evaluateRealtimeRules(taskRuleRegistry, 'dueDate', '2026-12-31', clientCtx)
     expect(issues.filter(i => i.field === 'dueDate')).toEqual([])
   })
 })
