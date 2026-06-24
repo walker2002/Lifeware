@@ -132,87 +132,51 @@ lifecycle:
         event_type: HabitDeleted
     terminal_states: [archived, deleted]
 
-# ─── 区块 C: field_metadata ──────────────────────────────────────
-# [018-G1] G1-M1：覆盖 UpdateHabitInput 全集（14 字段），每个字段标注
-# mutation_mode（FactField 走字段执行器 / ContentField 直走 Repo）。
-# 字段执行器对未声明字段会拒绝写入（F-1），故此处必须与 irepository.ts
-# CreateHabitInput 保持一致。分类经 autoplan 批准，勿自行改判。
+# ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode；label/required 移除）──
+# 字段执行器对未声明字段拒绝写入（F-1），须与 irepository.ts CreateHabitInput 一致。
 field_metadata:
-  # ── ContentField（直接走 Repo.updateFields，不经字段执行器）──
   title:
     type: string
-    label: 标题
-    required: true
     mutation_mode: ContentField
   description:
     type: string
-    label: 描述
-    required: false
     mutation_mode: ContentField
   startDate:
     type: date
-    label: 开始日期
-    required: false
     mutation_mode: ContentField
   endDate:
     type: date
-    label: 结束日期
-    required: false
     mutation_mode: ContentField
   keyResultId:
     type: string
-    label: 关联关键结果
-    required: false
     mutation_mode: ContentField
   tags:
     type: json
-    label: 标签
-    required: false
     mutation_mode: ContentField
-
-  # ── FactField（经字段执行器：字段级校验 + updateFields + TaskFieldUpdated 事件）──
   defaultTime:
     type: time
-    label: 默认执行时间
-    required: true
     mutation_mode: FactField
   earliestTime:
     type: time
-    label: 最早时间
-    required: false
     mutation_mode: FactField
   latestStartTime:
     type: time
-    label: 最晚开始时间
-    required: false
     mutation_mode: FactField
   defaultDuration:
     type: number
-    label: 默认时长（分钟）
-    required: true
     mutation_mode: FactField
   minDuration:
     type: number
-    label: 最小时长（分钟）
-    required: false
     mutation_mode: FactField
   trackable:
     type: boolean
-    label: 可打卡
-    required: true
     mutation_mode: FactField
-  # frequencyType 改为 enum + options：字段执行器 validateField 按 type==='enum'
-  # 与 meta.options 校验合法取值（见 field-executor/index.ts:62-70）。
   frequencyType:
     type: enum
-    label: 频率类型
-    required: false
     options: [daily, weekly, custom]
     mutation_mode: FactField
   daysOfWeek:
     type: json
-    label: 每周执行日
-    required: false
     mutation_mode: FactField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
@@ -323,42 +287,4 @@ cnui_surfaces:
   habit-creation-card:
     description: 习惯创建表单卡片
     handler: ./cnui/handlers
-
-# ─── 区块 L: rules（[018-G3] 规则三层架构，R1） ─────────────────
-# D 模式（权威合并规则前置）：habit_action_fields_valid 必须置首。
-#   submit 时 evaluateDomainRules 按 manifest 顺序折叠，聚合规则先 Rejected
-#   则 aggregateValidation「首个 Rejected 胜出」吞掉后续粒度规则的 Rejected，
-#   保持「全部 errors」逐字输出（golden）。粒度 both 规则做客户端 realtime blur。
-rules:
-  # ── 权威聚合（phase: submit，复刻现状 onValidate 全分支，返回全部 errors）──
-  - id: habit_action_fields_valid
-    phase: submit
-    fields: [title, defaultTime, earliestTime, latestStartTime, defaultDuration, minDuration, frequencyType, habitId, name, applicableDays, templateId, date, timeOverride]
-    message: 习惯字段校验失败
-
-  # ── 客户端 realtime（phase: both，action-invariant 单字段纯函数）──
-  - id: habit_default_duration_positive
-    phase: both
-    fields: [defaultDuration]
-    message: 默认时长必须大于 0
-  - id: habit_min_duration_positive
-    phase: both
-    fields: [minDuration]
-    message: 最短时长必须大于 0
-  - id: habit_frequency_type_valid
-    phase: both
-    fields: [frequencyType]
-    message: 频率类型必须是 daily/weekly/custom
-  - id: habit_default_time_format
-    phase: both
-    fields: [defaultTime]
-    message: 默认时间必须是有效的 HH:MM 格式
-  - id: habit_earliest_time_format
-    phase: both
-    fields: [earliestTime]
-    message: 最早开始时间必须是有效的 HH:MM 格式
-  - id: habit_latest_time_format
-    phase: both
-    fields: [latestStartTime]
-    message: 最迟开始时间必须是有效的 HH:MM 格式
 
