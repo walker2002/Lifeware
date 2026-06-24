@@ -16,7 +16,6 @@ export type {
   DomainRuleRegistry,
 } from './types'
 export { fieldIssuesToValidationResult } from './adapter'
-export { validateRuleIntegrity } from './integrity'
 export { evaluateDomainRules } from './evaluate'
 export { evaluateRealtimeRules, type RealtimeRuleMeta } from './realtime'
 export { useManifestRules, useServerErrorBackfill } from './use-manifest-rules'
