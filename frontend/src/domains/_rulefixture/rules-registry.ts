@@ -1,8 +1,10 @@
 /**
  * @file rules-registry
- * @brief [018-G3] R0 fixture 域规则注册表（2 条 tracer，打通两层）
+ * @brief R0 fixture 域规则注册表（2 条 tracer，打通两层）
  *
- * - fixture_name_required (phase: both)：单字段 RealtimeCheck，空字符串→FieldIssue
+ * [020] registry 即 SSOT：每条 rule 自带 { check, fields, message } meta，
+ * manifest 不再声明 rules。
+ * - fixture_name_required (phase: both/realtime)：单字段 RealtimeCheck，空字符串→FieldIssue
  * - fixture_count_positive (phase: submit)：SubmitCheck，count<=0→Rejected
  */
 import { validationPassed, validationRejected } from '@/usom/types/process'
@@ -24,6 +26,19 @@ const countPositive: SubmitCheck = async (intent, _ctx) => {
 }
 
 export const fixtureRuleRegistry: DomainRuleRegistry = {
-  realtime: { fixture_name_required: nameRequired },
-  submit: { fixture_count_positive: countPositive },
+  realtime: {
+    fixture_name_required: {
+      check: nameRequired,
+      fields: ['name'],
+      message: '名称不能为空',
+    },
+  },
+  submit: {
+    fixture_count_positive: {
+      check: countPositive,
+      fields: ['count'],
+      message: '数量必须为正数',
+    },
+  },
 }
+

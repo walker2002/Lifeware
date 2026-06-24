@@ -1,27 +1,29 @@
 /**
  * @file evaluate
- * @brief [018-G3] 服务端消费者 — evaluateDomainRules
+ * @brief 服务端消费者 — evaluateDomainRules（[020] registry 即 SSOT）
  *
- * 读 manifest 取 phase∈{both,submit} 规则：
- * - both：用 registry.realtime[id] 重跑 RealtimeCheck（单字段）→ fieldIssuesToValidationResult 适配
- * - submit：用 registry.submit[id] 跑 SubmitCheck（异步，可查库）
- * 全部结果经 aggregateValidation 折叠（复用 VALIDATION_RANK，零新规则）。
+ * [020] Phase 2：不再 loadDomainManifest 读 rules，改遍历传入的 registry 参数（registry
+ * 自带 { check, fields, message } meta，manifest 不再声明 rules）。
+ *
+ * D 模式顺序：先跑 submit 聚合规则、再跑 realtime 规则。submit 的 Rejected 先进 results，
+ * aggregateValidation 折叠时首个 Rejected 胜出吞粒度（复刻原 manifest L 区「聚合规则置首」语义）。
  * submit fail-CLOSED：SubmitCheck 抛错 → 该条计 Rejected + 记日志（宁可阻断也不放过无效数据）。
+ * realtime 重跑同样 fail-CLOSED：抛错计 Rejected（单字段提示，提示级，但服务端权威阶段严判）。
  */
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { ValidationResult } from '@/usom/types/process'
 import { aggregateValidation } from '@/nexus/orchestrator'
-import { loadDomainManifest } from '@/domains/manifest-loader'
 import { fieldIssuesToValidationResult } from './adapter'
 import type { ClientRuleCtx, DomainRuleRegistry, ServerRuleCtx } from './types'
 import type { StructuredIntent } from '@/usom/types/objects'
 
 /**
- * 评估域规则（服务端权威）。
- * @param domainId 域 id（闭包绑定本域）
+ * 评估域规则（服务端权威，[020] registry 即 SSOT）。
+ *
+ * @param domainId 域 id（保留供日志/未来扩展；[020] 后不再读 manifest）
  * @param intent 结构化意图
  * @param serverCtx 服务端上下文（repos/userId/now）
- * @param registry 本域规则注册表（由各域注入；真实域在 hooks 闭包内绑定，fixture 在测试直传）
+ * @param registry 本域规则注册表（SSOT，自带 meta，由各域 hooks 闭包内绑定）
  */
 export async function evaluateDomainRules(
   domainId: string,
@@ -29,36 +31,37 @@ export async function evaluateDomainRules(
   serverCtx: ServerRuleCtx,
   registry: DomainRuleRegistry,
 ): Promise<ValidationResult> {
-  const loaded = loadDomainManifest(domainId)
-  // 域不存在或加载失败 → 无规则可跑 → Passed（兼容真实域 R0 无 rules）
-  if (!loaded.success) return validationPassed()
-  const rules = loaded.manifest.rules
-  if (!rules || rules.length === 0) return validationPassed()
-
-  const clientCtx: ClientRuleCtx = {} // 最小化；realtime 重跑无需 now（both 规则不含时序）
+  void domainId // [020] 不再读 manifest；保留入参以稳定签名 + 供日志/未来扩展
+  const clientCtx: ClientRuleCtx = {} // 最小化；realtime 重跑无需 now（realtime 为纯函数）
   const results: ValidationResult[] = []
 
-  for (const rule of rules) {
-    if (rule.phase === 'both') {
-      const check = registry.realtime[rule.id]
-      if (!check) continue // id 完整性由 validateRuleIntegrity 兜底；运行期缺 check 跳过（realtime 是提示）
-      const fieldValue = intent.fields[rule.fields[0]]
-      const issues = check(fieldValue, clientCtx)
-      results.push(fieldIssuesToValidationResult(issues))
-    } else {
-      // phase: submit
-      const check = registry.submit[rule.id]
-      if (!check) continue
+  // 1. submit 聚合规则（权威，可查库，fail-CLOSED）
+  for (const [id, rule] of Object.entries(registry.submit)) {
+    try {
+      results.push(await rule.check(intent, serverCtx))
+    } catch (e) {
+      console.error(`[rules] submit 规则 "${id}" 抛错（fail-closed）:`, e)
+      results.push(validationRejected([`规则校验失败，请重试 (${id})`]))
+    }
+  }
+
+  // 2. realtime 规则 submit 阶段权威重跑（单字段，fail-CLOSED）
+  for (const [id, rule] of Object.entries(registry.realtime)) {
+    for (const field of rule.fields) {
       try {
-        results.push(await check(intent, serverCtx))
+        const issues = rule.check(intent.fields[field], clientCtx)
+        results.push(fieldIssuesToValidationResult(issues))
       } catch (e) {
-        // fail-CLOSED：submit 抛错 → Rejected + 记日志
-        console.error(`[rules] submit 规则 "${rule.id}" 抛错（fail-closed）:`, e)
-        results.push(validationRejected([`规则校验失败，请重试 (${rule.id})`]))
+        console.error(`[rules] realtime 规则 "${id}" 重跑抛错（fail-closed）:`, e)
+        results.push(validationRejected([`规则校验失败，请重试 (${id})`]))
       }
     }
   }
 
-  // 折叠所有结果（复用 VALIDATION_RANK，零新规则）
-  return results.reduce((acc, r) => aggregateValidation(acc, r), validationPassed() as ValidationResult)
+  // 折叠所有结果（复用 VALIDATION_RANK，零新规则；首个 Rejected 胜出吞粒度）
+  return results.reduce(
+    (acc, r) => aggregateValidation(acc, r),
+    validationPassed() as ValidationResult,
+  )
 }
+

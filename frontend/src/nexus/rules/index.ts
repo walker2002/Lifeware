@@ -2,10 +2,10 @@
  * @file index
  * @brief [018-G3] 规则三层架构框架 barrel
  *
- * ⚠️ 服务端专用 barrel：re-export 了 evaluateDomainRules（→ loadDomainManifest → node:fs）。
- * **client 组件（'use client'）禁止从此 barrel import**——会经 evaluate→loader 把 node:fs
- * 泄漏进 client bundle（next build 报 Can't resolve 'fs'）。client 表单须直接 import 各
- * client-safe 子模块：use-manifest-rules / realtime / server-error-mapping / server/get-realtime-rules。
+ * ⚠️ 服务端专用 barrel：re-export 了 evaluateDomainRules（服务端权威评估，[020] 起改读传入的
+ * registry 参数，不再 loadDomainManifest）。仍判服务端专用：evaluate 经 orchestrator 在
+ * 服务端执行，且本 barrel 还 re-export 了 use-manifest-rules / server-error-mapping 等 client
+ * 路径——client 组件（'use client'）禁止从此 barrel import，直接 import 各 client-safe 子模块。
  */
 export type {
   FieldIssue,
