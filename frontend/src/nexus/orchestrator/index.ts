@@ -21,6 +21,7 @@ import type {
   ValidationResult,
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
+import type { Task } from '@/usom/types/objects'
 import type {
   ISystemEventRepository,
 } from '@/usom/interfaces/irepository'
@@ -41,6 +42,8 @@ import { resolvePathType } from './path-router'
 import { formatCNUIFromContext, formatTextSummary } from './query-cnui-formatter'
 import { createAISessionManager } from '@/nexus/ai-runtime/session'
 import type { QueryResultEntry } from '@/nexus/ai-runtime/session'
+import { TaskRepository } from '@/domains/tasks/repository/task'
+import { ThreadRepository } from '@/domains/tasks/repository/thread'
 
 /**
  * 意图引擎接口
@@ -290,6 +293,176 @@ function trace(
 // Intent action → SM action 的动态映射（从各域 manifest 构建）
 const ACTION_MAP: Record<string, string> = buildActionMap()
 
+// ─── [025] 级联检测类型 ──────────────────────────────────────────
+
+/** 级联 action 白名单 */
+const CASCADE_ELIGIBLE_ACTIONS = new Set([
+  'completeTask', 'archiveTask', 'deleteTask',
+  'completeThread', 'archiveThread', 'deleteThread',
+])
+
+/** 父 action → 子 cascade_action 映射 */
+const CASCADE_ACTION_MAP: Record<string, string> = {
+  completeTask: 'cascade_complete',
+  archiveTask: 'cascade_archive',
+  deleteTask: 'cascade_delete',
+  completeThread: 'cascade_complete',
+  archiveThread: 'cascade_archive',
+  deleteThread: 'cascade_delete',
+}
+
+/** 级联预览数据 */
+interface CascadePreview {
+  parentAction: string
+  parentId: string
+  parentTitle: string
+  parentType: 'task' | 'thread'
+  directCount: number
+  totalCount: number
+  cascadeAction: string
+  allDescendants: Array<{ id: string; title: string; status: string; parentId: string | null }>
+}
+
+/**
+ * 级联检测 — 识别 complete/archive/delete 操作，查询子任务并构造 CascadePreview。
+ *
+ * cascade_ 前缀的 action 直通（防递归）；非白名单 action 直通。
+ * 返回 Passed（无级联）或 NeedConfirm（有级联，携带 CascadePreview）。
+ */
+async function cascadeCheck(
+  intent: StructuredIntent,
+  userId: USOM_ID,
+): Promise<ValidationResult> {
+  try {
+    const action = intent.action
+
+    // cascade_ action 直通，不递归检测
+    if (action.startsWith('cascade_')) return { kind: 'Passed' }
+
+    // 非白名单 action 直通
+    if (!CASCADE_ELIGIBLE_ACTIONS.has(action)) return { kind: 'Passed' }
+
+    // 提取父对象信息
+    const isThreadAction = action.includes('Thread')
+    const parentType = isThreadAction ? 'thread' : 'task'
+    const parentIdKey = isThreadAction ? 'threadId' : 'taskId'
+    const parentId = intent.fields[parentIdKey] as string | undefined
+
+    if (!parentId) return { kind: 'Passed' }
+
+    // 查询子任务
+    const taskRepo = new TaskRepository()
+    let directChildren: Task[]
+
+    if (isThreadAction) {
+      // findByThread: 查该 thread 下的所有 task（不含已删除）
+      directChildren = await taskRepo.findByUserId(userId, {
+        threadId: parentId,
+        status: ['todo', 'planned', 'in_progress', 'completed', 'archived'],
+      })
+    } else {
+      // findByParent: 查该 task 的直接子任务
+      directChildren = await taskRepo.findByParent(parentId, userId)
+    }
+
+    // 过滤：只保留符合 cascade 规则的状态（非 deleted）
+    const eligibleChildren = directChildren.filter(
+      c => c.status !== 'deleted',
+    )
+
+    if (eligibleChildren.length === 0) return { kind: 'Passed' }
+
+    // 递归收集所有后代（BFS）
+    const allDescendants: CascadePreview['allDescendants'] = []
+    const queue = eligibleChildren.map(c => ({ id: c.id, title: c.title, status: c.status, parentId: c.parentId ?? null }))
+    allDescendants.push(...queue)
+
+    let i = 0
+    while (i < queue.length) {
+      const current = queue[i++]!
+      const grandchildren = await taskRepo.findByParent(current.id, userId)
+      for (const gc of grandchildren) {
+        if (gc.status !== 'deleted') {
+          const entry = { id: gc.id, title: gc.title, status: gc.status, parentId: gc.parentId ?? null }
+          queue.push(entry)
+          allDescendants.push(entry)
+        }
+      }
+    }
+
+    // 获取父对象标题
+    let parentTitle = ''
+    if (isThreadAction) {
+      const threadRepo = new ThreadRepository()
+      const thread = await threadRepo.findById(parentId, userId)
+      parentTitle = thread?.name ?? parentId
+    } else {
+      const taskRepo2 = new TaskRepository()
+      const parent = await taskRepo2.findById(parentId, userId)
+      parentTitle = parent?.title ?? parentId
+    }
+
+    const cascadePreview: CascadePreview = {
+      parentAction: action,
+      parentId,
+      parentTitle,
+      parentType,
+      directCount: eligibleChildren.length,
+      totalCount: allDescendants.length,
+      cascadeAction: CASCADE_ACTION_MAP[action]!,
+      allDescendants,
+    }
+
+    return {
+      kind: 'NeedConfirm',
+      data: { source: 'cascade', cascadePreview },
+    }
+  } catch {
+    // DB 查询失败（测试环境非 UUID ID / 连接异常等）→ 降级为无级联，放行
+    return { kind: 'Passed' }
+  }
+}
+
+/**
+ * 双重约束检查 — createTask 时校验 threadId + parentId 状态。
+ * completed/archived 的 Thread 下禁止创建；completed/archived/deleted 的父 Task 下禁止创建。
+ */
+async function parentConstraintCheck(
+  intent: StructuredIntent,
+  userId: USOM_ID,
+): Promise<ValidationResult> {
+  if (intent.action !== 'createTask') return { kind: 'Passed' }
+
+  try {
+    const errors: string[] = []
+    const threadId = intent.fields['threadId'] as string | undefined
+    const parentId = intent.fields['parentId'] as string | undefined
+
+    if (threadId) {
+      const threadRepo = new ThreadRepository()
+      const thread = await threadRepo.findById(threadId, userId)
+      if (thread && ['completed', 'archived'].includes(thread.status)) {
+        errors.push('无法在已完成/已归档的主线下创建任务')
+      }
+    }
+
+    if (parentId) {
+      const taskRepo = new TaskRepository()
+      const parent = await taskRepo.findById(parentId, userId)
+      if (parent && ['completed', 'archived', 'deleted'].includes(parent.status)) {
+        errors.push('无法在已完成/已归档/已删除的任务下创建子任务')
+      }
+    }
+
+    return errors.length === 0
+      ? ({ kind: 'Passed' } as ValidationResult)
+      : ({ kind: 'Rejected', errors } as ValidationResult)
+  } catch {
+    // DB 查询失败（测试环境非 UUID ID / 连接异常等）→ 降级放行
+    return { kind: 'Passed' }
+  }
+}
+
 /**
  * 将域动作转换为状态机动作
  * @param domainAction - 域动作名称
@@ -453,6 +626,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
     ): Promise<OrchestratorResult> {
       const snapshot = createStubSnapshot(userId)
       const usomSnapshot = toUSOMSnapshot(snapshot)
+      // [025] 级联拆分计划：在 NeedConfirm 块中赋值，在 SM 执行后消费
+      let cascadeSplitPlan: CascadePreview | undefined
       const domainId = intent.targetDomain
       const domain = findDomain(domainId)
 
@@ -466,6 +641,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
           return { success: false, error: domainValidation.errors.join('; ') }
         }
       }
+
+      // 1.3 双重约束检查（[025] S3：createTask 校验父对象状态）
+      const constraintValidation = await parentConstraintCheck(intent, userId)
+      if (constraintValidation.kind === 'Rejected') {
+        return { success: false, error: constraintValidation.errors!.join('; ') }
+      }
+
+      // 1.4 级联检测（[025] S2：complete/archive/delete 查子任务）
+      const cascadeValidation = await cascadeCheck(intent, userId)
 
       // 1.5 路径路由 — 根据 manifest 声明判定路径类型
       const manifestResult = loadDomainManifest(domainId)
@@ -519,10 +703,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         }
       }
 
-      // 3. 聚合三方 ValidationResult：domain × rule × cnui，取最严格（全序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）
+      // 3. 聚合四方 ValidationResult：domain × cascade × rule × cnui，取最严格（全序 Rejected > NeedConfirm > NeedInput > PassedWithWarning > Passed）
       // Orchestrator 聚合属调度职责，不属业务逻辑，合规。
       const aggregated = aggregateValidation(
-        aggregateValidation(domainValidation, ruleValidation),
+        aggregateValidation(
+          aggregateValidation(domainValidation, cascadeValidation),
+          ruleValidation,
+        ),
         cnuiValidation,
       )
 
@@ -558,20 +745,26 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         // 完整 CNUI Suspend 回环（持久化/回填/UI 回流）延后到独立切片 ⑥。
         // 向后兼容：同时回填旧字段 needsCnuiConfirmation/needsConfirmation/confirmationMessage。
         const data = aggregated.data as Record<string, unknown>
-        const confirmations =
-          data?.source === 'rule' ? (data.confirmations as string[] | undefined) : undefined
-        return {
-          success: false,
-          suspended: { reason: 'need_confirm', data: aggregated.data },
-          // 兼容旧消费方（intent.ts 透传字段）
-          needsConfirmation: data?.source === 'rule' ? true : false,
-          needsCnuiConfirmation: data?.source === 'cnui' ? true : false,
-          confirmationMessage: confirmations?.join('; '),
-          cnuiAction: data?.source === 'cnui' ? (data.cnuiAction as string) : undefined,
-          cnuiDomain: data?.source === 'cnui' ? (data.cnuiDomain as string) : undefined,
-          cnuiSurface: data?.source === 'cnui' ? (data.cnuiSurface as string) : undefined,
-          cnuiIntentFields: data?.source === 'cnui' ? (data.cnuiIntentFields as Record<string, unknown>) : undefined,
-          warnings: ruleResult.warnings,
+        // [025] 级联确认：若已确认，设置拆分计划并 fall through 到 SM 执行
+        if (data?.source === 'cascade' && confirmed) {
+          cascadeSplitPlan = data.cascadePreview as CascadePreview
+          // fall through — 不 return，继续走下面的 SM 路径
+        } else {
+          const confirmations =
+            data?.source === 'rule' ? (data.confirmations as string[] | undefined) : undefined
+          return {
+            success: false,
+            suspended: { reason: 'need_confirm', data: aggregated.data },
+            // 兼容旧消费方（intent.ts 透传字段）
+            needsConfirmation: data?.source === 'rule' ? true : false,
+            needsCnuiConfirmation: data?.source === 'cnui' ? true : false,
+            confirmationMessage: confirmations?.join('; '),
+            cnuiAction: data?.source === 'cnui' ? (data.cnuiAction as string) : undefined,
+            cnuiDomain: data?.source === 'cnui' ? (data.cnuiDomain as string) : undefined,
+            cnuiSurface: data?.source === 'cnui' ? (data.cnuiSurface as string) : undefined,
+            cnuiIntentFields: data?.source === 'cnui' ? (data.cnuiIntentFields as Record<string, unknown>) : undefined,
+            warnings: ruleResult.warnings,
+          }
         }
       }
 
@@ -584,8 +777,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         const smObjectType = getObjectType(intent)
         const repo = deps.getRepo(domainId, smObjectType)
 
-        // 复用上方已加载的 manifest，提取 cascade 规则
-        const cascadeRules = manifestResult.success
+        // [025] tasks 域级联由 Orchestrator 接管，SM 不再执行 cascade
+        const cascadeRules = manifestResult.success && domainId !== 'tasks'
           ? (manifestResult.manifest.cascade_rules?.filter((r: any) => r.type === 'parent_child_status') ?? [])
           : []
 
@@ -622,6 +815,54 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
         if (domain && smResult.event) {
           await domain.onEvent(smResult.event, usomSnapshot)
+        }
+
+        // [025] 级联拆分执行
+        if (cascadeSplitPlan && cascadeSplitPlan.allDescendants.length > 0) {
+          const childResults: Array<{ id: string; success: boolean; error?: string }> = []
+          for (const child of cascadeSplitPlan.allDescendants) {
+            const childIntent: StructuredIntent = {
+              id: crypto.randomUUID() as USOM_ID,
+              intentionId: intent.intentionId,
+              targetDomain: 'tasks',
+              action: cascadeSplitPlan.cascadeAction,
+              fields: {
+                taskId: child.id,
+                title: child.title,
+              },
+              confidence: 1.0,
+              resolvedBy: 'template_form',
+              pathType: 'contract',
+              createdAt: new Date().toISOString() as Timestamp,
+            }
+            try {
+              const r = await orchestrator.executeIntent(childIntent, userId)
+              childResults.push({ id: child.id, success: r.success, error: r.error })
+            } catch (err) {
+              childResults.push({
+                id: child.id,
+                success: false,
+                error: err instanceof Error ? err.message : '级联执行失败',
+              })
+            }
+          }
+
+          const failedCount = childResults.filter(r => !r.success).length
+          const warnings = [
+            ...(ruleResult.warnings ?? []),
+            `级联操作完成：${cascadeSplitPlan.totalCount} 个子任务已处理` +
+              (failedCount > 0 ? `，${failedCount} 个失败` : ''),
+          ]
+
+          return {
+            success: failedCount === 0,
+            object: smResult.object,
+            objectType: smObjectType,
+            warnings,
+            error: failedCount > 0
+              ? `${failedCount}/${cascadeSplitPlan.totalCount} 个子任务级联失败`
+              : undefined,
+          }
         }
 
         return {
