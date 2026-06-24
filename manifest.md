@@ -38,9 +38,11 @@ UI-REDESIGN.md           # 界面改版设计（Phase 1~3 视觉升级方案）
 domain-development-guide.md  # [019] Domain 开发权威指南（范式+注册+治理，单一权威文件）= 原 mydocs 注册指南 + domain-paradigm 整合；Part I 范式/治理/CI/C-DC，Part II Step1-13 机械指南（已对齐 tasks 参考实现）；route-generation-spec 为下级
 superpowers/specs/
   2026-06-20-rules-three-tier-architecture-design.md  # [018-G3] 规则三层架构设计 v3（plan-eng-review CLEAN）
+  2026-06-23-020-rules-management-redesign.md         # [020] 系统规则管理重设计（office-hours DESIGN，锁定 D1/D2/D3）
 superpowers/plans/
   2026-06-20-018-g3-r0-rules-framework.md             # [018-G3] R0 walking-skeleton 实现计划
   2026-06-20-018-g3-r1-habits-end-to-end.md           # [018-G3] R1 habits 端到端实现计划
+  2026-06-24-020-rules-management-redesign.md         # [020] 去 C/L 范式重构实现计划（plan-eng-review CLEARED，RT1-RT9）
 ```
 
 ### 第三层：Claude 自动维护
@@ -109,7 +111,8 @@ superpowers/plans/
 | 数据库设计 | 2026_05_30 | 2026_05_28 | 新增 user_activities 用户行为埋点表（统一分析入口，4 种行为类型，时间衰减聚合查询）；新增"用户行为分析"表分类 |
 | 用户行为埋点设计 | 2026_05_30 | 无 | 创建。用户行为埋点框架设计（user_activities 表 + recordActivity Server Action + 时间衰减聚合 + AI 助手常用意图展示改造 + /analytics 独立分析页面） |
 | 界面设计规范 | 2026_05_31 | 无 | 创建。完整 UI 设计规范：色彩令牌体系、排版/间距/圆角/阴影层级、基础组件规范（按钮/输入框/卡片/气泡/徽标/空状态/加载）、布局系统（AppShell 三栏）、导航系统、交互规范（动画/反馈/键盘）、响应式断点、图标/暗色模式规范、AI Agent 检查清单 C-01~C-07 |
-| 系统规则管理重设计 | 2026_06_23 | 无 | 创建（office-hours 产出，DESIGN）。[020] 基于 revisit 存档（mutation_mode 正交轴裂缝 + manifest C/L 过度设计）+ `mydocs/dev/020` 需求。锁定三项决策：D1 Business Rule 集中管理进代码/「动态」指 Policy 本次不做；D2 Tasks+Habits 完整做 + OKR/Timebox sunset 记债；D3 批量编辑走聚合事务+聚合校验，**不保留**「单字段触发相关规则」（020 该句作废）。规则三分类（Business/Governance/Policy）+ 判据（查库与否/跨域与否）。发现并记录 `updateTask` 逐字段 `service.update` bug（绕过聚合校验+无事务，revisit 案题1 实案，可先独立修）。待 /writing-plans 展开。触动 constitution §IX 约束 2/3 + §III |
+| 系统规则管理重设计 | 2026_06_23 | 无 | 创建（office-hours 产出，DESIGN）。[020] 基于 revisit 存档（mutation_mode 正交轴裂缝 + manifest C/L 过度设计）+ `mydocs/dev/020` 需求。锁定三项决策：D1 Business Rule 集中管理进代码/「动态」指 Policy 本次不做；D2 Tasks+Habits 完整做 + OKR/Timebox sunset 记债；D3 批量编辑走聚合事务+聚合校验，**不保留**「单字段触发相关规则」（020 该句作废）。规则三分类（Business/Governance/Policy）+ 判据（查库与否/跨域与否）。**plan 已产出**（`plans/2026-06-24-020-rules-management-redesign.md`，/plan-eng-review CLEARED，9 findings → RT1-RT9）；updateTask/updateThread 事务 bug 已独立修复（a47c418，聚合校验留 D3）。触动 constitution §IX 约束 2/3 + §III |
+| 系统规则管理重设计 plan | 2026_06_24 | 无 | 创建（/writing-plans 产出，TDD）。[020] 去 C/L 范式重构主体（7 Phase/~20 Task）：registry 扩展自带 fields/message meta（registry 即 SSOT）→ evaluate/realtime/useManifestRules 改读 registry → 删 get-realtime-rules 中转 + manifest C/L → 删 G-rule-integrity + validate-domain-structure 补「realtime 恰 1 字段」CI（C1）→ constitution MINOR 2.0.0→2.1.0。plan-eng-review 9 findings 全 resolve 落 RT1-RT9（F1 选 B 彻底收敛 message 双源→提取常量；T1 D 模式吞粒 regression mandatory；A1 Phase1-3 中间态须连续完成）。D3 聚合校验 + E 区 required_fields defer |
 | 项目宪章 | 2026_05_31 | 2026_05_29 | v1.8.0→v1.9.0：MINOR — 新增 UI 设计规范治理；Document Authority Chain 补充 UI-DESIGN-SPEC.md；Tier 2 文档清单补充；Compliance Review 新增 UI 合规审查条目（C-01~C-07） |
 | USOM 详细设计 | 2026_06_03 | 2026_05_28 | Task Domain 重构：Project→Thread（ProjectStatus→ThreadStatus，projectId→threadId）；移除 ProjectTemplate/TaskTemplate；Task 新增双轴标签系统（AI 维护：clarity/complexity/decomposition + 用户管理：captureMode/energyProfile/schedulingConstraint/tracking + aiTags）；SystemEventType 从 Project* 更新为 Thread* |
 | 界面改版设计 | 2026_05_31 | 无 | 创建。Phase 1~3 视觉升级方案：三栏布局优化、欢迎页 AI 引导区、任务/习惯卡片改版 |
