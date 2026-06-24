@@ -192,7 +192,8 @@ lifecycle:
         trigger: intent
         action: start
         event_type: TaskStarted
-      - from: in_progress
+      # [025] ISSUE-004：complete 允许 todo/planned/in_progress → completed（与 cascade_complete 对齐）
+      - from: [todo, planned, in_progress]
         to: completed
         trigger: intent
         action: complete

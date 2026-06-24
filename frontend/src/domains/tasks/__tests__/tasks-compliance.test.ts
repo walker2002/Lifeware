@@ -158,9 +158,9 @@ describe('T016: Tasks hooks.ts 纯函数验证', () => {
 })
 
 describe('T017: Tasks transitions.ts 转换表验证', () => {
-  it('taskTransitions 应有 22 条转换（含级联）', () => {
+  it('taskTransitions 应有 24 条转换（含级联 + ISSUE-004 直接完成）', () => {
     expect(Array.isArray(taskTransitions)).toBe(true)
-    expect(taskTransitions.length).toBe(22)
+    expect(taskTransitions.length).toBe(24)
   })
 
   it('threadTransitions 应有 5 条转换', () => {
@@ -184,6 +184,21 @@ describe('T017: Tasks transitions.ts 转换表验证', () => {
 
   it('taskTransitions: findTransition("in_progress", "complete") 返回正确转换', () => {
     const t = findTransition(taskTransitions, 'in_progress', 'complete')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('completed')
+    expect(t!.eventType).toBe('TaskCompleted')
+  })
+
+  // [025] ISSUE-004：todo/planned 也应能直接 complete（与 cascade_complete 对齐）
+  it('taskTransitions: findTransition("todo", "complete") 返回 completed（ISSUE-004）', () => {
+    const t = findTransition(taskTransitions, 'todo', 'complete')
+    expect(t).not.toBeNull()
+    expect(t!.to).toBe('completed')
+    expect(t!.eventType).toBe('TaskCompleted')
+  })
+
+  it('taskTransitions: findTransition("planned", "complete") 返回 completed（ISSUE-004）', () => {
+    const t = findTransition(taskTransitions, 'planned', 'complete')
     expect(t).not.toBeNull()
     expect(t!.to).toBe('completed')
     expect(t!.eventType).toBe('TaskCompleted')

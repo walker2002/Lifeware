@@ -3,6 +3,7 @@
  * @brief Tasks Domain 状态转换表（重构后）
  *
  * task: (none) → todo → planned → in_progress → completed → archived
+ *        todo | planned | in_progress → completed（直接完成，[025] ISSUE-004：与 cascade_complete 对齐）
  *        todo | planned | in_progress | completed → deleted（软删除）
  * thread: (none) → active → paused → completed → archived
  */
@@ -31,6 +32,10 @@ export const taskTransitions: Transition<TaskStatus>[] = [
   { from: 'todo',    to: 'planned',     action: 'plan',     eventType: 'TaskPlanned' },
   { from: 'planned', to: 'in_progress', action: 'start',    eventType: 'TaskStarted' },
   { from: 'todo',    to: 'in_progress', action: 'start',    eventType: 'TaskStarted' },
+  // [025] ISSUE-004：complete 允许 todo/planned/in_progress → completed（与 cascade_complete 对齐，
+  // 消除「todo 任务标记完成 → 非法状态转换」500）。用户在 complete-zone 填实际用时后直接完成合理。
+  { from: 'todo',        to: 'completed', action: 'complete', eventType: 'TaskCompleted' },
+  { from: 'planned',     to: 'completed', action: 'complete', eventType: 'TaskCompleted' },
   { from: 'in_progress', to: 'completed', action: 'complete', eventType: 'TaskCompleted' },
   { from: 'completed', to: 'archived',  action: 'archive',  eventType: 'TaskArchived' },
   { from: 'todo',        to: 'deleted', action: 'delete',  eventType: 'TaskDeleted' },
