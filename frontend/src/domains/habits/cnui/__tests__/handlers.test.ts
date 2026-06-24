@@ -39,9 +39,16 @@ vi.mock('@/lib/db/repositories/system-event.repository', () => ({
   SystemEventRepository: vi.fn().mockImplementation(() => mockEventRepo),
 }))
 
-vi.mock('@/domains/habits/validation', () => ({
-  validateHabitFields: vi.fn(() => ({ valid: true, errors: [] })),
-}))
+// [020] Phase 1 RT1 连带：validation 新增 HABIT_RULE_MESSAGES 导出，mock 须同步——用 importOriginal
+// 自动带出全部真实导出，仅 override validateHabitFields（handlers 测试不消费 HABIT_RULE_MESSAGES，但
+// mock 契约须完整，否则 vitest 报 "No HABIT_RULE_MESSAGES export is defined on the mock"）。
+vi.mock('@/domains/habits/validation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/domains/habits/validation')>()
+  return {
+    ...actual,
+    validateHabitFields: vi.fn(() => ({ valid: true, errors: [] })),
+  }
+})
 
 vi.mock('@/domains/habits/transitions', () => ({
   findTransition: vi.fn(() => ({
