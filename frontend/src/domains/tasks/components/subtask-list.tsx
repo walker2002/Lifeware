@@ -25,6 +25,8 @@ interface SubtaskListProps {
   userId: USOM_ID
   /** 打开子任务详情回调 */
   onOpenTask: (taskId: USOM_ID) => void
+  /** 子任务变更回调（添加后通知父组件刷新任务树） */
+  onChanged?: () => void
 }
 
 // ─── 常量 ──────────────────────────────────────────────────────────────
@@ -70,7 +72,7 @@ const PRIORITY_LABELS: Record<string, string> = {
  * C 区 — 子任务列表组件
  * @param props - 组件属性
  */
-export function SubtaskList({ taskId, userId, onOpenTask }: SubtaskListProps) {
+export function SubtaskList({ taskId, userId, onOpenTask, onChanged }: SubtaskListProps) {
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
@@ -113,10 +115,11 @@ export function SubtaskList({ taskId, userId, onOpenTask }: SubtaskListProps) {
       })
       setNewTitle('')
       await loadSubtasks()
+      onChanged?.()
     } finally {
       setAdding(false)
     }
-  }, [newTitle, taskId, loadSubtasks])
+  }, [newTitle, taskId, loadSubtasks, onChanged])
 
   const completedCount = subtasks.filter(t => t.status === 'completed').length
   const total = subtasks.length
