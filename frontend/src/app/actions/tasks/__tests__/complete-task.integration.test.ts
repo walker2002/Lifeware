@@ -26,7 +26,16 @@ import { db } from '@/lib/db'
 import * as s from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { TaskRepository } from '@/domains/tasks/repository/task'
-import { completeTask } from '@/app/actions/tasks'
+import { completeTask, type TaskActionResult } from '@/app/actions/tasks'
+
+/**
+ * 类型守卫：判别联合 TaskActionResult 窄化到 ok 分支。
+ * expect(...).toBe('ok') 不能让 TS 收窄联合类型，故提取显式谓词，
+ * 既兼顾运行时校验、又使后续 result.task 访问通过 tsc。
+ */
+function assertOk(r: TaskActionResult): asserts r is Extract<TaskActionResult, { status: 'ok' }> {
+  expect(r.status).toBe('ok')
+}
 
 /**
  * completeTask 内部硬编码的 MVP 用户 ID（与 tasks.ts 一致）。
@@ -58,7 +67,7 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
       const result = await completeTask(task.id)
 
       // 3. 判别联合 ok 分支 + 复查 DB —— 状态已落库为 completed
-      expect(result.status).toBe('ok')
+      assertOk(result)
       expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
@@ -83,7 +92,7 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
       const result = await completeTask(task.id, { notes: '完成备注' })
 
       // 判别联合 ok 分支 + 复查 DB —— 状态已 completed、notes 已落库
-      expect(result.status).toBe('ok')
+      assertOk(result)
       expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
@@ -108,7 +117,7 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
       const result = await completeTask(task.id, { actualDuration: 45 })
 
       // 判别联合 ok 分支 + 复查 DB —— 状态已 completed、actualDuration 已落库
-      expect(result.status).toBe('ok')
+      assertOk(result)
       expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
