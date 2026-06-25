@@ -322,8 +322,6 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
     resumeThread: (d) => `已恢复 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     completeThread: (d) => `已完成 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
     archiveThread: (d) => `已归档 ${(d as any)?.selectedIds?.length ?? 1} 条主线`,
-    refineTask: () => '细化请求已提交，AI 将分析任务并给出建议',
-    splitTask: () => '拆分请求已提交，AI 将分析任务并给出建议',
   }
 
   /**

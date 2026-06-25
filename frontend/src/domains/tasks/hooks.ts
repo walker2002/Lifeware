@@ -170,16 +170,6 @@ export function createTasksHooks(manifest: DomainManifest) {
 
       case 'TaskCreated': {
         const clarity = event.payload['clarity'] as string
-        if (clarity === 'fuzzy') {
-          return {
-            metrics: [],
-            suggestions: [{
-              actionType: 'refine_task',
-              label: `新任务很模糊，需要细化: ${title}`,
-              weight: 70,
-            }],
-          }
-        }
         return {
           metrics: [{ metricKey: 'task_created', value: 1 }],
           suggestions: [],
@@ -241,30 +231,6 @@ export function createTasksHooks(manifest: DomainManifest) {
           actionType: 'complete_task',
           category: 'cue',
           weight: task.priority === 'critical' ? 90 : 70,
-        })
-      }
-
-      if (task.clarity === 'fuzzy') {
-        actions.push({
-          id: `task-refine-${task.id}` as unknown as USOM_ID,
-          sourceObjectId: task.id as unknown as USOM_ID,
-          sourceObjectType: 'task',
-          label: `任务需要细化: ${task.title}`,
-          actionType: 'refine_task',
-          category: 'cue',
-          weight: 65,
-        })
-      }
-
-      if (task.decomposition === 'splittable') {
-        actions.push({
-          id: `task-split-${task.id}` as unknown as USOM_ID,
-          sourceObjectId: task.id as unknown as USOM_ID,
-          sourceObjectType: 'task',
-          label: `任务建议拆分: ${task.title}`,
-          actionType: 'split_task',
-          category: 'cue',
-          weight: 55,
         })
       }
     }

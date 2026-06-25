@@ -343,9 +343,7 @@ export type ActionType =
   | 'habit_risk_warning'     // 习惯风险警告
   | 'complete_task'          // 完成任务
   | 'create_task'            // 创建任务
-  | 'refine_task'            // 细化任务
   | 'review_task'            // 复盘任务
-  | 'split_task'             // 拆分任务
   | 'start_timebox'          // 开始时间盒
   | 'review_okr'             // 复盘 OKR
   | 'create_review'          // 创建复盘

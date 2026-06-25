@@ -251,37 +251,6 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
 
     // ── AI 辅助操作 ──
 
-    if (action === 'refineTask') {
-      try {
-        const repo = new TaskRepository()
-        const allTasks = await repo.findByUserId(MVP_USER_ID as USOM_ID)
-        const fuzzyTasks = allTasks
-          .filter(t => t.clarity === 'fuzzy' || t.clarity === 'scoped')
-          .map(t => ({
-            id: t.id,
-            title: t.title,
-            priority: t.priority,
-            estimatedDuration: t.estimatedDuration,
-            status: t.status,
-          }))
-        return {
-          content: '请选择要细化的任务',
-          dataSnapshot: { action: 'refine', items: fuzzyTasks },
-        }
-      } catch (e) {
-        console.error('[taskCnuiHandler] 查询模糊任务失败:', e)
-        return { content: '请填写信息', dataSnapshot: {} }
-      }
-    }
-
-    if (action === 'splitTask') {
-      const tasks = await getActiveTasks()
-      return {
-        content: '请选择要拆分的任务',
-        dataSnapshot: { items: tasks },
-      }
-    }
-
     if (action in THREAD_LIFECYCLE_STATUS_MAP) {
       try {
         const { ThreadRepository } = await import('@/domains/tasks/repository/thread')
@@ -438,16 +407,6 @@ export const taskCnuiHandler: CnuiSurfaceHandler = {
         return { success: true, data: { object: thread } }
       }
 
-      // refineTask: MVP 阶段仅确认收到（AI 细化管道待实现）
-      if (action === 'refineTask') {
-        return { success: true, data: { message: '细化请求已提交，AI 将分析任务并给出建议' } }
-      }
-
-      // splitTask: MVP 阶段仅确认收到（AI 拆分管道待实现）
-      if (action === 'splitTask') {
-        return { success: true, data: { message: '拆分请求已提交，AI 将分析任务并给出建议' } }
-      }
-
       const { submitDynamicIntent } = await import('@/app/actions/intent')
 
       // 线程批量操作：selectedIds 存在时逐个执行（遇错即停）
@@ -508,6 +467,5 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'task-action-panel': taskCnuiHandler,
   'thread-creation-card': taskCnuiHandler,
   'thread-action-panel': taskCnuiHandler,
-  'task-split-card': taskCnuiHandler,
   'task-tree-view': taskCnuiHandler,
 }

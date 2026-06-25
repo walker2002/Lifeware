@@ -2,7 +2,7 @@
  * @file TaskActionPanel
  * @brief 任务操作面板 CNUI Surface
  *
- * CN-UI Surface 组件，处理 completeTask、archiveTask、deleteTask、refineTask 等任务操作。
+ * CN-UI Surface 组件，处理 completeTask、archiveTask、deleteTask 等任务操作。
  * 支持多选 + 批量确认。
  */
 
@@ -40,7 +40,6 @@ const ACTION_LABELS: Record<string, { title: string; button: string }> = {
   complete: { title: '完成任务', button: '完成所选' },
   archive: { title: '归档任务', button: '归档所选' },
   delete: { title: '删除任务', button: '删除所选' },
-  refine: { title: '细化任务', button: '细化所选' },
 }
 
 /** 优先级标签 */

@@ -6,7 +6,7 @@
  * 用户只读，作为 AI "思维过程透明化" 的展示
  */
 
-import { Brain, Lightbulb } from 'lucide-react'
+import { Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '../../../usom/types/objects'
 
@@ -169,12 +169,6 @@ export function SystemCognitionPanel({ task }: SystemCognitionPanelProps) {
             <span className="text-xs text-ink">
               {DECOMPOSITION_LABELS[task.decomposition] ?? task.decomposition}
             </span>
-            {task.decomposition === 'splittable' && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-warning">
-                <Lightbulb className="size-3" />
-                AI 建议：此任务可拆分为更小的子任务
-              </p>
-            )}
           </div>
         </div>
       )}

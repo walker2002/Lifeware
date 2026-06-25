@@ -21,7 +21,6 @@ cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })
 import { TaskCreationCard } from '@/domains/tasks/cnui/surfaces/TaskCreationCard'
 import { TaskEditCard } from '@/domains/tasks/cnui/surfaces/TaskEditCard'
 import { TaskActionPanel } from '@/domains/tasks/cnui/surfaces/TaskActionPanel'
-import { TaskSplitCard } from '@/domains/tasks/cnui/surfaces/TaskSplitCard'
 import { ThreadCreationCard } from '@/domains/tasks/cnui/surfaces/ThreadCreationCard'
 import { ThreadActionPanel } from '@/domains/tasks/cnui/surfaces/ThreadActionPanel'
 import { TaskTreeViewCard } from '@/domains/tasks/cnui/surfaces/TaskTreeView'
@@ -29,7 +28,6 @@ import { TaskTreeViewCard } from '@/domains/tasks/cnui/surfaces/TaskTreeView'
 cnuiRegistry.register('tasks', 'task-creation-card', { component: TaskCreationCard })
 cnuiRegistry.register('tasks', 'task-edit-card', { component: TaskEditCard })
 cnuiRegistry.register('tasks', 'task-action-panel', { component: TaskActionPanel })
-cnuiRegistry.register('tasks', 'task-split-card', { component: TaskSplitCard })
 cnuiRegistry.register('tasks', 'thread-creation-card', { component: ThreadCreationCard })
 cnuiRegistry.register('tasks', 'thread-action-panel', { component: ThreadActionPanel })
 cnuiRegistry.register('tasks', 'task-tree-view', { component: TaskTreeViewCard })

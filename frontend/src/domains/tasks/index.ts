@@ -17,7 +17,6 @@ import { ThreadActionPanel } from './cnui/surfaces/ThreadActionPanel'
 import { TaskCreationCard } from './cnui/surfaces/TaskCreationCard'
 import { TaskEditCard } from './cnui/surfaces/TaskEditCard'
 import { TaskActionPanel } from './cnui/surfaces/TaskActionPanel'
-import { TaskSplitCard } from './cnui/surfaces/TaskSplitCard'
 import { TaskTreeViewCard } from './cnui/surfaces/TaskTreeView'
 
 // ── CNUI Surface 注册 ────────────────────────────────────────
@@ -43,10 +42,6 @@ cnuiRegistry.register('tasks', 'task-edit-card', {
 })
 cnuiRegistry.register('tasks', 'task-action-panel', {
   component: TaskActionPanel,
-  handlerModulePath,
-})
-cnuiRegistry.register('tasks', 'task-split-card', {
-  component: TaskSplitCard,
   handlerModulePath,
 })
 cnuiRegistry.register('tasks', 'task-tree-view', {

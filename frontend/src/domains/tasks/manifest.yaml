@@ -86,26 +86,6 @@ intent_triggers:
       - 添加新任务叫完成报告
     keywords: [任务, task, 创建, 添加]
 
-  - action: refineTask
-    shortcut: /refineTask
-    description: AI 帮助细化模糊任务
-    response_type: cnui
-    cnui_surface: task-action-panel
-    examples:
-      - 细化这个任务
-      - 帮我拆解任务
-    keywords: [细化, refine, 拆解]
-
-  - action: splitTask
-    shortcut: /splitTask
-    description: AI 建议拆分可拆分任务
-    response_type: cnui
-    cnui_surface: task-split-card
-    examples:
-      - 拆分这个任务
-      - 建议子任务
-    keywords: [拆分, split, 子任务]
-
   - action: updateTask
     shortcut: /updateTask
     description: 更新任务信息
@@ -518,8 +498,6 @@ cnui_surfaces:
   task-edit-card:
     handler: ./cnui/handlers
   task-action-panel:
-    handler: ./cnui/handlers
-  task-split-card:
     handler: ./cnui/handlers
   task-tree-view:
     handler: ./cnui/handlers
