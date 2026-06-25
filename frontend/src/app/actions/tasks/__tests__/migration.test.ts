@@ -7,7 +7,8 @@
  *    修复「逐字段 service.update 无事务」半截改动 bug）
  *  - updateThread(name) → 同走 service.execute 单事务聚合写（objectType='thread'，
  *    与 updateTask 同病同修）
- *  - completeTask → 经 service.execute 单事务（字段先 + 状态后），不两阶段 repo.update
+ *  - completeTask → [025] D3 起全走 Orchestrator（submitDynamicIntent），字段+taskId
+ *    透传，cascadeCheck 在 Orchestrator 内执行（不再直调 mutation service.execute）
  *  - promoteToThread → 经 service.execute 聚合事务（create thread + 迁子任务 + 删原任务），
  *    不直写 repo.update(status='deleted')
  *  - deleteThread → 经 submitDynamicIntent(SM)，不 repo.delete 硬删
@@ -98,26 +99,28 @@ describe('T7 tasks.ts 迁移 — 写入口路径', () => {
     expect(updateMock).not.toHaveBeenCalled()
   })
 
-  it('completeTask 字段+状态在 service.execute 单事务内（先字段后状态）', async () => {
-    executeMock.mockResolvedValue({
+  it('completeTask 全走 Orchestrator（submitDynamicIntent），字段+taskId 透传（[025] D3）', async () => {
+    // [025] D3：completeTask 不再直调 mutation service.execute，改走 submitDynamicIntent
+    // → cascadeCheck 在 Orchestrator 内执行；字段+状态经 executeFieldStateWrite 原子写。
+    // mutation service 的字段+状态原子写由 executeFieldStateWrite 回调保证（Task 2 覆盖），
+    // 此处仅验证 completeTask 透传到 Orchestrator 的入参正确。
+    submitDynamicIntentMock.mockResolvedValue({
       success: true,
       object: { id: 'task-1', status: 'completed' },
     })
 
-    await completeTask('task-1', { actualDuration: 30, notes: '完成' })
+    const result = await completeTask('task-1', { actualDuration: 30, notes: '完成' })
 
-    // 经 execute，单次调用（单事务），不再两阶段 repo.update + submit
-    expect(executeMock).toHaveBeenCalledTimes(1)
-    const [intent] = executeMock.mock.calls[0]
-    // 字段先于状态：字段步在前、状态步在后
-    const fieldIdx = intent.steps.findIndex((s: any) => s.kind === 'field')
-    const stateIdx = intent.steps.findIndex((s: any) => s.kind === 'state')
-    expect(fieldIdx).toBeLessThan(stateIdx)
-    // 状态步动作 = complete
-    expect(intent.steps[stateIdx]).toMatchObject({ kind: 'state', action: 'complete' })
-    // 字段步含 actualDuration / notes
-    const fields = intent.steps.filter((s: any) => s.kind === 'field').map((s: any) => s.field)
-    expect(fields).toEqual(expect.arrayContaining(['actualDuration', 'notes']))
+    // 走 submitDynamicIntent（不再走 mutation service.execute）
+    expect(submitDynamicIntentMock).toHaveBeenCalledTimes(1)
+    expect(executeMock).not.toHaveBeenCalled()
+    // 入参：domain='tasks', action='completeTask', fields 含 taskId + 业务字段
+    const [domain, action, fields] = submitDynamicIntentMock.mock.calls[0]
+    expect(domain).toBe('tasks')
+    expect(action).toBe('completeTask')
+    expect(fields).toMatchObject({ taskId: 'task-1', actualDuration: 30, notes: '完成' })
+    // 返回判别联合 ok 分支
+    expect(result).toEqual({ status: 'ok', task: { id: 'task-1', status: 'completed' } })
   })
 
   it('promoteToThread 经 service.execute 聚合事务（create thread + 迁子任务 + 删原任务）', async () => {

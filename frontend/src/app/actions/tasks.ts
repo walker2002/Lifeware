@@ -14,8 +14,12 @@
  *   失败整体回滚（修复「逐字段 service.update 无事务」半截改动 bug）。字段步内部
  *   FactField 走字段执行器（字段级校验 + updateFields + TaskFieldUpdated），
  *   ContentField 直走 repo.updateFields；不再直接 repo.update 写 FactField。
- * - 完成任务（completeTask）：字段（actualDuration/notes）+ 状态（complete）在
- *   写入口 execute() 单事务内原子完成（消除两阶段写）。
+ * - 完成任务（completeTask）：[025] D3 起全走 Orchestrator（submitDynamicIntent），
+ *   不再直调 mutation service。字段+状态经 Task 2 的 executeFieldStateWrite 回调
+ *   在 mutation service 单事务内原子完成；cascadeCheck 在 Orchestrator 内执行，
+ *   needs_confirmation 经判别联合 TaskActionResult 透传客户端（ISSUE-002/003）。
+ * - 状态转换 action（updateTaskStatus/archiveTask/deleteTask）：同样返回判别联合
+ *   TaskActionResult 透传 cascade needsConfirmation（ISSUE-003）。
  * - 提升为主线（promoteToThread）：建主线 + 迁子任务 threadId + 软删原任务，
  *   聚合事务 execute() 内原子完成（失败回滚）。
  * - 删除主线（deleteThread）：走 SM（thread lifecycle 含 archived→deleted），
@@ -36,6 +40,23 @@ import type { CreateTaskInput, UpdateTaskInput, TaskFilters, CreateThreadInput, 
 
 /** MVP 阶段固定用户 ID */
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
+
+// ─── Action 结果判别联合（[025] D3）──────────────────────────────────────
+/**
+ * 任务写操作的判别联合返回类型。
+ *
+ * [025] ISSUE-003：状态转换 action（completeTask/updateTaskStatus/archiveTask/
+ * deleteTask）改返回判别联合，使 cascade 规则的 needsConfirmation 信号能透传到
+ * 客户端（旧版 throw「状态更新失败」丢弃了 NeedConfirm 信号，导致级联确认弹窗
+ * 无法触发）。
+ *
+ * - status='ok'：成功，携带更新后的 task。
+ * - status='needs_confirm'：规则引擎要求用户确认（如级联影响子任务），携带提示
+ *   消息、需重发的 action 名、本次提交的字段（供客户端 confirmed=true 重发）。
+ */
+export type TaskActionResult =
+  | { status: 'ok'; task: Task }
+  | { status: 'needs_confirm'; message: string; confirmAction: string; confirmFields: Record<string, unknown> }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Task 操作
@@ -157,11 +178,20 @@ export async function updateTask(taskId: string, input: UpdateTaskInput): Promis
  * - archived → archiveTask (SM action: archive)
  * - deleted → deleteTask (SM action: delete)
  *
+ * [025] ISSUE-003：返回判别联合 TaskActionResult。当 cascade 规则要求确认时
+ * （result.needsConfirmation），返回 status='needs_confirm' 透传信号，不再 throw
+ * 丢弃之；confirmed=true 时客户端重发可绕过确认。
+ *
  * @param taskId - 任务 ID
  * @param status - 新状态
- * @returns 更新后的任务
+ * @param confirmed - 是否已确认（绕过 cascade 确认，客户端二次提交时传 true）
+ * @returns 判别联合：成功 {status:'ok', task} 或需确认 {status:'needs_confirm', ...}
  */
-export async function updateTaskStatus(taskId: string, status: Task['status']): Promise<Task> {
+export async function updateTaskStatus(
+  taskId: string,
+  status: Task['status'],
+  confirmed?: boolean,
+): Promise<TaskActionResult> {
   const STATUS_TO_ACTION: Record<string, string> = {
     planned: 'planTask',
     in_progress: 'startTask',
@@ -173,22 +203,49 @@ export async function updateTaskStatus(taskId: string, status: Task['status']): 
   if (!action) {
     throw new Error(`不支持的目标状态: ${status}`)
   }
-  const result = await submitDynamicIntent('tasks', action, { taskId })
+  const confirmFields = { taskId }
+  const result = await submitDynamicIntent('tasks', action, confirmFields, confirmed)
   if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: action,
+        confirmFields,
+      }
+    }
     throw new Error(result.error ?? '状态更新失败')
   }
-  return result.object as Task
+  return { status: 'ok', task: result.object as Task }
 }
 
 /**
  * 归档任务（通过 Nexus 链路）
+ *
+ * [025] ISSUE-003：返回判别联合 TaskActionResult，透传 cascade needsConfirmation。
+ *
  * @param taskId - 任务 ID
+ * @param confirmed - 是否已确认（绕过 cascade 确认）
+ * @returns 判别联合：成功 {status:'ok', task} 或需确认 {status:'needs_confirm', ...}
  */
-export async function archiveTask(taskId: string): Promise<void> {
-  const result = await submitDynamicIntent('tasks', 'archiveTask', { taskId })
+export async function archiveTask(
+  taskId: string,
+  confirmed?: boolean,
+): Promise<TaskActionResult> {
+  const confirmFields = { taskId }
+  const result = await submitDynamicIntent('tasks', 'archiveTask', confirmFields, confirmed)
   if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: 'archiveTask',
+        confirmFields,
+      }
+    }
     throw new Error(result.error ?? '归档任务失败')
   }
+  return { status: 'ok', task: result.object as Task }
 }
 
 /**
@@ -197,51 +254,67 @@ export async function archiveTask(taskId: string): Promise<void> {
  * 注意：删除操作走 SM lifecycle 转换，将 status 设为 'deleted'（非硬删除）。
  * deleted 状态的任务不会出现在任何常规查询中。
  * 已归档（archived）的任务不可直接删除，需先取消归档到其他状态后再删除。
+ *
+ * [025] ISSUE-003：返回判别联合 TaskActionResult，透传 cascade needsConfirmation。
+ *
  * @param taskId - 任务 ID
+ * @param confirmed - 是否已确认（绕过 cascade 确认）
+ * @returns 判别联合：成功 {status:'ok', task} 或需确认 {status:'needs_confirm', ...}
  */
-export async function deleteTask(taskId: string): Promise<void> {
-  const result = await submitDynamicIntent('tasks', 'deleteTask', { taskId })
+export async function deleteTask(
+  taskId: string,
+  confirmed?: boolean,
+): Promise<TaskActionResult> {
+  const confirmFields = { taskId }
+  const result = await submitDynamicIntent('tasks', 'deleteTask', confirmFields, confirmed)
   if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: 'deleteTask',
+        confirmFields,
+      }
+    }
     throw new Error(result.error ?? '删除任务失败')
   }
+  return { status: 'ok', task: result.object as Task }
 }
 
 /**
- * 完成任务：字段 + 状态在写入口单事务内原子完成
+ * 完成任务：全走 Orchestrator（submitDynamicIntent），字段+状态原子写
  *
- * 步骤：先字段（actualDuration/notes 等），后状态（complete）。
- * 整体在 createTasksMutationService().execute() 单事务内，任一步失败整体回滚
- * （消除旧版「先 repo 存字段、再走 SM 状态转换」的两阶段写）。
+ * [025] D3：不再直调 createTasksMutationService（绕过 Orchestrator 会导致 cascadeCheck
+ * 不执行，违背决策#3）。改为 submitDynamicIntent('tasks','completeTask', fields)：
+ * - 字段（actualDuration/notes 等）经 Task 2 的 executeFieldStateWrite 回调在
+ *   mutation service 单事务内与状态转换原子完成（修复 SM updateStatus 丢字段）。
+ * - cascadeCheck 在 Orchestrator 内执行；命中级联规则时返回 needs_confirmation，
+ *   经本 action 的判别联合透传到客户端（修复 ISSUE-002/003）。
  *
  * @param taskId - 任务 ID
  * @param extraFields - 额外字段（actualDuration, notes 等）
- * @returns 更新后的任务
+ * @param confirmed - 是否已确认（绕过 cascade 确认，客户端二次提交时传 true）
+ * @returns 判别联合：成功 {status:'ok', task} 或需确认 {status:'needs_confirm', ...}
  */
-export async function completeTask(taskId: string, extraFields?: Record<string, unknown>): Promise<Task> {
-  const service = createTasksMutationService()
-  const fieldSteps = Object.entries(extraFields ?? {})
-    .filter(([, v]) => v !== undefined)
-    .map(([field, value]) => ({ kind: 'field' as const, field, value }))
-
-  const res = await service.execute(
-    {
-      id: crypto.randomUUID() as USOM_ID,
-      domainId: 'tasks',
-      objectType: 'task',
-      targetId: taskId as USOM_ID,
-      steps: [...fieldSteps, { kind: 'state', action: 'complete' }],
-    },
-    MVP_USER_ID as USOM_ID,
-  )
-  if (!res.success) {
-    throw new Error(res.error ?? '完成任务失败')
+export async function completeTask(
+  taskId: string,
+  extraFields?: Record<string, unknown>,
+  confirmed?: boolean,
+): Promise<TaskActionResult> {
+  const fields: Record<string, unknown> = { taskId, ...extraFields }
+  const result = await submitDynamicIntent('tasks', 'completeTask', fields, confirmed)
+  if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: 'completeTask',
+        confirmFields: fields,
+      }
+    }
+    throw new Error(result.error ?? '完成任务失败')
   }
-  // SM 状态步返回更新后的对象；兜底读回
-  if (res.object) return res.object as Task
-  const repo = new TaskRepository()
-  const updated = await repo.findById(taskId as USOM_ID, MVP_USER_ID as USOM_ID)
-  if (!updated) throw new Error('任务不存在')
-  return updated
+  return { status: 'ok', task: result.object as Task }
 }
 
 /**

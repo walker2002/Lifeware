@@ -54,11 +54,12 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
     await db.update(s.tasks).set({ status: 'in_progress' }).where(eq(s.tasks.id, task.id))
 
     try {
-      // 2. completeTask（无额外字段）→ 单事务状态转换
+      // 2. completeTask（无额外字段）→ 单事务状态转换（[025] D3 走 Orchestrator）
       const result = await completeTask(task.id)
 
-      // 3. 复查 DB —— 状态已落库为 completed
-      expect(result.status).toBe('completed')
+      // 3. 判别联合 ok 分支 + 复查 DB —— 状态已落库为 completed
+      expect(result.status).toBe('ok')
+      expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
       expect(after!.status).toBe('completed')
@@ -77,11 +78,13 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
 
     try {
       // completeTask 携带 notes：notes 已在 manifest field_metadata 声明（ContentField）
-      // → 字段落库 + 状态转 completed，单事务原子完成
+      // → 字段落库 + 状态转 completed，单事务原子完成（[025] D3 走 Orchestrator，经
+      // executeFieldStateWrite 回调保留原子写）
       const result = await completeTask(task.id, { notes: '完成备注' })
 
-      // 复查 DB —— 状态已 completed、notes 已落库
-      expect(result.status).toBe('completed')
+      // 判别联合 ok 分支 + 复查 DB —— 状态已 completed、notes 已落库
+      expect(result.status).toBe('ok')
+      expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
       expect(after!.status).toBe('completed')
@@ -101,11 +104,12 @@ describe('completeTask 单事务 — 集成测试（真实 PostgreSQL）', () =>
 
     try {
       // completeTask 携带 actualDuration：actualDuration 已在 manifest field_metadata 声明
-      // （FactField，影响排程的业务事实）→ 字段落库 + 状态转 completed
+      // （FactField，影响排程的业务事实）→ 字段落库 + 状态转 completed（[025] D3 走 Orchestrator）
       const result = await completeTask(task.id, { actualDuration: 45 })
 
-      // 复查 DB —— 状态已 completed、actualDuration 已落库
-      expect(result.status).toBe('completed')
+      // 判别联合 ok 分支 + 复查 DB —— 状态已 completed、actualDuration 已落库
+      expect(result.status).toBe('ok')
+      expect(result.task.status).toBe('completed')
       const after = await repo.findById(task.id as any, MVP_USER_ID as any)
       expect(after).not.toBeNull()
       expect(after!.status).toBe('completed')

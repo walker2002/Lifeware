@@ -8,6 +8,7 @@
 
 import type { LifecycleDefinition, FieldMetadata } from '@/usom/types/domain-types'
 import { findDomain } from '@/domains/registry'
+import { loadDomainManifest } from '@/domains/manifest-loader'
 
 /**
  * 从 manifest 获取指定域的 lifecycle 定义
@@ -17,23 +18,19 @@ import { findDomain } from '@/domains/registry'
  * @deprecated 直接使用 manifest.lifecycle 替代
  */
 export function getLifecycleFromManifest(domainId: string, objectType: string): LifecycleDefinition | undefined {
+  // 通过 loadDomainManifest(domainId) 获取完整 manifest（顶部 ESM import）。
+  // 根因：旧实现用 require('@/domains/manifest-loader')，在 vitest/ESM 下无法解析
+  // @/ TS alias，抛「Cannot find module」被 try/catch 吞掉 → 函数走兜底返回 undefined。
+  // （旧实现传绝对路径 `src/domains/${id}` 本身可用——loadDomainManifest 对绝对路径
+  // path.isAbsolute 直用，不翻倍——路径非根因，require 不解析 alias 才是。）
+  const result = loadDomainManifest(domainId)
+  if (result.success) {
+    return result.manifest.lifecycle[objectType]
+  }
+  // 兜底：plugin.manifest（process 层简化版，可能无完整 lifecycle）
   const plugin = findDomain(domainId)
   if (!plugin) return undefined
-
-  // plugin.manifest 是 process 层的简化版，需要从完整 manifest 获取
-  // 通过 loadDomainManifest 获取完整 manifest
-  try {
-    const { loadDomainManifest } = require('@/domains/manifest-loader')
-    const path = require('node:path')
-    const domainDir = path.resolve(process.cwd(), `src/domains/${domainId}`)
-    const result = loadDomainManifest(domainDir)
-    if (result.success) {
-      return result.manifest.lifecycle[objectType]
-    }
-  } catch {
-    // fallback
-  }
-  return undefined
+  return (plugin.manifest as Record<string, any>)?.lifecycle?.[objectType] as LifecycleDefinition | undefined
 }
 
 // ─── 动态 ACTION_MAP 构建 ─────────────────────────────────────
@@ -63,12 +60,14 @@ export function buildActionMap(): Record<string, string> {
   const map: Record<string, string> = {}
 
   for (const domainId of DOMAIN_IDS) {
+    // 通过 loadDomainManifest(domainId) 获取完整 manifest。根因：旧实现用
+    // require('@/domains/manifest-loader') 在 vitest/ESM 下无法解析 @/ TS alias，抛
+    // 「Cannot find module」被 try/catch 吞掉 → ACTION_MAP 为空 → toStateMachineAction
+    // 对所有 action 返回原值（completeTask 不被转成 complete）。改顶部 ESM import 修复；
+    // 传纯 domainId 与 loadDomainManifest 契约一致（绝对路径非根因，见上函数注释）。
     let manifest: { lifecycle?: Record<string, { transitions: Array<{ action: string }> }>; intent_triggers?: Array<{ action: string }> }
     try {
-      const { loadDomainManifest } = require('@/domains/manifest-loader')
-      const path = require('node:path')
-      const domainDir = path.resolve(process.cwd(), `src/domains/${domainId}`)
-      const result = loadDomainManifest(domainDir)
+      const result = loadDomainManifest(domainId)
       if (!result.success) continue
       manifest = result.manifest
     } catch {

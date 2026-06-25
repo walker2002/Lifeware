@@ -327,7 +327,8 @@ async function executePipeline(
         const service = createTasksMutationService()
         const res = await service.execute(
           {
-            id: crypto.randomUUID() as USOM_ID,
+            // 用入参 intentId 做 AggregateIntent.id，建立与触发 intent 的追踪关联
+            id: intentId,
             domainId,
             objectType,
             targetId,
@@ -338,9 +339,6 @@ async function executePipeline(
           },
           userId,
         )
-        // 聚合写的 intent.id 仅供审计追踪，此处不复用入参 intentId（mutation service
-        // 内部 SM 自行生成 proposal.id 与 intentId 映射）。
-        void intentId
         return { success: res.success, object: res.object as Record<string, unknown> | undefined, error: res.error }
       },
       onTrace: logger?.onTrace,
