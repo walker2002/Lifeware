@@ -18,6 +18,7 @@ import { TaskDetailDrawer } from '../components/task-detail-drawer'
 import { ThreadDetailDrawer } from '../components/thread-detail-drawer'
 import { TaskFullscreenView } from '../components/task-fullscreen-view'
 import { TaskFilterBar } from '../components/task-filter-bar'
+import { TaskCreateDrawer, type TaskCreateDefaults } from '../components/task-create-drawer'
 import type { SortField, SearchType } from '../components/task-filter-bar'
 
 // ─── 状态类型 ──────────────────────────────────────────────────
@@ -28,12 +29,14 @@ import type { SortField, SearchType } from '../components/task-filter-bar'
  * - task: 任务详情抽屉（携带 taskId）
  * - thread: 主线详情抽屉（携带 threadId）
  * - fullscreen: 任务全屏视图（携带 taskId）
+ * - create: 新建任务抽屉（携带 TaskCreateDefaults）
  */
 type DrawerState =
   | { type: 'closed' }
   | { type: 'task'; taskId: string }
   | { type: 'thread'; threadId: string }
   | { type: 'fullscreen'; taskId: string }
+  | { type: 'create'; defaults: TaskCreateDefaults }
 
 // ─── 页面组件 ──────────────────────────────────────────────────
 
@@ -79,6 +82,11 @@ export default function TaskTreePage() {
   /** 打开主线详情抽屉 */
   const openThreadDetail = useCallback((threadId: string) => {
     setDrawer({ type: 'thread', threadId })
+  }, [])
+
+  /** 打开新建任务抽屉 */
+  const openCreateDrawer = useCallback((defaults: TaskCreateDefaults) => {
+    setDrawer({ type: 'create', defaults })
   }, [])
 
   /** 关闭所有抽屉 */
@@ -220,12 +228,14 @@ export default function TaskTreePage() {
               filterStatus={filterStatus}
               searchQuery={searchQuery}
               sortBy={sortBy}
+              onOpenTaskCreate={(d) => openCreateDrawer(d)}
+              onCreateSubtask={(parentId) => openCreateDrawer({ parentId })}
             />
           )}
         </main>
       </div>
 
-      {/* ═══ 详情抽屉（仅 task / thread，fullscreen 在 main 内渲染） ═══ */}
+      {/* ═══ 详情抽屉（仅 task / thread / create，fullscreen 在 main 内渲染） ═══ */}
       {drawer.type === 'task' && (
         <TaskDetailDrawer
           taskId={drawer.taskId}
@@ -233,6 +243,7 @@ export default function TaskTreePage() {
           onClose={closeDrawer}
           onEnterFullscreen={enterFullscreen}
           onTaskChanged={handleDataChanged}
+          onCreateSubtask={(d) => openCreateDrawer({ parentId: d.parentId, title: d.title })}
         />
       )}
       {drawer.type === 'thread' && (
@@ -240,6 +251,14 @@ export default function TaskTreePage() {
           threadId={drawer.threadId}
           onClose={closeDrawer}
           onThreadChanged={handleDataChanged}
+        />
+      )}
+      {drawer.type === 'create' && (
+        <TaskCreateDrawer
+          defaults={drawer.defaults}
+          userId={'placeholder' as any}
+          onClose={closeDrawer}
+          onCreated={() => { handleDataChanged(); closeDrawer() }}
         />
       )}
     </div>

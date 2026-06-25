@@ -48,6 +48,8 @@ interface TaskDetailDrawerProps {
   onEnterFullscreen?: (taskId: string) => void
   /** 任务变更通知回调 */
   onTaskChanged?: () => void
+  /** 子任务「+」→ 打开新建子任务抽屉（转发到页面） */
+  onCreateSubtask?: (defaults: { parentId: string; title?: string }) => void
 }
 
 /** 抽屉宽度约束 */
@@ -96,6 +98,7 @@ export function TaskDetailDrawer({
   onClose,
   onEnterFullscreen,
   onTaskChanged,
+  onCreateSubtask,
 }: TaskDetailDrawerProps) {
   // ─── 导航栈 ──────────────────────────────────────────────────
   const [navStack, setNavStack] = useState<NavEntry[]>([{ taskId, task: null, hasUnsavedChanges: false }])
@@ -391,6 +394,8 @@ export function TaskDetailDrawer({
                       taskId={currentTask.id}
                       userId={userId}
                       onOpenTask={(id) => navigateToTask(id)}
+                      onChanged={() => onTaskChanged?.()}
+                      onOpenSubtaskCreate={(d) => onCreateSubtask?.(d)}
                     />
                     <TaskCompleteZone
                       task={currentTask}
@@ -411,6 +416,8 @@ export function TaskDetailDrawer({
                   taskId={currentTask.id}
                   userId={userId}
                   onOpenTask={(id) => navigateToTask(id)}
+                  onChanged={() => onTaskChanged?.()}
+                  onOpenSubtaskCreate={(d) => onCreateSubtask?.(d)}
                 />
 
                 {/* D 区：完成追踪 */}

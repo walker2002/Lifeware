@@ -27,6 +27,8 @@ interface SubtaskListProps {
   onOpenTask: (taskId: USOM_ID) => void
   /** 子任务变更回调（添加后通知父组件刷新任务树） */
   onChanged?: () => void
+  /** 「+」→ 打开新建子任务抽屉（带已输入文本预填） */
+  onOpenSubtaskCreate?: (defaults: { parentId: string; title?: string }) => void
 }
 
 // ─── 常量 ──────────────────────────────────────────────────────────────
@@ -72,7 +74,7 @@ const PRIORITY_LABELS: Record<string, string> = {
  * C 区 — 子任务列表组件
  * @param props - 组件属性
  */
-export function SubtaskList({ taskId, userId, onOpenTask, onChanged }: SubtaskListProps) {
+export function SubtaskList({ taskId, userId, onOpenTask, onChanged, onOpenSubtaskCreate }: SubtaskListProps) {
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
@@ -203,8 +205,10 @@ export function SubtaskList({ taskId, userId, onOpenTask, onChanged }: SubtaskLi
         />
         <button
           type="button"
-          onClick={handleAdd}
-          disabled={adding || !newTitle.trim()}
+          onClick={() => onOpenSubtaskCreate?.({ parentId: taskId, title: newTitle.trim() || undefined })}
+          disabled={adding}
+          aria-label="打开新建子任务详细编辑"
+          title="新建子任务（详细编辑）"
           className="h-8 w-8 flex items-center justify-center rounded-md bg-primary text-on-primary hover:bg-primary-active disabled:opacity-40 transition-colors shrink-0"
         >
           {adding ? (

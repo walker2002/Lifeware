@@ -21,9 +21,11 @@ import {
   GripVertical,
   Pencil,
   Archive,
+  Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import type { TaskCreateDefaults } from './task-create-drawer'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +78,10 @@ export interface TaskTreeViewProps {
   searchQuery?: string
   /** 排序字段 */
   sortBy?: SortField
+  /** 快速添加「+」→ 打开新建任务抽屉 */
+  onOpenTaskCreate?: (defaults: TaskCreateDefaults) => void
+  /** 「在下方新建子任务」→ 打开新建子任务抽屉 */
+  onCreateSubtask?: (parentTaskId: string) => void
 }
 
 // ─── 本地树节点类型 ────────────────────────────────────────────
@@ -97,6 +103,16 @@ const MAX_DEPTH = 5
 
 /** 每层缩进像素 */
 const INDENT_PX = 20
+
+/**
+ * 将列表筛选 threadId 映射为新建任务的 threadId 归属。
+ * __all__/__orphan__ → undefined（不预绑）；具体主线 id → 原样。
+ * handleQuickAdd 与「+」按钮入口共用，保证快速创建与抽屉创建归属一致。
+ */
+export function resolveThreadFromFilter(threadId: string | undefined): string | undefined {
+  if (!threadId || threadId === '__all__' || threadId === '__orphan__') return undefined
+  return threadId
+}
 
 /**
  * 递归过滤树节点：保留匹配搜索词的节点及其祖先
@@ -192,6 +208,8 @@ export function TaskTreeView({
   filterStatus,
   searchQuery = '',
   sortBy = 'title',
+  onOpenTaskCreate,
+  onCreateSubtask,
 }: TaskTreeViewProps) {
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -408,8 +426,7 @@ export function TaskTreeView({
     try {
       const newTask = await createTask({
         title: quickAddText.trim(),
-        threadId: threadId !== '__all__' && threadId !== '__orphan__'
-          ? threadId as any : undefined,
+        threadId: resolveThreadFromFilter(threadId) as never,
       })
       setQuickAddText('')
       toast.success('任务已创建')
@@ -611,6 +628,7 @@ export function TaskTreeView({
                   onOpenTaskDetail={onOpenTaskDetail}
                   onStatusChange={handleStatusChange}
                   onDataChanged={onDataChanged}
+                  onCreateSubtask={onCreateSubtask}
                 />
               ))}
             </div>
@@ -629,6 +647,15 @@ export function TaskTreeView({
             placeholder="+ 快速添加任务，回车确认"
             className="flex-1 h-9 rounded-md border border-hairline bg-canvas px-3 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-[rgba(204,120,92,0.3)]"
           />
+          <button
+            type="button"
+            onClick={() => onOpenTaskCreate?.({ title: quickAddText, threadId: resolveThreadFromFilter(threadId) })}
+            aria-label="打开新建任务详细编辑"
+            title="新建任务（详细编辑）"
+            className="shrink-0 size-9 flex items-center justify-center rounded-md border border-hairline bg-canvas text-body hover:text-ink hover:bg-hover-overlay transition-colors"
+          >
+            <Plus className="size-4" />
+          </button>
           {isCreating && (
             <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           )}
@@ -667,6 +694,8 @@ interface TaskTreeRowProps {
   onStatusChange: (taskId: string, newStatus: Task['status']) => void
   /** 数据变更回调（行内归档后刷新） */
   onDataChanged?: () => void
+  /** 新建子任务回调 */
+  onCreateSubtask?: (parentTaskId: string) => void
 }
 
 /**
@@ -685,6 +714,7 @@ function SortableTaskRow({
   onOpenTaskDetail,
   onStatusChange,
   onDataChanged,
+  onCreateSubtask,
 }: { id: string } & TaskTreeRowProps) {
   const {
     attributes,
@@ -726,6 +756,7 @@ function SortableTaskRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onDataChanged={onDataChanged}
+          onCreateSubtask={onCreateSubtask}
         />
       </div>
     </div>
@@ -747,6 +778,7 @@ function TaskTreeRow({
   onOpenTaskDetail,
   onStatusChange,
   onDataChanged,
+  onCreateSubtask,
 }: TaskTreeRowProps) {
   const { task, depth, childCount } = node
   const isExpanded = expandedIds.has(task.id)
@@ -974,7 +1006,7 @@ function TaskTreeRow({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('子任务创建即将支持') }}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateSubtask?.(task.id) }}>
               在此下方新建子任务
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info('关联主线即将支持') }}>
@@ -1014,6 +1046,7 @@ function TaskTreeRow({
           onOpenTaskDetail={onOpenTaskDetail}
           onStatusChange={onStatusChange}
           onDataChanged={onDataChanged}
+          onCreateSubtask={onCreateSubtask}
         />
       ))}
     </>
