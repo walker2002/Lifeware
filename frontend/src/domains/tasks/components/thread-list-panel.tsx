@@ -321,6 +321,10 @@ export function ThreadListPanel({
                                 if (act.action === 'edit') {
                                   onOpenThreadDetail?.(thread.id)
                                 } else if (act.action === 'delete') {
+                                  await deleteThread(thread.id)
+                                  toast.success(`${act.label}成功`)
+                                  setLocalRefreshKey(k => k + 1)
+                                } else {
                                   const targetStatus = ACTION_TO_TARGET_STATUS[act.action]
                                   if (targetStatus) {
                                     await updateThreadStatus(thread.id, targetStatus as Thread['status'])
