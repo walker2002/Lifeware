@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react'
 import { X, ChevronDown, ChevronRight, ArrowLeft, Zap, Maximize2 } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
-import { getTaskById, getTaskAncestors } from '@/app/actions/tasks'
+import { getTaskById, getTaskAncestors, getThreadById } from '@/app/actions/tasks'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
@@ -56,6 +56,17 @@ interface TaskDetailDrawerProps {
 const MIN_WIDTH = 400
 const MAX_WIDTH = 800
 const DEFAULT_WIDTH = 560
+
+/**
+ * 计算面包屑根节点标签。
+ * - 有主线（hasThread）且取到名 → 主线名
+ * - 有主线但未取名 → 兜底「主线」
+ * - 无主线（普通任务）→ 「普通任务」
+ */
+export function rootBreadcrumbLabel(hasThread: boolean, threadName: string | null | undefined): string {
+  if (hasThread) return threadName ?? '主线'
+  return '普通任务'
+}
 
 /** 导航栈条目 */
 interface NavEntry {
@@ -105,6 +116,7 @@ export function TaskDetailDrawer({
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [ancestors, setAncestors] = useState<Array<{ id: string; title: string }>>([])
+  const [rootLabel, setRootLabel] = useState('任务树')
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
 
   /** 当前导航条目 */
@@ -135,6 +147,13 @@ export function TaskDetailDrawer({
         // 加载面包屑祖先
         const ancs = await getTaskAncestors(targetId)
         setAncestors(ancs)
+        // 计算根节点标签
+        if (t.threadId) {
+          const th = await getThreadById(t.threadId as string)
+          setRootLabel(rootBreadcrumbLabel(true, th?.name ?? null))
+        } else {
+          setRootLabel(rootBreadcrumbLabel(false, null))
+        }
       }
     } catch {
       setNotFound(true)
@@ -226,7 +245,7 @@ export function TaskDetailDrawer({
         onClick={onClose}
         className="text-body hover:text-ink transition-colors shrink-0"
       >
-        任务树
+        {rootLabel}
       </button>,
     ]
     reversed.forEach((anc) => {
@@ -248,7 +267,7 @@ export function TaskDetailDrawer({
       <span key="current" className="text-ink font-medium truncate max-w-[120px]" title={currentTask.title}>{currentTask.title}</span>,
     )
     return items
-  }, [ancestors, currentTask, onClose, navigateToBreadcrumb])
+  }, [ancestors, currentTask, onClose, navigateToBreadcrumb, rootLabel])
 
   /** 关闭拦截 */
   const handleCloseAttempt = useCallback(() => {
