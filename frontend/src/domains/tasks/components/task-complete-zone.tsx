@@ -13,10 +13,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import { CheckCircle2, Clock, FileText, Save, Send, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { updateTask, completeTask } from '@/app/actions/tasks'
 import { formatDuration, parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
+import { CascadeConfirmDialog } from '@/components/layout/cascade-confirm-dialog'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 
@@ -38,6 +40,74 @@ interface ReviewFormData {
   method: string
   learnings: string
   improvements: string
+}
+
+// ─── 级联确认 hook（[025] D4） ─────────────────────────────────────────
+
+/**
+ * 待级联确认的完成请求载荷。
+ * 仅存于内存（useState），刷新即丢失（spec §7.1 ⑥ 持久化 defer）。
+ */
+interface PendingConfirm {
+  message: string
+  extraFields?: Record<string, unknown>
+}
+
+/**
+ * useCascadeComplete —— 完成/级联确认的统一逻辑。
+ *
+ * [025] ISSUE-003 D4：completeTask 现返回判别联合 TaskActionResult。
+ * 本 hook 封装分流：needs_confirm → 暂存请求并交由调用方渲染 CascadeConfirmDialog；
+ * ok → 调 onTaskUpdate(task)。「连带下级」确认后以 confirmed=true 重发。
+ *
+ * 三个追踪表单（CheckIn/Log/Review）共用本 hook，差异仅在调 complete 前
+ * 构造 extraFields（由调用方负责）。
+ *
+ * @param taskId - 任务 ID
+ * @param onTaskUpdate - 完成成功后的任务更新回调
+ */
+function useCascadeComplete(
+  taskId: string,
+  onTaskUpdate: (task: Task) => void,
+) {
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null)
+
+  /**
+   * 发起完成请求。
+   * @returns 成功时返回更新后的 Task；needs_confirm 时返回 null（已暂存请求，
+   *   调用方无需再处理；本 hook 渲染的 CascadeConfirmDialog 会接管确认流）。
+   */
+  const complete = useCallback(async (extraFields?: Record<string, unknown>): Promise<Task | null> => {
+    const result = await completeTask(taskId, extraFields)
+    if (result.status === 'needs_confirm') {
+      setPendingConfirm({ message: result.message, extraFields })
+      return null
+    }
+    return result.task
+  }, [taskId])
+
+  /**
+   * 「连带下级」确认：以 confirmed=true 重发完成请求。
+   * pendingConfirm 清理放在 finally，确保任何分支都不卡住弹窗
+   * （对齐 task-tree-view 的 handleConfirmCascade）。
+   */
+  const confirmCascade = useCallback(async () => {
+    if (!pendingConfirm) return
+    try {
+      const result = await completeTask(taskId, pendingConfirm.extraFields, true)
+      if (result.status === 'ok') {
+        onTaskUpdate(result.task)
+      }
+    } catch {
+      toast.error('操作失败，请重试')
+    } finally {
+      setPendingConfirm(null)
+    }
+  }, [pendingConfirm, taskId, onTaskUpdate])
+
+  const cancel = useCallback(() => setPendingConfirm(null), [])
+
+  return { pendingConfirm, complete, confirmCascade, cancel }
 }
 
 // ─── 组件 ──────────────────────────────────────────────────────────────
@@ -103,6 +173,7 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
   const [durHours, setDurHours] = useState(() => durationHours(task.estimatedDuration))
   const [durMinutes, setDurMinutes] = useState(() => durationMinutes(task.estimatedDuration))
   const [saving, setSaving] = useState(false)
+  const { pendingConfirm, complete, confirmCascade, cancel } = useCascadeComplete(task.id, onTaskUpdate)
 
   const isCompleted = task.status === 'completed'
 
@@ -112,12 +183,12 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
       const total = parseDurationToMinutes(durHours, durMinutes)
       const extraFields: Record<string, unknown> = {}
       if (total > 0) extraFields.actualDuration = total
-      const updated = await completeTask(task.id, Object.keys(extraFields).length > 0 ? extraFields : undefined)
-      onTaskUpdate(updated)
+      const updated = await complete(Object.keys(extraFields).length > 0 ? extraFields : undefined)
+      if (updated) onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
-  }, [durHours, durMinutes, task.id, onTaskUpdate])
+  }, [durHours, durMinutes, complete, onTaskUpdate])
 
   if (isCompleted) return <CompletedSummary task={task} />
 
@@ -188,6 +259,14 @@ function CheckInForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: 
           {saving ? '保存中…' : '标记完成'}
         </button>
       </div>
+
+      {/* [025] D4 级联确认弹窗 */}
+      <CascadeConfirmDialog
+        open={!!pendingConfirm}
+        message={pendingConfirm?.message ?? ''}
+        onConfirm={confirmCascade}
+        onCancel={cancel}
+      />
     </div>
   )
 }
@@ -202,6 +281,7 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
   const [durMinutes, setDurMinutes] = useState(() => durationMinutes(task.estimatedDuration))
   const [output, setOutput] = useState('')
   const [saving, setSaving] = useState(false)
+  const { pendingConfirm, complete, confirmCascade, cancel } = useCascadeComplete(task.id, onTaskUpdate)
 
   const isCompleted = task.status === 'completed'
 
@@ -212,12 +292,12 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
       const patch: Record<string, unknown> = {}
       if (dur > 0) patch.actualDuration = dur
       if (output.trim()) patch.notes = output.trim()
-      const updated = await completeTask(task.id, Object.keys(patch).length > 0 ? patch : undefined)
-      onTaskUpdate(updated)
+      const updated = await complete(Object.keys(patch).length > 0 ? patch : undefined)
+      if (updated) onTaskUpdate(updated)
     } finally {
       setSaving(false)
     }
-  }, [durHours, durMinutes, output, task.id, onTaskUpdate])
+  }, [durHours, durMinutes, output, complete, onTaskUpdate])
 
   if (isCompleted) return <CompletedSummary task={task} />
 
@@ -299,6 +379,14 @@ function LogForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: Task
           {saving ? '保存中…' : '记录并完成'}
         </button>
       </div>
+
+      {/* [025] D4 级联确认弹窗 */}
+      <CascadeConfirmDialog
+        open={!!pendingConfirm}
+        message={pendingConfirm?.message ?? ''}
+        onConfirm={confirmCascade}
+        onCancel={cancel}
+      />
     </div>
   )
 }
@@ -316,6 +404,7 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
     improvements: '',
   })
   const [saving, setSaving] = useState<'draft' | 'complete' | null>(null)
+  const { pendingConfirm, complete, confirmCascade, cancel } = useCascadeComplete(task.id, onTaskUpdate)
 
   const isCompleted = task.status === 'completed'
 
@@ -335,17 +424,17 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
     }
   }, [form, task.id, onTaskUpdate])
 
-  /** 完成并提交复盘 */
+  /** 完成并提交复盘（[025] D4：走级联确认分流） */
   const handleComplete = useCallback(async () => {
     setSaving('complete')
     try {
       const notes = buildReviewNotes(form)
-      const updated = await completeTask(task.id, notes ? { notes } : undefined)
-      onTaskUpdate(updated)
+      const updated = await complete(notes ? { notes } : undefined)
+      if (updated) onTaskUpdate(updated)
     } finally {
       setSaving(null)
     }
-  }, [form, task.id, onTaskUpdate])
+  }, [form, complete, onTaskUpdate])
 
   if (isCompleted) return <CompletedSummary task={task} />
 
@@ -411,6 +500,14 @@ function ReviewForm({ task, onTaskUpdate }: { task: Task; onTaskUpdate: (task: T
           </button>
         </div>
       </div>
+
+      {/* [025] D4 级联确认弹窗 */}
+      <CascadeConfirmDialog
+        open={!!pendingConfirm}
+        message={pendingConfirm?.message ?? ''}
+        onConfirm={confirmCascade}
+        onCancel={cancel}
+      />
     </div>
   )
 }

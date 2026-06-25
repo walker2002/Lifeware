@@ -45,7 +45,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads, archiveTask, searchTasks } from '@/app/actions/tasks'
+import { getTasks, getChildCounts, getSubtasks, createTask, updateTaskStatus as updateTaskStatusAction, getThreads, searchTasks } from '@/app/actions/tasks'
+import { CascadeConfirmDialog } from '@/components/layout/cascade-confirm-dialog'
 import type { Task } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
@@ -147,6 +148,16 @@ const STATUS_DOT_CLASS: Record<string, string> = {
   in_progress: 'bg-info animate-pulse',
   completed: 'bg-success',
   archived: 'bg-surface-card',
+}
+
+/** 任务状态 → 成功 toast 文案（归档/完成等高感知操作给精准文案） */
+const STATUS_TOAST: Record<string, string> = {
+  todo: '任务已回到待办',
+  planned: '任务已标记为计划',
+  in_progress: '任务已开始',
+  completed: '任务已完成',
+  archived: '任务已归档',
+  deleted: '任务已删除',
 }
 
 /** 清晰度 → 圆点样式 */
@@ -411,17 +422,60 @@ export function TaskTreeView({
     }
   }, [quickAddText, isCreating, threadId, onDataChanged])
 
-  // ─── 状态变更 ──────────────────────────────────────────────
+  // ─── 状态变更（[025] D4：cascade needs_confirm → 弹级联确认框） ──
+
+  /**
+   * 待级联确认的状态变更请求。
+   * 当 updateTaskStatusAction 返回 needs_confirm 时填充，
+   * 「连带下级」确认后以 confirmed=true 重发。
+   * 仅存于 React state（内存），刷新即丢失（spec §7.1 ⑥ 持久化 defer）。
+   */
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    taskId: string
+    newStatus: Task['status']
+    message: string
+  } | null>(null)
 
   const handleStatusChange = useCallback(async (taskId: string, newStatus: Task['status']) => {
     try {
-      await updateTaskStatusAction(taskId, newStatus)
+      const result = await updateTaskStatusAction(taskId, newStatus)
+      if (result.status === 'needs_confirm') {
+        // 命中 cascade 规则：暂存请求，弹出级联确认框
+        setPendingConfirm({ taskId, newStatus, message: result.message })
+        return
+      }
+      // status === 'ok'
+      // 就地更新状态圆点（plan/start/complete 等不改变行可见性的状态）
       setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
-      toast.success('任务状态已更新')
+      // archived/deleted 会让该行从常规视图消失，需整树刷新重算过滤/计数
+      // （原归档按钮单独调 onDataChanged，Task 4 改走 onStatusChange 后此处补回）
+      if (newStatus === 'archived' || newStatus === 'deleted') {
+        onDataChanged?.()
+      }
+      toast.success(STATUS_TOAST[newStatus] ?? '任务状态已更新')
     } catch {
       toast.error('操作失败，请重试')
     }
-  }, [])
+  }, [onDataChanged])
+
+  /** 「连带下级」确认：以 confirmed=true 重发同一状态变更 */
+  const handleConfirmCascade = useCallback(async () => {
+    if (!pendingConfirm) return
+    const { taskId, newStatus } = pendingConfirm
+    try {
+      const result = await updateTaskStatusAction(taskId, newStatus, true)
+      if (result.status === 'ok') {
+        // 级联变更影响多个树节点（父+子），触发父组件整体刷新
+        setRootNodes(prev => prev.map(t => t.task.id === taskId ? { ...t, task: { ...t.task, status: newStatus } } : t))
+        onDataChanged?.()
+        toast.success('任务及下级已更新')
+      }
+    } catch {
+      toast.error('操作失败，请重试')
+    } finally {
+      setPendingConfirm(null)
+    }
+  }, [pendingConfirm, onDataChanged])
 
   // ─── 渲染 ────────────────────────────────────────────────────
 
@@ -580,6 +634,14 @@ export function TaskTreeView({
           )}
         </div>
       </div>
+
+      {/* ═══ [025] D4 级联确认弹窗 ═════════════════════════════ */}
+      <CascadeConfirmDialog
+        open={!!pendingConfirm}
+        message={pendingConfirm?.message ?? ''}
+        onConfirm={handleConfirmCascade}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </div>
   )
 }
@@ -888,15 +950,11 @@ function TaskTreeRow({
           {task.status !== 'completed' && task.status !== 'archived' && (
             <button
               type="button"
-              onClick={async (e) => {
+              onClick={(e) => {
+                // [025] D4：经 onStatusChange → updateTaskStatus('archived') 走级联确认，
+                // 不再直调 archiveTask（直调会绕过 cascade 弹窗）
                 e.stopPropagation()
-                try {
-                  await archiveTask(task.id)
-                  toast.success('任务已归档')
-                  onDataChanged?.()
-                } catch {
-                  toast.error('归档失败')
-                }
+                onStatusChange(task.id, 'archived')
               }}
               className="p-1 rounded text-body hover:text-ink hover:bg-hover-overlay transition-colors"
               title="归档"
