@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 // [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
 import { useManifestRules, useServerErrorBackfill } from '@/nexus/rules/use-manifest-rules'
 import { taskRuleRegistry } from '../../rules-registry'
+import { durationHours, durationMinutes, parseDurationToMinutes } from '@/lib/format-duration'
 
 /** 优先级选项 */
 const PRIORITY_OPTIONS = [
@@ -55,8 +56,11 @@ export function TaskCreationCard({
   const [title, setTitle] = useState((dataModel.title as string) ?? '')
   const [description, setDescription] = useState((dataModel.description as string) ?? '')
   const [priority, setPriority] = useState((dataModel.priority as string) ?? '')
-  const [estimatedDuration, setEstimatedDuration] = useState(
-    dataModel.estimatedDuration ? String(dataModel.estimatedDuration) : '',
+  const [durHours, setDurHours] = useState(() =>
+    dataModel.estimatedDuration ? durationHours(Number(dataModel.estimatedDuration)) : '',
+  )
+  const [durMinutes, setDurMinutes] = useState(() =>
+    dataModel.estimatedDuration ? durationMinutes(Number(dataModel.estimatedDuration)) : '',
   )
   const [threadId, setThreadId] = useState<string | null>(
     (dataModel.threadId as string) ?? null,
@@ -71,11 +75,12 @@ export function TaskCreationCard({
   /** 提交表单 */
   function handleConfirm() {
     if (!title.trim()) return
+    const totalMinutes = parseDurationToMinutes(durHours, durMinutes)
     onConfirm({
       title: title.trim(),
       description: description || undefined,
       priority: priority || undefined,
-      estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
+      estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
       threadId: threadId || undefined,
     })
   }
@@ -145,22 +150,40 @@ export function TaskCreationCard({
             )}
           </div>
           <div>
-            <label className="text-xs text-body mb-1 block">预估时长（分钟）</label>
-            <input
-              type="number"
-              min={5}
-              value={estimatedDuration}
-              onChange={e => {
-                setEstimatedDuration(e.target.value)
-                onDataChange({ ...dataModel, estimatedDuration: e.target.value })
-              }}
-              onBlur={() => {
-                const num = estimatedDuration && !isNaN(Number(estimatedDuration)) ? Number(estimatedDuration) : undefined
-                validateField('estimatedDuration', num)
-              }}
-              placeholder="60"
-              className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
-            />
+            <label className="text-xs text-body mb-1 block">预估时长</label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                value={durHours}
+                onChange={e => {
+                  setDurHours(e.target.value)
+                  const total = parseDurationToMinutes(e.target.value, durMinutes)
+                  onDataChange({ ...dataModel, estimatedDuration: total > 0 ? total : undefined })
+                }}
+                onBlur={() => {
+                  const total = parseDurationToMinutes(durHours, durMinutes)
+                  validateField('estimatedDuration', total || undefined)
+                }}
+                placeholder="0"
+                className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              />
+              <span className="text-xs text-body shrink-0">时</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={durMinutes}
+                onChange={e => {
+                  setDurMinutes(e.target.value)
+                  const total = parseDurationToMinutes(durHours, e.target.value)
+                  onDataChange({ ...dataModel, estimatedDuration: total > 0 ? total : undefined })
+                }}
+                placeholder="0"
+                className="h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink placeholder:text-body/70-soft focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              />
+              <span className="text-xs text-body shrink-0">分</span>
+            </div>
             {(fieldErrors.estimatedDuration || serverFieldErrors.estimatedDuration) && (
               <p className="text-xs text-error mt-0.5">{fieldErrors.estimatedDuration || serverFieldErrors.estimatedDuration}</p>
             )}
