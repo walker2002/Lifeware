@@ -985,7 +985,7 @@ export interface IContributionRepository {
    * @param tx - 可选事务句柄
    * @returns 重新计算后的进度数据
    */
-  recomputeProgress(keyResultId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<{ currentValue: number; progressRate: number; completedCount: number; totalCount: number }>
+  recomputeProgress(keyResultId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<{ currentValue: number; progressRate: number }>
 }
 
 // ─── Intention ─────────────────────────────────────────────────
