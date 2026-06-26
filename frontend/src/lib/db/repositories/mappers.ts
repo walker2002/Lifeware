@@ -4,7 +4,7 @@
 import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../../../usom/types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
-  Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog,
+  Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog, Contribution,
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
   AISession, ChatMessage, TaskExecutionLog,
@@ -943,5 +943,45 @@ export function cycleUSOMToRow(cycle: Cycle, userId: USOM_ID) {
     startedAt: toDate(cycle.startedAt),
     endedAt: toDate(cycle.endedAt),
     reviewedAt: toDate(cycle.reviewedAt),
+  }
+}
+
+// --- Contribution --------------------------------------------------
+// [022] 2A-T4：Contribution 双向映射。delta/weight 为 PG numeric → JS number。
+type ContributionRow = {
+  id: string
+  keyResultId: string
+  contributorType: string
+  contributorId: string
+  delta: string | null
+  weight: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export function contributionRowToUSOM(row: ContributionRow): Contribution {
+  return {
+    id: row.id,
+    keyResultId: row.keyResultId,
+    contributorType: row.contributorType as Contribution['contributorType'],
+    contributorId: row.contributorId,
+    delta: row.delta != null ? Number(row.delta) : undefined,
+    weight: row.weight != null ? Number(row.weight) : 1.0,
+    createdAt: row.createdAt.toISOString() as Timestamp,
+    updatedAt: row.updatedAt.toISOString() as Timestamp,
+  }
+}
+
+export function contributionUSOMToRow(c: Contribution, userId: USOM_ID) {
+  return {
+    id: c.id,
+    userId,
+    keyResultId: c.keyResultId,
+    contributorType: c.contributorType,
+    contributorId: c.contributorId,
+    delta: c.delta?.toString() ?? null,
+    weight: c.weight?.toString() ?? '1.0',
+    createdAt: toDate(c.createdAt)!,
+    updatedAt: toDate(c.updatedAt)!,
   }
 }
