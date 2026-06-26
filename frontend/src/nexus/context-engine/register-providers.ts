@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { registerContextCapability } from './registry'
 import { TimeboxProvider, EnergyProfileProvider } from '@/domains/timebox/providers'
 import { ActiveTasksProvider, CompletedTasksProvider } from '@/domains/tasks/providers'
-import { PendingHabitsProvider, HabitTemplatesProvider } from '@/domains/habits/providers'
+import { PendingHabitsProvider, HabitTemplatesProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
 import type { ITimeboxRepository, ITaskRepository, IHabitRepository, IHabitTemplateRepository } from '@/usom/interfaces/irepository'
 
 const TimeboxArraySchema = z.array(z.object({
@@ -94,6 +94,17 @@ export function registerAllProviders(deps: ProviderDeps): void {
       schema: HabitArraySchema,
       description: '待打卡习惯',
       provider: new PendingHabitsProvider(deps.habitRepo),
+    })
+
+    registerContextCapability({
+      id: 'activeHabits',
+      visibility: 'planning',
+      schema: z.array(z.object({
+        id: z.string(),
+        title: z.string(),
+      })),
+      description: '活跃习惯列表（供跨域贡献关联搜索）',
+      provider: new ActiveHabitsProvider(deps.habitRepo),
     })
   }
 
