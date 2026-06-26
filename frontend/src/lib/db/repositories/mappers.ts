@@ -9,6 +9,7 @@ import type {
   HabitTemplate, TemplateHabitItem,
   AISession, ChatMessage, TaskExecutionLog,
   RecurrenceRule,
+  Cycle,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -894,5 +895,46 @@ export function aiSessionUSOMToRow(session: Omit<AISession, 'id' | 'createdAt' |
     referencedObjectIds: session.referencedObjectIds,
     archivedAt: session.archivedAt ? new Date(session.archivedAt) : null,
     deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
+  }
+}
+
+// --- Cycle -------------------------------------------------------
+// [022] 1A-T4：Cycle 一级对象双向映射。row→USOM 不含 userId/schemaVersion（同其它 mapper 习惯）。
+type CycleRow = {
+  id: string; cycleType: string; name: string;
+  periodStart: string; periodEnd: string; status: string;
+  createdAt: Date; updatedAt: Date;
+  startedAt: Date | null; endedAt: Date | null; reviewedAt: Date | null;
+}
+
+export function cycleRowToUSOM(row: CycleRow): Cycle {
+  return {
+    id: row.id,
+    cycleType: row.cycleType as Cycle['cycleType'],
+    name: row.name,
+    period: { start: row.periodStart as DateOnly, end: row.periodEnd as DateOnly },
+    status: row.status as Cycle['status'],
+    createdAt: row.createdAt.toISOString() as Timestamp,
+    updatedAt: row.updatedAt.toISOString() as Timestamp,
+    startedAt: toISO(row.startedAt),
+    endedAt: toISO(row.endedAt),
+    reviewedAt: toISO(row.reviewedAt),
+  }
+}
+
+export function cycleUSOMToRow(cycle: Cycle, userId: USOM_ID) {
+  return {
+    id: cycle.id,
+    userId,
+    cycleType: cycle.cycleType,
+    name: cycle.name,
+    periodStart: cycle.period.start,
+    periodEnd: cycle.period.end,
+    status: cycle.status,
+    createdAt: toDate(cycle.createdAt)!,
+    updatedAt: toDate(cycle.updatedAt)!,
+    startedAt: toDate(cycle.startedAt),
+    endedAt: toDate(cycle.endedAt),
+    reviewedAt: toDate(cycle.reviewedAt),
   }
 }
