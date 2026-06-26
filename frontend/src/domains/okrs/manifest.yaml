@@ -81,13 +81,7 @@ intent_triggers:
       - OKR 工作台
     keywords: [OKR, 工作台]
     view_route: /okrs
-  - action: view_detail
-    shortcut: /objectiveDetail
-    description: 查看目标详情
-    examples:
-      - 查看目标详情
-    keywords: [详情]
-    view_route: /okrs/:id
+    response_type: page
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -292,12 +286,6 @@ view_routes:
     url: /okrs/key-results/new
     params:
       mode: create
-  view_workspace:
-    component: domains/okrs/pages/OKRWorkspacePage
-    url: /okrs
-  view_detail:
-    component: domains/okrs/pages/ObjectiveDetailPage
-    url: /okrs/:id
 
 # ─── 区块 H: cascade_rules ─────────────────────────────────────────
 cascade_rules:

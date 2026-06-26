@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
@@ -15,12 +15,21 @@ import { saveImportedOKRs } from "@/app/actions/okr-import"
 
 type PanelMode = "empty" | "detail" | "edit" | "create" | "import"
 
-export function OKRWorkspace() {
+interface OKRWorkspaceProps {
+  /** 独立页面模式：全高布局 + PageBanner；默认 false（内嵌模式） */
+  standalone?: boolean
+  /** 初始展开的 Objective ID（来自 ?detail= 查询参数） */
+  initialDetailId?: string
+}
+
+export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspaceProps) {
   const hook = useOKRs()
   const { leftWidth, handleMouseDown, containerRef } = useResizablePanel({
     storageKey: "lw-okr-left-width",
   })
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // [022] 用 initialDetailId 作为 selectedId 的初始化值，
+  // 避免 useEffect 触发的 1-frame 闪烁。
+  const [selectedId, setSelectedId] = useState<string | null>(initialDetailId ?? null)
   const [mode, setMode] = useState<PanelMode>("empty")
   const [statusFilter, setStatusFilter] = useState<ObjectiveStatus | "all">("all")
   const [detailData, setDetailData] = useState<ObjectiveWithKR | null>(null)
@@ -142,8 +151,28 @@ export function OKRWorkspace() {
     setMode("empty")
   }, [])
 
+  // [022] standalone 模式下根据 ?detail= 自动展开详情。
+  // selectedId 已通过 useState initializer 同步设置，避免 1-frame 闪烁；
+  // 此 effect 仅负责在 objectives 首次加载完成后调用 loadDetail 加载详情数据。
+  useEffect(() => {
+    if (
+      initialDetailId &&
+      hook.objectives.length > 0 &&
+      hook.objectives.some((o) => o.id === initialDetailId) &&
+      detailData?.id !== initialDetailId
+    ) {
+      void handleSelect(initialDetailId)
+    }
+  }, [initialDetailId, hook.objectives, detailData, handleSelect])
+
   return (
-    <div ref={containerRef} className="flex h-full">
+    <>
+      {standalone && (
+        <div className="border-b border-hairline px-5 py-3 flex items-center gap-2 bg-canvas">
+          <h1 className="text-base font-semibold text-ink">OKR 工作台</h1>
+        </div>
+      )}
+      <div ref={containerRef} className={`flex ${standalone ? "flex-1 min-h-0" : "h-full"}`}>
       <div
         className="shrink-0 overflow-y-auto"
         style={{ width: leftWidth }}
@@ -203,6 +232,7 @@ export function OKRWorkspace() {
         onOpenChange={setImportOpen}
         onImportComplete={handleImportComplete}
       />
-    </div>
+      </div>
+    </>
   )
 }
