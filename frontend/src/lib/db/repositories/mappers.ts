@@ -148,7 +148,7 @@ type HabitRow = {
   frequencyType: string; defaultTime: string;
   earliestTime: string; latestStartTime: string;
   defaultDuration: number; minDuration: number;
-  trackable: boolean; keyResultId: string | null;
+  trackable: boolean;
   streak: number; longestStreak: number; completionRate7d: number;
   startDate: string; endDate: string | null;
   daysOfWeek: number[] | null; tags: string[];
@@ -175,7 +175,6 @@ export function habitRowToUSOM(row: HabitRow): Habit {
     trackable: row.trackable,
     startDate: row.startDate as DateOnly,
     endDate: (row.endDate as DateOnly) ?? undefined,
-    keyResultId: row.keyResultId ?? undefined,
     streak: row.streak,
     longestStreak: row.longestStreak,
     completionRate7d: row.completionRate7d,
@@ -202,7 +201,6 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
     defaultDuration: habit.defaultDuration,
     minDuration: habit.minDuration,
     trackable: habit.trackable,
-    keyResultId: habit.keyResultId ?? null,
     streak: habit.streak,
     longestStreak: habit.longestStreak,
     completionRate7d: habit.completionRate7d,
