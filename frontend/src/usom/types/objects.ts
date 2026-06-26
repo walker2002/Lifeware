@@ -239,6 +239,32 @@ export interface KeyResult {
   updatedAt: Timestamp
 }
 
+// ─── 3.6b Contribution ─────────────────────────────────────────
+/**
+ * KR 贡献记录（OKR 域私有 junction）
+ *
+ * 记录外部对象对 KeyResult 进度的贡献链接。
+ * contributorType + contributorId 为不透明引用，OKR 不感知来源内部结构。
+ * @property id - 贡献记录唯一标识
+ * @property keyResultId - 关联的关键结果ID
+ * @property contributorType - 贡献者类型（task/habit/manual）
+ * @property contributorId - 贡献者ID
+ * @property delta - 贡献增量（可选）
+ * @property weight - 贡献权重（可选）
+ * @property createdAt - 创建时间
+ * @property updatedAt - 更新时间
+ */
+export interface Contribution {
+  id: USOM_ID
+  keyResultId: USOM_ID
+  contributorType: 'task' | 'habit' | 'manual'
+  contributorId: USOM_ID
+  delta?: number
+  weight?: number
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
 // ─── 3.6a Thread ──────────────────────────────────────────────
 /**
  * 主线接口（替代原 Project）
@@ -402,7 +428,6 @@ export interface RecurrenceRule {
  * @property trackable - 是否可追踪
  * @property startDate - 开始日期
  * @property endDate - 结束日期
- * @property keyResultId - 关联的关键结果ID
  * @property streak - 当前连续打卡天数
  * @property longestStreak - 最长连续打卡天数
  * @property completionRate7d - 7天完成率
@@ -427,7 +452,6 @@ export interface Habit {
   trackable: boolean
   startDate: DateOnly
   endDate?: DateOnly
-  keyResultId?: USOM_ID
   streak: number
   longestStreak: number
   completionRate7d: number
