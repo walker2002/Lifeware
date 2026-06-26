@@ -10,8 +10,11 @@
 import type { ParsedObjective, ImportReport, ImportResult, SaveImportResult } from "@/lib/okr-import/types"
 import { renderOKRsToMarkdown, parseOKRMarkdown } from "@/lib/okr-import/markdown-parser"
 import { createAIRuntime } from "@/nexus/ai-runtime"
-import { createObjective, createKeyResult, MVP_USER_ID } from "./okr"
+import { createObjective, createKeyResult } from "./okr"
 import { CycleRepository } from "@/domains/okrs/repository/cycle"
+
+/** MVP 阶段固定用户 ID（与 actions/okr.ts 一致） */
+const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
 
 // ─── LLM Prompt ─────────────────────────────────────────────
 

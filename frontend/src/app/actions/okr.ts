@@ -7,7 +7,7 @@
 
 "use server";
 
-import type { Objective, KeyResult } from "@/usom/types/objects";
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects";
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
 import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
@@ -22,12 +22,12 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createEventBus } from "../../nexus/infrastructure/event-bus";
 
 /** MVP 用户 ID（临时使用） */
-export const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
+const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 /**
  * OKR 操作结果
  */
-export interface OKRActionResult<T = void> {
+interface OKRActionResult<T = void> {
   /** 是否成功 */
   success: boolean;
   /** 返回数据 */
@@ -92,6 +92,34 @@ export async function getKeyResultsByObjective(
     return { success: true, data };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "获取关键结果失败" };
+  }
+}
+
+// ─── 周期（[022] QA fix：移到 server action 以避免 use-okrs.ts 客户端导入 CycleRepository） ─
+
+/**
+ * 获取当前用户的活跃周期列表
+ */
+export async function getActiveCycles(): Promise<OKRActionResult<Cycle[]>> {
+  try {
+    const repo = new CycleRepository();
+    const data = await repo.findByUserAndStatus("in_progress", MVP_USER_ID);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "获取周期失败" };
+  }
+}
+
+/**
+ * 创建周期
+ */
+export async function createCycle(cycle: Cycle): Promise<OKRActionResult<Cycle>> {
+  try {
+    const repo = new CycleRepository();
+    const data = await repo.save(cycle, MVP_USER_ID);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "创建周期失败" };
   }
 }
 

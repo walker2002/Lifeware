@@ -11,7 +11,6 @@ import { useState, useEffect, useCallback } from "react"
 import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import { CycleRepository } from "@/domains/okrs/repository/cycle"
 import {
   getObjectives,
   getObjectiveById,
@@ -23,6 +22,8 @@ import {
   updateKeyResult,
   updateKeyResultProgress,
   deleteDraftKeyResult,
+  getActiveCycles,
+  createCycle as createCycleAction,
 } from "@/app/actions/okr"
 
 /** MVP 阶段固定用户 ID */
@@ -88,8 +89,8 @@ export function useOKRs(): UseOKRsResult {
 
   // [022] 加载 Cycle 列表（用于 cycle picker 下拉）
   useEffect(() => {
-    new CycleRepository().findByUserAndStatus('in_progress', MVP_USER_ID as any)
-      .then(setCycles)
+    getActiveCycles()
+      .then(result => { if (result.success && result.data) setCycles(result.data) })
       .finally(() => setIsLoadingCycles(false))
   }, [])
 
@@ -177,15 +178,16 @@ export function useOKRs(): UseOKRsResult {
   }, [refresh])
 
   /**
-   * [022] 新建周期（客户端直接调 CycleRepository.save）。
+   * [022] 新建周期（[022] QA fix：改为 server action）。
    *
    * MVP 取舍：创建 cycle 与创建 objective 是两步 server action，
    * objective 失败不会回滚已创建的 cycle（下次可直接选），
    * 但表单保留已填内容 + errors 区提示「周期已创建，请重试保存目标」。
    */
   const createCycle = useCallback(async (cycle: Cycle): Promise<Cycle> => {
-    const repo = new CycleRepository()
-    const saved = await repo.save(cycle, MVP_USER_ID as any)
+    const result = await createCycleAction(cycle)
+    if (!result.success || !result.data) throw new Error(result.error ?? "创建周期失败")
+    const saved = result.data
     setCycles(prev => [...prev, saved])
     return saved
   }, [])
