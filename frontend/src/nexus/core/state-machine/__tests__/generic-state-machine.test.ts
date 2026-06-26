@@ -122,6 +122,8 @@ function makeEventRepo() {
     repo: {
       append: vi.fn(async (e: SystemEvent) => { events.push(e) }),
       findByUserInRange: vi.fn().mockResolvedValue([]),
+      // [022] ADV-#1：ISystemEventRepository 新增方法
+      findByIntent: vi.fn().mockResolvedValue([]),
       findUnprocessed: vi.fn().mockResolvedValue([]),
       markProcessed: vi.fn().mockResolvedValue(undefined),
     } as ISystemEventRepository,

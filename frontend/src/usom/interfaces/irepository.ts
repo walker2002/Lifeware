@@ -1116,6 +1116,19 @@ export interface ISystemEventRepository {
   findByUserInRange(userId: USOM_ID, startAt: Timestamp, endAt: Timestamp): Promise<SystemEvent[]>
 
   /**
+   * 按 intentId 查找事件（[022] ADV-#1 修复 2026-06-26）。
+   *
+   * 替代跨域事件分发器的「时间窗口 + JS 过滤 intentId」方案：
+   * 直接走 JSONB payload->>'intentId' 索引查询，无需 5 秒窗口近似，
+   * 消除并发场景下的跨意图事件泄漏风险（spike §R7 设计决策升级）。
+   *
+   * @param intentId - 意图 ID
+   * @param userId - 用户 ID（多租户 T-02）
+   * @returns 该 intent 关联的事件列表（含已处理/未处理，按 occurredAt asc）
+   */
+  findByIntent(intentId: USOM_ID, userId: USOM_ID): Promise<SystemEvent[]>
+
+  /**
    * 查找未处理的事件
    * @param userId - 用户 ID
    * @returns 未处理事件列表

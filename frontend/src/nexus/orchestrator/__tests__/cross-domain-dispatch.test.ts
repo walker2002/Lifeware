@@ -6,7 +6,7 @@
  * - 同域事件被 L891-893 既有 onEvent 处理，post-hook 跳过（不双重分发，R1 缓解）
  * - 跨域事件按 manifest.subscribedEvents 分发到目标域 onEvent
  * - 错误隔离（try/catch）
- * - 走 eventRepo.findByUserInRange + intentId 过滤（R7 缓解）
+ * - 走 eventRepo.findByIntent 精确查询（[022] ADV-#1 升级，替代原 5s 窗口方案）
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -132,6 +132,8 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
     mockEventRepo = {
       append: vi.fn().mockResolvedValue(undefined),
       findByUserInRange: vi.fn().mockResolvedValue([]),
+      // [022] ADV-#1：dispatchCrossDomainEvents 改为按 intentId 查询，新增 mock
+      findByIntent: vi.fn().mockResolvedValue([]),
       findUnprocessed: vi.fn().mockResolvedValue([]),
       markProcessed: vi.fn().mockResolvedValue(undefined),
     }
@@ -166,7 +168,7 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
 
   it('同域事件不通过 post-hook 触发 onEvent（R1 缓解验证）', async () => {
     const intentId = 'intent-test-1'
-    mockEventRepo.findByUserInRange.mockResolvedValueOnce([
+    mockEventRepo.findByIntent.mockResolvedValueOnce([
       {
         id: 'evt-1' as any,
         type: 'TaskCompleted',
@@ -199,7 +201,7 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
 
   it('eventRepo 抛错被隔离（不影响主流程）', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    mockEventRepo.findByUserInRange.mockRejectedValueOnce(new Error('DB connection lost'))
+    mockEventRepo.findByIntent.mockRejectedValueOnce(new Error('DB connection lost'))
 
     const intent = {
       id: 'intent-test-2' as any,
@@ -223,7 +225,7 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
     const intentId = 'intent-test-3'
     // 模拟 HabitLogged 事件（task 域执行，habits 域订阅，但需 OKR 也订阅 → 跨域分发）
     // 这里把 intent 走 tasks 域（已 mock）但模拟 eventRepo 返回 HabitLogged
-    mockEventRepo.findByUserInRange.mockResolvedValueOnce([
+    mockEventRepo.findByIntent.mockResolvedValueOnce([
       {
         id: 'evt-2' as any,
         type: 'HabitLogged',
@@ -255,7 +257,7 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
 
   it('未订阅事件不触发跨域 onEvent', async () => {
     const intentId = 'intent-test-4'
-    mockEventRepo.findByUserInRange.mockResolvedValueOnce([
+    mockEventRepo.findByIntent.mockResolvedValueOnce([
       {
         id: 'evt-3' as any,
         type: 'TimeboxLogged',
@@ -287,16 +289,9 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
 
   it('intentId 不匹配的事件被过滤掉', async () => {
     const intentId = 'intent-test-5'
-    mockEventRepo.findByUserInRange.mockResolvedValueOnce([
-      {
-        id: 'evt-other' as any,
-        type: 'TaskCompleted',
-        occurredAt: new Date().toISOString() as any,
-        triggeredBy: 'state_machine',
-        payload: { objectId: 'task-other', intentId: 'OTHER-INTENT' },
-        snapshotId: 'snap' as any,
-      },
-    ])
+    // [022] ADV-#1：filtering 由 repository 完成（payload->>'intentId' 精确查询），
+    // 此处 mock findByIntent 返回空（模拟 repo 已过滤掉非本 intent 事件）。
+    mockEventRepo.findByIntent.mockResolvedValueOnce([])
 
     const intent = {
       id: intentId as any,
@@ -312,7 +307,60 @@ describe('[022-A4] Orchestrator dispatchCrossDomainEvents', () => {
 
     await orchestrator.executeIntent(intent as any, 'user-1' as any)
 
+    // repo 返回空 → orchestrator 不分发
     expect(mockOkrsOnEvent).not.toHaveBeenCalled()
     expect(mockHabitsOnEvent).not.toHaveBeenCalled()
+    // 关键：repo.findByIntent 被以正确参数调用（userId + intentId）
+    expect(mockEventRepo.findByIntent).toHaveBeenCalledWith(intentId, 'user-1')
+  })
+
+  // [022] ADV-#2 修复：onEvent 失败应持久化 OnEventDispatchFailed 事件供回溯
+  it('onEvent 失败时持久化 OnEventDispatchFailed 事件（ADV-#2）', async () => {
+    const intentId = 'intent-test-6'
+    mockEventRepo.findByIntent.mockResolvedValueOnce([
+      {
+        id: 'evt-6' as any,
+        type: 'TaskCompleted',
+        occurredAt: new Date().toISOString() as any,
+        triggeredBy: 'state_machine',
+        payload: { objectId: 'task-1', intentId },
+        snapshotId: 'snap' as any,
+      },
+    ])
+    // 模拟 okrs onEvent 抛错
+    mockOkrsOnEvent.mockRejectedValueOnce(new Error('hook boom'))
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const intent = {
+      id: intentId as any,
+      intentionId: 'intention-1' as any,
+      targetDomain: 'tasks',
+      action: 'complete',
+      fields: { objectId: 'task-1' },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      pathType: 'contract',
+      createdAt: new Date().toISOString() as any,
+    }
+
+    await orchestrator.executeIntent(intent as any, 'user-1' as any)
+
+    // 断言：error event 被持久化到 system_events
+    expect(mockEventRepo.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'OnEventDispatchFailed',
+        triggeredBy: 'handler',
+        payload: expect.objectContaining({
+          originalEventId: 'evt-6',
+          originalEventType: 'TaskCompleted',
+          originalIntentId: intentId,
+          targetDomain: 'okrs',
+          error: 'hook boom',
+        }),
+      }),
+      'user-1',
+    )
+    // 关键：主流程未失败（即使 onEvent 抛错）
+    consoleSpy.mockRestore()
   })
 })

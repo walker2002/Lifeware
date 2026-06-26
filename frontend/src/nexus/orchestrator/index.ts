@@ -532,11 +532,13 @@ function resolveObjectId(fields: Record<string, unknown>, objectType: string): U
 // 按各域 manifest.subscribedEvents 列表分发给目标域 onEvent。
 // - 同域跳过：上方 executeIntent L891-893 已对同域调 onEvent，此处跳过避免双重触发。
 // - 走 eventRepo：与 [025] D1 executeFieldStateWrite 路径解耦（该路径不调 onEvent）。
-// - 时间窗口 ±5 秒：SM.execute + eventRepo.append 同事务内完成，落库到读取 < 100ms。
+// - [022] ADV-#1 修复 2026-06-26：使用 SystemEventRepository.findByIntent 精确查询，
+//   替代「时间窗口 ±5 秒 + JS intentId 过滤」方案（spike §R7），消除并发场景下的
+//   跨意图事件泄漏风险（用户同时发起 2 个 intent 时，旧方案可能误拾取他人事件）。
 // - 错误隔离：try/catch + console.error，主写事务已 commit，失败不影响主流程。
+//   [022] ADV-#2 修复：失败事件追加 system_events `OnEventDispatchFailed` 记录供回溯。
 // - userId 不在 event.payload 中（payload 仅含 objectId/intentId/proposalId/fromStatus/toStatus），
 //   显式从 executeIntent 入参透传，与多租户 T-02 一致。
-const CROSS_DOMAIN_DISPATCH_WINDOW_MS = 5000
 
 async function dispatchCrossDomainEvents(params: {
   eventRepo: ISystemEventRepository
@@ -547,15 +549,8 @@ async function dispatchCrossDomainEvents(params: {
 }): Promise<void> {
   const { eventRepo, intentId, userId, targetDomain, snapshot } = params
   try {
-    // 1. 读取本次 intent 在近 5 秒窗口内产出的事件（R7 缓解：用 findByUserInRange 替代不存在的 findByIntent）
-    const now = new Date()
-    const windowStart = new Date(now.getTime() - CROSS_DOMAIN_DISPATCH_WINDOW_MS).toISOString() as Timestamp
-    const windowEnd = now.toISOString() as Timestamp
-    const recentEvents = await eventRepo.findByUserInRange(userId, windowStart, windowEnd)
-    // 过滤：仅本次 intent 产生的事件
-    const intentEvents = recentEvents.filter(
-      e => e.payload['intentId'] === intentId,
-    )
+    // 1. 按 intentId 精确查询（[022] ADV-#1）
+    const intentEvents = await eventRepo.findByIntent(intentId, userId)
     if (intentEvents.length === 0) return
 
     // 2. 遍历 domainRegistry，分发到各订阅域（R1 缓解：跳过同域）
@@ -568,6 +563,32 @@ async function dispatchCrossDomainEvents(params: {
           try {
             await plugin.onEvent(event, snapshot)
           } catch (err) {
+            // [022] ADV-#2 修复 2026-06-26：持久化失败事件供回溯
+            // 此前仅 console.error，主写事务已 commit 后失败事件无任何痕迹。
+            // 现在追加 OnEventDispatchFailed 事件（payload 含原 event 摘要 + 错误），
+            // 可由运维脚本检索；事件本身不重试（spike §R6 defer 重试机制）。
+            const errorEvent: SystemEvent = {
+              id: crypto.randomUUID() as USOM_ID,
+              type: 'OnEventDispatchFailed',
+              occurredAt: new Date().toISOString() as Timestamp,
+              triggeredBy: 'handler',
+              payload: {
+                originalEventId: event.id,
+                originalEventType: event.type,
+                originalIntentId: intentId,
+                targetDomain: plugin.manifest.domainId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              snapshotId: '' as USOM_ID,
+            }
+            eventRepo.append(errorEvent, userId).catch(appendErr => {
+              // 兜底：连 system_events 写入都失败时，保留 console.error 兜底
+              console.error(
+                `[orchestrator.postHook] onEvent failed AND error-event append failed: domain=${plugin.manifest.domainId}, event=${event.type}`,
+                err,
+                appendErr,
+              )
+            })
             console.error(
               `[orchestrator.postHook] onEvent failed: domain=${plugin.manifest.domainId}, event=${event.type}`,
               err,

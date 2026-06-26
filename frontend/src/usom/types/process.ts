@@ -214,6 +214,7 @@ export type SystemEventType =
   | 'HabitFieldUpdated'
   | 'OkrFieldUpdated'
   | 'CycleCreated' | 'CyclePlanned' | 'CycleStarted' | 'CycleEnded' | 'CycleReviewed'
+  | 'OnEventDispatchFailed'
 
 export interface SystemEvent {
   id: USOM_ID
