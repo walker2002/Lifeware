@@ -228,15 +228,6 @@ field_metadata:
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:
-  - action: activate
-    label: 激活
-    confirm_required: false
-  - action: pause
-    label: 暂停
-    confirm_required: false
-  - action: complete
-    label: 完成
-    confirm_required: false
   - action: discard
     label: 废弃
     confirm_required: true
