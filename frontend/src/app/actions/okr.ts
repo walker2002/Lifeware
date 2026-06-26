@@ -14,6 +14,7 @@ import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";
 import { createOkrsGenericRepo } from "@/domains/okrs/repository/generic-repo-adapter";
+import { createOkrsMutationService } from "./okrs/mutation-service";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { TimeboxRepository } from "@/domains/timebox/repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
@@ -185,7 +186,13 @@ export async function createObjective(
 
 /**
  * 更新目标
- * 
+ *
+ * 经 mutation-service 逐字段写入（FactField→FieldExecutor / ContentField→repo.updateFields），
+ * 成功后 re-fetch 回填 data（FactField 成功路径 svc.update 仅返回 {success:true} 无 object，A6/FM-8）。
+ *
+ * 已知架构债（FM-5，本 Task 不处理）：orchestrator（自带 SM）与 mutation-service（factory 自带 SM）
+ * 并存——Phase 1 仅修真正的 repo 直写违宪（updateObjective），不强行统一两套写入口（须宪法讨论）。
+ *
  * @param objectiveId - 目标 ID
  * @param fields - 更新字段
  * @returns 更新结果
@@ -195,21 +202,20 @@ export async function updateObjective(
   fields: Record<string, unknown>,
 ): Promise<OKRActionResult<Objective>> {
   try {
-    const repo = new ObjectiveRepository();
-    const existing = await repo.findById(objectiveId, MVP_USER_ID);
-    if (!existing) return { success: false, error: "目标不存在" };
-
-    const now = new Date().toISOString() as Timestamp;
-    const updated: Objective = {
-      ...existing,
-      ...fields,
-      updatedAt: now,
-    };
-    await repo.save(updated, MVP_USER_ID);
-    const refreshed = await repo.findById(objectiveId, MVP_USER_ID);
-    return { success: true, data: refreshed! };
+    const svc = createOkrsMutationService()
+    // 过滤派生/不可写字段（period 现为派生；调用方不应再发，但防御性剔除）
+    const writable = { ...fields }
+    delete writable.period
+    // 逐字段经 mutation-service 写（FactField→FieldExecutor / ContentField→repo.updateFields）
+    for (const [field, value] of Object.entries(writable)) {
+      const r = await svc.update(objectiveId, field, value, MVP_USER_ID, 'okrs', 'objective')
+      if (!r.success) return { success: false, error: r.error }
+    }
+    // re-fetch 回填 data（svc.update FactField 成功只返回 {success:true} 无 object）
+    const refreshed = await new ObjectiveRepository().findById(objectiveId, MVP_USER_ID)
+    return { success: true, data: refreshed! }
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "更新目标失败" };
+    return { success: false, error: err instanceof Error ? err.message : '更新目标失败' }
   }
 }
 
