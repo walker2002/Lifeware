@@ -43,9 +43,9 @@ describe('T011: OKRs manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toMatch(/key_result:/)
   })
 
-  it('intent_triggers 应仅包含 view_workspace（[022-A4] Phase 3 清理后）', () => {
-    // [022-A4] 移除 lifecycle action triggers；仅保留 view_workspace 导航类意图
-    expect(manifestContent).toMatch(/action:\s*view_workspace/)
+  it('intent_triggers 应仅包含 okrs（[022-A4] Phase 3 清理后）', () => {
+    // [022-A4] 移除 lifecycle action triggers；仅保留 okrs 导航类意图
+    expect(manifestContent).toMatch(/action:\s*okrs/)
     expect(manifestContent).not.toMatch(/action:\s*createObjective/)
     expect(manifestContent).not.toMatch(/action:\s*activateObjective/)
     expect(manifestContent).not.toMatch(/action:\s*createKeyResult/)
@@ -53,8 +53,8 @@ describe('T011: OKRs manifest.yaml 六区块完整性', () => {
     expect(manifestContent).not.toMatch(/action:\s*updateKeyResultProgress/)
   })
 
-  it('intent_triggers 应包含 view_workspace view_route', () => {
-    expect(manifestContent).toMatch(/action:\s*view_workspace/)
+  it('intent_triggers 应包含 okrs view_route', () => {
+    expect(manifestContent).toMatch(/action:\s*okrs/)
     expect(manifestContent).toMatch(/view_route:\s*\/okrs/)
   })
 })
