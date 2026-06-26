@@ -451,6 +451,11 @@ interface KeyResult {
   createdAt:    Timestamp
   updatedAt:    Timestamp
   discardedAt?: Timestamp
+  // [022] 2026-06-26：补齐 KR 生命周期时间戳。status='completed' 时由 updateProgress
+  // 派生写 completedAt；archive() 写 archivedAt。mapper 此前漏映射导致 findById 丢失
+  // 这两个字段，已在 keyResultRowToUSOM 修复。
+  completedAt?: Timestamp
+  archivedAt?:  Timestamp
 }
 
 type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded' | 'archived'
@@ -1364,6 +1369,7 @@ type SystemEventType =
   | 'ExecutionLogged'                                    // 新增：跨 Domain 执行记录事件
   | 'GenerativeContextAssembled' | 'GenerativeHandlerCompleted'
   | 'GenerativeUserConfirmed' | 'GenerativeProposalRejected' | 'GenerativeBatchExecuted'
+  | 'OnEventDispatchFailed'                              // [022] 2026-06-26 ADV-#2：跨域 onEvent 失败 DLQ 事件
 
 // 示例：HabitLogged payload
 interface HabitLoggedPayload {
@@ -1695,6 +1701,6 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_06_08*
+*文档版本：2026_06_26*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
-*关联数据库文档：LW_database_数据库设计_2026_03_21.md*
+*关联数据库文档：docs/database-design.md*
