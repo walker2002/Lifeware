@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_06_26 (refactor)**：OKR Domain 重组 [022] Tier-2 文档先行 — 新增 §4.0 `cycles` 表（OKR 周期一级对象，cycle_type/status/period_start/period_end/三时间戳，健康度读时聚合不落库）；`objectives` 表删除 `period_type`/`period_start`/`period_end` 三列 + `check_objectives_period_end_after_start` 约束 + `idx_objectives_period` 索引，新增 `cycle_id uuid NOT NULL REFERENCES cycles(id) ON DELETE RESTRICT` + `idx_objectives_cycle` 索引；周期信息上移至 cycles 表，Objective 经 cycle_id 归属；§11.2 映射表补 `Objective.cycleId` 与 `Objective.period`（派生）说明
 - **2026_06_03 (refactor)**：Task Domain 重构 — `projects` → `threads` 表（`project_id` → `thread_id`，移除 `planning` 状态）；删除 `project_templates`/`task_templates` 表（MVP 不实现模板）；`tasks` 表新增双轴标签列（AI 维护：`clarity`/`complexity`/`decomposition`，用户管理：`capture_mode`/`energy_profile`/`scheduling_constraint`/`tracking`）+ `ai_tags` 扩展数据列；新增 8 个相关索引
 - **2026_05_30 (enhancement)**：新增 `user_activities` 用户行为埋点表（统一分析入口，append-only，不走 Nexus 管道）；表结构总览新增"用户行为分析"分类
 - **2026_05_28 (refactor)**：执行记录模型统一化 —— `habit_logs` 字段对齐 ExecutionRecord（`status` → `completion_status`，新增 `planned_duration`/`deviation_minutes`/`completion_rating`/`energy_level`，source 扩展 `'timebox_sync'`）；新增 `task_execution_logs` 表
@@ -123,6 +124,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 └── energy_logs            ← 能量校准日志（日志记录，非 USOM 对象）
 
 核心业务表（Core Objects）
+├── cycles                 ← OKR 周期
 ├── objectives             ← OKR 目标
 ├── key_results            ← OKR 关键结果
 ├── threads                ← 主线（任务组织容器）
@@ -277,6 +279,37 @@ CREATE INDEX idx_energy_logs_user_logged ON energy_logs(user_id, logged_at desc)
 
 ## 四、核心业务表
 
+### 4.0 cycles（OKR 周期表，一级对象）
+
+对应 USOM `Cycle`。OKR 的周期归属对象，`objectives.cycle_id` 引用本表。周期本身独立于 Objective 存在，支持复用与跨周期对比。
+
+```sql
+-- §4.0 cycles（OKR 周期表，一级对象）
+CREATE TABLE cycles (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  schema_version int NOT NULL DEFAULT 1,
+  cycle_type    text NOT NULL,  -- enum: annual | quarterly | monthly | semi_annual | custom
+  name          text NOT NULL,
+  period_start  date NOT NULL,
+  period_end    date NOT NULL,
+  status        text NOT NULL,  -- enum: draft | not_started | in_progress | ended | reviewed
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  started_at    timestamptz,
+  ended_at      timestamptz,
+  reviewed_at   timestamptz,
+  CONSTRAINT check_cycles_period_end_after_start CHECK (period_end > period_start)
+);
+CREATE INDEX idx_cycles_user_status ON cycles(user_id, status);
+CREATE INDEX idx_cycles_period ON cycles(user_id, period_start, period_end);
+-- 注：总体健康度读时聚合、不落库（无 health_score 列）
+```
+
+> **设计说明**：`objectives` 不再自带 `period_type`/`period_start`/`period_end`，周期信息统一由 `cycles` 表承载，Objective 通过 `cycle_id` 外键归属。总体健康度（health_score）不落库，由 Repository 层读时聚合 KR 进度得出。
+
+---
+
 ### 4.1 objectives（目标表）
 
 对应 USOM `Objective`。
@@ -293,10 +326,8 @@ CREATE TABLE objectives (
   title       text not null,
   description text,
 
-  -- 周期字段（查询关键）
-  period_type  text not null check (period_type in ('daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual')),
-  period_start date not null,
-  period_end   date not null,
+  -- 周期归属（查询关键）：周期信息由 cycles 表承载，Objective 通过 cycle_id 外键归属
+  cycle_id    uuid NOT NULL REFERENCES cycles(id) ON DELETE RESTRICT,
 
   -- 编号与优先级
   objective_number TEXT,  -- 目标编号，格式如 26Q1-O1，创建时自动生成
@@ -318,12 +349,8 @@ CREATE TABLE objectives (
 
 -- 索引
 CREATE INDEX idx_objectives_user_status ON objectives(user_id, status) where archived_at is null;
-CREATE INDEX idx_objectives_period ON objectives(user_id, period_start, period_end);
+CREATE INDEX idx_objectives_cycle ON objectives(user_id, cycle_id);
 CREATE INDEX idx_objectives_parent ON objectives(parent_id) where parent_id is not null;
-
--- 约束
-ALTER TABLE objectives ADD CONSTRAINT check_objectives_period_end_after_start
-  CHECK (period_end > period_start);
 ```
 
 > **注意**：USOM 中 `keyResultIds` 是 `Objective` 的字段，但在 DB 层通过 `key_results.objective_id` 外键反向关联，不在 `objectives` 表中存储数组。Repository 层负责聚合。
@@ -1290,6 +1317,8 @@ interface DerivedSignalsRepository {
 | USOM 字段 | DB 存储方式 | 映射说明 |
 |---|---|---|
 | `Objective.keyResultIds` | 不存储 | 由 `key_results.objective_id` 反查，Repository 聚合后注入 |
+| `Objective.cycleId` | `cycle_id` uuid | snake_case 映射；外键指向 `cycles(id)`，ON DELETE RESTRICT |
+| `Objective.period` | 不存储（派生只读） | Repository 读时 join `cycles` 表，按 `cycle_id` 填充 `{type, start, end}` |
 | `Objective.okrType` | `okr_type` text | snake_case 映射 |
 | `Objective.discardedAt` | `discarded_at` timestamptz | snake_case 映射 |
 | `KeyResult.discardedAt` | `discarded_at` timestamptz | snake_case 映射 |
