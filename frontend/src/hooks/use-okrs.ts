@@ -8,9 +8,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { Objective, KeyResult } from "@/usom/types/objects"
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
+import { CycleRepository } from "@/domains/okrs/repository/cycle"
 import {
   getObjectives,
   getObjectiveById,
@@ -23,6 +24,9 @@ import {
   updateKeyResultProgress,
   deleteDraftKeyResult,
 } from "@/app/actions/okr"
+
+/** MVP 阶段固定用户 ID */
+const MVP_USER_ID = '00000000-0000-0000-0000-000000000001' as const
 
 /**
  * OKR Hook 返回结果
@@ -42,12 +46,26 @@ interface UseOKRsResult {
   updateKR: (id: string, fields: Record<string, unknown>) => Promise<KeyResult | null>
   updateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
   deleteKR: (id: string) => Promise<boolean>
+  /** [022] 可选周期列表（用于 cycle picker） */
+  cycles: Cycle[]
+  /** 周期列表加载中 */
+  isLoadingCycles: boolean
+  /**
+   * 新建周期（客户端直接调 CycleRepository.save）。
+   * [022] MVP 取舍：创建 cycle 与创建 objective 为两步 server action，
+   * objective 失败不会回滚已创建的 cycle（下次可直接选）。
+   */
+  createCycle: (cycle: Cycle) => Promise<Cycle>
 }
 
 export function useOKRs(): UseOKRsResult {
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // [022] Cycle 数据：独立于 objectives 的加载状态
+  const [cycles, setCycles] = useState<Cycle[]>([])
+  const [isLoadingCycles, setIsLoadingCycles] = useState(true)
 
   const refresh = useCallback(async (status?: ObjectiveStatus) => {
     try {
@@ -67,6 +85,13 @@ export function useOKRs(): UseOKRsResult {
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // [022] 加载 Cycle 列表（用于 cycle picker 下拉）
+  useEffect(() => {
+    new CycleRepository().findByUserAndStatus('in_progress', MVP_USER_ID as any)
+      .then(setCycles)
+      .finally(() => setIsLoadingCycles(false))
+  }, [])
 
   const updateLocal = useCallback((id: string, updated: Objective) => {
     setObjectives(prev => prev.map(o => o.id === id ? updated : o))
@@ -151,6 +176,20 @@ export function useOKRs(): UseOKRsResult {
     return false
   }, [refresh])
 
+  /**
+   * [022] 新建周期（客户端直接调 CycleRepository.save）。
+   *
+   * MVP 取舍：创建 cycle 与创建 objective 是两步 server action，
+   * objective 失败不会回滚已创建的 cycle（下次可直接选），
+   * 但表单保留已填内容 + errors 区提示「周期已创建，请重试保存目标」。
+   */
+  const createCycle = useCallback(async (cycle: Cycle): Promise<Cycle> => {
+    const repo = new CycleRepository()
+    const saved = await repo.save(cycle, MVP_USER_ID as any)
+    setCycles(prev => [...prev, saved])
+    return saved
+  }, [])
+
   return {
     objectives,
     isLoading,
@@ -166,5 +205,8 @@ export function useOKRs(): UseOKRsResult {
     updateKR: updateKR_,
     updateKRProgress: updateKRProgress_,
     deleteKR: deleteKR_,
+    cycles,
+    isLoadingCycles,
+    createCycle: createCycle as any,
   }
 }

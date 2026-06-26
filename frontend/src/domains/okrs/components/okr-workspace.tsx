@@ -52,13 +52,11 @@ export function OKRWorkspace() {
   const handleSaveCreate = useCallback(async (fields: OKRFormFields) => {
     setIsCreating(true)
     const obj = await hook.create({
+      cycleId: fields.cycleId,
       title: fields.title,
       description: fields.description,
       okrType: fields.okrType,
       priority: fields.priority,
-      periodType: fields.periodType,
-      periodStart: fields.periodStart,
-      periodEnd: fields.periodEnd,
     })
     if (obj) {
       for (const kr of fields.keyResults) {
@@ -72,21 +70,28 @@ export function OKRWorkspace() {
     setIsCreating(false)
   }, [hook])
 
+  /**
+   * [022] 编辑保存：若 cycleId 变化则传入新值。
+   * update 经 mutation-service，周期不可改为空。
+   */
   const handleSaveEdit = useCallback(async (fields: OKRFormFields) => {
     if (!selectedId) return
-    const updated = await hook.update(selectedId, {
+    const updateFields: Record<string, unknown> = {
       title: fields.title,
       description: fields.description,
       okrType: fields.okrType,
       priority: fields.priority,
-      period: { type: fields.periodType, start: fields.periodStart, end: fields.periodEnd },
-    })
+    }
+    if (fields.cycleId && fields.cycleId !== detailData?.cycleId) {
+      updateFields.cycleId = fields.cycleId
+    }
+    const updated = await hook.update(selectedId, updateFields)
     if (updated) {
       const data = await hook.loadDetail(selectedId)
       setDetailData(data)
       setMode("detail")
     }
-  }, [selectedId, hook])
+  }, [selectedId, hook, detailData])
 
   const handleBack = useCallback(() => {
     setMode("detail")
@@ -187,6 +192,9 @@ export function OKRWorkspace() {
             onUpdateKRProgress={hook.updateKRProgress}
             onDeleteKR={hook.deleteKR}
             onReload={selectedId ? async () => { const data = await hook.loadDetail(selectedId); setDetailData(data) } : undefined}
+            cycles={hook.cycles}
+            isLoadingCycles={hook.isLoadingCycles}
+            onCreateCycle={hook.createCycle}
           />
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { Objective, KeyResult } from "@/usom/types/objects"
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +31,12 @@ interface OKRPanelProps {
   onUpdateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
   onDeleteKR: (id: string) => Promise<boolean>
   onReload?: () => Promise<void>
+  /** [022] 周期列表（透传至 OKRForm） */
+  cycles?: Cycle[]
+  /** [022] 周期列表加载中 */
+  isLoadingCycles?: boolean
+  /** [022] 新建周期回调 */
+  onCreateCycle?: (cycle: Cycle) => Promise<Cycle>
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,6 +53,7 @@ const PRIORITY_LABELS: Record<string, { label: string; variant: "destructive" | 
 export function OKRPanel({
   mode, data, isCreating, onBack, onEdit, onSaveCreate, onSaveEdit,
   onActivate, onChangeStatus, onAddKR, onUpdateKRProgress, onDeleteKR, onReload,
+  cycles = [], isLoadingCycles = false, onCreateCycle = async (c) => c,
 }: OKRPanelProps) {
   const [isAddingKR, setIsAddingKR] = useState(false)
   const [newKR, setNewKR] = useState({ title: "", targetValue: 100, unit: "%" })
@@ -69,7 +76,7 @@ export function OKRPanel({
     return (
       <div className="p-4">
         <h2 className="text-lg font-semibold mb-4">创建新 OKR</h2>
-        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} />
+        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} cycles={cycles} isLoadingCycles={isLoadingCycles} onCreateCycle={onCreateCycle} />
       </div>
     )
   }
@@ -89,13 +96,14 @@ export function OKRPanel({
             description: obj.description,
             okrType: obj.okrType,
             priority: obj.priority,
-            periodType: obj.period.type,
-            periodStart: obj.period.start as string,
-            periodEnd: obj.period.end as string,
+            cycleId: obj.cycleId,
             keyResults: krs.map(kr => ({ title: kr.title, targetValue: kr.targetValue, unit: kr.unit })),
           }}
           onSubmit={onSaveEdit}
           onCancel={onBack}
+          cycles={cycles}
+          isLoadingCycles={isLoadingCycles}
+          onCreateCycle={onCreateCycle}
         />
       </div>
     )

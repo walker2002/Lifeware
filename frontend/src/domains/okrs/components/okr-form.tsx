@@ -1,17 +1,28 @@
 /**
  * @file okr-form
  * @brief OKR 表单组件
- * 
- * 提供 OKR 创建和编辑的表单界面
+ *
+ * 提供 OKR 创建和编辑的表单界面。
+ * [022] 1C-T15：period 三字段 → cycleId 选择器（四态：空/必填/两步写/loading）。
  */
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import type { Cycle } from "@/usom/types/objects"
+import type { USOM_ID } from "@/usom/types/primitives"
 
 /**
  * OKR 表单字段
@@ -21,70 +32,52 @@ export interface OKRFormFields {
   description?: string
   okrType: "visionary" | "committed"
   priority: "P0" | "P1" | "P2"
-  periodType: string
-  periodStart: string
-  periodEnd: string
+  /** [022] 权威周期归属，替代原 periodType/periodStart/periodEnd */
+  cycleId: string
   keyResults: { title: string; targetValue: number; unit: string }[]
 }
 
 interface OKRFormProps {
   initial?: Partial<OKRFormFields>
+  /** [022] 表单从外部获取周期列表（由 useOKRs / 调用方传入） */
+  cycles: Cycle[]
+  /** 周期列表加载中 */
+  isLoadingCycles: boolean
+  /**
+   * 新建周期回调。
+   * [022] MVP 取舍：创建 cycle 与创建 objective 是两步 server action，
+   * objective 失败不会回滚已创建的 cycle（下次可直接选），
+   * 但表单保留已填内容 + errors 区提示「周期已创建，请重试保存目标」。
+   */
+  onCreateCycle: (cycle: Cycle) => Promise<Cycle>
   onSubmit: (fields: OKRFormFields) => void
   onCancel?: () => void
   isLoading?: boolean
 }
 
-export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps) {
+export function OKRForm({
+  initial, onSubmit, onCancel, isLoading, cycles, isLoadingCycles, onCreateCycle,
+}: OKRFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [okrType, setOkrType] = useState<"visionary" | "committed">(initial?.okrType ?? "committed")
   const [priority, setPriority] = useState<"P0" | "P1" | "P2">(initial?.priority ?? "P1")
-  const [periodType, setPeriodType] = useState(initial?.periodType ?? "quarterly")
-  const [periodStart, setPeriodStart] = useState(initial?.periodStart ?? "")
-  const [periodEnd, setPeriodEnd] = useState(initial?.periodEnd ?? "")
+  const [cycleId, setCycleId] = useState(initial?.cycleId ?? "")
+  const [showNewCycleForm, setShowNewCycleForm] = useState(false)
+  // 新建周期字段
+  const [newCycleType, setNewCycleType] = useState<Cycle['cycleType']>("quarterly")
+  const [newCycleName, setNewCycleName] = useState("")
+  const [newCycleStart, setNewCycleStart] = useState("")
+  const [newCycleEnd, setNewCycleEnd] = useState("")
   const [keyResults, setKeyResults] = useState<{ title: string; targetValue: number; unit: string }[]>(
     initial?.keyResults ?? [{ title: "", targetValue: 100, unit: "%" }],
   )
   const [errors, setErrors] = useState<string[]>([])
+  /** [022] 是否为内联新建 cycle 提交中（独立于外部 isLoading） */
+  const [isCreatingCycle, setIsCreatingCycle] = useState(false)
 
-  // 周期日期自动填充
-  useEffect(() => {
-    const now = new Date()
-    const y = now.getFullYear()
-    const m = now.getMonth() // 0-based
-    const mm = String(m + 1).padStart(2, '0')
-    const fmt = (d: Date) => d.toISOString().slice(0, 10)
-    const lastDay = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
-
-    switch (periodType) {
-      case 'annual':
-        setPeriodStart(`${y}-01-01`)
-        setPeriodEnd(`${y}-12-31`)
-        break
-      case 'semi_annual':
-        if (m < 6) {
-          setPeriodStart(`${y}-01-01`)
-          setPeriodEnd(`${y}-06-30`)
-        } else {
-          setPeriodStart(`${y}-07-01`)
-          setPeriodEnd(`${y}-12-31`)
-        }
-        break
-      case 'quarterly': {
-        const q = Math.floor(m / 3)
-        const qStart = new Date(y, q * 3, 1)
-        const qEnd = new Date(y, q * 3 + 3, 0)
-        setPeriodStart(fmt(qStart))
-        setPeriodEnd(fmt(qEnd))
-        break
-      }
-      case 'monthly': {
-        setPeriodStart(`${y}-${mm}-01`)
-        setPeriodEnd(`${y}-${mm}-${lastDay(y, m)}`)
-        break
-      }
-    }
-  }, [periodType])
+  // 四态-1：空状态——cycles 为空时自动展开新建表单
+  const cyclesEmpty = !isLoadingCycles && cycles.length === 0 && !showNewCycleForm
 
   const addKR = () => {
     setKeyResults([...keyResults, { title: "", targetValue: 100, unit: "%" }])
@@ -105,15 +98,50 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
     const errs: string[] = []
     if (!title.trim()) errs.push("目标标题必填")
     if (title.length > 200) errs.push("标题不能超过 200 字符")
-    if (!periodStart) errs.push("请设置周期开始日期")
-    if (!periodEnd) errs.push("请设置周期结束日期")
-    if (periodStart && periodEnd && periodStart >= periodEnd) errs.push("结束日期必须晚于开始日期")
+    // 四态-2：cycleId 必填校验
+    if (!cycleId) errs.push("请选择或创建周期")
     keyResults.forEach((kr, i) => {
       if (!kr.title.trim()) errs.push(`KR${i + 1}: 标题必填`)
       if (kr.targetValue <= 0) errs.push(`KR${i + 1}: 目标值必须大于 0`)
       if (!kr.unit.trim()) errs.push(`KR${i + 1}: 单位必填`)
     })
     return errs
+  }
+
+  /**
+   * [022] 处理内联新建 Cycle 提交。
+   * 两步写：建 cycle 是第一步，建 objective 是第二步。
+   * cycle 成功但 objective 失败时，cycle 已持久化，下次可直接选。
+   */
+  const handleCreateCycle = async () => {
+    const now = new Date()
+    const start = newCycleStart || now.toISOString().slice(0, 10)
+    const end = newCycleEnd || (() => {
+      const d = new Date(now)
+      d.setMonth(d.getMonth() + 3)
+      return d.toISOString().slice(0, 10)
+    })()
+
+    setIsCreatingCycle(true)
+    try {
+      const cycle: Cycle = {
+        id: crypto.randomUUID() as USOM_ID,
+        cycleType: newCycleType,
+        name: newCycleName || `${start}~${end}`,
+        period: { start: start as any, end: end as any },
+        status: 'in_progress',
+        createdAt: now.toISOString() as any,
+        updatedAt: now.toISOString() as any,
+      }
+      const saved = await onCreateCycle(cycle)
+      setCycleId(saved.id)
+      setShowNewCycleForm(false)
+      setErrors([])
+    } catch {
+      setErrors(["创建周期失败，请重试"])
+    } finally {
+      setIsCreatingCycle(false)
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,9 +157,7 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
       description: description.trim() || undefined,
       okrType,
       priority,
-      periodType,
-      periodStart,
-      periodEnd,
+      cycleId,
       keyResults: keyResults.filter(kr => kr.title.trim()),
     })
   }
@@ -188,26 +214,77 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
         </div>
       </div>
 
+      {/* [022] Cycle 选择器 —— 替换原 periodType/periodStart/periodEnd 三字段 */}
       <div className="space-y-2">
-        <Label>周期类型</Label>
-        <select value={periodType} onChange={e => setPeriodType(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
-          <option value="quarterly">季度</option>
-          <option value="semi_annual">半年度</option>
-          <option value="monthly">月度</option>
-          <option value="annual">年度</option>
-        </select>
-      </div>
+        <div className="flex items-center justify-between">
+          <Label>周期</Label>
+          {!cyclesEmpty && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewCycleForm(!showNewCycleForm)}>
+              {showNewCycleForm ? "取消新建" : "+ 新建周期"}
+            </Button>
+          )}
+        </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="period-start">开始日期</Label>
-          <Input id="period-start" type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="period-end">结束日期</Label>
-          <Input id="period-end" type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
-        </div>
+        {/* 四态-4 loading：cycles 列表 fetching 时下拉 disabled + Spinner */}
+        {isLoadingCycles ? (
+          <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            加载周期列表...
+          </div>
+        ) : cyclesEmpty ? (
+          /* 四态-1 空状态：下拉禁用 + placeholder「尚无周期，请先新建」+ 默认展开内联新建 */
+          <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-muted/20 text-sm text-muted-foreground">
+            尚无周期，请先新建
+          </div>
+        ) : (
+          <Select value={cycleId} onValueChange={v => setCycleId(v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="选择周期..." />
+            </SelectTrigger>
+            <SelectContent>
+              {cycles.map(c => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name} ({c.period.start} ~ {c.period.end})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* 内联新建 Cycle 表单 */}
+        {(showNewCycleForm || cyclesEmpty) && (
+          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/20">
+            <div className="space-y-2">
+              <Label className="text-xs">周期类型</Label>
+              <select value={newCycleType} onChange={e => setNewCycleType(e.target.value as Cycle['cycleType'])}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+                <option value="quarterly">季度</option>
+                <option value="semi_annual">半年度</option>
+                <option value="monthly">月度</option>
+                <option value="annual">年度</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">周期名称（可选）</Label>
+              <Input value={newCycleName} onChange={e => setNewCycleName(e.target.value)} placeholder="例如：2026 Q3" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs">开始日期</Label>
+                <Input type="date" value={newCycleStart} onChange={e => setNewCycleStart(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">结束日期</Label>
+                <Input type="date" value={newCycleEnd} onChange={e => setNewCycleEnd(e.target.value)} />
+              </div>
+            </div>
+            <Button type="button" variant="default" size="sm" onClick={handleCreateCycle} disabled={isCreatingCycle}>
+              {isCreatingCycle && <Loader2 className="size-4 animate-spin mr-1" />}
+              创建周期
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -234,7 +311,9 @@ export function OKRForm({ initial, onSubmit, onCancel, isLoading }: OKRFormProps
 
       <div className="flex gap-3 justify-end">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>取消</Button>}
-        <Button type="submit" disabled={isLoading}>{isLoading ? "保存中..." : "保存"}</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? <><Loader2 className="size-4 animate-spin mr-1" />保存中...</> : "保存"}
+        </Button>
       </div>
     </form>
   )
