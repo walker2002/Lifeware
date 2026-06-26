@@ -224,6 +224,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
             cycles={hook.cycles}
             isLoadingCycles={hook.isLoadingCycles}
             onCreateCycle={hook.createCycle}
+            onImportTrigger={() => setImportOpen(true)}
           />
         )}
       </div>
