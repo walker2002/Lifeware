@@ -147,6 +147,24 @@ export const keyResults = pgTable('key_results', {
   index('idx_key_results_due_date').on(table.userId, table.dueDate),
 ])
 
+// ─── 4.2b contributions（KR 贡献记录）─────────────────────────────
+export const contributions = pgTable('contributions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  keyResultId: uuid('key_result_id').notNull().references(() => keyResults.id, { onDelete: 'cascade' }),
+  contributorType: text('contributor_type', { enum: ['task', 'habit', 'manual'] }).notNull(),
+  contributorId: uuid('contributor_id').notNull(),
+  delta: numeric('delta', { precision: 10, scale: 2 }),
+  weight: numeric('weight', { precision: 3, scale: 2 }).default('1.0'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('uq_contributions_kr_source').on(table.keyResultId, table.contributorType, table.contributorId),
+  index('idx_contributions_kr').on(table.userId, table.keyResultId),
+  index('idx_contributions_source').on(table.contributorType, table.contributorId),
+])
+
 // ─── 4.3 threads（主线）──────────────────────────────────────────
 export const threads = pgTable('threads', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -255,8 +273,6 @@ export const habits = pgTable('habits', {
   minDuration: integer('min_duration').notNull(),
   trackable: boolean('trackable').notNull().default(true),
 
-  keyResultId: uuid('key_result_id').references(() => keyResults.id, { onDelete: 'set null' }),
-
   streak: integer('streak').notNull().default(0),
   longestStreak: integer('longest_streak').notNull().default(0),
   completionRate7d: real('completion_rate_7d').notNull().default(0),
@@ -275,7 +291,6 @@ export const habits = pgTable('habits', {
 }, (table) => [
   index('idx_habits_user_status').on(table.userId, table.status),
   index('idx_habits_start_date').on(table.userId, table.startDate),
-  index('idx_habits_key_result').on(table.keyResultId),
 ])
 
 // ─── 4.5 habit_logs ───────────────────────────────────────────
