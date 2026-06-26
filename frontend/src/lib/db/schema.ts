@@ -62,6 +62,29 @@ export const energyLogs = pgTable('energy_logs', {
   index('idx_energy_logs_user_logged').on(table.userId, table.loggedAt),
 ])
 
+// ─── 4.0 cycles ───────────────────────────────────────────────
+// 周期表：承载 OKR 周期元数据（annual/quarterly/monthly/semi_annual/custom）。
+// objectives.cycle_id 为可空外键，回填前 NULL；1C Task 17 再对 objectives SET NOT NULL。
+export const cycles = pgTable('cycles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  cycleType: text('cycle_type', { enum: ['annual', 'quarterly', 'monthly', 'semi_annual', 'custom'] }).notNull(),
+  name: text('name').notNull(),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  status: text('status', { enum: ['draft', 'not_started', 'in_progress', 'ended', 'reviewed'] }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+}, (table) => [
+  check('check_cycles_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
+  index('idx_cycles_user_status').on(table.userId, table.status),
+  index('idx_cycles_period').on(table.userId, table.periodStart, table.periodEnd),
+])
+
 // ─── 4.1 objectives ───────────────────────────────────────────
 export const objectives = pgTable('objectives', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -72,11 +95,15 @@ export const objectives = pgTable('objectives', {
   title: text('title').notNull(),
   description: text('description'),
 
-  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }).notNull(),
-  periodStart: date('period_start').notNull(),
-  periodEnd: date('period_end').notNull(),
+  // period_* 三列暂留但放开 NOT NULL（mapper 自 Task 5 起不再写 period）；
+  // 1C Task 17 整列 DROP。
+  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }),
+  periodStart: date('period_start'),
+  periodEnd: date('period_end'),
 
   parentId: uuid('parent_id'),
+  // cycleId 可空：回填前 NULL，1C Task 17 SET NOT NULL
+  cycleId: uuid('cycle_id').references(() => cycles.id, { onDelete: 'restrict' }),
 
   okrType: text('okr_type').notNull().default('committed'),
   objectiveNumber: text('objective_number'),
