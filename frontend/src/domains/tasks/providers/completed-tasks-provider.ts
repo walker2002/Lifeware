@@ -9,6 +9,7 @@
 import type { ContextProvider } from '@/usom/types/process'
 import type { ITaskRepository } from '@/usom/interfaces/irepository'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { Task } from '@/usom/types/objects'
 
 export class CompletedTasksProvider implements ContextProvider {
   constructor(private readonly repo: ITaskRepository) {}
@@ -17,9 +18,9 @@ export class CompletedTasksProvider implements ContextProvider {
     if (query !== 'completed_ids') return []
 
     const { userId } = params as { userId: USOM_ID }
-    const tasks = await this.repo.findByStatuses(['completed'], userId)
+    const tasks = await this.repo.findByStatus('completed', userId)
 
-    return tasks.map(t => ({
+    return tasks.map((t: Task) => ({
       id: t.id,
       title: t.title,
       completedAt: t.completedAt,
