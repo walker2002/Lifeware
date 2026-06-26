@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { ObjectiveStatus, KeyResultStatus, Timestamp } from '../primitives'
+import type { ObjectiveStatus, KeyResultStatus, Timestamp, USOM_ID } from '../primitives'
 import type { Objective, KeyResult } from '../objects'
 
 describe('OKR 类型定义', () => {
@@ -30,6 +30,7 @@ describe('OKR 类型定义', () => {
         title: '测试目标',
         objectiveNumber: 'O001',
         priority: 'P1',
+        cycleId: '' as USOM_ID, // [022-T3] 占位，T16 接线真实 cycleId
         period: { type: 'quarterly' as any, start: '2026-04-01', end: '2026-06-30' },
         keyResultIds: [],
         tags: [],
@@ -47,6 +48,7 @@ describe('OKR 类型定义', () => {
         title: '愿景目标',
         objectiveNumber: 'O002',
         priority: 'P2',
+        cycleId: '' as USOM_ID, // [022-T3] 占位，T16 接线真实 cycleId
         period: { type: 'quarterly' as any, start: '2026-04-01', end: '2026-06-30' },
         keyResultIds: [],
         tags: [],
@@ -64,6 +66,7 @@ describe('OKR 类型定义', () => {
         title: '废弃目标',
         objectiveNumber: 'O003',
         priority: 'P1',
+        cycleId: '' as USOM_ID, // [022-T3] 占位，T16 接线真实 cycleId
         period: { type: 'quarterly' as any, start: '2026-04-01', end: '2026-06-30' },
         keyResultIds: [],
         tags: [],

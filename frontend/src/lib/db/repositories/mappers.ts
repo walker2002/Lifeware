@@ -449,6 +449,8 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
     status: row.status as Objective['status'],
     title: row.title,
     description: row.description ?? undefined,
+    // [022-T3] 占位：T5+6 将由 ObjectiveRepository join cycles 表填入真实 cycleId
+    cycleId: '' as USOM_ID,
     period: {
       type: row.periodType as Objective['period']['type'],
       start: row.periodStart as DateOnly,

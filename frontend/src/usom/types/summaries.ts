@@ -52,6 +52,9 @@ export interface ObjectiveSummary {
   id: USOM_ID
   title: string
   status: ObjectiveStatus
+  /** 权威周期归属，指向 Cycle */
+  cycleId: USOM_ID
+  /** 派生只读：由 Cycle 填充 */
   period: { type: PeriodType; start: DateOnly; end: DateOnly }
   keyResultIds: USOM_ID[]
 }

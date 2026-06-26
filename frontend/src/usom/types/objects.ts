@@ -131,6 +131,34 @@ export interface StructuredIntent {
   createdAt: Timestamp
 }
 
+// ─── 3.5a Cycle ──────────────────────────────────────────────
+/**
+ * OKR 周期（一级对象）。多个 Objective 归属同一 Cycle。
+ * 总体健康度读时聚合、不落库。
+ * @property id - 周期唯一标识
+ * @property cycleType - 周期类型（年度/季度/月度/半年/自定义）
+ * @property name - 周期名称
+ * @property period - 周期起止区间（Cycle 自身字段，独占周期信息）
+ * @property status - 周期生命周期状态（draft/not_started/in_progress/ended/reviewed）
+ * @property createdAt - 创建时间
+ * @property updatedAt - 更新时间
+ * @property startedAt - 进入 in_progress 的时间
+ * @property endedAt - 进入 ended 的时间
+ * @property reviewedAt - 进入 reviewed 的时间
+ */
+export interface Cycle {
+  id: USOM_ID
+  cycleType: 'annual' | 'quarterly' | 'monthly' | 'semi_annual' | 'custom'
+  name: string
+  period: { start: DateOnly; end: DateOnly }
+  status: 'draft' | 'not_started' | 'in_progress' | 'ended' | 'reviewed'
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  startedAt?: Timestamp
+  endedAt?: Timestamp
+  reviewedAt?: Timestamp
+}
+
 // ─── 3.5 Objective ────────────────────────────────────────────
 /**
  * 目标接口（OKR 目标）
@@ -138,7 +166,8 @@ export interface StructuredIntent {
  * @property status - 目标状态
  * @property title - 目标标题
  * @property description - 目标描述
- * @property period - 目标周期
+ * @property cycleId - 权威周期归属，指向 Cycle（见 §3.5a）
+ * @property period - 目标周期（派生只读）
  * @property parentId - 父目标ID（用于层级结构）
  * @property keyResultIds - 关联的关键结果ID列表
  * @property tags - 标签列表
@@ -156,6 +185,9 @@ export interface Objective {
   status: ObjectiveStatus
   title: string
   description?: string
+  /** 权威周期归属，指向 Cycle */
+  cycleId: USOM_ID
+  /** 派生只读：repo 读时 join cycle 填充，不落库 */
   period: {
     type: PeriodType
     start: DateOnly
