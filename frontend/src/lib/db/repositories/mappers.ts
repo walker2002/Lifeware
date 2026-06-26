@@ -522,6 +522,10 @@ export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
     status: row.status as KeyResult['status'],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
     discardedAt: toISO(row.discardedAt),
+    // [022] 2026-06-26 review deferred：补齐 mapper 漏掉的 archivedAt/completedAt。
+    // 此前 archive() 写入 archivedAt 后 findById 丢失该字段，回写测试断言失败。
+    archivedAt: toISO(row.archivedAt),
+    completedAt: toISO(row.completedAt),
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
   }

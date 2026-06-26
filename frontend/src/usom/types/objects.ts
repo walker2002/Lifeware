@@ -220,6 +220,8 @@ export interface Objective {
  * @property status - 关键结果状态
  * @property dueDate - 截止日期
  * @property discardedAt - 废弃时间
+ * @property completedAt - 完成时间
+ * @property archivedAt - 归档时间
  * @property createdAt - 创建时间
  * @property updatedAt - 更新时间
  */
@@ -235,6 +237,11 @@ export interface KeyResult {
   status: KeyResultStatus
   dueDate?: DateOnly
   discardedAt?: Timestamp
+  // [022] 2026-06-26 review deferred：补齐 KR 生命周期时间戳字段。
+  // 此前 mapper 不映射，导致 archive() 写后 read 丢失 archivedAt，
+  // status='completed' 派生后丢失 completedAt。
+  completedAt?: Timestamp
+  archivedAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }

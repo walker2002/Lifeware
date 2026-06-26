@@ -334,4 +334,78 @@ describe('KeyResultRepository.updateProgress 集成', () => {
     // 清理
     await cleanContributions(krId)
   })
+
+  // ─── [022] 2026-06-26 review deferred TEST gaps ───────────
+  // 补 KeyResultRepository.updateFields / save / archive 三个未覆盖方法的回归测试
+
+  it('updateFields 局部字段更新（仅改 title，其余字段保持）', async () => {
+    const updated = await krRepo.updateFields(
+      krId,
+      { title: 'T8 KR-更新进度-afterUpdateFields' },
+      USER_ID,
+    )
+    expect(updated.title).toBe('T8 KR-更新进度-afterUpdateFields')
+    // 断言：其他字段未被覆盖
+    expect(updated.targetValue).toBe(10)
+    expect(updated.unit).toBe('任务数')
+    // 还原 title 以免影响后续测试
+    await krRepo.updateFields(krId, { title: 'T8 KR-更新进度' }, USER_ID)
+  })
+
+  it('updateFields 不存在的 id 抛错', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000999'
+    await expect(
+      krRepo.updateFields(fakeId, { title: 'never' }, USER_ID),
+    ).rejects.toThrow('not found after updateFields')
+  })
+
+  it('save (upsert) 按 id 冲突更新：第二次 save 覆盖第一次的字段', async () => {
+    // 准备：构造 KR 对象，第一次 save
+    const krA = {
+      id: krId,
+      userId: USER_ID as any,
+      objectiveId,
+      title: 'T8 KR-saveTest-A',
+      description: 'desc-A',
+      targetValue: 10,
+      currentValue: 0,
+      unit: '任务数' as const,
+      progressRate: 0,
+      status: 'active' as const,
+      priority: 'P1' as const,
+      createdAt: new Date().toISOString() as any,
+      updatedAt: new Date().toISOString() as any,
+    } as any
+    await krRepo.save(krA, USER_ID)
+    let got = await krRepo.findById(krId, USER_ID)
+    expect(got?.title).toBe('T8 KR-saveTest-A')
+    expect(got?.description).toBe('desc-A')
+
+    // 第二次 save：相同 id，title/description 不同 → 应覆盖
+    const krB = {
+      ...krA,
+      title: 'T8 KR-saveTest-B',
+      description: 'desc-B',
+      updatedAt: new Date().toISOString() as any,
+    }
+    await krRepo.save(krB, USER_ID)
+    got = await krRepo.findById(krId, USER_ID)
+    expect(got?.title).toBe('T8 KR-saveTest-B')
+    expect(got?.description).toBe('desc-B')
+
+    // 还原
+    await krRepo.updateFields(krId, { title: 'T8 KR-更新进度' }, USER_ID)
+  })
+
+  it('archive 标记 KR 为 archived 并写 archivedAt', async () => {
+    // 先确认 KR 当前 status 不是 archived
+    const before = await krRepo.findById(krId, USER_ID)
+    expect(before?.status).not.toBe('archived')
+
+    await krRepo.archive(krId, USER_ID)
+    const after = await krRepo.findById(krId, USER_ID)
+    expect(after?.status).toBe('archived')
+    expect(after?.archivedAt).toBeDefined()
+    expect(after?.archivedAt).not.toBeNull()
+  })
 })
