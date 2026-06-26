@@ -434,10 +434,16 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
 }
 
 // --- Objective (keyResultIds injected by repository) -------------
+// [022-T5] period 不再落库：ObjectiveRow 的 period 信息来自 join cycle 的三列
+// （cycleType / cyclePeriodStart / cyclePeriodEnd），由 Repository 通过 leftJoin
+// cycles 提供。cycleId 直接透传 row.cycleId。
 type ObjectiveRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string; description: string | null;
-  periodType: string; periodStart: string; periodEnd: string;
+  cycleId: string | null;
+  cycleType: string | null;            // join cycles.cycle_type（过渡期 cycle_id 可 NULL）
+  cyclePeriodStart: string | null;     // join cycles.period_start
+  cyclePeriodEnd: string | null;       // join cycles.period_end
   parentId: string | null; okrType: string; tags: string[];
   objectiveNumber: string | null; priority: string;
   createdAt: Date; updatedAt: Date;
@@ -450,12 +456,13 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
     status: row.status as Objective['status'],
     title: row.title,
     description: row.description ?? undefined,
-    // [022-T3] 占位：T5+6 将由 ObjectiveRepository join cycles 表填入真实 cycleId
-    cycleId: '' as USOM_ID,
+    // [022-T5] cycleId 来自 row（替换 [022-T3] 占位）
+    cycleId: row.cycleId as USOM_ID,
+    // [022-T5] period 从 joined cycle 字段派生（不再读 periodType/periodStart/periodEnd）
     period: {
-      type: row.periodType as Objective['period']['type'],
-      start: row.periodStart as DateOnly,
-      end: row.periodEnd as DateOnly,
+      type: row.cycleType as Objective['period']['type'],
+      start: row.cyclePeriodStart as DateOnly,
+      end: row.cyclePeriodEnd as DateOnly,
     },
     parentId: row.parentId ?? undefined,
     keyResultIds,
@@ -472,15 +479,15 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
 }
 
 export function objectiveUSOMToRow(objective: Objective, userId: USOM_ID) {
+  // [022-T5] 不再写 periodType/periodStart/periodEnd（period 已是派生只读），
+  // 改写 cycleId（权威周期归属）。period_* 列保留在 schema，1C Task 17 整列 DROP。
   return {
     id: objective.id,
     userId: userId,
     status: objective.status,
     title: objective.title,
     description: objective.description ?? null,
-    periodType: objective.period.type,
-    periodStart: objective.period.start,
-    periodEnd: objective.period.end,
+    cycleId: objective.cycleId,
     parentId: objective.parentId ?? null,
     okrType: objective.okrType,
     objectiveNumber: objective.objectiveNumber || null,
