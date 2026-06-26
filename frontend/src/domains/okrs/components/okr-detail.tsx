@@ -21,6 +21,7 @@ import {
 import { KRProgress } from "./kr-progress"
 import { OKRForm } from "./okr-form"
 import type { OKRFormFields } from "./okr-form"
+import { ContributionPanel } from "./contribution-panel"
 
 /**
  * OKR 详情组件属性
@@ -261,6 +262,11 @@ export function OKRDetail({
           <Card key={kr.id}>
             <CardContent className="pt-4 space-y-2">
               <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
+              <ContributionPanel
+                krId={kr.id}
+                objectiveStatus={obj.status}
+                onChange={load}
+              />
               {kr.status === "draft" && (
                 <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
                   删除
