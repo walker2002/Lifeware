@@ -22,7 +22,7 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createEventBus } from "../../nexus/infrastructure/event-bus";
 
 /** MVP 用户 ID（临时使用） */
-const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
+export const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 /**
  * OKR 操作结果
@@ -166,7 +166,7 @@ function makeIntent(action: string, fields: Record<string, unknown>) {
  * @returns 创建结果
  */
 export async function createObjective(
-  input: { title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2"; periodType?: string; periodStart?: string; periodEnd?: string },
+  input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" },
 ): Promise<OKRActionResult<Objective>> {
   try {
     const orchestrator = await createOKROrchestrator();

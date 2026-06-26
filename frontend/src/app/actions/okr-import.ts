@@ -10,7 +10,8 @@
 import type { ParsedObjective, ImportReport, ImportResult, SaveImportResult } from "@/lib/okr-import/types"
 import { renderOKRsToMarkdown, parseOKRMarkdown } from "@/lib/okr-import/markdown-parser"
 import { createAIRuntime } from "@/nexus/ai-runtime"
-import { createObjective, createKeyResult } from "./okr"
+import { createObjective, createKeyResult, MVP_USER_ID } from "./okr"
+import { CycleRepository } from "@/domains/okrs/repository/cycle"
 
 // ─── LLM Prompt ─────────────────────────────────────────────
 
@@ -158,16 +159,19 @@ export async function saveImportedOKRs(markdown: string): Promise<SaveImportResu
       return { success: false, error: criticalErrors.join('；') }
     }
 
+    const cycleRepo = new CycleRepository()
     let savedCount = 0
     for (const okr of okrs) {
+      const periodType = okr.periodType ?? inferPeriodType(okr.periodStart!, okr.periodEnd!)
+      const cycle = await cycleRepo.findOrCreateCycle(
+        MVP_USER_ID, periodType, okr.periodStart!, okr.periodEnd!
+      )
       const objResult = await createObjective({
+        cycleId: cycle.id,
         title: okr.title,
         description: okr.description,
         okrType: okr.okrType ?? 'committed',
         priority: okr.priority ?? 'P1',
-        periodType: okr.periodType ?? inferPeriodType(okr.periodStart!, okr.periodEnd!),
-        periodStart: okr.periodStart,
-        periodEnd: okr.periodEnd,
       })
 
       if (!objResult.success || !objResult.data) {

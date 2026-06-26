@@ -34,7 +34,7 @@ interface UseOKRsResult {
   refresh: (status?: ObjectiveStatus) => Promise<void>
   updateLocal: (id: string, updated: Objective) => void
   loadDetail: (id: string) => Promise<ObjectiveWithKR | null>
-  create: (input: { title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2"; periodType?: string; periodStart?: string; periodEnd?: string }) => Promise<Objective | null>
+  create: (input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" }) => Promise<Objective | null>
   update: (id: string, fields: Record<string, unknown>) => Promise<Objective | null>
   activate: (id: string) => Promise<boolean>
   changeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<boolean>
@@ -77,7 +77,7 @@ export function useOKRs(): UseOKRsResult {
     return result.success ? result.data ?? null : null
   }, [])
 
-  const create = useCallback(async (input: { title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2"; periodType?: string; periodStart?: string; periodEnd?: string }): Promise<Objective | null> => {
+  const create = useCallback(async (input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" }): Promise<Objective | null> => {
     const result = await createObjective(input)
     if (result.success) {
       await refresh()

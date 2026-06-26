@@ -10,7 +10,7 @@ import { eq, and } from 'drizzle-orm'
 import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { Cycle } from '../../../usom/types/objects'
-import type { USOM_ID } from '../../../usom/types/primitives'
+import type { USOM_ID, DateOnly, Timestamp } from '../../../usom/types/primitives'
 import { cycleRowToUSOM, cycleUSOMToRow } from '../../../lib/db/repositories/mappers'
 
 /**
@@ -81,4 +81,63 @@ export class CycleRepository {
     if (!got) throw new Error(`Cycle ${id} not found after updateFields`)
     return got
   }
+
+  /**
+   * 按客观键 (user_id, period_start, period_end) 查找已有 cycle 或新建。
+   *
+   * 幂等：任意次调用仅返回同一 cycle 的 id。用于 okr-import 等批量导入场景，
+   * 避免每个 objective 都产生重复 cycle 行。
+   *
+   * @param userId - 用户 ID
+   * @param periodType - 原始周期类型枚举（如 weekly/monthly/quarterly/annual）
+   * @param periodStart - 周期起始日期 YYYY-MM-DD
+   * @param periodEnd - 周期结束日期 YYYY-MM-DD
+   * @param status - 新建 cycle 的初始状态，默认 'draft'
+   * @param tx - 可选事务句柄
+   * @returns 已有或新建的 Cycle
+   */
+  async findOrCreateCycle(
+    userId: USOM_ID,
+    periodType: string,
+    periodStart: string,
+    periodEnd: string,
+    status: Cycle['status'] = 'draft',
+    tx: DbClient = db,
+  ): Promise<Cycle> {
+    const existing = await tx.select().from(s.cycles)
+      .where(and(
+        eq(s.cycles.userId, userId),
+        eq(s.cycles.periodStart, periodStart),
+        eq(s.cycles.periodEnd, periodEnd),
+      ))
+      .limit(1)
+    if (existing.length > 0) return cycleRowToUSOM(existing[0] as any)
+
+    const cycleType = deriveCycleType(periodType)
+    const cycle: Cycle = {
+      id: crypto.randomUUID(),
+      cycleType,
+      name: ['annual', 'quarterly', 'monthly', 'semi_annual'].includes(periodType)
+        ? `${periodStart}~${periodEnd}`
+        : `${periodType}:${periodStart}~${periodEnd}`,
+      period: { start: periodStart as DateOnly, end: periodEnd as DateOnly },
+      status,
+      createdAt: new Date().toISOString() as Timestamp,
+      updatedAt: new Date().toISOString() as Timestamp,
+    }
+    await tx.insert(s.cycles).values(cycleUSOMToRow(cycle, userId))
+    return cycle
+  }
+}
+
+/**
+ * 把 period_* 枚举映射到 cycleType。
+ * annual / quarterly / monthly / semi_annual → 直映；
+ * daily / weekly → 'custom'（标注原类型在 name 中）。
+ */
+function deriveCycleType(periodType: string): Cycle['cycleType'] {
+  const KEEP = ['annual', 'quarterly', 'monthly', 'semi_annual']
+  return KEEP.includes(periodType)
+    ? (periodType as Cycle['cycleType'])
+    : 'custom'
 }
