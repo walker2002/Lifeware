@@ -12,6 +12,7 @@ import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
 import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
+import { CycleRepository } from "@/domains/okrs/repository/cycle";
 import { createOkrsGenericRepo } from "@/domains/okrs/repository/generic-repo-adapter";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { TimeboxRepository } from "@/domains/timebox/repository";
@@ -109,6 +110,7 @@ async function createOKROrchestrator() {
   const okrsRepos = createOkrsGenericRepo({
     objectiveRepo: objectiveRepo as any,
     keyResultRepo: keyResultRepo as any,
+    cycleRepo: new CycleRepository() as any,
   });
 
   return createOrchestrator({

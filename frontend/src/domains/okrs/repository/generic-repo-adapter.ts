@@ -30,6 +30,11 @@ interface OkrsRepoPair {
     updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
+  cycleRepo: {
+    findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+  }
 }
 
 /**
@@ -57,11 +62,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           okrType: fields.okrType ?? 'committed',
           priority: fields.priority ?? 'P1',
           tags: fields.tags ?? [],
-          period: {
-            type: fields.periodType ?? 'quarterly',
-            start: fields.periodStart ?? '',
-            end: fields.periodEnd ?? '',
-          },
+          cycleId: fields.cycleId,
           keyResultIds: [] as string[],
           objectiveNumber: '',
           createdAt: now,
@@ -138,6 +139,23 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       },
       async deleteDraft(id, userId, tx) {
         await repos.keyResultRepo.deleteDraft(id, userId, tx)
+      },
+    },
+    cycle: {
+      async findById(id, userId, tx) {
+        return repos.cycleRepo.findById(id, userId, tx)
+      },
+      async save(obj, userId, tx) {
+        await repos.cycleRepo.save(obj, userId, tx)
+      },
+      async create(_fields, _userId, _tx) {
+        throw new Error('Cycle 不支持通过 GenericRepo 创建，请使用 CycleRepository')
+      },
+      async updateStatus(_id, _toStatus, _userId, _tx) {
+        throw new Error('Cycle 不支持通过 GenericRepo 状态转换')
+      },
+      async updateFields(id, fields, userId, tx) {
+        return repos.cycleRepo.updateFields(id, fields, userId, tx)
       },
     },
   }
