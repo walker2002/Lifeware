@@ -29,12 +29,36 @@ export class CycleRepository {
     return rows.map((r) => cycleRowToUSOM(r as any))
   }
 
-  async save(cycle: Cycle, userId: USOM_ID, tx: DbClient = db): Promise<void> {
+  /**
+   * 保存 cycle（按自然键 upsert）。
+   *
+   * [022] 1A-T8：改按自然键 (user_id, period_start, period_end) 冲突更新，
+   * 依赖 uq_cycles_user_period 唯一索引。冲突时保留已有主键 id 与 createdAt，
+   * 仅更新其他字段。
+   *
+   * @returns 实际持久化的 Cycle（含正确的 id——冲突更新后的已有 id）。
+   */
+  async save(cycle: Cycle, userId: USOM_ID, tx: DbClient = db): Promise<Cycle> {
     const row = cycleUSOMToRow(cycle, userId)
+    const { id: _id, createdAt: _createdAt, ...rowWithoutIdAndCreatedAt } = row
     await tx.insert(s.cycles).values(row).onConflictDoUpdate({
-      target: s.cycles.id,
-      set: row,
+      target: [s.cycles.userId, s.cycles.periodStart, s.cycles.periodEnd],
+      set: rowWithoutIdAndCreatedAt,
     })
+    // 按自然键回查，获取实际持久化的行（id 可能因冲突而不同于输入 cycle.id）
+    const rows = await tx
+      .select()
+      .from(s.cycles)
+      .where(
+        and(
+          eq(s.cycles.userId, userId),
+          eq(s.cycles.periodStart, row.periodStart),
+          eq(s.cycles.periodEnd, row.periodEnd),
+        ),
+      )
+      .limit(1)
+    if (!rows[0]) throw new Error(`Cycle save 后按自然键回查失败`)
+    return cycleRowToUSOM(rows[0] as any)
   }
 
   /**

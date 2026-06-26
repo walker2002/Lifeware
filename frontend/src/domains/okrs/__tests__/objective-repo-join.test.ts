@@ -42,10 +42,11 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
-    await cycleRepo.save(cycle, MVP_USER_ID as any)
+    // [022] 1A-T8：save 按自然键 upsert，返回实际持久化的 Cycle
+    const saved = await cycleRepo.save(cycle, MVP_USER_ID as any)
 
     const objRepo = new ObjectiveRepository()
-    const obj = makeObjective(cycle.id)
+    const obj = makeObjective(saved.id)
     await objRepo.save(obj, MVP_USER_ID as any)
 
     const got = await objRepo.findById(obj.id, MVP_USER_ID as any)
@@ -53,7 +54,7 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
     expect(got?.period.start).toBe('2026-04-01')
     expect(got?.period.end).toBe('2026-06-30')
     expect(got?.period.type).toBe('quarterly')
-    expect(got?.cycleId).toBe(cycle.id)
+    expect(got?.cycleId).toBe(saved.id)
   })
 
   it('save 从 cycleId 反查 cycle 派生编号（不依赖 objective.period）', async () => {
@@ -67,10 +68,11 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
-    await cycleRepo.save(cycle, MVP_USER_ID as any)
+    // [022] 1A-T8：save 按自然键 upsert，返回实际持久化的 Cycle
+    const saved = await cycleRepo.save(cycle, MVP_USER_ID as any)
 
     const objRepo = new ObjectiveRepository()
-    const obj = makeObjective(cycle.id)
+    const obj = makeObjective(saved.id)
     await objRepo.save(obj, MVP_USER_ID as any)
 
     const got = await objRepo.findById(obj.id, MVP_USER_ID as any)
@@ -90,10 +92,11 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
-    await cycleRepo.save(q3, MVP_USER_ID as any)
+    // [022] 1A-T8：save 按自然键 upsert，返回实际持久化的 Cycle
+    const saved = await cycleRepo.save(q3, MVP_USER_ID as any)
 
     const objRepo = new ObjectiveRepository()
-    const obj = makeObjective(q3.id)
+    const obj = makeObjective(saved.id)
     await objRepo.save(obj, MVP_USER_ID as any)
 
     // Q3 落在 2026 全年范围内

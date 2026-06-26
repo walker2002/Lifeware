@@ -23,8 +23,9 @@ describe('CycleRepository', () => {
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
-    await repo.save(cycle, MVP_USER_ID as any)
-    const got = await repo.findById(cycle.id as any, MVP_USER_ID as any)
+    const saved = await repo.save(cycle, MVP_USER_ID as any)
+    // [022] 1A-T8：save 按自然键 upsert，返回实际持久化的 Cycle
+    const got = await repo.findById(saved.id as any, MVP_USER_ID as any)
     expect(got?.name).toBe('2026-Q2')
     expect(got?.cycleType).toBe('quarterly')
     expect(got?.period.start).toBe('2026-04-01')

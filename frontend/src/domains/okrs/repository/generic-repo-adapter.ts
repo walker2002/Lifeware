@@ -32,7 +32,7 @@ interface OkrsRepoPair {
   }
   cycleRepo: {
     findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
-    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+    save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
 }
@@ -50,6 +50,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       },
       async save(obj, userId, tx) {
         await repos.objectiveRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
@@ -96,6 +97,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       },
       async save(obj, userId, tx) {
         await repos.keyResultRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
@@ -146,7 +148,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
         return repos.cycleRepo.findById(id, userId, tx)
       },
       async save(obj, userId, tx) {
-        await repos.cycleRepo.save(obj, userId, tx)
+        return repos.cycleRepo.save(obj, userId, tx)
       },
       async create(_fields, _userId, _tx) {
         throw new Error('Cycle 不支持通过 GenericRepo 创建，请使用 CycleRepository')

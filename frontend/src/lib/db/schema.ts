@@ -83,6 +83,7 @@ export const cycles = pgTable('cycles', {
   check('check_cycles_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
   index('idx_cycles_user_status').on(table.userId, table.status),
   index('idx_cycles_period').on(table.userId, table.periodStart, table.periodEnd),
+  uniqueIndex('uq_cycles_user_period').on(table.userId, table.periodStart, table.periodEnd),
 ])
 
 // ─── 4.1 objectives ───────────────────────────────────────────

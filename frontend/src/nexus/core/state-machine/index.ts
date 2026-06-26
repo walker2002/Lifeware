@@ -61,7 +61,7 @@ export interface GenericRepo {
    * @param userId - 用户 ID
    * @param tx - 可选事务句柄（缺省回退到 db 单例）
    */
-  save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
+  save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
 
   /**
    * 创建新对象，内部生成 ID，返回含 ID 的完整对象

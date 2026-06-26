@@ -42,6 +42,7 @@ export function createHabitsGenericRepo(repos: HabitsRepoPair): Record<string, G
       },
       async save(obj, userId, tx) {
         await repos.habitRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         return repos.habitRepo.create(fields, userId, tx)
@@ -60,6 +61,7 @@ export function createHabitsGenericRepo(repos: HabitsRepoPair): Record<string, G
       },
       async save(obj, userId) {
         await repos.habitLogRepo.save(obj, userId)
+        return obj
       },
       async create(fields, userId) {
         // HabitLog 使用 save 创建（日志是不可变事实，无独立 create 方法）
