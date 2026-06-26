@@ -212,6 +212,8 @@ export type SystemEventType =
   | 'ExecutionLogged'
   | 'TaskFieldUpdated'
   | 'HabitFieldUpdated'
+  | 'OkrFieldUpdated'
+  | 'CycleCreated' | 'CyclePlanned' | 'CycleStarted' | 'CycleEnded' | 'CycleReviewed'
 
 export interface SystemEvent {
   id: USOM_ID
@@ -394,3 +396,5 @@ export type QueryResult =
 // ─── 类型断言（仅编译期）：HabitFieldUpdated 须为合法 SystemEventType ──
 const _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'HabitFieldUpdated'
 void _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
+const _OKR_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'OkrFieldUpdated'
+void _OKR_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
