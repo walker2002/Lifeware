@@ -43,6 +43,18 @@ export class ContributionRepository implements IContributionRepository {
   async add(input: CreateContributionInput, userId: USOM_ID, tx: DbClient = db): Promise<Contribution> {
     const now = new Date()
     const id = crypto.randomUUID() as USOM_ID
+
+    // [Review fix 2026-06-26] 多租户 T-02 + R-01: 验证 keyResultId 属于当前 userId。
+    // 此前仅依赖 FK + userId 列写入，未校验 KR owner 匹配，可能允许插入「指向他人 KR」的
+    // 贡献行（FK 不强制 user_id 相等）。此处显式 owner-check 防止跨租户污染。
+    const kr = await tx.select({ id: s.keyResults.id })
+      .from(s.keyResults)
+      .where(and(eq(s.keyResults.id, input.keyResultId), eq(s.keyResults.userId, userId)))
+      .limit(1)
+    if (kr.length === 0) {
+      throw new Error(`KeyResult ${input.keyResultId} not found or not owned by user ${userId}`)
+    }
+
     await tx.insert(s.contributions).values({
       id,
       userId,

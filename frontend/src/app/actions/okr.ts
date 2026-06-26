@@ -111,7 +111,14 @@ export async function getActiveCycles(): Promise<OKRActionResult<Cycle[]>> {
 }
 
 /**
- * 创建周期
+ * 创建周期（[022] QA fix 2026-06-26）
+ *
+ * 走 repo.save 直写是有意为之的例外（与 write-entry-guard 守卫规则一致）：
+ * Cycle 是单行 upsert（自然键 userId+periodStart+periodEnd 唯一约束），
+ * 无跨表副作用（无 KR recompute、无 event fan-out），mutation-service
+ * 抽象对单行 upsert 反而是过度设计。
+ *
+ * 例外登记：write-entry-guard.test.ts 的 allow 列表
  */
 export async function createCycle(cycle: Cycle): Promise<OKRActionResult<Cycle>> {
   try {
