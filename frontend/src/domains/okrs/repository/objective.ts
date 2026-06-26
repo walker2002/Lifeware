@@ -2,10 +2,9 @@
  * @file objective
  * @brief Objective 仓储实现
  *
- * [022] 1A-T6：所有读方法经 findObjRows helper 以 leftJoin cycles 取周期字段，
+ * [022] 1A-T6：所有读方法经 findObjRows helper 以 innerJoin cycles 取周期字段，
  * mapper 的 period 从 join 的 cycleType/cyclePeriodStart/cyclePeriodEnd 派生。
- * 过渡期 cycle_id 可 NULL（backfill 在 T8），故用 leftJoin 而非 innerJoin；
- * 1C Task 17 SET NOT NULL 后再切 innerJoin。
+ * [022] 1C T17：cycle_id 已 SET NOT NULL + period 列已 DROP，leftJoin 切 innerJoin。
  * save 不再读 objective.period（create 路径无 period），改为从 cycleId 反查 cycle
  * 派生编号前缀。KR 查询统一改 inArray 批查，消除 N+1。
  */
@@ -24,10 +23,9 @@ import { CycleRepository } from './cycle'
  */
 export class ObjectiveRepository implements IObjectiveRepository {
   /**
-   * 统一的 objective 行查询（过渡期 leftJoin cycles）。
-   * 选 cycle 三列供 mapper 派生 period。〔critical〕过渡期 cycle_id 可 NULL
-   * （backfill 在 T8），故用 leftJoin——innerJoin 会丢弃所有未回填的历史 objective。
-   * T17 SET NOT NULL 后再切 innerJoin。
+   * 统一的 objective 行查询（innerJoin cycles）。
+   * 选 cycle 三列供 mapper 派生 period。〔022〕1C T17：cycle_id NOT NULL，
+   * 所有 objective 必有归属 cycle，故用 innerJoin。
    */
   private async findObjRows(where: SQL | undefined, tx: DbClient = db) {
     return tx.select({
@@ -50,7 +48,7 @@ export class ObjectiveRepository implements IObjectiveRepository {
       cyclePeriodStart: s.cycles.periodStart,
       cyclePeriodEnd: s.cycles.periodEnd,
     }).from(s.objectives)
-      .leftJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
+      .innerJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
       .where(where)
   }
 
@@ -149,7 +147,7 @@ export class ObjectiveRepository implements IObjectiveRepository {
       cyclePeriodStart: s.cycles.periodStart,
       cyclePeriodEnd: s.cycles.periodEnd,
     }).from(s.objectives)
-      .leftJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
+      .innerJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
       .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
     if (!rows[0]) return null
     const krRows = await db.select().from(s.keyResults)

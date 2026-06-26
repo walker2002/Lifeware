@@ -64,7 +64,7 @@ export const energyLogs = pgTable('energy_logs', {
 
 // ─── 4.0 cycles ───────────────────────────────────────────────
 // 周期表：承载 OKR 周期元数据（annual/quarterly/monthly/semi_annual/custom）。
-// objectives.cycle_id 为可空外键，回填前 NULL；1C Task 17 再对 objectives SET NOT NULL。
+// objectives.cycle_id NOT NULL 外键，[022] 1C T17 已完成 period 列 DROP + SET NOT NULL。
 export const cycles = pgTable('cycles', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -96,15 +96,9 @@ export const objectives = pgTable('objectives', {
   title: text('title').notNull(),
   description: text('description'),
 
-  // period_* 三列暂留但放开 NOT NULL（mapper 自 Task 5 起不再写 period）；
-  // 1C Task 17 整列 DROP。
-  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }),
-  periodStart: date('period_start'),
-  periodEnd: date('period_end'),
-
   parentId: uuid('parent_id'),
-  // cycleId 可空：回填前 NULL，1C Task 17 SET NOT NULL
-  cycleId: uuid('cycle_id').references(() => cycles.id, { onDelete: 'restrict' }),
+  // [022] 1C T17：cycle_id SET NOT NULL，period 列已 DROP，周期信息统一由 cycles 表承载
+  cycleId: uuid('cycle_id').notNull().references(() => cycles.id, { onDelete: 'restrict' }),
 
   okrType: text('okr_type').notNull().default('committed'),
   objectiveNumber: text('objective_number'),
@@ -117,9 +111,8 @@ export const objectives = pgTable('objectives', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
-  check('check_objectives_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
   index('idx_objectives_user_status').on(table.userId, table.status),
-  index('idx_objectives_period').on(table.userId, table.periodStart, table.periodEnd),
+  index('idx_objectives_cycle').on(table.userId, table.cycleId),
   index('idx_objectives_parent').on(table.parentId),
 ])
 
