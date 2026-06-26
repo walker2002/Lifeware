@@ -71,6 +71,9 @@ function makeDeps() {
   return {
     eventRepo: {
       append: vi.fn(),
+      findByUserInRange: vi.fn().mockResolvedValue([]),
+      findUnprocessed: vi.fn().mockResolvedValue([]),
+      markProcessed: vi.fn(),
     },
     intentEngine: {
       parse: vi.fn(),

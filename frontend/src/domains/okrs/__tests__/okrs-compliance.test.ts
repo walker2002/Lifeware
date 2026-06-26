@@ -43,29 +43,29 @@ describe('T011: OKRs manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toMatch(/key_result:/)
   })
 
-  it('intent_triggers 应包含 createObjective 和 activateObjective', () => {
-    expect(manifestContent).toMatch(/action:\s*createObjective/)
-    expect(manifestContent).toMatch(/action:\s*activateObjective/)
-  })
-
-  it('intent_triggers 应包含 KR 操作', () => {
-    expect(manifestContent).toMatch(/action:\s*createKeyResult/)
-    expect(manifestContent).toMatch(/action:\s*updateKeyResult/)
-    expect(manifestContent).toMatch(/action:\s*updateKeyResultProgress/)
-  })
-
-  it('intent_triggers 应包含 view_workspace 和 view_detail view_route', () => {
+  it('intent_triggers 应仅包含 view_workspace（[022-A4] Phase 3 清理后）', () => {
+    // [022-A4] 移除 lifecycle action triggers；仅保留 view_workspace 导航类意图
     expect(manifestContent).toMatch(/action:\s*view_workspace/)
-    expect(manifestContent).toMatch(/action:\s*view_detail/)
-    expect(manifestContent).toMatch(/view_route:/)
+    expect(manifestContent).not.toMatch(/action:\s*createObjective/)
+    expect(manifestContent).not.toMatch(/action:\s*activateObjective/)
+    expect(manifestContent).not.toMatch(/action:\s*createKeyResult/)
+    expect(manifestContent).not.toMatch(/action:\s*updateKeyResult/)
+    expect(manifestContent).not.toMatch(/action:\s*updateKeyResultProgress/)
+  })
+
+  it('intent_triggers 应包含 view_workspace view_route', () => {
+    expect(manifestContent).toMatch(/action:\s*view_workspace/)
+    expect(manifestContent).toMatch(/view_route:\s*\/okrs/)
   })
 })
 
 describe('T012: OKRs hooks.ts 纯函数验证', () => {
-  it('hooks.ts 不应包含数据库相关导入', async () => {
+  it('hooks.ts 不应包含数据库相关导入（[022-A4] 允许 IContributionRepository 类型导入）', async () => {
     const hooksContent = readFileSync(resolve(__dirname, '../hooks.ts'), 'utf-8')
-    expect(hooksContent).not.toMatch(/from.*['"]@?\.?\.?\/?(lib\/db|drizzle|repository)/)
-    expect(hooksContent).not.toMatch(/import.*[Rr]epository/)
+    // 禁止直接 import DB / repository 实体（constitution §VI 无副作用原则）
+    expect(hooksContent).not.toMatch(/from.*['"]@?\.?\.?\/?(lib\/db|drizzle)/)
+    // 允许接口类型导入（IContributionRepository），但禁止具体实现类
+    expect(hooksContent).not.toMatch(/import\s+(?!type).*[Rr]epository/)
   })
 
   it('createOkrsHooks 工厂函数应从 hooks.ts 导出', () => {
