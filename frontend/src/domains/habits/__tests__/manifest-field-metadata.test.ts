@@ -2,7 +2,7 @@
  * @file manifest-field-metadata
  * @brief habits manifest field_metadata 区块合规测试（[018-G1] G1-M1 结构任务 T1）
  *
- * 验证 habits manifest 的 field_metadata 覆盖 UpdateHabitInput 全集（14 字段），
+ * 验证 habits manifest 的 field_metadata 覆盖 UpdateHabitInput 全集（13 字段），
  * 且每个字段都标注 mutation_mode（FactField|ContentField），frequencyType 为 enum
  * 并使用 options（非 allowed_values）—— 字段执行器据此激活枚举校验。
  *
@@ -21,7 +21,7 @@ const fieldMetadata = result.success
   ? result.manifest.field_metadata
   : {}
 
-/** CreateHabitInput 的全部字段名（权威字段集，14 个） */
+/** CreateHabitInput 的全部字段名（权威字段集，13 个） */
 const REQUIRED_FIELDS: ReadonlyArray<keyof CreateHabitInput> = [
   'title',
   'description',
@@ -35,7 +35,6 @@ const REQUIRED_FIELDS: ReadonlyArray<keyof CreateHabitInput> = [
   'daysOfWeek',
   'startDate',
   'endDate',
-  'keyResultId',
   'tags',
 ]
 
@@ -44,7 +43,7 @@ describe('G1-M1: habits manifest field_metadata 覆盖 UpdateHabitInput 全集',
     expect(result.success).toBe(true)
   })
 
-  it('field_metadata 应覆盖 CreateHabitInput 的全部 14 个字段（超集）', () => {
+  it('field_metadata 应覆盖 CreateHabitInput 的全部 13 个字段（超集）', () => {
     const declared = new Set(Object.keys(fieldMetadata))
     const missing = REQUIRED_FIELDS.filter(f => !declared.has(f as string))
     expect(missing).toEqual([])
@@ -70,9 +69,9 @@ describe('G1-M1: habits manifest field_metadata 覆盖 UpdateHabitInput 全集',
     expect((freq as unknown as Record<string, unknown>).allowed_values).toBeUndefined()
   })
 
-  it('已批准分类：ContentField（title/description/startDate/endDate/keyResultId/tags）', () => {
+  it('已批准分类：ContentField（title/description/startDate/endDate/tags）', () => {
     const contentFields: Array<keyof CreateHabitInput> = [
-      'title', 'description', 'startDate', 'endDate', 'keyResultId', 'tags',
+      'title', 'description', 'startDate', 'endDate', 'tags',
     ]
     for (const f of contentFields) {
       expect(fieldMetadata[f as string]?.mutation_mode).toBe('ContentField')

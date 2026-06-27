@@ -4,11 +4,12 @@
 import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../../../usom/types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
-  Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog,
+  Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog, Contribution,
   Timebox, Review, ReviewSection, ReviewMetrics,
   HabitTemplate, TemplateHabitItem,
   AISession, ChatMessage, TaskExecutionLog,
   RecurrenceRule,
+  Cycle,
 } from '../../../usom/types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface,
@@ -147,7 +148,7 @@ type HabitRow = {
   frequencyType: string; defaultTime: string;
   earliestTime: string; latestStartTime: string;
   defaultDuration: number; minDuration: number;
-  trackable: boolean; keyResultId: string | null;
+  trackable: boolean;
   streak: number; longestStreak: number; completionRate7d: number;
   startDate: string; endDate: string | null;
   daysOfWeek: number[] | null; tags: string[];
@@ -174,7 +175,6 @@ export function habitRowToUSOM(row: HabitRow): Habit {
     trackable: row.trackable,
     startDate: row.startDate as DateOnly,
     endDate: (row.endDate as DateOnly) ?? undefined,
-    keyResultId: row.keyResultId ?? undefined,
     streak: row.streak,
     longestStreak: row.longestStreak,
     completionRate7d: row.completionRate7d,
@@ -201,7 +201,6 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
     defaultDuration: habit.defaultDuration,
     minDuration: habit.minDuration,
     trackable: habit.trackable,
-    keyResultId: habit.keyResultId ?? null,
     streak: habit.streak,
     longestStreak: habit.longestStreak,
     completionRate7d: habit.completionRate7d,
@@ -433,10 +432,16 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
 }
 
 // --- Objective (keyResultIds injected by repository) -------------
+// [022-T5] period 不再落库：ObjectiveRow 的 period 信息来自 join cycle 的三列
+// （cycleType / cyclePeriodStart / cyclePeriodEnd），由 Repository 通过 leftJoin
+// cycles 提供。cycleId 直接透传 row.cycleId。
 type ObjectiveRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string; description: string | null;
-  periodType: string; periodStart: string; periodEnd: string;
+  cycleId: string | null;
+  cycleType: string | null;            // join cycles.cycle_type（过渡期 cycle_id 可 NULL）
+  cyclePeriodStart: string | null;     // join cycles.period_start
+  cyclePeriodEnd: string | null;       // join cycles.period_end
   parentId: string | null; okrType: string; tags: string[];
   objectiveNumber: string | null; priority: string;
   createdAt: Date; updatedAt: Date;
@@ -449,10 +454,13 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
     status: row.status as Objective['status'],
     title: row.title,
     description: row.description ?? undefined,
+    // [022-T5] cycleId 来自 row（替换 [022-T3] 占位）
+    cycleId: row.cycleId as USOM_ID,
+    // [022-T5] period 从 joined cycle 字段派生（不再读 periodType/periodStart/periodEnd）
     period: {
-      type: row.periodType as Objective['period']['type'],
-      start: row.periodStart as DateOnly,
-      end: row.periodEnd as DateOnly,
+      type: row.cycleType as Objective['period']['type'],
+      start: row.cyclePeriodStart as DateOnly,
+      end: row.cyclePeriodEnd as DateOnly,
     },
     parentId: row.parentId ?? undefined,
     keyResultIds,
@@ -469,15 +477,15 @@ export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = 
 }
 
 export function objectiveUSOMToRow(objective: Objective, userId: USOM_ID) {
+  // [022-T5] 不再写 periodType/periodStart/periodEnd（period 已是派生只读），
+  // 改写 cycleId（权威周期归属）。period_* 列保留在 schema，1C Task 17 整列 DROP。
   return {
     id: objective.id,
     userId: userId,
     status: objective.status,
     title: objective.title,
     description: objective.description ?? null,
-    periodType: objective.period.type,
-    periodStart: objective.period.start,
-    periodEnd: objective.period.end,
+    cycleId: objective.cycleId,
     parentId: objective.parentId ?? null,
     okrType: objective.okrType,
     objectiveNumber: objective.objectiveNumber || null,
@@ -514,6 +522,10 @@ export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
     status: row.status as KeyResult['status'],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
     discardedAt: toISO(row.discardedAt),
+    // [022] 2026-06-26 review deferred：补齐 mapper 漏掉的 archivedAt/completedAt。
+    // 此前 archive() 写入 archivedAt 后 findById 丢失该字段，回写测试断言失败。
+    archivedAt: toISO(row.archivedAt),
+    completedAt: toISO(row.completedAt),
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
   }
@@ -892,5 +904,86 @@ export function aiSessionUSOMToRow(session: Omit<AISession, 'id' | 'createdAt' |
     referencedObjectIds: session.referencedObjectIds,
     archivedAt: session.archivedAt ? new Date(session.archivedAt) : null,
     deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
+  }
+}
+
+// --- Cycle -------------------------------------------------------
+// [022] 1A-T4：Cycle 一级对象双向映射。row→USOM 不含 userId/schemaVersion（同其它 mapper 习惯）。
+type CycleRow = {
+  id: string; cycleType: string; name: string;
+  periodStart: string; periodEnd: string; status: string;
+  createdAt: Date; updatedAt: Date;
+  startedAt: Date | null; endedAt: Date | null; reviewedAt: Date | null;
+}
+
+export function cycleRowToUSOM(row: CycleRow): Cycle {
+  return {
+    id: row.id,
+    cycleType: row.cycleType as Cycle['cycleType'],
+    name: row.name,
+    period: { start: row.periodStart as DateOnly, end: row.periodEnd as DateOnly },
+    status: row.status as Cycle['status'],
+    createdAt: row.createdAt.toISOString() as Timestamp,
+    updatedAt: row.updatedAt.toISOString() as Timestamp,
+    startedAt: toISO(row.startedAt),
+    endedAt: toISO(row.endedAt),
+    reviewedAt: toISO(row.reviewedAt),
+  }
+}
+
+export function cycleUSOMToRow(cycle: Cycle, userId: USOM_ID) {
+  return {
+    id: cycle.id,
+    userId,
+    cycleType: cycle.cycleType,
+    name: cycle.name,
+    periodStart: cycle.period.start,
+    periodEnd: cycle.period.end,
+    status: cycle.status,
+    createdAt: toDate(cycle.createdAt)!,
+    updatedAt: toDate(cycle.updatedAt)!,
+    startedAt: toDate(cycle.startedAt),
+    endedAt: toDate(cycle.endedAt),
+    reviewedAt: toDate(cycle.reviewedAt),
+  }
+}
+
+// --- Contribution --------------------------------------------------
+// [022] 2A-T4：Contribution 双向映射。delta/weight 为 PG numeric → JS number。
+type ContributionRow = {
+  id: string
+  keyResultId: string
+  contributorType: string
+  contributorId: string
+  delta: string | null
+  weight: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export function contributionRowToUSOM(row: ContributionRow): Contribution {
+  return {
+    id: row.id,
+    keyResultId: row.keyResultId,
+    contributorType: row.contributorType as Contribution['contributorType'],
+    contributorId: row.contributorId,
+    delta: row.delta != null ? Number(row.delta) : undefined,
+    weight: row.weight != null ? Number(row.weight) : 1.0,
+    createdAt: row.createdAt.toISOString() as Timestamp,
+    updatedAt: row.updatedAt.toISOString() as Timestamp,
+  }
+}
+
+export function contributionUSOMToRow(c: Contribution, userId: USOM_ID) {
+  return {
+    id: c.id,
+    userId,
+    keyResultId: c.keyResultId,
+    contributorType: c.contributorType,
+    contributorId: c.contributorId,
+    delta: c.delta?.toString() ?? null,
+    weight: c.weight?.toString() ?? '1.0',
+    createdAt: toDate(c.createdAt)!,
+    updatedAt: toDate(c.updatedAt)!,
   }
 }

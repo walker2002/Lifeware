@@ -1,17 +1,20 @@
 /**
  * @file key-result
  * @brief KeyResult 仓储实现
- * 
- * 实现 IKeyResultRepository 接口，提供 KeyResult 数据的数据库操作
+ *
+ * 实现 IKeyResultRepository 接口，提供 KeyResult 数据的数据库操作。
+ * [022] Phase 2：updateProgress 经 ContributionRepository.recomputeProgress 重算，
+ * 含孤儿贡献清理（源已删除的 task/habit 引用）。
  */
 
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IKeyResultRepository } from '../../../usom/interfaces/irepository'
 import type { KeyResult } from '../../../usom/types/objects'
 import type { USOM_ID, KeyResultStatus } from '../../../usom/types/primitives'
 import { keyResultRowToUSOM, keyResultUSOMToRow } from '../../../lib/db/repositories/mappers'
+import { ContributionRepository } from './contribution'
 
 /**
  * KeyResult 仓储
@@ -29,19 +32,80 @@ export class KeyResultRepository implements IKeyResultRepository {
     return rows.map(r => keyResultRowToUSOM(r as any))
   }
 
-  async updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID): Promise<KeyResult> {
-    // 先获取当前 KR 以计算 progressRate
-    const existing = await this.findById(id, userId)
+  /**
+   * 更新 KeyResult 进度（经 ContributionRepository.recomputeProgress 重算）。
+   *
+   * [022] 2B-T8：不再信任传入的 _currentValue，改为从 junction 表重算。
+   * 重算前会清理孤儿贡献（源 task/habit 已删除的引用）。
+   * 保留 status 派生（currentValue >= targetValue → completed）和下钳（Math.max(0, …)）。
+   *
+   * [Review fix 2026-06-26] 接受 tx 参数并透传给所有 db.* 调用，使调用方
+   * （mutation-service、跨域事件分发）能在同一事务中完成「孤儿清理 + 重算 +
+   * 写回 + 派生 status」原子化，避免 PG READ COMMITTED 默认隔离级别下的
+   * SELECT-then-UPDATE 失更新竞态。
+   */
+  async updateProgress(
+    id: USOM_ID,
+    _currentValue: number,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<KeyResult> {
+    const contributionRepo = new ContributionRepository()
+
+    // ── 0. 孤儿清理：移除源已不存在的贡献记录 ──
+    const contributions = await contributionRepo.findByKeyResult(id, userId, tx)
+
+    // 0a. Task 孤儿：查询 tasks 表确认每个 contributorId 仍存在
+    const taskContribs = contributions.filter(c => c.contributorType === 'task')
+    if (taskContribs.length > 0) {
+      const taskIds = [...new Set(taskContribs.map(c => c.contributorId))]
+      const existingTasks = await tx.select({ id: s.tasks.id })
+        .from(s.tasks)
+        .where(and(
+          eq(s.tasks.userId, userId),
+          inArray(s.tasks.id, taskIds),
+        ))
+      const existingTaskIds = new Set(existingTasks.map(t => t.id))
+      for (const c of taskContribs) {
+        if (!existingTaskIds.has(c.contributorId)) {
+          await contributionRepo.removeByContributor('task', c.contributorId, userId, tx)
+        }
+      }
+    }
+
+    // 0b. Habit 孤儿：查询 habits 表确认每个 contributorId 仍存在
+    const habitContribs = contributions.filter(c => c.contributorType === 'habit')
+    if (habitContribs.length > 0) {
+      const habitIds = [...new Set(habitContribs.map(c => c.contributorId))]
+      const existingHabits = await tx.select({ id: s.habits.id })
+        .from(s.habits)
+        .where(and(
+          eq(s.habits.userId, userId),
+          inArray(s.habits.id, habitIds),
+        ))
+      const existingHabitIds = new Set(existingHabits.map(h => h.id))
+      for (const c of habitContribs) {
+        if (!existingHabitIds.has(c.contributorId)) {
+          await contributionRepo.removeByContributor('habit', c.contributorId, userId, tx)
+        }
+      }
+    }
+
+    // ── 1. 经 junction 表重算进度 ──
+    const { currentValue, progressRate } = await contributionRepo.recomputeProgress(id, userId, tx)
+
+    // ── 2. 获取 KR 元数据用于 status 派生 ──
+    const existing = await this.findById(id, userId, tx)
     if (!existing) throw new Error(`KeyResult ${id} not found`)
 
-    const clampedValue = Math.max(0, Math.min(currentValue, existing.targetValue))
-    const progressRate = existing.targetValue > 0
-      ? Number((clampedValue / existing.targetValue).toFixed(4))
-      : 0
+    // ── 3. 下钳保底（recomputeProgress 已内部钳制，此处再保底一次）──
+    const clampedValue = Math.max(0, currentValue)
 
-    const newStatus = clampedValue >= existing.targetValue ? 'completed' : existing.status
+    // ── 4. Status 派生：currentValue >= targetValue → completed ──
+    const newStatus: KeyResultStatus = clampedValue >= existing.targetValue ? 'completed' : existing.status
 
-    await db.update(s.keyResults)
+    // ── 5. 持久化（threading tx 保证整个 recompute 链路原子化）──
+    await tx.update(s.keyResults)
       .set({
         currentValue: String(clampedValue),
         progressRate: String(progressRate),
@@ -50,13 +114,19 @@ export class KeyResultRepository implements IKeyResultRepository {
       })
       .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
 
-    const updated = await this.findById(id, userId)
-    if (!updated) throw new Error(`KeyResult ${id} not found after update`)
+    const updated = await this.findById(id, userId, tx)
+    if (!updated) throw new Error(`KeyResult ${id} not found after updateProgress`)
     return updated
   }
 
-  async batchUpdateStatus(objectiveId: USOM_ID, fromStatus: KeyResultStatus, toStatus: KeyResultStatus, userId: USOM_ID): Promise<void> {
-    await db.update(s.keyResults)
+  async batchUpdateStatus(
+    objectiveId: USOM_ID,
+    fromStatus: KeyResultStatus,
+    toStatus: KeyResultStatus,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<void> {
+    await tx.update(s.keyResults)
       .set({ status: toStatus, updatedAt: new Date() })
       .where(and(
         eq(s.keyResults.objectiveId, objectiveId),
@@ -103,8 +173,8 @@ export class KeyResultRepository implements IKeyResultRepository {
     })
   }
 
-  async archive(id: USOM_ID, userId: USOM_ID): Promise<void> {
-    await db.update(s.keyResults)
+  async archive(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<void> {
+    await tx.update(s.keyResults)
       .set({ status: 'archived', archivedAt: new Date() })
       .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
   }

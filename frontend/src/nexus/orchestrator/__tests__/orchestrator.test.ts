@@ -216,6 +216,8 @@ function createMockEventRepo() {
   return {
     append: vi.fn().mockResolvedValue(undefined),
     findByUserInRange: vi.fn().mockResolvedValue([]),
+    // [022] ADV-#1：dispatchCrossDomainEvents 改为按 intentId 查询，新增 mock
+    findByIntent: vi.fn().mockResolvedValue([]),
     findUnprocessed: vi.fn().mockResolvedValue([]),
     markProcessed: vi.fn().mockResolvedValue(undefined),
   }

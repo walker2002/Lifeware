@@ -19,15 +19,84 @@ import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
+import type { IContributionRepository } from '@/usom/interfaces/irepository'
 
 /**
  * OKR 域钩子可选仓储依赖
  * @property objectiveRepo - 目标仓储
  * @property keyResultRepo - 关键结果仓储
+ * @property contributionRepo - 贡献仓储（[022] Phase 3 A4 跨域事件驱动 KR 进度重算）
  */
 interface OkrsHookRepos {
   objectiveRepo: any
   keyResultRepo: any
+  contributionRepo: IContributionRepository
+}
+
+/**
+ * [022-A4] 处理 TaskCompleted 跨域事件 —— 查找受影响的 KR 并重算进度
+ * @param event - TaskCompleted 事件
+ * @param repos - 仓储依赖
+ * @param userId - 来自 snapshot 的 userId（不在 payload 中）
+ * @returns 空指标和建议（纯副作用，不污染 ActionSurface）
+ */
+async function handleTaskCompleted(
+  event: SystemEvent,
+  repos: OkrsHookRepos | undefined,
+  userId: string | undefined,
+): Promise<{ metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }> {
+  if (!repos?.contributionRepo || !userId) return { metrics: [], suggestions: [] }
+  const taskId = event.payload['objectId'] as string | undefined
+  if (!taskId) return { metrics: [], suggestions: [] }
+
+  try {
+    const contribs = await repos.contributionRepo.findByContributor(
+      'task', taskId as USOM_ID, userId as USOM_ID,
+    )
+    for (const c of contribs) {
+      try {
+        await repos.contributionRepo.recomputeProgress(c.keyResultId, userId as USOM_ID)
+      } catch (err) {
+        console.error(`[okrs.onEvent] recomputeProgress failed for KR ${c.keyResultId}:`, err)
+      }
+    }
+  } catch (err) {
+    console.error('[okrs.onEvent] TaskCompleted handler failed:', err)
+  }
+  return { metrics: [], suggestions: [] }
+}
+
+/**
+ * [022-A4] 处理 HabitLogged 跨域事件 —— 查找受影响的 KR 并重算进度
+ * @param event - HabitLogged 事件
+ * @param repos - 仓储依赖
+ * @param userId - 来自 snapshot 的 userId
+ * @returns 空指标和建议
+ */
+async function handleHabitLogged(
+  event: SystemEvent,
+  repos: OkrsHookRepos | undefined,
+  userId: string | undefined,
+): Promise<{ metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }> {
+  if (!repos?.contributionRepo || !userId) return { metrics: [], suggestions: [] }
+  const habitId = event.payload['objectId'] as string | undefined
+  if (!habitId) return { metrics: [], suggestions: [] }
+
+  try {
+    const contribs = await repos.contributionRepo.findByContributor(
+      'habit', habitId as USOM_ID, userId as USOM_ID,
+    )
+    for (const c of contribs) {
+      try {
+        await repos.contributionRepo.recomputeProgress(c.keyResultId, userId as USOM_ID)
+      } catch (err) {
+        console.error(`[okrs.onEvent] recomputeProgress failed for KR ${c.keyResultId}:`, err)
+      }
+    }
+  } catch (err) {
+    console.error('[okrs.onEvent] HabitLogged handler failed:', err)
+  }
+  return { metrics: [], suggestions: [] }
 }
 
 /**
@@ -136,20 +205,22 @@ export function createOkrsHooks(
   }
 
   /**
-   * 处理系统事件
+   * 处理系统事件（[022-A4] 升级为 async 以支持跨域事件驱动 KR 进度重算）
    * @param event - 系统事件
-   * @param _snapshot - USOM 快照
+   * @param snapshot - USOM 快照（用于取 userId）
    * @returns 指标更新和动作表面建议
    */
-  function onEvent(
+  async function onEvent(
     event: SystemEvent,
-    _snapshot: USOMSnapshot,
-  ): { metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] } {
+    snapshot: USOMSnapshot,
+  ): Promise<{ metrics: MetricUpdate[]; suggestions: ActionSurfaceSuggestion[] }> {
     if (!subscribedEvents.has(event.type)) {
       return { metrics: [], suggestions: [] }
     }
 
     const title = (event.payload['title'] as string) || '未命名目标'
+    // [022-A4] R2 缓解：userId 来自 snapshot，不来自 event.payload（payload 不含 userId）
+    const userId = snapshot?.userId as string | undefined
 
     switch (event.type) {
       case 'ObjectiveCreated':
@@ -218,6 +289,14 @@ export function createOkrsHooks(
           suggestions: [],
         }
       }
+
+      // [022-A4] 跨域事件：TaskCompleted → 查找受影响 KR 并触发 recomputeProgress
+      case 'TaskCompleted':
+        return await handleTaskCompleted(event, repos, userId)
+
+      // [022-A4] 跨域事件：HabitLogged → 查找受影响 KR 并触发 recomputeProgress
+      case 'HabitLogged':
+        return await handleHabitLogged(event, repos, userId)
 
       default:
         return { metrics: [], suggestions: [] }

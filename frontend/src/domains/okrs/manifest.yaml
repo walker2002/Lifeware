@@ -7,87 +7,19 @@ name: OKRs
 description: 目标与关键结果管理 — 将愿景转化为可衡量的关键结果
 
 # ─── 区块 A: intent_triggers ─────────────────────────────────────
+# [022-A4] Phase 3 manifest 清理：移除所有 lifecycle action triggers（create/activate/pause/resume/
+# complete/discard/archive/update 等），这些由 lifecycle 配置驱动走 SM，不走 AI intent 路由。
+# 仅保留 okrs（导航类意图）作为 AI 可解析的入口。
 intent_triggers:
-  - action: createObjective
-    shortcut: /createObjective
-    description: 创建一个新的目标
-    examples:
-      - 创建一个新目标
-      - 我想设定一个季度目标
-    keywords: [目标, objective, OKR]
-  - action: activateObjective
-    shortcut: /activateObjective
-    description: 激活一个目标
-    examples:
-      - 激活这个目标
-      - 开始执行目标
-    keywords: [激活, activate]
-  - action: pauseObjective
-    shortcut: /pauseObjective
-    description: 暂停一个目标
-    examples:
-      - 暂停这个目标
-    keywords: [暂停, pause]
-  - action: resumeObjective
-    shortcut: /resumeObjective
-    description: 恢复一个暂停的目标
-    examples:
-      - 恢复这个目标
-    keywords: [恢复, resume]
-  - action: completeObjective
-    shortcut: /completeObjective
-    description: 完成一个目标
-    examples:
-      - 完成这个目标
-      - 目标已完成
-    keywords: [完成, complete]
-  - action: discardObjective
-    shortcut: /discardObjective
-    description: 废弃一个目标
-    examples:
-      - 废弃这个目标
-    keywords: [废弃, discard]
-  - action: archiveObjective
-    shortcut: /archiveObjective
-    description: 归档一个目标
-    examples:
-      - 归档这个目标
-    keywords: [归档, archive]
-  - action: createKeyResult
-    shortcut: /createKeyResult
-    description: 创建一个关键结果
-    examples:
-      - 添加一个关键结果
-      - 新增 KR
-    keywords: [关键结果, KR, key result]
-  - action: updateKeyResult
-    shortcut: /updateKeyResult
-    description: 更新关键结果
-    examples:
-      - 更新关键结果
-    keywords: [更新, update]
-  - action: updateKeyResultProgress
-    shortcut: /updateProgress
-    description: 更新关键结果进度
-    examples:
-      - 更新进度
-      - KR 进度 50%
-    keywords: [进度, progress]
-  - action: view_workspace
+  - action: okrs
     shortcut: /okrs
-    description: 查看 OKR 工作台
+    description: OKR 工作台
     examples:
       - 查看我的 OKR
       - OKR 工作台
     keywords: [OKR, 工作台]
     view_route: /okrs
-  - action: view_detail
-    shortcut: /objectiveDetail
-    description: 查看目标详情
-    examples:
-      - 查看目标详情
-    keywords: [详情]
-    view_route: /okrs/:id
+    response_type: page
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -201,53 +133,33 @@ lifecycle:
         action: archive
         event_type: KeyResultUpdated
     terminal_states: [archived]
+  cycle:
+    states: [draft, not_started, in_progress, ended, reviewed]
+    initial_state: draft
+    transitions:
+      - { from: null, to: draft, trigger: intent, action: create, event_type: CycleCreated }
+      - { from: draft, to: not_started, trigger: intent, action: plan, event_type: CyclePlanned }
+      - { from: not_started, to: in_progress, trigger: intent, action: start, event_type: CycleStarted }
+      - { from: in_progress, to: ended, trigger: intent, action: end, event_type: CycleEnded }
+      - { from: ended, to: reviewed, trigger: intent, action: review, event_type: CycleReviewed }
+    terminal_states: [reviewed]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 field_metadata:
-  title:
-    type: string
-    label: 标题
-    required: true
-  okrType:
-    type: string
-    label: OKR 类型
-    required: false
-  periodType:
-    type: string
-    label: 周期类型
-    required: false
-  periodStart:
-    type: time
-    label: 周期开始时间
-    required: false
-  periodEnd:
-    type: time
-    label: 周期结束时间
-    required: false
-  targetValue:
-    type: number
-    label: 目标值
-    required: false
-  currentValue:
-    type: number
-    label: 当前值
-    required: false
-  unit:
-    type: string
-    label: 单位
-    required: false
+  title: { type: string, mutation_mode: ContentField }
+  description: { type: string, mutation_mode: ContentField }
+  okrType: { type: string, mutation_mode: ContentField }
+  priority: { type: enum, mutation_mode: ContentField, options: [P0, P1, P2] }
+  tags: { type: json, mutation_mode: ContentField }
+  cycleId: { type: string, mutation_mode: FactField }
+  status: { type: enum, mutation_mode: FactField, options: [draft, active, paused, completed, discarded, archived] }
+  targetValue: { type: number, mutation_mode: FactField }
+  currentValue: { type: number, mutation_mode: FactField }
+  unit: { type: string, mutation_mode: ContentField }
+  progressRate: { type: number, mutation_mode: PresentationField }
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:
-  - action: activate
-    label: 激活
-    confirm_required: false
-  - action: pause
-    label: 暂停
-    confirm_required: false
-  - action: complete
-    label: 完成
-    confirm_required: false
   - action: discard
     label: 废弃
     confirm_required: true
@@ -293,9 +205,18 @@ subscribed_events:
   - KeyResultProgressUpdated
   - TaskCompleted
   - HabitLogged
+  - OkrFieldUpdated
+  - CycleCreated
+  - CyclePlanned
+  - CycleStarted
+  - CycleEnded
+  - CycleReviewed
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:
+  okrs:
+    component: domains/okrs/pages/OkrWorkspacePage
+    url: /okrs
   createObjective:
     component: domains/okrs/pages/ObjectiveFormPage
     url: /okrs/objectives/new
@@ -306,12 +227,6 @@ view_routes:
     url: /okrs/key-results/new
     params:
       mode: create
-  view_workspace:
-    component: domains/okrs/pages/OKRWorkspacePage
-    url: /okrs
-  view_detail:
-    component: domains/okrs/pages/ObjectiveDetailPage
-    url: /okrs/:id
 
 # ─── 区块 H: cascade_rules ─────────────────────────────────────────
 cascade_rules:

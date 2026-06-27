@@ -4,3 +4,4 @@
  */
 
 export { ActiveTasksProvider } from './active-tasks-provider'
+export { CompletedTasksProvider } from './completed-tasks-provider'

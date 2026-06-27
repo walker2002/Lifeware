@@ -7,12 +7,14 @@
 
 "use server";
 
-import type { Objective, KeyResult } from "@/usom/types/objects";
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects";
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
 import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
+import { CycleRepository } from "@/domains/okrs/repository/cycle";
 import { createOkrsGenericRepo } from "@/domains/okrs/repository/generic-repo-adapter";
+import { createOkrsMutationService } from "./okrs/mutation-service";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { TimeboxRepository } from "@/domains/timebox/repository";
 import { createOrchestrator } from "../../nexus/orchestrator";
@@ -25,7 +27,7 @@ const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 /**
  * OKR 操作结果
  */
-export interface OKRActionResult<T = void> {
+interface OKRActionResult<T = void> {
   /** 是否成功 */
   success: boolean;
   /** 返回数据 */
@@ -93,6 +95,41 @@ export async function getKeyResultsByObjective(
   }
 }
 
+// ─── 周期（[022] QA fix：移到 server action 以避免 use-okrs.ts 客户端导入 CycleRepository） ─
+
+/**
+ * 获取当前用户的活跃周期列表
+ */
+export async function getActiveCycles(): Promise<OKRActionResult<Cycle[]>> {
+  try {
+    const repo = new CycleRepository();
+    const data = await repo.findByUserAndStatus("in_progress", MVP_USER_ID);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "获取周期失败" };
+  }
+}
+
+/**
+ * 创建周期（[022] QA fix 2026-06-26）
+ *
+ * 走 repo.save 直写是有意为之的例外（与 write-entry-guard 守卫规则一致）：
+ * Cycle 是单行 upsert（自然键 userId+periodStart+periodEnd 唯一约束），
+ * 无跨表副作用（无 KR recompute、无 event fan-out），mutation-service
+ * 抽象对单行 upsert 反而是过度设计。
+ *
+ * 例外登记：write-entry-guard.test.ts 的 allow 列表
+ */
+export async function createCycle(cycle: Cycle): Promise<OKRActionResult<Cycle>> {
+  try {
+    const repo = new CycleRepository();
+    const data = await repo.save(cycle, MVP_USER_ID);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "创建周期失败" };
+  }
+}
+
 // ─── 操作 ────────────────────────────────────────────────────────
 
 /**
@@ -109,6 +146,7 @@ async function createOKROrchestrator() {
   const okrsRepos = createOkrsGenericRepo({
     objectiveRepo: objectiveRepo as any,
     keyResultRepo: keyResultRepo as any,
+    cycleRepo: new CycleRepository() as any,
   });
 
   return createOrchestrator({
@@ -163,7 +201,7 @@ function makeIntent(action: string, fields: Record<string, unknown>) {
  * @returns 创建结果
  */
 export async function createObjective(
-  input: { title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2"; periodType?: string; periodStart?: string; periodEnd?: string },
+  input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" },
 ): Promise<OKRActionResult<Objective>> {
   try {
     const orchestrator = await createOKROrchestrator();
@@ -183,7 +221,13 @@ export async function createObjective(
 
 /**
  * 更新目标
- * 
+ *
+ * 经 mutation-service 逐字段写入（FactField→FieldExecutor / ContentField→repo.updateFields），
+ * 成功后 re-fetch 回填 data（FactField 成功路径 svc.update 仅返回 {success:true} 无 object，A6/FM-8）。
+ *
+ * 已知架构债（FM-5，本 Task 不处理）：orchestrator（自带 SM）与 mutation-service（factory 自带 SM）
+ * 并存——Phase 1 仅修真正的 repo 直写违宪（updateObjective），不强行统一两套写入口（须宪法讨论）。
+ *
  * @param objectiveId - 目标 ID
  * @param fields - 更新字段
  * @returns 更新结果
@@ -193,21 +237,20 @@ export async function updateObjective(
   fields: Record<string, unknown>,
 ): Promise<OKRActionResult<Objective>> {
   try {
-    const repo = new ObjectiveRepository();
-    const existing = await repo.findById(objectiveId, MVP_USER_ID);
-    if (!existing) return { success: false, error: "目标不存在" };
-
-    const now = new Date().toISOString() as Timestamp;
-    const updated: Objective = {
-      ...existing,
-      ...fields,
-      updatedAt: now,
-    };
-    await repo.save(updated, MVP_USER_ID);
-    const refreshed = await repo.findById(objectiveId, MVP_USER_ID);
-    return { success: true, data: refreshed! };
+    const svc = createOkrsMutationService()
+    // 过滤派生/不可写字段（period 现为派生；调用方不应再发，但防御性剔除）
+    const writable = { ...fields }
+    delete writable.period
+    // 逐字段经 mutation-service 写（FactField→FieldExecutor / ContentField→repo.updateFields）
+    for (const [field, value] of Object.entries(writable)) {
+      const r = await svc.update(objectiveId, field, value, MVP_USER_ID, 'okrs', 'objective')
+      if (!r.success) return { success: false, error: r.error }
+    }
+    // re-fetch 回填 data（svc.update FactField 成功只返回 {success:true} 无 object）
+    const refreshed = await new ObjectiveRepository().findById(objectiveId, MVP_USER_ID)
+    return { success: true, data: refreshed! }
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "更新目标失败" };
+    return { success: false, error: err instanceof Error ? err.message : '更新目标失败' }
   }
 }
 
@@ -346,79 +389,5 @@ export async function deleteDraftKeyResult(
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "删除失败" };
-  }
-}
-
-// ─── 自动进度推进 (T034-T036) ────────────────────────────────────
-// 任务完成时：等分策略 (KR targetValue / linkedTaskCount)
-// 习惯打卡时：+1 策略
-
-export async function handleTaskCompletedKRProgress(
-  keyResultId: string,
-): Promise<OKRActionResult<KeyResult>> {
-  try {
-    const krRepo = new KeyResultRepository();
-    const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
-    if (!kr || kr.status !== "active") return { success: true };
-
-    // TODO: keyResultId 已从 tasks 表移除，需要通过 junction 表重新关联
-    const linkedTasks: any[] = [];
-
-    const totalLinked = linkedTasks.length;
-    if (totalLinked === 0) return { success: true };
-
-    const completedLinked = linkedTasks.filter(t => t.status === "completed").length;
-    const increment = kr.targetValue / totalLinked;
-    const newCurrentValue = Math.round(completedLinked * increment * 100) / 100;
-
-    const updated = await krRepo.updateProgress(keyResultId, newCurrentValue, MVP_USER_ID);
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "KR 进度更新失败" };
-  }
-}
-
-export async function handleHabitLoggedKRProgress(
-  keyResultId: string,
-): Promise<OKRActionResult<KeyResult>> {
-  try {
-    const krRepo = new KeyResultRepository();
-    const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
-    if (!kr || kr.status !== "active") return { success: true };
-
-    const newCurrentValue = kr.currentValue + 1;
-    const updated = await krRepo.updateProgress(keyResultId, newCurrentValue, MVP_USER_ID);
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "KR 进度更新失败" };
-  }
-}
-
-export async function handleTaskDeletedKRRecalc(
-  keyResultId: string,
-): Promise<OKRActionResult<KeyResult>> {
-  try {
-    const krRepo = new KeyResultRepository();
-    const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
-    if (!kr || kr.status !== "active") return { success: true };
-
-    // TODO: keyResultId 已从 tasks 表移除，需要通过 junction 表重新关联
-    const linkedTasks: any[] = [];
-
-    const totalLinked = linkedTasks.length;
-    if (totalLinked === 0) {
-      // 无关联任务，进度归零
-      const updated = await krRepo.updateProgress(keyResultId, 0, MVP_USER_ID);
-      return { success: true, data: updated };
-    }
-
-    const completedLinked = linkedTasks.filter(t => t.status === "completed").length;
-    const increment = kr.targetValue / totalLinked;
-    const newCurrentValue = Math.round(completedLinked * increment * 100) / 100;
-
-    const updated = await krRepo.updateProgress(keyResultId, newCurrentValue, MVP_USER_ID);
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "KR 进度重算失败" };
   }
 }

@@ -13,12 +13,13 @@ import type {
   Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
   HabitTemplate, TemplateHabitItem,
   AISession, AISessionSummary, ChatMessage, UserSettings, TaskExecutionLog,
-  RecurrenceRule,
+  RecurrenceRule, Contribution,
 } from '../types/objects'
 import type {
   ContextSnapshot, SystemEvent, ActionSurface, DerivedSignals, EnergyLog,
 } from '../types/process'
 import type { HabitFrequency } from '../types/objects'
+import type { DbClient } from '../../lib/db/index'
 
 // ─── User ──────────────────────────────────────────────────────
 
@@ -535,8 +536,6 @@ export interface CreateHabitInput {
   startDate: DateOnly
   /** 结束日期 */
   endDate?: DateOnly
-  /** 关联的关键结果 ID */
-  keyResultId?: USOM_ID
   /** 标签列表 */
   tags?: string[]
 }
@@ -912,6 +911,83 @@ export interface IKeyResultRepository {
   archive(id: USOM_ID, userId: USOM_ID): Promise<void>
 }
 
+// ─── Contribution ───────────────────────────────────────────────
+
+/**
+ * 创建贡献记录输入
+ */
+export interface CreateContributionInput {
+  /** 关联的关键结果 ID */
+  keyResultId: USOM_ID
+  /** 贡献者类型 */
+  contributorType: 'task' | 'habit' | 'manual'
+  /** 贡献者 ID */
+  contributorId: USOM_ID
+  /** 贡献增量（可选） */
+  delta?: number
+  /** 贡献权重（可选） */
+  weight?: number
+}
+
+/**
+ * 贡献记录仓储接口
+ */
+export interface IContributionRepository {
+  /**
+   * 根据关键结果查找贡献记录
+   * @param keyResultId - 关键结果 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 贡献记录列表
+   */
+  findByKeyResult(keyResultId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Contribution[]>
+
+  /**
+   * 根据贡献者查找贡献记录
+   * @param contributorType - 贡献者类型
+   * @param contributorId - 贡献者 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 贡献记录列表
+   */
+  findByContributor(contributorType: string, contributorId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Contribution[]>
+
+  /**
+   * 添加贡献记录
+   * @param input - 创建输入
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 创建的贡献记录
+   */
+  add(input: CreateContributionInput, userId: USOM_ID, tx?: DbClient): Promise<Contribution>
+
+  /**
+   * 删除贡献记录
+   * @param id - 贡献记录 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   */
+  remove(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
+
+  /**
+   * 根据贡献者删除贡献记录
+   * @param contributorType - 贡献者类型
+   * @param contributorId - 贡献者 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   */
+  removeByContributor(contributorType: string, contributorId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
+
+  /**
+   * 重新计算关键结果进度
+   * @param keyResultId - 关键结果 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 重新计算后的进度数据
+   */
+  recomputeProgress(keyResultId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<{ currentValue: number; progressRate: number }>
+}
+
 // ─── Intention ─────────────────────────────────────────────────
 
 /**
@@ -1038,6 +1114,19 @@ export interface ISystemEventRepository {
    * @returns 事件列表
    */
   findByUserInRange(userId: USOM_ID, startAt: Timestamp, endAt: Timestamp): Promise<SystemEvent[]>
+
+  /**
+   * 按 intentId 查找事件（[022] ADV-#1 修复 2026-06-26）。
+   *
+   * 替代跨域事件分发器的「时间窗口 + JS 过滤 intentId」方案：
+   * 直接走 JSONB payload->>'intentId' 索引查询，无需 5 秒窗口近似，
+   * 消除并发场景下的跨意图事件泄漏风险（spike §R7 设计决策升级）。
+   *
+   * @param intentId - 意图 ID
+   * @param userId - 用户 ID（多租户 T-02）
+   * @returns 该 intent 关联的事件列表（含已处理/未处理，按 occurredAt asc）
+   */
+  findByIntent(intentId: USOM_ID, userId: USOM_ID): Promise<SystemEvent[]>
 
   /**
    * 查找未处理的事件

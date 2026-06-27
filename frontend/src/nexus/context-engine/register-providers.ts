@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import { registerContextCapability } from './registry'
 import { TimeboxProvider, EnergyProfileProvider } from '@/domains/timebox/providers'
-import { ActiveTasksProvider } from '@/domains/tasks/providers'
-import { PendingHabitsProvider, HabitTemplatesProvider } from '@/domains/habits/providers'
+import { ActiveTasksProvider, CompletedTasksProvider } from '@/domains/tasks/providers'
+import { PendingHabitsProvider, HabitTemplatesProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
 import type { ITimeboxRepository, ITaskRepository, IHabitRepository, IHabitTemplateRepository } from '@/usom/interfaces/irepository'
 
 const TimeboxArraySchema = z.array(z.object({
@@ -22,6 +22,12 @@ const TaskArraySchema = z.array(z.object({
   energyRequired: z.string().optional(),
   estimatedDuration: z.number(),
   threadId: z.string().nullable().optional(),
+}))
+
+const CompletedTaskArraySchema = z.array(z.object({
+  id: z.string(),
+  title: z.string(),
+  completedAt: z.string().optional(),
 }))
 
 const HabitArraySchema = z.array(z.object({
@@ -71,6 +77,14 @@ export function registerAllProviders(deps: ProviderDeps): void {
       description: '活跃任务',
       provider: new ActiveTasksProvider(deps.taskRepo),
     })
+
+    registerContextCapability({
+      id: 'completedTasks',
+      visibility: 'planning',
+      schema: CompletedTaskArraySchema,
+      description: '已完成任务（供跨域贡献重算）',
+      provider: new CompletedTasksProvider(deps.taskRepo),
+    })
   }
 
   if (deps.habitRepo) {
@@ -80,6 +94,17 @@ export function registerAllProviders(deps: ProviderDeps): void {
       schema: HabitArraySchema,
       description: '待打卡习惯',
       provider: new PendingHabitsProvider(deps.habitRepo),
+    })
+
+    registerContextCapability({
+      id: 'activeHabits',
+      visibility: 'planning',
+      schema: z.array(z.object({
+        id: z.string(),
+        title: z.string(),
+      })),
+      description: '活跃习惯列表（供跨域贡献关联搜索）',
+      provider: new ActiveHabitsProvider(deps.habitRepo),
     })
   }
 

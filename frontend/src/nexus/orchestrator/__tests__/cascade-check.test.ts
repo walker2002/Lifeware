@@ -169,7 +169,12 @@ function createTestOrchestrator(overrides?: {
 }) {
   const ruleResult = overrides?.ruleResult ?? { result: 'pass', warnings: [] }
   return createOrchestrator({
-    eventRepo: { append: vi.fn().mockResolvedValue(undefined) } as any,
+    eventRepo: {
+      append: vi.fn().mockResolvedValue(undefined),
+      findByUserInRange: vi.fn().mockResolvedValue([]),
+      findUnprocessed: vi.fn().mockResolvedValue([]),
+      markProcessed: vi.fn(),
+    } as any,
     intentEngine: { parse: vi.fn() } as any,
     ruleEngine: { evaluate: vi.fn().mockResolvedValue(ruleResult) } as any,
     getRepo: () => ({

@@ -30,7 +30,7 @@ import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOMSnapshot } from '@/usom/types/process'
 import { createGenericStateMachine } from '@/nexus/core/state-machine'
 import { createEventBus } from '../infrastructure/event-bus'
-import { findDomain, findHandler } from '@/domains/registry'
+import { findDomain, findHandler, domainRegistry } from '@/domains/registry'
 import { buildActionMap, resolveObjectType, getLifecycleFromManifest } from './lifecycle-configs'
 import { assembleContext } from '@/nexus/context-engine'
 import { loadDomainManifest } from '@/domains/manifest-loader'
@@ -527,6 +527,82 @@ function resolveObjectId(fields: Record<string, unknown>, objectType: string): U
   return (fields.objectId ?? fields[`${camelType}Id`]) as USOM_ID | undefined
 }
 
+// [022-A4] 跨域事件分发器：post-mutation hook
+// 在 SM.execute 完成后从 eventRepo 读取本次 intent 关联的事件，
+// 按各域 manifest.subscribedEvents 列表分发给目标域 onEvent。
+// - 同域跳过：上方 executeIntent L891-893 已对同域调 onEvent，此处跳过避免双重触发。
+// - 走 eventRepo：与 [025] D1 executeFieldStateWrite 路径解耦（该路径不调 onEvent）。
+// - [022] ADV-#1 修复 2026-06-26：使用 SystemEventRepository.findByIntent 精确查询，
+//   替代「时间窗口 ±5 秒 + JS intentId 过滤」方案（spike §R7），消除并发场景下的
+//   跨意图事件泄漏风险（用户同时发起 2 个 intent 时，旧方案可能误拾取他人事件）。
+// - 错误隔离：try/catch + console.error，主写事务已 commit，失败不影响主流程。
+//   [022] ADV-#2 修复：失败事件追加 system_events `OnEventDispatchFailed` 记录供回溯。
+// - userId 不在 event.payload 中（payload 仅含 objectId/intentId/proposalId/fromStatus/toStatus），
+//   显式从 executeIntent 入参透传，与多租户 T-02 一致。
+
+async function dispatchCrossDomainEvents(params: {
+  eventRepo: ISystemEventRepository
+  intentId: USOM_ID
+  userId: USOM_ID
+  targetDomain: string
+  snapshot: USOMSnapshot
+}): Promise<void> {
+  const { eventRepo, intentId, userId, targetDomain, snapshot } = params
+  try {
+    // 1. 按 intentId 精确查询（[022] ADV-#1）
+    const intentEvents = await eventRepo.findByIntent(intentId, userId)
+    if (intentEvents.length === 0) return
+
+    // 2. 遍历 domainRegistry，分发到各订阅域（R1 缓解：跳过同域）
+    for (const plugin of domainRegistry) {
+      // [022-A4] R1 关键：跳过同域避免与 L891-893 既有 onEvent 双重触发
+      if (plugin.manifest.domainId === targetDomain) continue
+      const subscribedTypes = plugin.manifest.subscribedEvents ?? []
+      for (const event of intentEvents) {
+        if (subscribedTypes.includes(event.type) && plugin.onEvent) {
+          try {
+            await plugin.onEvent(event, snapshot)
+          } catch (err) {
+            // [022] ADV-#2 修复 2026-06-26：持久化失败事件供回溯
+            // 此前仅 console.error，主写事务已 commit 后失败事件无任何痕迹。
+            // 现在追加 OnEventDispatchFailed 事件（payload 含原 event 摘要 + 错误），
+            // 可由运维脚本检索；事件本身不重试（spike §R6 defer 重试机制）。
+            const errorEvent: SystemEvent = {
+              id: crypto.randomUUID() as USOM_ID,
+              type: 'OnEventDispatchFailed',
+              occurredAt: new Date().toISOString() as Timestamp,
+              triggeredBy: 'handler',
+              payload: {
+                originalEventId: event.id,
+                originalEventType: event.type,
+                originalIntentId: intentId,
+                targetDomain: plugin.manifest.domainId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              snapshotId: '' as USOM_ID,
+            }
+            eventRepo.append(errorEvent, userId).catch(appendErr => {
+              // 兜底：连 system_events 写入都失败时，保留 console.error 兜底
+              console.error(
+                `[orchestrator.postHook] onEvent failed AND error-event append failed: domain=${plugin.manifest.domainId}, event=${event.type}`,
+                err,
+                appendErr,
+              )
+            })
+            console.error(
+              `[orchestrator.postHook] onEvent failed: domain=${plugin.manifest.domainId}, event=${event.type}`,
+              err,
+            )
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // 整体兜底：dispatch 异常不影响主流程（主写事务已 commit）
+    console.error('[orchestrator.postHook] dispatchCrossDomainEvents failed:', err)
+  }
+}
+
 /**
  * 构建查询结果摘要
  * @param intent - 结构化意图
@@ -894,6 +970,21 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
           writeResult = { success: true, object: smResult.object, event: smResult.event }
         }
+
+        // [022-A4] Post-mutation cross-domain event dispatch
+        // SM.execute 已通过 eventRepo.append 落库到 system_events 表；
+        // 此处从 eventRepo 读取本次 intent 关联的全部事件（按时间窗口 + intentId 过滤），
+        // 按各域 manifest.subscribedEvents 分发给目标域 onEvent。
+        // 同域（intent.targetDomain）事件由上方 L891-893 的同域 onEvent 调用处理，
+        // 此处跳过避免双重触发（R1 风险缓解）。
+        // 错误隔离：try/catch + console.error，主写事务已 commit，失败不影响主流程。
+        await dispatchCrossDomainEvents({
+          eventRepo: deps.eventRepo,
+          intentId: intent.id,
+          userId,
+          targetDomain: domainId,
+          snapshot: usomSnapshot,
+        })
 
         // [025] 级联拆分执行（复用 writeResult.object —— 无论写来自 sm.execute 还是
         // executeFieldStateWrite）。注：级联仅 tasks 域，父对象走 else 分支（sm.execute），

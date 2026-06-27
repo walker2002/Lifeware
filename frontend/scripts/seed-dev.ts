@@ -165,29 +165,42 @@ async function seed() {
   }
   console.log('  ✓ 用户校准')
 
-  // 3. 目标 (objectives)
+  // 3a. 周期 (cycles) — objectives 必须有 cycle_id（[022] NOT NULL）
   const qStart = formatDate(daysAgo(30))
   const qEnd = formatDate(daysFromNow(60))
+  const CYCLE_ID = '90000000-0000-0000-0000-000000000001'
 
+  await upsert(s.cycles, {
+    id: CYCLE_ID, userId: USER_ID, schemaVersion: 1,
+    cycleType: 'quarterly', name: '2026 Q2 种子周期',
+    periodStart: qStart, periodEnd: qEnd,
+    status: 'in_progress',
+    createdAt: daysAgo(30), updatedAt: now,
+  })
+
+  // 3b. 目标 (objectives) — [022] period* 列已删除，cycle_id 为 NOT NULL
   await upsert(s.objectives, {
     id: IDS.objHealth, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '提升身心健康', description: '通过运动、冥想和良好作息提升整体健康水平',
-    periodType: 'quarterly', periodStart: qStart, periodEnd: qEnd, tags: ['健康', '生活'],
+    cycleId: CYCLE_ID, tags: ['健康', '生活'],
+    okrType: 'committed', priority: 'P1',
     createdAt: daysAgo(30), updatedAt: now,
   })
   await upsert(s.objectives, {
     id: IDS.objCareer, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '推进核心项目', description: '完成 Lifeware MVP 开发并上线',
-    periodType: 'quarterly', periodStart: qStart, periodEnd: qEnd, tags: ['职业', '项目'],
+    cycleId: CYCLE_ID, tags: ['职业', '项目'],
+    okrType: 'committed', priority: 'P1',
     createdAt: daysAgo(30), updatedAt: now,
   })
   await upsert(s.objectives, {
     id: IDS.objLearn, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '持续学习成长', description: '阅读技术书籍、学习新技能',
-    periodType: 'quarterly', periodStart: qStart, periodEnd: qEnd, tags: ['学习', '成长'],
+    cycleId: CYCLE_ID, tags: ['学习', '成长'],
+    okrType: 'committed', priority: 'P1',
     createdAt: daysAgo(30), updatedAt: now,
   })
-  console.log('  ✓ 目标 (3)')
+  console.log('  ✓ 周期 (1) + 目标 (3)')
 
   // 4. 关键结果 (key_results)
   await upsert(s.keyResults, {
@@ -264,9 +277,11 @@ async function seed() {
     defaultTime: '22:00', earliestTime: '21:30', latestStartTime: '22:30',
     defaultDuration: 30, minDuration: 15, trackable: true,
     streak: 3, longestStreak: 7, completionRate7d: 0.71,
-    startDate: formatDate(daysAgo(30)), keyResultId: IDS.krRead, tags: ['学习'],
+    startDate: formatDate(daysAgo(30)), tags: ['学习'],
     createdAt: daysAgo(30), updatedAt: now,
   })
+  // [022] habitExercise 关联 KR 通过 contributions junction 实现，
+  // 不再直接写 keyResultId（列已被 0020_contributions 删除）。
   await upsert(s.habits, {
     id: IDS.habitExercise, userId: USER_ID, schemaVersion: 1,
     status: 'active', title: '力量训练', description: '每周 3 次力量训练',
@@ -274,7 +289,7 @@ async function seed() {
     defaultTime: '18:00', earliestTime: '17:30', latestStartTime: '18:30',
     defaultDuration: 45, minDuration: 20, trackable: true,
     streak: 2, longestStreak: 4, completionRate7d: 0.57,
-    startDate: formatDate(daysAgo(30)), keyResultId: IDS.krExercise,
+    startDate: formatDate(daysAgo(30)),
     daysOfWeek: [1, 3, 5], tags: ['健康', '运动'],
     createdAt: daysAgo(30), updatedAt: now,
   })

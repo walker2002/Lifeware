@@ -62,6 +62,30 @@ export const energyLogs = pgTable('energy_logs', {
   index('idx_energy_logs_user_logged').on(table.userId, table.loggedAt),
 ])
 
+// ─── 4.0 cycles ───────────────────────────────────────────────
+// 周期表：承载 OKR 周期元数据（annual/quarterly/monthly/semi_annual/custom）。
+// objectives.cycle_id NOT NULL 外键，[022] 1C T17 已完成 period 列 DROP + SET NOT NULL。
+export const cycles = pgTable('cycles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  cycleType: text('cycle_type', { enum: ['annual', 'quarterly', 'monthly', 'semi_annual', 'custom'] }).notNull(),
+  name: text('name').notNull(),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  status: text('status', { enum: ['draft', 'not_started', 'in_progress', 'ended', 'reviewed'] }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+}, (table) => [
+  check('check_cycles_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
+  index('idx_cycles_user_status').on(table.userId, table.status),
+  index('idx_cycles_period').on(table.userId, table.periodStart, table.periodEnd),
+  uniqueIndex('uq_cycles_user_period').on(table.userId, table.periodStart, table.periodEnd),
+])
+
 // ─── 4.1 objectives ───────────────────────────────────────────
 export const objectives = pgTable('objectives', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -72,11 +96,9 @@ export const objectives = pgTable('objectives', {
   title: text('title').notNull(),
   description: text('description'),
 
-  periodType: text('period_type', { enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual'] }).notNull(),
-  periodStart: date('period_start').notNull(),
-  periodEnd: date('period_end').notNull(),
-
   parentId: uuid('parent_id'),
+  // [022] 1C T17：cycle_id SET NOT NULL，period 列已 DROP，周期信息统一由 cycles 表承载
+  cycleId: uuid('cycle_id').notNull().references(() => cycles.id, { onDelete: 'restrict' }),
 
   okrType: text('okr_type').notNull().default('committed'),
   objectiveNumber: text('objective_number'),
@@ -89,9 +111,8 @@ export const objectives = pgTable('objectives', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
-  check('check_objectives_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
   index('idx_objectives_user_status').on(table.userId, table.status),
-  index('idx_objectives_period').on(table.userId, table.periodStart, table.periodEnd),
+  index('idx_objectives_cycle').on(table.userId, table.cycleId),
   index('idx_objectives_parent').on(table.parentId),
 ])
 
@@ -124,6 +145,24 @@ export const keyResults = pgTable('key_results', {
   index('idx_key_results_user_status').on(table.userId, table.status),
   index('idx_key_results_objective').on(table.objectiveId),
   index('idx_key_results_due_date').on(table.userId, table.dueDate),
+])
+
+// ─── 4.2b contributions（KR 贡献记录）─────────────────────────────
+export const contributions = pgTable('contributions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  keyResultId: uuid('key_result_id').notNull().references(() => keyResults.id, { onDelete: 'cascade' }),
+  contributorType: text('contributor_type', { enum: ['task', 'habit', 'manual'] }).notNull(),
+  contributorId: uuid('contributor_id').notNull(),
+  delta: numeric('delta', { precision: 10, scale: 2 }),
+  weight: numeric('weight', { precision: 3, scale: 2 }).default('1.0'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('uq_contributions_kr_source').on(table.keyResultId, table.contributorType, table.contributorId),
+  index('idx_contributions_kr').on(table.userId, table.keyResultId),
+  index('idx_contributions_source').on(table.contributorType, table.contributorId),
 ])
 
 // ─── 4.3 threads（主线）──────────────────────────────────────────
@@ -234,8 +273,6 @@ export const habits = pgTable('habits', {
   minDuration: integer('min_duration').notNull(),
   trackable: boolean('trackable').notNull().default(true),
 
-  keyResultId: uuid('key_result_id').references(() => keyResults.id, { onDelete: 'set null' }),
-
   streak: integer('streak').notNull().default(0),
   longestStreak: integer('longest_streak').notNull().default(0),
   completionRate7d: real('completion_rate_7d').notNull().default(0),
@@ -254,7 +291,6 @@ export const habits = pgTable('habits', {
 }, (table) => [
   index('idx_habits_user_status').on(table.userId, table.status),
   index('idx_habits_start_date').on(table.userId, table.startDate),
-  index('idx_habits_key_result').on(table.keyResultId),
 ])
 
 // ─── 4.5 habit_logs ───────────────────────────────────────────

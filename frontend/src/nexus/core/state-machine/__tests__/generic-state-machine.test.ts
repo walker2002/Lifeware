@@ -16,7 +16,7 @@ function makeMockRepo(existing?: Record<string, unknown> | null): GenericRepo {
   }
   return {
     findById: vi.fn(async (id: string) => store.get(id) ?? null),
-    save: vi.fn(async (obj: Record<string, unknown>) => { store.set(obj.id as string, obj) }),
+    save: vi.fn(async (obj: Record<string, unknown>, _userId: string, _tx?: unknown) => { store.set(obj.id as string, obj); return obj }),
     create: vi.fn(async (fields: Record<string, unknown>, _userId: string) => {
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
@@ -122,6 +122,8 @@ function makeEventRepo() {
     repo: {
       append: vi.fn(async (e: SystemEvent) => { events.push(e) }),
       findByUserInRange: vi.fn().mockResolvedValue([]),
+      // [022] ADV-#1：ISystemEventRepository 新增方法
+      findByIntent: vi.fn().mockResolvedValue([]),
       findUnprocessed: vi.fn().mockResolvedValue([]),
       markProcessed: vi.fn().mockResolvedValue(undefined),
     } as ISystemEventRepository,

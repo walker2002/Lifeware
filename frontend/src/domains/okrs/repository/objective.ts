@@ -1,116 +1,176 @@
 /**
  * @file objective
  * @brief Objective 仓储实现
- * 
- * 实现 IObjectiveRepository 接口，提供 Objective 数据的数据库操作
+ *
+ * [022] 1A-T6：所有读方法经 findObjRows helper 以 innerJoin cycles 取周期字段，
+ * mapper 的 period 从 join 的 cycleType/cyclePeriodStart/cyclePeriodEnd 派生。
+ * [022] 1C T17：cycle_id 已 SET NOT NULL + period 列已 DROP，leftJoin 切 innerJoin。
+ * save 不再读 objective.period（create 路径无 period），改为从 cycleId 反查 cycle
+ * 派生编号前缀。KR 查询统一改 inArray 批查，消除 N+1。
  */
 
-import { eq, and, between, inArray, ne, like, sql } from 'drizzle-orm'
+import { eq, and, between, inArray, ne, like, type SQL } from 'drizzle-orm'
 import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IObjectiveRepository, ObjectiveWithKR } from '../../../usom/interfaces/irepository'
 import type { Objective } from '../../../usom/types/objects'
 import type { USOM_ID, ObjectiveStatus, DateOnly } from '../../../usom/types/primitives'
-import { objectiveRowToUSOM, objectiveUSOMToRow } from '../../../lib/db/repositories/mappers'
-import { keyResultRowToUSOM } from '../../../lib/db/repositories/mappers'
+import { objectiveRowToUSOM, objectiveUSOMToRow, keyResultRowToUSOM } from '../../../lib/db/repositories/mappers'
+import { CycleRepository } from './cycle'
 
 /**
  * Objective 仓储
  */
 export class ObjectiveRepository implements IObjectiveRepository {
+  /**
+   * 统一的 objective 行查询（innerJoin cycles）。
+   * 选 cycle 三列供 mapper 派生 period。〔022〕1C T17：cycle_id NOT NULL，
+   * 所有 objective 必有归属 cycle，故用 innerJoin。
+   */
+  private async findObjRows(where: SQL | undefined, tx: DbClient = db) {
+    return tx.select({
+      id: s.objectives.id,
+      status: s.objectives.status,
+      title: s.objectives.title,
+      description: s.objectives.description,
+      parentId: s.objectives.parentId,
+      okrType: s.objectives.okrType,
+      objectiveNumber: s.objectives.objectiveNumber,
+      priority: s.objectives.priority,
+      tags: s.objectives.tags,
+      createdAt: s.objectives.createdAt,
+      updatedAt: s.objectives.updatedAt,
+      discardedAt: s.objectives.discardedAt,
+      completedAt: s.objectives.completedAt,
+      archivedAt: s.objectives.archivedAt,
+      cycleId: s.objectives.cycleId,
+      cycleType: s.cycles.cycleType,
+      cyclePeriodStart: s.cycles.periodStart,
+      cyclePeriodEnd: s.cycles.periodEnd,
+    }).from(s.objectives)
+      .innerJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
+      .where(where)
+  }
+
+  /**
+   * 批查 KR（单次 inArray 查询，按 objectiveId 分组），消除逐行 N+1。
+   * ids 为空时跳过查询返回空 Map（避免 inArray([]) 生成不合法 SQL）。
+   */
+  private async batchKeyResultIds(ids: string[], tx: DbClient = db): Promise<Map<string, string[]>> {
+    const byObj = new Map<string, string[]>()
+    if (ids.length === 0) return byObj
+    const krRows = await tx.select({ id: s.keyResults.id, objectiveId: s.keyResults.objectiveId })
+      .from(s.keyResults)
+      .where(inArray(s.keyResults.objectiveId, ids))
+    for (const k of krRows) {
+      let arr = byObj.get(k.objectiveId)
+      if (!arr) { arr = []; byObj.set(k.objectiveId, arr) }
+      arr.push(k.id)
+    }
+    return byObj
+  }
+
   async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Objective | null> {
-    const rows = await tx.select().from(s.objectives)
-      .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
+    const rows = await this.findObjRows(
+      and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)), tx,
+    )
     if (!rows[0]) return null
-    const krs = await tx.select({ id: s.keyResults.id }).from(s.keyResults)
-      .where(eq(s.keyResults.objectiveId, id))
-    return objectiveRowToUSOM(rows[0] as any, krs.map(k => k.id))
+    const krByObj = await this.batchKeyResultIds([rows[0].id], tx)
+    return objectiveRowToUSOM(rows[0] as any, krByObj.get(rows[0].id) ?? [])
   }
 
   async findAll(userId: USOM_ID): Promise<Objective[]> {
-    const rows = await db.select().from(s.objectives)
-      .where(and(eq(s.objectives.userId, userId), ne(s.objectives.status, 'archived')))
-    const results: Objective[] = []
-    for (const row of rows) {
-      const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
-        .where(eq(s.keyResults.objectiveId, row.id))
-      results.push(objectiveRowToUSOM(row as any, krs.map(k => k.id)))
-    }
-    return results
+    const rows = await this.findObjRows(
+      and(eq(s.objectives.userId, userId), ne(s.objectives.status, 'archived')),
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findActive(userId: USOM_ID): Promise<Objective[]> {
-    const rows = await db.select().from(s.objectives)
-      .where(and(eq(s.objectives.userId, userId), eq(s.objectives.status, 'active')))
-    const results: Objective[] = []
-    for (const row of rows) {
-      const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
-        .where(eq(s.keyResults.objectiveId, row.id))
-      results.push(objectiveRowToUSOM(row as any, krs.map(k => k.id)))
-    }
-    return results
+    const rows = await this.findObjRows(
+      and(eq(s.objectives.userId, userId), eq(s.objectives.status, 'active')),
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findByStatus(status: ObjectiveStatus, userId: USOM_ID): Promise<Objective[]> {
-    const rows = await db.select().from(s.objectives)
-      .where(and(eq(s.objectives.userId, userId), eq(s.objectives.status, status)))
-    const results: Objective[] = []
-    for (const row of rows) {
-      const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
-        .where(eq(s.keyResults.objectiveId, row.id))
-      results.push(objectiveRowToUSOM(row as any, krs.map(k => k.id)))
-    }
-    return results
+    const rows = await this.findObjRows(
+      and(eq(s.objectives.userId, userId), eq(s.objectives.status, status)),
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findByPeriod(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]> {
-    const rows = await db.select().from(s.objectives)
-      .where(and(
-        eq(s.objectives.userId, userId),
-        between(s.objectives.periodStart, start, end),
-      ))
-    const results: Objective[] = []
-    for (const row of rows) {
-      const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
-        .where(eq(s.keyResults.objectiveId, row.id))
-      results.push(objectiveRowToUSOM(row as any, krs.map(k => k.id)))
-    }
-    return results
+    // [022-T6] period 已迁至 cycles 表，故 between 过滤改用 s.cycles.periodStart
+    const rows = await this.findObjRows(
+      and(eq(s.cycles.userId, userId), between(s.cycles.periodStart, start, end)),
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findByStatusInPeriod(status: ObjectiveStatus[], start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]> {
-    const rows = await db.select().from(s.objectives)
-      .where(and(
-        eq(s.objectives.userId, userId),
+    // [022-T6] status 仍属 objectives，period 过滤改用 cycles
+    const rows = await this.findObjRows(
+      and(
+        eq(s.cycles.userId, userId),
         inArray(s.objectives.status, status),
-        between(s.objectives.periodStart, start, end),
-      ))
-    const results: Objective[] = []
-    for (const row of rows) {
-      const krs = await db.select({ id: s.keyResults.id }).from(s.keyResults)
-        .where(eq(s.keyResults.objectiveId, row.id))
-      results.push(objectiveRowToUSOM(row as any, krs.map(k => k.id)))
-    }
-    return results
+        between(s.cycles.periodStart, start, end),
+      ),
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findWithKeyResults(id: USOM_ID, userId: USOM_ID): Promise<ObjectiveWithKR | null> {
-    const rows = await db.select().from(s.objectives)
+    // 独立 join：返回 ObjectiveWithKR 含完整 KR 对象，不复用 findObjRows
+    const rows = await db.select({
+      id: s.objectives.id,
+      status: s.objectives.status,
+      title: s.objectives.title,
+      description: s.objectives.description,
+      parentId: s.objectives.parentId,
+      okrType: s.objectives.okrType,
+      objectiveNumber: s.objectives.objectiveNumber,
+      priority: s.objectives.priority,
+      tags: s.objectives.tags,
+      createdAt: s.objectives.createdAt,
+      updatedAt: s.objectives.updatedAt,
+      discardedAt: s.objectives.discardedAt,
+      completedAt: s.objectives.completedAt,
+      archivedAt: s.objectives.archivedAt,
+      cycleId: s.objectives.cycleId,
+      cycleType: s.cycles.cycleType,
+      cyclePeriodStart: s.cycles.periodStart,
+      cyclePeriodEnd: s.cycles.periodEnd,
+    }).from(s.objectives)
+      .innerJoin(s.cycles, eq(s.objectives.cycleId, s.cycles.id))
       .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
     if (!rows[0]) return null
     const krRows = await db.select().from(s.keyResults)
       .where(eq(s.keyResults.objectiveId, id))
-    const obj = objectiveRowToUSOM(rows[0] as any, krRows.map(k => k.id))
-    return { ...obj, keyResults: krRows.map(r => keyResultRowToUSOM(r as any)) }
+    const obj = objectiveRowToUSOM(rows[0] as any, krRows.map((k) => k.id))
+    return { ...obj, keyResults: krRows.map((r) => keyResultRowToUSOM(r as any)) }
   }
 
   async save(objective: Objective, userId: USOM_ID, tx: DbClient = db): Promise<void> {
-    if (!objective.objectiveNumber) {
-      const prefix = this.buildNumberPrefix(objective.period.type, objective.period.start)
+    // [022-T6] create 路径的 objective 无 period（T7 objective.create 只构造 cycleId），
+    // 故 save 不再读 objective.period，改为从 cycleId 反查 cycle 派生编号前缀。
+    let obj = objective
+    if (!obj.objectiveNumber) {
+      const cycleRepo = new CycleRepository()
+      const cycle = obj.cycleId ? await cycleRepo.findById(obj.cycleId, userId, tx) : null
+      if (!cycle) {
+        throw new Error(`save objective: cycle ${obj.cycleId} 不存在（无法派生编号）`)
+      }
+      const prefix = this.buildNumberPrefix(cycle.cycleType, cycle.period.start)
       const count = await this.countByPrefix(prefix, userId, tx)
-      objective = { ...objective, objectiveNumber: `${prefix}-O${count + 1}` }
+      obj = { ...obj, objectiveNumber: `${prefix}-O${count + 1}` }
     }
-    const row = objectiveUSOMToRow(objective, userId)
+    const row = objectiveUSOMToRow(obj, userId)
     await tx.insert(s.objectives).values(row).onConflictDoUpdate({
       target: s.objectives.id,
       set: row,
@@ -138,10 +198,14 @@ export class ObjectiveRepository implements IObjectiveRepository {
     return updated
   }
 
-  private buildNumberPrefix(periodType: string, periodStart: string): string {
+  /**
+   * 由周期类型 + 周期起始月派生目标编号前缀。
+   * 入参语义：cycleType 取 Cycle.cycleType，periodStart 取 Cycle.period.start。
+   */
+  private buildNumberPrefix(cycleType: string, periodStart: string): string {
     const start = new Date(periodStart)
     const yy = String(start.getFullYear()).slice(-2)
-    switch (periodType) {
+    switch (cycleType) {
       case 'annual': return `${yy}Y`
       case 'semi_annual': return `${yy}H${start.getMonth() < 6 ? 1 : 2}`
       case 'quarterly': return `${yy}Q${Math.floor(start.getMonth() / 3) + 1}`

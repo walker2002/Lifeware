@@ -147,9 +147,6 @@ field_metadata:
   endDate:
     type: date
     mutation_mode: ContentField
-  keyResultId:
-    type: string
-    mutation_mode: ContentField
   tags:
     type: json
     mutation_mode: ContentField

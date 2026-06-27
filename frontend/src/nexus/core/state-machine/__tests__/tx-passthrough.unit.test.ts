@@ -47,7 +47,7 @@ function makeSpyRepo(existing: Record<string, unknown> | null): GenericRepo & {
     }),
     save: vi.fn(async (obj: Record<string, unknown>, _userId: string, tx?: unknown) => {
       record('save', tx)
-      store.set(obj.id as string, obj)
+      store.set(obj.id as string, obj); return obj
     }),
     create: vi.fn(async (fields: Record<string, unknown>, _userId: string, tx?: unknown) => {
       record('create', tx)

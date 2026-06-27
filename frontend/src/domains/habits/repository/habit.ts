@@ -72,7 +72,6 @@ export class HabitRepository implements IHabitRepository {
       trackable: data.trackable,
       startDate: data.startDate,
       endDate: data.endDate,
-      keyResultId: data.keyResultId,
       streak: 0,
       longestStreak: 0,
       completionRate7d: 0,
@@ -107,7 +106,6 @@ export class HabitRepository implements IHabitRepository {
       }),
       ...(data.startDate !== undefined && { startDate: data.startDate as DateOnly }),
       ...(data.endDate !== undefined && { endDate: data.endDate as DateOnly }),
-      ...(data.keyResultId !== undefined && { keyResultId: data.keyResultId }),
       ...(data.tags !== undefined && { tags: data.tags }),
       updatedAt: new Date().toISOString() as Timestamp,
     }

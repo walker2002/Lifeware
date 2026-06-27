@@ -35,12 +35,14 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
       },
       async save(obj, userId, tx) {
         await repos.timeboxRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
         const obj = { id, ...fields, createdAt: now, updatedAt: now }
         await repos.timeboxRepo.save(obj, userId, tx)
+        return obj
         return obj
       },
       async updateStatus(id, toStatus, userId, tx) {

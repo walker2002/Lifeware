@@ -45,6 +45,7 @@ export function createTasksGenericRepo(repos: TasksRepoPair): Record<string, Gen
       },
       async save(obj, userId, tx) {
         await repos.taskRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         return repos.taskRepo.create(fields, userId, tx)
@@ -62,6 +63,7 @@ export function createTasksGenericRepo(repos: TasksRepoPair): Record<string, Gen
       },
       async save(obj, userId, tx) {
         await repos.threadRepo.save(obj, userId, tx)
+        return obj
       },
       async create(fields, userId, tx) {
         return repos.threadRepo.create(fields, userId, tx)
