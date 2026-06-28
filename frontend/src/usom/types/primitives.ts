@@ -102,6 +102,28 @@ export interface EnergyCurvePoint {
   baseline: number // 1-10
 }
 
+// ─── Energy Curve (D10 整合：5 处重复归一) ─────────────────────
+/**
+ * 能量曲线 — 用户每日能量时段分布（高效/低效小时，聚合时段）。
+ *
+ * 与 {@link EnergyCurvePoint}（逐小时基线点 `hour+baseline`）区分：
+ * - `EnergyCurve` 是**聚合时段**（peakHours/lowHours 数组）
+ * - `EnergyCurvePoint` 是**逐小时基线点**（hour+baseline 单点）
+ *
+ * D10 整合：原 `peakHours/lowHours` 在 5 处重复定义
+ * （energy-profile-provider / register-providers / scheduling-handler /
+ * DerivedSignals.energyPattern / schema energyPattern jsonb），统一为本类型。
+ * 归 ContextEngine 管理（EnergyStateManager.curve()），MVP 静态默认值。
+ *
+ * R2 + R7：`readonly` 配合 `DEFAULT_ENERGY_CURVE` 的 `Object.freeze` 防误改。
+ */
+export interface EnergyCurve {
+  /** 高效时段（24h 制小时数组，如 [9, 10, 11]），只读 */
+  readonly peakHours: readonly number[]
+  /** 低效时段（24h 制小时数组，如 [14, 15, 16]），只读 */
+  readonly lowHours: readonly number[]
+}
+
 // ─── Energy Sensitivity ────────────────────────────────────────
 /**
  * 能量敏感度，表示用户能量波动的敏感程度

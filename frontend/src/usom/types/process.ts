@@ -3,7 +3,7 @@
 
 import type {
   USOM_ID, Timestamp, DateOnly, Tag, Notes,
-  EnergyState, TimeOfDay, PeriodType,
+  EnergyState, EnergyCurve, TimeOfDay, PeriodType,
   IntentionStatus, ObjectiveStatus, KeyResultStatus,
   TaskStatus, HabitStatus, TimeboxStatus,
   DomainId, ActionCategory, ActionType, USOMObjectType, ExternalSourceType,
@@ -64,11 +64,7 @@ export type USOMSnapshot = Readonly<{
 // ─── 4.3 DerivedSignals ───────────────────────────────────────
 export interface DerivedSignals {
   userId: USOM_ID
-  energyPattern: {
-    peakHours: number[]
-    lowHours: number[]
-    confidence: number
-  } | null
+  energyPattern: (EnergyCurve & { confidence: number }) | null
   activeTaskCount: number
   avgCompletionRate7d: number
   avgCompletionRate30d: number
