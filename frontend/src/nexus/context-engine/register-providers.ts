@@ -45,9 +45,21 @@ const TemplateArraySchema = z.array(z.object({
   habits: z.array(z.any()),
 }))
 
+/**
+ * EnergyCurve Schema（F3 [023] A0 post-review）
+ *
+ * 原始 `z.array(z.number())` 接受 NaN/Infinity/负数/&gt;23/小数——
+ * 静默污染 routing 与 energy match 计算。
+ *
+ * 守卫：每个 hour 必须为 [0, 23] 区间内的整数（z.number().int() 已
+ * 拒绝 NaN/Infinity/小数）。空数组允许（MVP 静态默认与用户校准
+ * 动态值都允许空）。
+ */
+const EnergyCurveHourSchema = z.number().int().min(0).max(23)
+
 const EnergyCurveSchema = z.object({
-  peakHours: z.array(z.number()),
-  lowHours: z.array(z.number()),
+  peakHours: z.array(EnergyCurveHourSchema),
+  lowHours: z.array(EnergyCurveHourSchema),
   source: z.string(),
 })
 

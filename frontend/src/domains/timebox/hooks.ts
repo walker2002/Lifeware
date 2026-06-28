@@ -44,6 +44,13 @@ export function createTimeboxHooks(manifest: DomainManifest) {
    * timebox 字段简单无 enum（title 字符串 + startTime ISO + duration number），
    * 不存在中文→枚举映射或日期格式整理需求。A1 若给 timebox 加 enum 字段
    * （如 activityArchetypeId L1/L2 校验），需补 normalize 预处理。
+   *
+   * **F5 [023] A0 post-review** — `repos: {}` 是 MVP 有意选择，非 bug：
+   * 当前 timebox 规则全字段（title / startTime / duration）无关 repo/IO，
+   * 走纯 schema 校验即可。Future-proof 标记：A2 timebox 重写时若加
+   * 「该时间槽与已有 timebox 不重叠」或「user WIP 上限」类规则，需在
+   * 此处注入 `timeboxRepo`/`taskRepo`/`userCalibrationRepo`，并加
+   * 对应 Repository 层依赖追踪（[018] R0/R1 模式）。当前 doc-only 警告。
    */
   async function onValidate(
     intent: StructuredIntent,
@@ -53,6 +60,7 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     // R15 省略 normalizeFieldValues（timebox 字段简单无 enum；A1 加 enum 字段时需补）。
     // `now` 在 snapshot.currentTime 缺失时回落 0——MVP timebox rules 全字段无关 now，
     // 未来若加依赖 now 的 rule，需确保 snapshot.currentTime 始终存在（A2 评估）。
+    // F5：repos 空对象是有意 MVP 简化（见 JSDoc），A2 加 repo-依赖规则时需扩 deps。
     return evaluateDomainRules('timebox', intent, {
       repos: {},
       userId: snapshot.userId,

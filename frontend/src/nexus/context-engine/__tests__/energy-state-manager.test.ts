@@ -101,3 +101,33 @@ describe('EnergyStateManager.current() R8 stale inferredLevel', () => {
     expect(result.inferredLevel).toBe(10) // calibratedLevel 8 + 2 = 10
   })
 })
+
+// F4: hour 边界钳位测试
+describe('EnergyStateManager.current() F4 hour 边界钳位', () => {
+  it('hour=-1 → clamp 到 0（0 不在 peakHours/lowHours → inferred = activeLevel）', () => {
+    const mgr = createEnergyStateManager()
+    expect(mgr.current(baseState(6), -1).inferredLevel).toBe(6)
+  })
+
+  it('hour=24 → clamp 到 23（23 不在 peakHours/lowHours → inferred = activeLevel）', () => {
+    const mgr = createEnergyStateManager()
+    expect(mgr.current(baseState(6), 24).inferredLevel).toBe(6)
+  })
+
+  it('hour=10.5 → 四舍五入到 11（peakHours 包含 11 → peak +2 → inferred = 8）', () => {
+    // 10.5 钳位后为 11；11 在 peakHours [9,10,11] 内（includes 严格相等）
+    // 视为 peak 时段，inferred = base + 2 = 8
+    const mgr = createEnergyStateManager()
+    expect(mgr.current(baseState(6), 10.5).inferredLevel).toBe(8)
+  })
+
+  it('hour=9.4 → 四舍五入到 9（peakHours 包含 9 → peak +2 → inferred = 8）', () => {
+    const mgr = createEnergyStateManager()
+    expect(mgr.current(baseState(6), 9.4).inferredLevel).toBe(8)
+  })
+
+  it('hour=NaN → 回落到 0（视为普通时段，inferred = activeLevel）', () => {
+    const mgr = createEnergyStateManager()
+    expect(mgr.current(baseState(6), NaN).inferredLevel).toBe(6)
+  })
+})

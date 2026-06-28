@@ -24,6 +24,23 @@
  * - 副作用：同名字段（title / startTime / duration）在两处都有校验规则 ——
  *   维护困惑是已存在债。A0.4 文档化此状态便于未来清理。
  *
+ * ## F2 — realtime "空值" 静默透传是有意 fail-OPEN 设计（[023] A0 post-review 评估）
+ *
+ * adversarial CRITICAL #1 指出 `startTimeFormat` 对 undefined/null/空串 silent pass
+ * 是 UX 缺陷。**经分析维持现状**，理由：
+ * - **[018-G3] 异常不对称治理约束**：「客户端 realtime fail-OPEN / 服务端 submit
+ *   fail-CLOSED」—— 部分更新场景下，realtime 不应把缺失字段当 error 阻塞用户输入。
+ * - submit 聚合规则 `timebox_fields_valid` 已 fail-CLOSED：缺 startTime 时返回
+ *   `Rejected`，经 `mapServerErrorsToFields` 按 message 匹配回填到 startTime 字段。
+ *   用户提交后会立即看到该字段的错误。
+ * - 强行在 realtime 给 missing 加 error 会破坏 [018-G3] 部分更新语义 + 与
+ *   `titleRequired`/`durationRange`（同样 fail-OPEN for undefined）行为不一致。
+ * - FieldIssue contract 无 severity 字段，无法区分"required hint"与"format error"。
+ *   升级 contract 影响 habits/tasks/okrs 三域 G3 系统，超出 A0 范围。
+ *
+ * **决策**：保持代码逻辑不动，本注释 + 测试断言「undefined → 无错误（submit 兜底）」
+ * 作为有意选择的明示文档。
+ *
  * @see frontend/src/domains/tasks/rules-registry.ts 范式参考
  */
 import { validationPassed, validationRejected } from '@/usom/types/process'
