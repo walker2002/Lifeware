@@ -964,7 +964,55 @@ interface DerivedSignals {
 
 ---
 
-### 4.4 Domain Plugin 四钩子签名（完整修正版）
+### 4.3a EnergyCurve 与 EnergyStateManager（D10 整合 · [023] A0.1 新增）
+
+**问题背景（D10 整合）**：`peakHours / lowHours` 在 5 处重复定义，存在不一致：
+
+| 位置 | peakHours | lowHours |
+|---|---|---|
+| `nexus/context-engine/energy-profile-provider.ts` | `[9,10,11]` | `[14,15,16]` |
+| `nexus/context-engine/register-providers.ts` | `[9,10,11]` | `[14,15,16]` |
+| `nexus/handlers/scheduling-handler.ts` (fallback) | `[9,10,11]` | `[13,14]` ⚠️ |
+| `usom/types/process.ts` `DerivedSignals.energyPattern` | `number[]` | `number[]` |
+| `lib/db/schema.ts` `derived_signals.energyPattern` (jsonb) | `number[]` | `number[]` |
+
+→ scheduling-handler 的 `[13,14]` 与其他位置 `[14,15,16]` 不一致，是隐藏的 bug 来源。
+
+**整合方案**：
+
+1. **类型 SSOT（USOM 层）** — `EnergyCurve` interface 定义在 `frontend/src/usom/types/primitives.ts`：
+
+```typescript
+export interface EnergyCurve {
+  readonly peakHours: readonly number[]  // 24h 制小时数组，如 [9, 10, 11]
+  readonly lowHours:  readonly number[]  // 24h 制小时数组，如 [14, 15, 16]
+}
+```
+
+与既有 `EnergyCurvePoint`（`{hour, baseline}` 逐小时基线点）区分：
+- `EnergyCurve` = 聚合时段（高效/低效小时数组）
+- `EnergyCurvePoint` = 逐小时基线点
+
+2. **默认常量（ContextEngine 层）** — `DEFAULT_ENERGY_CURVE` 定义在 `frontend/src/nexus/context-engine/energy-state-manager.ts`（A0.1 文件壳阶段）：
+
+```typescript
+export const DEFAULT_ENERGY_CURVE: EnergyCurve = Object.freeze({
+  peakHours: [9, 10, 11],
+  lowHours: [14, 15, 16],
+})
+```
+
+`Object.freeze` 配合 interface 的 `readonly` 修饰，防止运行时误改。
+
+3. **`DerivedSignals.energyPattern` 类型复用（R1）**：形状不变（运行时仍为 `{peakHours, lowHours, confidence}`），仅类型签名改为 `(EnergyCurve & { confidence: number }) | null`，与 `EnergyCurve` 类型契约对齐。Schema `$type<>` cast 与下游 repository 消费方在 A0.2 阶段同步更新。
+
+**EnergyStateManager 职责**（A0.3 阶段填充，本 task 仅建壳）：
+
+- 管理用户校准后的 `EnergyCurve`（MVP 静态使用 `DEFAULT_ENERGY_CURVE`）
+- 提供 `current()` / `trend()` / `curve()` API
+- 接受 `UserCalibration` 的能量时段校准，写回 ContextEngine 缓存
+
+---
 
 **归属说明**：钩子签名本身是 USOM 层的契约定义，因为它规定了 Domain 与 Nexus 之间数据传递的完整类型，需在此统一记录。
 
@@ -1121,6 +1169,12 @@ interface ActionSurfaceSuggestion {
   weight:           number
 }
 ```
+
+---
+
+### 4.4 Domain Plugin 四钩子签名（完整修正版）
+
+**归属说明**：钩子签名本身是 USOM 层的契约定义，因为它规定了 Domain 与 Nexus 之间数据传递的完整类型，需在此统一记录。
 
 ---
 
