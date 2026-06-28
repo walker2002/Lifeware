@@ -220,6 +220,8 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
             onAddKR={selectedId ? (input) => hook.addKR(selectedId, input) : undefined}
             onUpdateKRProgress={hook.updateKRProgress}
             onDeleteKR={hook.deleteKR}
+            /** [024] G2 信心度更新：仅在选中 OKR 时启用回调 */
+            onConfidenceUpdate={selectedId ? (krId, v) => hook.updateKR(krId, { confidence: v }) : undefined}
             onReload={selectedId ? async () => { const data = await hook.loadDetail(selectedId); setDetailData(data) } : undefined}
             cycles={hook.cycles}
             isLoadingCycles={hook.isLoadingCycles}

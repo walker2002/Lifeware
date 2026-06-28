@@ -29,6 +29,8 @@ interface OKRPanelProps {
   onChangeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<void>
   onAddKR?: (input: { title: string; description?: string; targetValue: number; unit: string }) => Promise<KeyResult | null>
   onUpdateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
+  /** [024] G2 信心度更新回调 */
+  onConfidenceUpdate?: (krId: string, confidence: number) => Promise<KeyResult | null>
   onDeleteKR: (id: string) => Promise<boolean>
   onReload?: () => Promise<void>
   /** [022] 周期列表（透传至 OKRForm） */
@@ -54,7 +56,7 @@ const PRIORITY_LABELS: Record<string, { label: string; variant: "destructive" | 
 
 export function OKRPanel({
   mode, data, isCreating, onBack, onEdit, onSaveCreate, onSaveEdit,
-  onActivate, onChangeStatus, onAddKR, onUpdateKRProgress, onDeleteKR, onReload,
+  onActivate, onChangeStatus, onAddKR, onUpdateKRProgress, onConfidenceUpdate, onDeleteKR, onReload,
   cycles = [], isLoadingCycles = false, onCreateCycle = async (c) => c,
   onImportTrigger,
 }: OKRPanelProps) {
@@ -100,7 +102,7 @@ export function OKRPanel({
             okrType: obj.okrType,
             priority: obj.priority,
             cycleId: obj.cycleId,
-            keyResults: krs.map(kr => ({ title: kr.title, targetValue: kr.targetValue, unit: kr.unit })),
+            keyResults: krs.map(kr => ({ title: kr.title, targetValue: kr.targetValue, unit: kr.unit, confidence: kr.confidence })),
           }}
           onSubmit={onSaveEdit}
           onCancel={onBack}
@@ -231,7 +233,7 @@ export function OKRPanel({
         {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map((kr, index) => (
           <Card key={kr.id}>
             <CardContent className="pt-4 space-y-2">
-              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
+              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} onConfidenceUpdate={onConfidenceUpdate} />
               {kr.status === "draft" && (
                 <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
                   删除

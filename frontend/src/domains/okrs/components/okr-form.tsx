@@ -35,7 +35,7 @@ export interface OKRFormFields {
   priority: "P0" | "P1" | "P2"
   /** [022] 权威周期归属，替代原 periodType/periodStart/periodEnd */
   cycleId: string
-  keyResults: { title: string; targetValue: number; unit: string }[]
+  keyResults: { title: string; targetValue: number; unit: string; /** [024] G2 信心度（0-100），留空时提交时默认 50 */ confidence?: number }[]
 }
 
 /**
@@ -115,7 +115,7 @@ export function OKRForm({
   const [newCycleName, setNewCycleName] = useState("")
   const [newCycleStart, setNewCycleStart] = useState("")
   const [newCycleEnd, setNewCycleEnd] = useState("")
-  const [keyResults, setKeyResults] = useState<{ title: string; targetValue: number; unit: string }[]>(
+  const [keyResults, setKeyResults] = useState<{ title: string; targetValue: number; unit: string; confidence?: number }[]>(
     initial?.keyResults ?? [{ title: "", targetValue: 100, unit: "%" }],
   )
   const [errors, setErrors] = useState<string[]>([])
@@ -155,7 +155,7 @@ export function OKRForm({
     setKeyResults(keyResults.filter((_, i) => i !== index))
   }
 
-  const updateKR = (index: number, field: string, value: string | number) => {
+  const updateKR = (index: number, field: string, value: string | number | undefined) => {
     const updated = [...keyResults]
     updated[index] = { ...updated[index], [field]: value }
     setKeyResults(updated)
@@ -225,7 +225,7 @@ export function OKRForm({
       okrType,
       priority,
       cycleId,
-      keyResults: keyResults.filter(kr => kr.title.trim()),
+      keyResults: keyResults.filter(kr => kr.title.trim()).map(kr => ({ ...kr, confidence: kr.confidence ?? 50 })),
     })
   }
 
@@ -406,6 +406,15 @@ export function OKRForm({
                   <div className="flex gap-2">
                     <Input type="number" value={kr.targetValue} onChange={e => updateKR(i, "targetValue", Number(e.target.value))} placeholder="目标值" className="w-24" min={0} />
                     <Input value={kr.unit} onChange={e => updateKR(i, "unit", e.target.value)} placeholder="单位" className="w-20" maxLength={20} />
+                  </div>
+                  {/* [024] G2 信心度输入：留空时提交时默认 50 */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">信心</Label>
+                    <Input type="number" min={0} max={100}
+                      value={kr.confidence ?? ''}
+                      onChange={e => updateKR(i, "confidence", e.target.value === '' ? undefined as any : Number(e.target.value))}
+                      placeholder="50" className="w-16 h-7 text-xs" />
+                    <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 </div>
                 {keyResults.length > 1 && (
