@@ -37,7 +37,7 @@ describe('SchedulingHandler', () => {
         { id: 'h1', title: '晨跑', defaultTime: '07:00', defaultDuration: 30, frequencyType: 'daily' },
       ],
       habitTemplates: [],
-      energyProfile: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' },
+      energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
     const result = await handler.handle(request)
@@ -62,7 +62,7 @@ describe('SchedulingHandler', () => {
       ],
       pendingHabits: [],
       habitTemplates: [],
-      energyProfile: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' },
+      energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
     const result = await handler.handle(request)
@@ -79,7 +79,7 @@ describe('SchedulingHandler', () => {
       activeTasks: [],
       pendingHabits: [],
       habitTemplates: [],
-      energyProfile: { peakHours: [], lowHours: [], source: 'test' },
+      energyCurve: { peakHours: [], lowHours: [], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
     const result = await handler.handle(request)
@@ -96,7 +96,7 @@ describe('SchedulingHandler', () => {
       ],
       pendingHabits: [],
       habitTemplates: [],
-      energyProfile: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' },
+      energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
     const result = await handler.handle(request)
@@ -124,7 +124,7 @@ describe('SchedulingHandler', () => {
           ],
         },
       ],
-      energyProfile: { peakHours: [9, 10], lowHours: [14], source: 'test' },
+      energyCurve: { peakHours: [9, 10], lowHours: [14], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
     // Manually inject h2 into pendingHabits so template matching works

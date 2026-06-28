@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { registerContextCapability } from './registry'
-import { TimeboxProvider, EnergyProfileProvider } from '@/domains/timebox/providers'
+import { TimeboxProvider, EnergyCurveProvider } from '@/domains/timebox/providers'
 import { ActiveTasksProvider, CompletedTasksProvider } from '@/domains/tasks/providers'
 import { PendingHabitsProvider, HabitTemplatesProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
 import type { ITimeboxRepository, ITaskRepository, IHabitRepository, IHabitTemplateRepository } from '@/usom/interfaces/irepository'
@@ -45,7 +45,7 @@ const TemplateArraySchema = z.array(z.object({
   habits: z.array(z.any()),
 }))
 
-const EnergyProfileSchema = z.object({
+const EnergyCurveSchema = z.object({
   peakHours: z.array(z.number()),
   lowHours: z.array(z.number()),
   source: z.string(),
@@ -119,10 +119,10 @@ export function registerAllProviders(deps: ProviderDeps): void {
   }
 
   registerContextCapability({
-    id: 'energyProfile',
+    id: 'energyCurve',
     visibility: 'planning',
-    schema: EnergyProfileSchema,
-    description: '能量档案',
-    provider: new EnergyProfileProvider(),
+    schema: EnergyCurveSchema,
+    description: '能量曲线（高效/低效时段）',
+    provider: new EnergyCurveProvider(),
   })
 }

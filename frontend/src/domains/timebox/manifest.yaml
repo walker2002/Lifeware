@@ -244,8 +244,8 @@ generation_actions:
       - id: habitTemplates
         query: templates_for_date
         params: [date, userId]
-      - id: energyProfile
-        query: energy_profile
+      - id: energyCurve
+        query: energy_curve
         params: []
     response_mode: cnui
     cnui_surface_type: timebox-list
@@ -262,8 +262,8 @@ generation_actions:
       - id: pendingHabits
         query: unlogged_for_date
         params: [date, userId]
-      - id: energyProfile
-        query: energy_profile
+      - id: energyCurve
+        query: energy_curve
         params: []
 
 # ─── 区块 J: cascade_rules ──────────────────────────────────────

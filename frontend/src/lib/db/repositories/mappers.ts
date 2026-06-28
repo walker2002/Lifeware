@@ -1,7 +1,7 @@
 // USOM <-> DB Mapping Functions
 // Bidirectional conversion between USOM objects and Drizzle row types.
 
-import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode } from '../../../usom/types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode, EnergyCurve } from '../../../usom/types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog, Contribution,
@@ -766,7 +766,7 @@ export function contextSnapshotToRow(snapshot: ContextSnapshot, userId: USOM_ID)
 // --- DerivedSignals ----------------------------------------------
 type DerivedSignalsRow = {
   id: string; userId: string;
-  energyPattern: { peakHours: number[]; lowHours: number[]; confidence: number } | null;
+  energyPattern: (EnergyCurve & { confidence: number }) | null;
   activeTaskCount: number; avgCompletionRate7d: number; avgCompletionRate30d: number;
   habitStreaks: Record<string, number>; habitCompletionRates: Record<string, number>;
   timeboxAdherence7d: number; isOvercommitted: boolean;

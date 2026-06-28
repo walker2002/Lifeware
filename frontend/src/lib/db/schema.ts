@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { LLMConfig } from '../../usom/types/objects'
+import type { EnergyCurve } from '../../usom/types/primitives'
 
 // ─── 3.1 users ─────────────────────────────────────────────────
 export const users = pgTable('users', {
@@ -575,7 +576,7 @@ export const derivedSignals = pgTable('derived_signals', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
-  energyPattern: jsonb('energy_pattern').$type<{ peakHours: number[]; lowHours: number[]; confidence: number } | null>(),
+  energyPattern: jsonb('energy_pattern').$type<(EnergyCurve & { confidence: number }) | null>(),
 
   activeTaskCount: integer('active_task_count').notNull().default(0),
   avgCompletionRate7d: real('avg_completion_rate_7d').notNull().default(0),

@@ -23,18 +23,10 @@ import type {
 import type { TaskSummary, HabitSummary, TimeboxSummary } from '@/usom/types/summaries'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { HabitTemplate } from '@/usom/types/objects'
+import type { EnergyCurve } from '@/usom/types/primitives'
+import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
-
-/**
- * 能量曲线
- */
-interface EnergyProfile {
-  /** 高效时段 */
-  peakHours: number[]
-  /** 低效时段 */
-  lowHours: number[]
-}
 
 /**
  * 日程项
@@ -101,7 +93,7 @@ export class SchedulingHandler implements DomainHandler {
     const items = this.buildScheduleItems(materials)
     const sorted = this.sortItems(items)
     const occupied = this.extractOccupiedSlots(materials.existingTimeboxes)
-    const proposals = this.generateProposals(sorted, occupied, materials.energyProfile, date)
+    const proposals = this.generateProposals(sorted, occupied, materials.energyCurve, date)
     const warnings = this.detectConflicts(proposals, materials.existingTimeboxes)
     const presentation = this.renderMarkdown(proposals, date)
 
@@ -155,9 +147,9 @@ export class SchedulingHandler implements DomainHandler {
     const pendingHabits = (contexts.pendingHabits ?? []) as HabitSummary[]
     const activeTasks = (contexts.activeTasks ?? []) as TaskSummary[]
     const existingTimeboxes = (contexts.existingTimeboxes ?? []) as TimeboxSummary[]
-    const energyProfile = (contexts.energyProfile ?? { peakHours: [9, 10, 11], lowHours: [13, 14] }) as EnergyProfile
+    const energyCurve = (contexts.energyCurve ?? DEFAULT_ENERGY_CURVE) as EnergyCurve
 
-    return { habitTemplates, pendingHabits, activeTasks, existingTimeboxes, energyProfile }
+    return { habitTemplates, pendingHabits, activeTasks, existingTimeboxes, energyCurve }
   }
 
   // ─── buildScheduleItems: 将 4 个来源统一为 ScheduleItem ────
@@ -251,7 +243,7 @@ export class SchedulingHandler implements DomainHandler {
   private generateProposals(
     items: ScheduleItem[],
     occupied: TimeSlot[],
-    energyProfile: EnergyProfile,
+    energyCurve: EnergyCurve,
     date: string,
   ): GeneratedProposal[] {
     const proposals: GeneratedProposal[] = []
@@ -282,7 +274,7 @@ export class SchedulingHandler implements DomainHandler {
       const energyMatch = this.computeEnergyMatch(
         cursorHour,
         item.energyRequired,
-        energyProfile,
+        energyCurve,
       )
 
       proposals.push({
@@ -393,11 +385,11 @@ export class SchedulingHandler implements DomainHandler {
   private computeEnergyMatch(
     hour: number,
     energyRequired: string | undefined,
-    energyProfile: EnergyProfile,
+    energyCurve: EnergyCurve,
   ): GeneratedProposal['energyMatch'] {
     const required = energyRequired ?? 'medium'
-    const isPeak = energyProfile.peakHours.includes(hour)
-    const isLow = energyProfile.lowHours.includes(hour)
+    const isPeak = energyCurve.peakHours.includes(hour)
+    const isLow = energyCurve.lowHours.includes(hour)
 
     let actual: string
     let score: number
