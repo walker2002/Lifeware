@@ -970,11 +970,12 @@ interface DerivedSignals {
 
 | 位置 | peakHours | lowHours |
 |---|---|---|
-| `nexus/context-engine/energy-profile-provider.ts` | `[9,10,11]` | `[14,15,16]` |
-| `nexus/context-engine/register-providers.ts` | `[9,10,11]` | `[14,15,16]` |
-| `nexus/handlers/scheduling-handler.ts` (fallback) | `[9,10,11]` | `[13,14]` ⚠️ |
-| `usom/types/process.ts` `DerivedSignals.energyPattern` | `number[]` | `number[]` |
-| `lib/db/schema.ts` `derived_signals.energyPattern` (jsonb) | `number[]` | `number[]` |
+| `frontend/src/nexus/context-engine/register-providers.ts` | `[9,10,11]` | `[14,15,16]` |
+| `frontend/src/domains/timebox/handlers/scheduling-handler.ts` (fallback) | `[9,10,11]` | `[13,14]` ⚠️ |
+| `frontend/src/usom/types/process.ts` `DerivedSignals.energyPattern` | `number[]` | `number[]` |
+| `frontend/src/lib/db/schema.ts` `derived_signals.energyPattern` (jsonb) | `number[]` | `number[]` |
+
+注：`energy-profile-provider.ts` 已被 [023] A0.2 重命名为 `frontend/src/domains/timebox/providers/energy-curve-provider.ts`，且 `DEFAULT_ENERGY_CURVE` 定义在 `frontend/src/nexus/context-engine/energy-state-manager.ts`（D10 R2 决策，归 ContextEngine）。
 
 → scheduling-handler 的 `[13,14]` 与其他位置 `[14,15,16]` 不一致，是隐藏的 bug 来源。
 
@@ -983,9 +984,13 @@ interface DerivedSignals {
 1. **类型 SSOT（USOM 层）** — `EnergyCurve` interface 定义在 `frontend/src/usom/types/primitives.ts`：
 
 ```typescript
+// 注意：字段不带 readonly 修饰（R7 修正：drizzle $type<> 与 readonly 不兼容）。
+// 不可变性由运行时 Object.freeze(DEFAULT_ENERGY_CURVE) 强制（[023] A0.1 + R7）。
+// 调用方 spread {...curve} 传引用不复制，mutate 数组内容会破坏 SSOT — 必须 spread
+// 后深克隆或仅读取。
 export interface EnergyCurve {
-  readonly peakHours: readonly number[]  // 24h 制小时数组，如 [9, 10, 11]
-  readonly lowHours:  readonly number[]  // 24h 制小时数组，如 [14, 15, 16]
+  peakHours: number[]  // 24h 制小时数组，如 [9, 10, 11]
+  lowHours: number[]   // 24h 制小时数组，如 [14, 15, 16]
 }
 ```
 
@@ -1011,10 +1016,6 @@ export const DEFAULT_ENERGY_CURVE: EnergyCurve = Object.freeze({
 - 管理用户校准后的 `EnergyCurve`（MVP 静态使用 `DEFAULT_ENERGY_CURVE`）
 - 提供 `current()` / `trend()` / `curve()` API
 - 接受 `UserCalibration` 的能量时段校准，写回 ContextEngine 缓存
-
----
-
-**归属说明**：钩子签名本身是 USOM 层的契约定义，因为它规定了 Domain 与 Nexus 之间数据传递的完整类型，需在此统一记录。
 
 #### ValidationResult 判别联合
 
