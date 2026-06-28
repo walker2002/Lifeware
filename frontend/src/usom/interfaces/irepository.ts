@@ -20,6 +20,8 @@ import type {
 } from '../types/process'
 import type { HabitFrequency } from '../types/objects'
 import type { DbClient } from '../../lib/db/index'
+import type { ActivityArchetype, EnergyCost, ActivityLabel } from '../activity-archetype/types'
+import type { L1Category } from '../activity-archetype/l1-categories'
 
 // ─── User ──────────────────────────────────────────────────────
 
@@ -1380,4 +1382,99 @@ export interface IUserSettingsRepository {
    * @returns 用户设置
    */
   upsert(settings: Omit<UserSettings, 'id'>, userId: USOM_ID): Promise<UserSettings>
+}
+
+// ─── ActivityArchetype ────────────────────────────────────────
+
+/** 创建 Activity Archetype 输入 */
+export interface CreateActivityArchetypeInput {
+  /** L1 一级分类 */
+  l1Category: L1Category
+  /** L2 二级名称 */
+  l2Name: string
+  /** 4 维能量消耗 */
+  energyCost: EnergyCost
+  /** 6 维执行特征 */
+  activityLabel: ActivityLabel
+}
+
+/** 更新 Activity Archetype 输入 */
+export interface UpdateActivityArchetypeInput {
+  /** L1 一级分类（可选） */
+  l1Category?: L1Category
+  /** L2 二级名称（可选） */
+  l2Name?: string
+  /** 4 维能量消耗（可选） */
+  energyCost?: EnergyCost
+  /** 6 维执行特征（可选） */
+  activityLabel?: ActivityLabel
+}
+
+/**
+ * Activity Archetype 仓储接口（[023] A1 D4 拆分方案：类型归 USOM，运行时数据归 DB）
+ *
+ * 每次 CUD 自动写入 user_audit_log（OQ-7）。
+ * seedDefaults 按 (l1Category, l2Name) 判重，幂等插入。
+ */
+export interface IActivityArchetypeRepository {
+  /**
+   * 按 ID 查单个 Archetype
+   * @param id - Archetype ID
+   * @param userId - 用户 ID（T-02 多租户）
+   * @param tx - 可选事务句柄
+   * @returns Archetype 或 null
+   */
+  findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<ActivityArchetype | null>
+
+  /**
+   * 查用户全部 Archetype（按 l1Category, l2Name 排序）
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns Archetype 列表
+   */
+  findByUser(userId: USOM_ID, tx?: DbClient): Promise<ActivityArchetype[]>
+
+  /**
+   * 按 L1 分类过滤（按 l2Name 排序）
+   * @param l1Category - L1 分类
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns Archetype 列表
+   */
+  findByL1Category(l1Category: L1Category, userId: USOM_ID, tx?: DbClient): Promise<ActivityArchetype[]>
+
+  /**
+   * 创建 Archetype（含 user_audit_log 写入）
+   * @param input - 创建输入
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 创建的 Archetype
+   */
+  create(input: CreateActivityArchetypeInput, userId: USOM_ID, tx?: DbClient): Promise<ActivityArchetype>
+
+  /**
+   * 更新 Archetype（含 user_audit_log 写入，记录 changedFields）
+   * @param id - Archetype ID
+   * @param input - 更新输入
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 更新后的 Archetype
+   */
+  update(id: USOM_ID, input: UpdateActivityArchetypeInput, userId: USOM_ID, tx?: DbClient): Promise<ActivityArchetype>
+
+  /**
+   * 删除非系统 Archetype（isSystem=true 拒绝删除）
+   * @param id - Archetype ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   */
+  delete(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
+
+  /**
+   * 按 L1 分类初始化种子数据（幂等：按 l1Category + l2Name 判重）
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   * @returns 实际插入数量
+   */
+  seedDefaults(userId: USOM_ID, tx?: DbClient): Promise<number>
 }
