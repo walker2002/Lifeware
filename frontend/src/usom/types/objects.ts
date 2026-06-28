@@ -837,3 +837,7 @@ export interface UserSettings {
   llmConfig?: LLMConfig
   uiPrefs?: Record<string, unknown>
 }
+
+// Activity Archetype（[023] A1）
+export type { ActivityArchetype, EnergyCost, ActivityLabel } from '@/usom/activity-archetype/types'
+export type { L1Category, L1CategoryKey } from '@/usom/activity-archetype/l1-categories'
