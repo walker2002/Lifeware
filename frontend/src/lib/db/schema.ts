@@ -10,6 +10,7 @@ import {
 import { sql } from 'drizzle-orm'
 import type { LLMConfig } from '../../usom/types/objects'
 import type { EnergyCurve } from '../../usom/types/primitives'
+import type { EnergyCost, ActivityLabel } from '../../usom/activity-archetype/types'
 
 // ─── 3.1 users ─────────────────────────────────────────────────
 export const users = pgTable('users', {
@@ -693,4 +694,37 @@ export const userActivities = pgTable('user_activities', {
 }, (table) => [
   index('idx_user_activities_user_time').on(table.userId, table.createdAt),
   index('idx_user_activities_type').on(table.userId, table.activityType, table.createdAt),
+])
+
+// ─── 7.6 activity_archetypes (Activity Archetype 跨域共享本体) ──
+export const activityArchetypes = pgTable('activity_archetypes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  l1Category: text('l1_category').notNull(),
+  l2Name: text('l2_name').notNull(),
+  energyCost: jsonb('energy_cost').$type<EnergyCost>().notNull(),
+  activityLabel: jsonb('activity_label').$type<ActivityLabel>().notNull(),
+  isSystem: boolean('is_system').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_activity_archetypes_user_l1').on(table.userId, table.l1Category),
+  index('idx_activity_archetypes_user_system').on(table.userId, table.isSystem),
+])
+
+// ─── 7.7 user_audit_log (配置变更审计日志，OQ-7) ──────────────
+export const userAuditLog = pgTable('user_audit_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tableName: text('table_name').notNull(),
+  recordId: uuid('record_id').notNull(),
+  action: text('action', { enum: ['create', 'update', 'delete'] }).notNull(),
+  changedFields: jsonb('changed_fields').$type<string[]>(),
+  oldValues: jsonb('old_values').$type<Record<string, unknown>>(),
+  newValues: jsonb('new_values').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_user_audit_log_user_table').on(table.userId, table.tableName, table.createdAt.desc()),
+  index('idx_user_audit_log_user_time').on(table.userId, table.createdAt.desc()),
 ])
