@@ -133,12 +133,15 @@ export function HabitCard({
   const showStats = streak > 0 || longestStreak > 0 || completionRate7d > 0
 
   return (
-    <Card className={cn(
-      "relative transition-opacity",
-      isSuspended && "opacity-60",
-      isArchived && "opacity-40",
-      selected && "border-primary/40 bg-primary/10",
-    )}>
+    <Card
+      className={cn(
+        "relative transition-opacity transition-colors cursor-pointer border-hairline bg-canvas hover:bg-muted/50",
+        isSuspended && "opacity-60",
+        isArchived && "opacity-40",
+        selected && "border-primary/40 bg-primary/10",
+      )}
+      onClick={() => (selectable ? onSelectToggle?.() : onEdit?.())}
+    >
       <CardContent className={cn("relative flex flex-col gap-3", selectable && "pl-10")}>
         {/* 批量选择复选框 */}
         {selectable && (
@@ -219,53 +222,47 @@ export function HabitCard({
         {/* 操作按钮 */}
         <div className="flex items-center gap-2">
           {trackable && onLog && !todayLogged && status === "active" && (
-            <Button size="sm" onClick={onLog}>
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); onLog?.() }}>
               打卡
             </Button>
           )}
           {trackable && todayLogged && (
             <span className="text-xs font-medium text-success">今日已打卡</span>
           )}
-          {/* 编辑按钮：所有状态都显示 */}
-          {onEdit && (
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              编辑
-            </Button>
-          )}
           {/* active: [暂停] */}
           {onStatusChange && status === "active" && (
-            <Button variant="outline" size="sm" onClick={() => onStatusChange("suspend")}>
+            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("suspend") }}>
               暂停
             </Button>
           )}
           {/* draft: [激活] [删除] */}
           {onStatusChange && isDraft && (
-            <Button variant="outline" size="sm" onClick={() => onStatusChange("activate")}>
+            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("activate") }}>
               激活
             </Button>
           )}
           {onStatusChange && isDraft && (
-            <Button variant="ghost" size="sm" onClick={() => onStatusChange("delete")}>
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("delete") }}>
               删除
             </Button>
           )}
           {/* suspended: [恢复] [归档] [删除] */}
           {onStatusChange && isSuspended && (
-            <Button variant="outline" size="sm" onClick={() => onStatusChange("reactivate")}>
+            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("reactivate") }}>
               恢复
             </Button>
           )}
           {onStatusChange && isSuspended && (
-            <Button variant="ghost" size="sm" onClick={() => onStatusChange("archive")}>
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("archive") }}>
               归档
             </Button>
           )}
           {onStatusChange && isSuspended && (
-            <Button variant="ghost" size="sm" onClick={() => onStatusChange("delete")}>
+            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange("delete") }}>
               删除
             </Button>
           )}
-          {/* archived: 仅编辑按钮（已在上方渲染），不显示其他按钮 */}
+          {/* archived: 整卡单击仍可编辑（onEdit），不显示其他按钮 */}
         </div>
       </CardContent>
     </Card>
