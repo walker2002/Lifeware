@@ -157,6 +157,7 @@ field_metadata:
   currentValue: { type: number, mutation_mode: FactField }
   unit: { type: string, mutation_mode: ContentField }
   progressRate: { type: number, mutation_mode: PresentationField }
+  confidence: { type: number, mutation_mode: FactField }
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

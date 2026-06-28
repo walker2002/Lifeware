@@ -207,28 +207,32 @@ async function seed() {
     id: IDS.krExercise, userId: USER_ID, schemaVersion: 1,
     status: 'active', objectiveId: IDS.objHealth,
     title: '每周运动 4 次', targetValue: '48', currentValue: '20', unit: '次',
-    progressRate: '0.4167', dueDate: formatDate(daysFromNow(60)),
+    progressRate: '0.4167', confidence: 50,
+    dueDate: formatDate(daysFromNow(60)),
     createdAt: daysAgo(30), updatedAt: now,
   })
   await upsert(s.keyResults, {
     id: IDS.krSleep, userId: USER_ID, schemaVersion: 1,
     status: 'active', objectiveId: IDS.objHealth,
     title: '保持 23:00 前入睡', targetValue: '90', currentValue: '60', unit: '天',
-    progressRate: '0.6667', dueDate: formatDate(daysFromNow(60)),
+    progressRate: '0.6667', confidence: 70,
+    dueDate: formatDate(daysFromNow(60)),
     createdAt: daysAgo(30), updatedAt: now,
   })
   await upsert(s.keyResults, {
     id: IDS.krProject, userId: USER_ID, schemaVersion: 1,
     status: 'active', objectiveId: IDS.objCareer,
     title: '完成 MVP 核心功能', targetValue: '10', currentValue: '6', unit: '个模块',
-    progressRate: '0.6000', dueDate: formatDate(daysFromNow(60)),
+    progressRate: '0.6000', confidence: 60,
+    dueDate: formatDate(daysFromNow(60)),
     createdAt: daysAgo(30), updatedAt: now,
   })
   await upsert(s.keyResults, {
     id: IDS.krRead, userId: USER_ID, schemaVersion: 1,
     status: 'active', objectiveId: IDS.objLearn,
     title: '阅读 4 本技术书籍', targetValue: '4', currentValue: '1', unit: '本',
-    progressRate: '0.2500', dueDate: formatDate(daysFromNow(60)),
+    progressRate: '0.2500', confidence: 40,
+    dueDate: formatDate(daysFromNow(60)),
     createdAt: daysAgo(30), updatedAt: now,
   })
   console.log('  ✓ 关键结果 (4)')
