@@ -818,6 +818,94 @@ interface ReviewMetrics {
 
 ---
 
+### 3.11 Activity Archetype（活动原型）
+
+**对象意图**：跨域共享的能量词典。定义每类活动的能量消耗特征（EnergyCost 4 维）与执行特征（ActivityLabel 6 维），供 tasks/habits/timebox 三域共同引用。
+
+**归属与责任边界**（D4 拆分方案）：
+
+| 维度 | 说明 |
+|------|------|
+| 类型定义 | USOM 层（`usom/activity-archetype/types.ts`） |
+| 接口定义 | USOM 层（`usom/interfaces/irepository.ts` 新增 IActivityArchetypeRepository） |
+| 运行时数据 | DB 层（`activity_archetypes` 表，GenericRepo CRUD） |
+| 配置管理 | 独立 config 页面（`/config/activity-archetypes`），不走 SM（OQ-7） |
+
+**L1/L2 二级分类体系**：
+
+- **L1 一级分类**（7 个，写死 const）：工作 / 生存 / 投资 / 关系 / 放松 / 健康 / 浪费
+- **L2 二级分类**（用户可增删改）：每条带默认 EnergyCost 4 维 + ActivityLabel 6 维
+
+```typescript
+export interface ActivityArchetype {
+  id:            USOM_ID
+  userId:        USOM_ID
+  l1Category:    L1Category        // L1 一级分类（7 选 1）
+  l2Name:        string            // L2 二级名称（如"深度专注"）
+  energyCost:    EnergyCost        // 4 维各 1-10（D8：在 Archetype 侧）
+  activityLabel: ActivityLabel     // 6 维特征（T3：保留，仅配置表存储）
+  isSystem:      boolean           // 系统内置（不可删除），默认 false
+  createdAt:     Timestamp
+  updatedAt:     Timestamp
+}
+```
+
+**EnergyCost — 4 维能量消耗**（D8 最终方案）：
+
+```typescript
+export interface EnergyCost {
+  /** 体力消耗 1-10 */
+  physical: number
+  /** 脑力消耗 1-10 */
+  mental: number
+  /** 情绪消耗 1-10 */
+  emotional: number
+  /** 创造力消耗 1-10 */
+  creative: number
+}
+```
+
+> **设计说明（D8）**：4 维仅在 Archetype 侧。每个 Activity Archetype 的 EnergyCost 描述"完成该活动对各维度的消耗/恢复"。用户可校准（"任务 A 对我脑力消耗 3 不是 8"），数据积累驱动未来个性化模型。**业务表（tasks/habits/timebox）只引用 activityArchetypeId，不存 4 维**。EnergyState 保持单维 activeLevel（治理文档 II 不改）。
+
+**ActivityLabel — 6 维执行特征**（T3 决议保留）：
+
+```typescript
+export interface ActivityLabel {
+  /** 喜欢度 1-10（10=非常喜欢） */
+  enjoyment: number
+  /** 典型时长（分钟） */
+  typicalDuration: number
+  /** 中断容忍度 */
+  interruptTolerance: 'low' | 'medium' | 'high'
+  /** 环境标签（如 ['安静', '电脑', '站立']） */
+  environment: string[]
+  /** 地点标签（如 ['办公室', '家', '户外']） */
+  location: string[]
+  /** 是否可与其他活动并行 */
+  parallelizable: boolean
+}
+```
+
+> **设计说明（T3）**：ActivityLabel 不存业务表（tasks/habits/timebox 只引用 activityArchetypeId）。未来复盘做 6 维指标（"用户最喜欢什么活动""什么环境完成率最高"），利于后续 AI Scheduler 偏好匹配。
+
+**L1 一级分类**（7 大类，写死 const）：
+
+| 分类 key | 中文名 | 说明 |
+|----------|--------|------|
+| `work` | 工作 | 职业相关的产出活动 |
+| `survival` | 生存 | 维持基本生理需求的活动 |
+| `investment` | 投资 | 面向未来的自我提升活动 |
+| `relationships` | 关系 | 维护人际关系的活动 |
+| `relaxation` | 放松 | 主动恢复精力的活动 |
+| `health` | 健康 | 维护身体健康的运动/保健活动 |
+| `waste` | 浪费 | 低价值/无意识的时间消耗 |
+
+**生命周期**：Activity Archetype 是配置实体，无状态机。增删改走 Repository 直写 + `user_audit_log` 记录（OQ-7：配置管理不走 SM）。`isSystem=true` 的条目不可删除（前端禁按钮 + Repository 守卫）。
+
+**配置管理权限（OQ-7）**：Activity Archetype 修改是配置变更（非业务执行写入口），走 Intent Engine 路由 + Repository 直写，修改留 `user_audit_log` DB 表。不走 SM（无 lifecycle），无需 Rule Engine 校验。
+
+---
+
 ## 四、系统流通对象（Process Objects）
 
 系统流通对象是 Nexus 内部各组件之间传递数据的格式，不直接对应持久化实体，但必须在 USOM 层统一定义。

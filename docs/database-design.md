@@ -1172,6 +1172,39 @@ Connector Layer 预留，MVP 不实现。
 -- CREATE TABLE external_events (...)
 ```
 
+### activity_archetypes（活动原型）
+
+| 列 | 类型 | 约束 | 说明 |
+|----|------|------|------|
+| id | uuid | PK, DEFAULT gen_random_uuid() | 主键 |
+| user_id | uuid | NOT NULL, FK→users(id) ON DELETE CASCADE | 多租户隔离 |
+| schema_version | integer | NOT NULL DEFAULT 1 | USOM 版本号 |
+| l1_category | text | NOT NULL | L1 一级分类（7 选 1） |
+| l2_name | text | NOT NULL | L2 二级名称 |
+| energy_cost | jsonb | NOT NULL | EnergyCost 4 维 `{physical,mental,emotional,creative}` |
+| activity_label | jsonb | NOT NULL DEFAULT '{}' | ActivityLabel 6 维 |
+| is_system | boolean | NOT NULL DEFAULT false | 系统内置，不可删除 |
+| created_at | timestamptz | NOT NULL DEFAULT now() | 创建时间 |
+| updated_at | timestamptz | NOT NULL DEFAULT now() | 更新时间 |
+
+索引：`(user_id, l1_category)`、`(user_id, is_system)`
+
+### user_audit_log（用户操作审计日志）
+
+| 列 | 类型 | 约束 | 说明 |
+|----|------|------|------|
+| id | uuid | PK, DEFAULT gen_random_uuid() | 主键 |
+| user_id | uuid | NOT NULL, FK→users(id) ON DELETE CASCADE | 操作人 |
+| table_name | text | NOT NULL | 被操作的表名 |
+| record_id | uuid | NOT NULL | 被操作的记录 ID |
+| action | text | NOT NULL, CHECK(IN('create','update','delete')) | 操作类型 |
+| changed_fields | jsonb | | 变更字段列表 |
+| old_values | jsonb | | 变更前值（create 时为 null） |
+| new_values | jsonb | | 变更后值（delete 时为 null） |
+| created_at | timestamptz | NOT NULL DEFAULT now() | 操作时间 |
+
+索引：`(user_id, table_name, created_at DESC)`、`(user_id, created_at DESC)`
+
 ---
 
 ## 九、数据库函数与触发器
