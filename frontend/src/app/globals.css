@@ -340,20 +340,22 @@ body {
 /* ========================================================================
    细滚动条工具类 — 用于 flex 子容器内独立滚动区域（如 OKR 工作台左侧目录）
    ======================================================================== */
+/* thumb 用 hairline 时对比度仅 ~1.2:1（隐于 #faf9f5 背景），改用
+   muted-foreground（~4.8:1，与次要文字同色）保证可见；悬停加深给反馈。 */
 .lw-scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--hairline) transparent;
+  scrollbar-color: var(--muted-foreground) transparent;
 }
 .lw-scrollbar-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .lw-scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--hairline);
+  background: var(--muted-foreground);
   border-radius: 3px;
 }
 .lw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  background: var(--body-strong);
 }
 .lw-scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
