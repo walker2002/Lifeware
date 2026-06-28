@@ -340,26 +340,26 @@ body {
 /* ========================================================================
    细滚动条工具类 — 用于 flex 子容器内独立滚动区域（如 OKR 工作台左侧目录）
    ======================================================================== */
-/* thumb 用 hairline 时对比度 ~1.2:1（隐于 #faf9f5）→ 隐。
-   改为 8px + 奶白 track + 中灰 thumb：奶白 gutter（surface-cream-strong
-   vs canvas 1.36:1，作为填充清晰可辨"这里有滚动区域"）+ 中灰滑块
-   （muted-soft vs canvas 3.3:1 / vs track 2.37:1）→ 一眼可识别为
-   独立滚动条，thumb 位置可辨。hover thumb 加深到 body-strong。
-   [024.1] B5：PostCSS 不保留 color-mix，故 track 用实色令牌。 */
+/* 用户实测反馈前两版（6px+muted-foreground、8px+奶白track+muted-soft）
+   仍"看不见"。问题本质：thumb 与 track 都偏浅、在 400px 窄面板上视觉
+   权重不足。这次把 thumb 加深到 body-strong（近黑 #252523），在奶白
+   track 中对比度 ~12:1——暗色块成为不可忽视的视觉锚点，"这是个独立
+   滚动条"一眼可辨。宽度 8→10px 更易抓。hover thumb 微暗到 ink。
+   [024.1] B5：PostCSS 不保留 color-mix，track 维持实色令牌。 */
 .lw-scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--muted-soft) var(--surface-cream-strong);
+  scrollbar-color: var(--body-strong) var(--surface-cream-strong);
 }
 .lw-scrollbar-thin::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 .lw-scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--muted-soft);
-  border-radius: 4px;
+  background: var(--body-strong);
+  border-radius: 5px;
 }
 .lw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--body-strong);
+  background: var(--ink);
 }
 .lw-scrollbar-thin::-webkit-scrollbar-track {
   background: var(--surface-cream-strong);
