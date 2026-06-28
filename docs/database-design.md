@@ -381,6 +381,9 @@ CREATE TABLE key_results (
   unit          text not null,
   progress_rate numeric not null default 0,  -- 冗余字段，便于排序
 
+  -- 信心度（[024] G2）
+  confidence    integer not null default 50,  -- 达成信心度（0-100 百分比），默认 50
+
   -- 时间字段（查询关键）
   due_date     date,
 
@@ -402,7 +405,11 @@ ALTER TABLE key_results ADD CONSTRAINT check_key_results_target_positive
   CHECK (target_value > 0);
 ALTER TABLE key_results ADD CONSTRAINT check_key_results_current_within_target
   CHECK (current_value >= 0 and current_value <= target_value);
+ALTER TABLE key_results ADD CONSTRAINT check_key_results_confidence_range
+  CHECK (confidence BETWEEN 0 AND 100);
 ```
+
+| confidence | integer | NOT NULL | DEFAULT 50 | KR 达成信心度（0-100 百分比），选填，默认 50（CHECK 约束 confidence BETWEEN 0 AND 100） |
 
 ---
 
