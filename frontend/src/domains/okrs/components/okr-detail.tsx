@@ -230,7 +230,7 @@ export function OKRDetail({
                 {actionLoading === sa.action ? "处理中..." : sa.label}
               </Button>
             ))}
-            {obj.status === "draft" && (
+            {(obj.status === "draft" || obj.status === "active") && (
               <Button variant="outline" onClick={() => setIsEditing(true)}>编辑</Button>
             )}
             {obj.status === "archived" && (
