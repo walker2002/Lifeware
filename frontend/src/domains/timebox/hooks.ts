@@ -1,7 +1,7 @@
 /**
  * @file hooks
  * @brief Timebox 域钩子函数工厂
- * 
+ *
  * 工厂函数模式，遵循 Constitution Principle VI: 无副作用、无数据库调用
  * 提供意图验证、事件响应和动作表面请求处理能力
  */
@@ -15,15 +15,12 @@ import type {
   MetricUpdate,
   ValidationResult,
 } from '@/usom/types/process'
-import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
+import { evaluateDomainRules } from '@/nexus/rules'
+import { timeboxRuleRegistry } from './rules-registry'
 
-/** 最小持续时间（分钟） */
-const MIN_DURATION = 5
-/** 最大持续时间（分钟） */
-const MAX_DURATION = 480
 /** 即将开始阈值（毫秒） */
 const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000
 
@@ -36,39 +33,27 @@ export function createTimeboxHooks(manifest: DomainManifest) {
   const subscribedEvents = new Set(manifest.subscribed_events)
 
   /**
-   * 验证意图
-   * @param intent - 结构化意图
-   * @param _snapshot - USOM 快照
-   * @returns 验证结果
+   * 验证意图（[018-G3] R2 + codex E5：改调 evaluateDomainRules，规则声明式化）
+   * 规则逻辑全部迁入 timeboxRuleRegistry（见 ./rules-registry）；本处仅薄壳委托。
+   *
+   * **R11** — 唯一生产调用方 `nexus/orchestrator/index.ts:742` 已用 `await`，
+   * async 签名安全。无其他生产 caller。tests `timebox-domain.test.ts`
+   * 兼容（`await timeboxPlugin.onValidate`）。
+   *
+   * **R15** — 本 onValidate **有意省略** `normalizeFieldValues` 预处理：
+   * timebox 字段简单无 enum（title 字符串 + startTime ISO + duration number），
+   * 不存在中文→枚举映射或日期格式整理需求。A1 若给 timebox 加 enum 字段
+   * （如 activityArchetypeId L1/L2 校验），需补 normalize 预处理。
    */
-  function onValidate(
+  async function onValidate(
     intent: StructuredIntent,
-    _snapshot: USOMSnapshot,
-  ): ValidationResult {
-    const errors: string[] = []
-    const { fields } = intent
-
-    const title = fields['title']
-    if (!title || (typeof title === 'string' && title.trim() === '')) {
-      errors.push('title 不能为空')
-    }
-
-    const startTime = fields['startTime']
-    if (!startTime || typeof startTime !== 'string' || isNaN(Date.parse(startTime))) {
-      errors.push('startTime 必须是有效的 ISO 8601 时间格式')
-    }
-
-    const duration = fields['duration']
-    if (
-      typeof duration !== 'number' ||
-      !Number.isInteger(duration) ||
-      duration < MIN_DURATION ||
-      duration > MAX_DURATION
-    ) {
-      errors.push(`duration 必须是 ${MIN_DURATION}~${MAX_DURATION} 之间的整数（分钟）`)
-    }
-
-    return errors.length === 0 ? validationPassed() : validationRejected(errors)
+    snapshot: USOMSnapshot,
+  ): Promise<ValidationResult> {
+    return evaluateDomainRules('timebox', intent, {
+      repos: {},
+      userId: snapshot.userId,
+      now: snapshot.currentTime ? Date.parse(snapshot.currentTime) : 0,
+    }, timeboxRuleRegistry)
   }
 
   /**
