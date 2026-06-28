@@ -49,6 +49,10 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     intent: StructuredIntent,
     snapshot: USOMSnapshot,
   ): Promise<ValidationResult> {
+    // R11 + R15：唯一生产 caller `orchestrator/index.ts:742` 已 `await`，async 安全。
+    // R15 省略 normalizeFieldValues（timebox 字段简单无 enum；A1 加 enum 字段时需补）。
+    // `now` 在 snapshot.currentTime 缺失时回落 0——MVP timebox rules 全字段无关 now，
+    // 未来若加依赖 now 的 rule，需确保 snapshot.currentTime 始终存在（A2 评估）。
     return evaluateDomainRules('timebox', intent, {
       repos: {},
       userId: snapshot.userId,

@@ -28,15 +28,14 @@ import type { EnergyState, EnergyScore, EnergyCurve } from '@/usom/types/primiti
  * scheduling-handler fallback 用 [9,10,11]/[13,14]。统一为本常量。
  * MVP 静态（符合"只做静态设置"），未来用户校准走 EnergyStateManager.curve()。
  *
- * R7：`Object.freeze` 防运行时误改；配合 `EnergyCurve` interface 的 `readonly` 修饰。
+ * R7：`Object.freeze` 防运行时误改。**EnergyCurve interface 不带 readonly 字段**
+ * （R7 修正：drizzle `$type<>` 与 readonly 不兼容，A0.1 commit 7538a52 去掉 readonly）。
+ * 类型上允许 mutate 但运行时 frozen 抛错——双重防御。
  */
 export const DEFAULT_ENERGY_CURVE: EnergyCurve = Object.freeze({
   peakHours: [9, 10, 11],
   lowHours: [14, 15, 16],
 }) as EnergyCurve
-
-// 类型 re-export 占位（A0.3 阶段用于 EnergyStateManager 接口签名）
-export type { EnergyState, EnergyScore, EnergyCurve }
 
 /** inferredLevel 推断的调整幅度 */
 const PEAK_ADJUSTMENT = 2
