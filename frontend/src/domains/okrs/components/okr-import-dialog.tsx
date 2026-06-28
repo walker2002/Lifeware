@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { validateFile, parseFileToText } from "@/lib/okr-import/file-parser"
 import { importOKRFromFile } from "@/app/actions/okr-import"
+import { okrExportTemplatesToMarkdown } from "./okr-form"
 import type { ImportResult } from "@/lib/okr-import/types"
 
 interface OKRImportDialogProps {
@@ -54,6 +55,24 @@ export function OKRImportDialog({ open, onOpenChange, onImportComplete }: OKRImp
     }
   }
 
+  /**
+   * [024.1] T3：触发浏览器下载 OKR 模板 Markdown 文件。
+   * 用户在文件中填写 Objective/KR 后可再次上传导入。
+   */
+  const handleDownloadTemplate = () => {
+    const markdown = okrExportTemplatesToMarkdown()
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const date = new Date().toISOString().slice(0, 10)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `okr-模板-${date}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -68,6 +87,15 @@ export function OKRImportDialog({ open, onOpenChange, onImportComplete }: OKRImp
           <p className="text-xs text-muted-foreground">
             支持格式: Markdown (.md)、纯文本 (.txt)、Excel (.xlsx)、Word (.docx)，文件大小限制 5MB
           </p>
+
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={handleDownloadTemplate}
+          >
+            下载模板
+          </Button>
 
           {error && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

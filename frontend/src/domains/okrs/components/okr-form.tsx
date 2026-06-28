@@ -77,6 +77,32 @@ const TEMPLATES: OKRTemplate[] = [
   },
 ]
 
+/**
+ * [024.1] T3：导出 OKR 模板到 Markdown 字符串，供下载用。
+ *
+ * 格式与 okr-import 的解析器约定保持一致：
+ *   - ## Objective: <模板名> (type: <okrType>, priority: <priority>)
+ *   - ### KR <n>: <模板 KR title 或序号>
+ *     - 目标值: <targetValue><unit>
+ *
+ * 模板中 KR.title 为空时填「KR <n>」占位,保证解析后 KR 数与 keyResults.length 一致。
+ */
+export function okrExportTemplatesToMarkdown(): string {
+  const lines: string[] = ["# OKR 填写模板", ""]
+  lines.push("复制下面的 Objective/KR 段,填写后通过「导入 OKR」上传即可。")
+  lines.push("")
+  for (const tpl of TEMPLATES) {
+    lines.push(`## Objective: ${tpl.name} (type: ${tpl.objectiveDefaults.okrType}, priority: ${tpl.objectiveDefaults.priority})`)
+    tpl.keyResults.forEach((kr, i) => {
+      const krTitle = kr.title.trim() || `KR ${i + 1}`
+      lines.push(`### KR ${i + 1}: ${krTitle}`)
+      lines.push(`- 目标值: ${kr.targetValue}${kr.unit}`)
+    })
+    lines.push("")
+  }
+  return lines.join("\n")
+}
+
 interface OKRFormProps {
   initial?: Partial<OKRFormFields>
   /**
