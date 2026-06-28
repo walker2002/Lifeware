@@ -1,13 +1,14 @@
 /**
  * @file okr-directory
- * @brief OKR 工作台左侧目录（周期-目标二级树 + ⋯ 菜单）
+ * @brief OKR 工作台左侧目录（周期-目标二级树 + ⋯ 菜单 + 折叠/展开）
  *
- * 重构要点（[024] G1）：
+ * 重构要点（[024] G1 + [024.1] T1）：
  *  - 顶层节点由 Cycle 驱动（不再是按 objective.period 派生的字符串分组）
  *  - 每个 cycle 下挂载 objectives.filter(o => o.cycleId === cycle.id)
  *  - 状态筛选作用于目标层（cycle 始终展示）
  *  - 周期 ⋯：添加目标 / 删除周期（有目标时禁用）
  *  - 目标 ⋯：按状态显示动作（暂停/完成/废弃/恢复/归档）
+ *  - 周期折叠：默认展开「含 active 目标」的周期；其他收起；点击 ChevronDown/Right 切换
  *
  * @remarks
  *  - 移除了 getPeriodGroupKey（旧实现用 objective.period 派生分组键；现在以 cycle 为权威）
@@ -17,6 +18,8 @@
 
 "use client"
 
+import { useState } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +102,26 @@ export function OKRDirectory({
   const handleAddObjective = onAddObjectiveToCycle ?? (() => {})
   const handleDeleteCycle = onDeleteCycle ?? (() => {})
   const handleChangeStatus = onChangeObjectiveStatus ?? (() => {})
+
+  // [024.1] T1：周期折叠。默认展开「含 active 目标」的周期；其他收起。
+  const [collapsedCycleIds, setCollapsedCycleIds] = useState<Set<string>>(() => {
+    const collapsed = new Set<string>()
+    for (const cycle of cycles) {
+      const hasActive = objectives.some(
+        (o) => o.cycleId === cycle.id && o.status === "active",
+      )
+      if (!hasActive) collapsed.add(cycle.id)
+    }
+    return collapsed
+  })
+  const toggleCollapsed = (cycleId: string) => {
+    setCollapsedCycleIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(cycleId)) next.delete(cycleId)
+      else next.add(cycleId)
+      return next
+    })
+  }
   return (
     <div className="p-3 space-y-3">
       <div className="flex items-center justify-between">
@@ -137,13 +160,24 @@ export function OKRDirectory({
             o => o.cycleId === cycle.id && (statusFilter === "all" || o.status === statusFilter)
           )
           const hasObjectives = cycleObjectives.length > 0
+          const isCollapsed = collapsedCycleIds.has(cycle.id)
           return (
             <div key={cycle.id}>
               <div className="flex items-center justify-between py-1 px-1 rounded hover:bg-muted/50 transition-colors">
-                <div className="flex items-baseline gap-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => toggleCollapsed(cycle.id)}
+                  aria-label={isCollapsed ? "展开周期" : "收起周期"}
+                  className="flex items-baseline gap-1 min-w-0 text-left outline-hidden"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
+                  )}
                   <span className="text-sm font-semibold text-ink truncate">{cycle.name}</span>
                   <span className="text-xs text-muted-foreground shrink-0">({cycleObjectives.length})</span>
-                </div>
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     aria-label="周期操作"
@@ -169,7 +203,7 @@ export function OKRDirectory({
                 </DropdownMenu>
               </div>
 
-              {hasObjectives && (
+              {!isCollapsed && hasObjectives && (
                 <div className="space-y-0.5 mt-1">
                   {cycleObjectives.map(obj => {
                     const items = objectiveMenuItems(obj.status)

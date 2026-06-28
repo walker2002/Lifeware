@@ -43,3 +43,69 @@ describe('[024] OKRDirectory 二级树', () => {
     expect(screen.getByText('删除周期')).toBeInTheDocument()
   })
 })
+
+/**
+ * [024.1] T1：周期折叠
+ *  - 默认：含 active 目标的周期展开；其他收起
+ *  - 点击 ChevronDown/Right 切换折叠
+ *  - 收起时其下目标不渲染（不占 DOM）
+ */
+describe('[024.1] OKRDirectory 周期折叠', () => {
+  const activeObj = { id: 'o1', title: '进行中目标', cycleId: 'c1', status: 'active', objectiveNumber: 'O1' } as any
+  const completedObj = { id: 'o2', title: '已完成目标', cycleId: 'c2', status: 'completed', objectiveNumber: 'O2' } as any
+  const c1 = { id: 'c1', name: '含进行中周期', period: { start: '2026-07-01', end: '2026-09-30' } } as any
+  const c2 = { id: 'c2', name: '仅已完成周期', period: { start: '2026-04-01', end: '2026-06-30' } } as any
+
+  it('默认 active 周期展开、无 active 周期收起', () => {
+    render(
+      <OKRDirectory
+        cycles={[c1, c2]}
+        objectives={[activeObj, completedObj]}
+        statusFilter="all"
+        onStatusFilterChange={() => {}}
+        onSelect={() => {}}
+        selectedId={null}
+      />,
+    )
+    // active 周期展开：能看到「进行中目标」
+    expect(screen.getByText('进行中目标')).toBeInTheDocument()
+    // 但「已完成目标」所在周期默认收起，看不到标题
+    expect(screen.queryByText('已完成目标')).not.toBeInTheDocument()
+  })
+
+  it('点击收起按钮可折叠 active 周期', async () => {
+    const user = userEvent.setup()
+    render(
+      <OKRDirectory
+        cycles={[c1]}
+        objectives={[activeObj]}
+        statusFilter="all"
+        onStatusFilterChange={() => {}}
+        onSelect={() => {}}
+        selectedId={null}
+      />,
+    )
+    expect(screen.getByText('进行中目标')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('收起周期'))
+    expect(screen.queryByText('进行中目标')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('展开周期')).toBeInTheDocument()
+  })
+
+  it('点击展开按钮可展开收起周期', async () => {
+    const user = userEvent.setup()
+    render(
+      <OKRDirectory
+        cycles={[c2]}
+        objectives={[completedObj]}
+        statusFilter="all"
+        onStatusFilterChange={() => {}}
+        onSelect={() => {}}
+        selectedId={null}
+      />,
+    )
+    expect(screen.queryByText('已完成目标')).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText('展开周期'))
+    expect(screen.getByText('已完成目标')).toBeInTheDocument()
+    expect(screen.getByLabelText('收起周期')).toBeInTheDocument()
+  })
+})
