@@ -1,8 +1,8 @@
 /**
  * @file kr-progress
  * @brief KeyResult 进度展示组件
- * 
- * 展示单个 KeyResult 的进度信息，支持编辑更新
+ *
+ * 展示单个 KeyResult 的进度信息与达成信心度（[024] G2），支持编辑更新
  */
 
 "use client"
@@ -24,12 +24,19 @@ interface KRProgressProps {
   editable?: boolean
   /** 进度更新回调 */
   onProgressUpdate?: (krId: string, value: number) => Promise<KeyResult | null>
+  /** [024] 信心度更新回调 */
+  onConfidenceUpdate?: (krId: string, confidence: number) => Promise<KeyResult | null>
 }
 
-export function KRProgress({ kr, krNumber, editable, onProgressUpdate }: KRProgressProps) {
+export function KRProgress({ kr, krNumber, editable, onProgressUpdate, onConfidenceUpdate }: KRProgressProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [inputValue, setInputValue] = useState(String(kr.currentValue))
   const [isUpdating, setIsUpdating] = useState(false)
+
+  // [024] 信心度编辑 state
+  const [isEditingConfidence, setIsEditingConfidence] = useState(false)
+  const [confidenceInput, setConfidenceInput] = useState(String(kr.confidence))
+  const [isUpdatingConfidence, setIsUpdatingConfidence] = useState(false)
 
   const percent = kr.targetValue > 0
     ? Math.round((kr.currentValue / kr.targetValue) * 100)
@@ -42,6 +49,16 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate }: KRProgr
     await onProgressUpdate?.(kr.id, val)
     setIsUpdating(false)
     setIsEditing(false)
+  }
+
+  // [024] 信心度提交处理：拒绝 NaN / <0 / >100
+  const handleSubmitConfidence = async () => {
+    const val = Number(confidenceInput)
+    if (isNaN(val) || val < 0 || val > 100) return
+    setIsUpdatingConfidence(true)
+    await onConfidenceUpdate?.(kr.id, val)
+    setIsUpdatingConfidence(false)
+    setIsEditingConfidence(false)
   }
 
   const statusColors: Record<string, string> = {
@@ -89,6 +106,37 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate }: KRProgr
             {editable && kr.status === "active" && (
               <Button size="sm" variant="link" onClick={() => { setInputValue(String(kr.currentValue)); setIsEditing(true) }} className="h-auto p-0 text-xs">
                 更新
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* [024] 信心度行 */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="shrink-0">信心</span>
+        {isEditingConfidence ? (
+          <>
+            <Input type="number" value={confidenceInput} min={0} max={100}
+              onChange={e => setConfidenceInput(e.target.value)}
+              className="w-16 h-7 text-xs"
+              onKeyDown={e => e.key === "Enter" && handleSubmitConfidence()} />
+            <span>%</span>
+            <Button size="sm" variant="ghost" onClick={handleSubmitConfidence} disabled={isUpdatingConfidence} className="h-7 text-xs">
+              {isUpdatingConfidence ? "..." : "确认"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setIsEditingConfidence(false)} className="h-7 text-xs">取消</Button>
+          </>
+        ) : (
+          <>
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[120px]">
+              <div className="h-full rounded-full bg-primary/60" style={{ width: `${kr.confidence}%` }} />
+            </div>
+            <span className="font-mono w-10 text-right">{kr.confidence}%</span>
+            {editable && kr.status === "active" && onConfidenceUpdate && (
+              <Button size="sm" variant="link" className="h-auto p-0 text-xs"
+                onClick={() => { setConfidenceInput(String(kr.confidence)); setIsEditingConfidence(true) }}>
+                更新信心
               </Button>
             )}
           </>
