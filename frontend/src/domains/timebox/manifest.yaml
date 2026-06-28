@@ -217,6 +217,10 @@ view_routes:
   view_schedule:
     component: domains/timebox/pages/SchedulePage
     url: /schedule
+  config_activity_archetypes:
+    component: app/config/activity-archetypes/page
+    url: /config/activity-archetypes
+    params: {}
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
