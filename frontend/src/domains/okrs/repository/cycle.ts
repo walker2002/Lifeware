@@ -83,6 +83,25 @@ export class CycleRepository {
   }
 
   /**
+   * 删除周期。多租户 T-02：where 必含 userId 过滤。
+   *
+   * [024] G1：周期级联检查由调用方（server action）负责——
+   * 本方法仅做单行硬删（无 FK ON DELETE 行为需顾虑：objectives.cycleId
+   * 若有引用本应在上层被「有目标 → 拒绝删除」拦截）。
+   *
+   * 用 .returning() 取被删行（drizzle pg 的 delete 不暴露 rowCount，
+   * 改用 returning.length 准确判断是否真删了 1 行）。
+   *
+   * @returns 被删除的行数（0=未找到或被 userId 过滤掉；1=实际删除）。
+   */
+  async delete(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<number> {
+    const deleted = await tx.delete(s.cycles)
+      .where(and(eq(s.cycles.id, id), eq(s.cycles.userId, userId)))
+      .returning({ id: s.cycles.id })
+    return deleted.length
+  }
+
+  /**
    * 按客观键 (user_id, period_start, period_end) 查找已有 cycle 或新建。
    *
    * 幂等：任意次调用仅返回同一 cycle 的 id。用于 okr-import 等批量导入场景，

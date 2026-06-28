@@ -24,6 +24,7 @@ import {
   deleteDraftKeyResult,
   getActiveCycles,
   createCycle as createCycleAction,
+  deleteCycle as deleteCycleAction,
 } from "@/app/actions/okr"
 
 /** MVP 阶段固定用户 ID */
@@ -57,6 +58,10 @@ interface UseOKRsResult {
    * objective 失败不会回滚已创建的 cycle（下次可直接选）。
    */
   createCycle: (cycle: Cycle) => Promise<Cycle>
+  /**
+   * [024] G1：删除周期。返回 true=已删，false=拒绝/失败（error 已写入 error 状态）。
+   */
+  deleteCycle: (cycleId: string) => Promise<boolean>
 }
 
 export function useOKRs(): UseOKRsResult {
@@ -192,6 +197,20 @@ export function useOKRs(): UseOKRsResult {
     return saved
   }, [])
 
+  /**
+   * [024] G1：删除周期。本地 state 立即同步移除（不论远端成功与否），
+   * error 写回 error 状态供 UI 提示。
+   */
+  const deleteCycle_ = useCallback(async (cycleId: string): Promise<boolean> => {
+    const result = await deleteCycleAction(cycleId)
+    if (result.success) {
+      setCycles(prev => prev.filter(c => c.id !== cycleId))
+      return true
+    }
+    setError(result.error ?? "删除失败")
+    return false
+  }, [])
+
   return {
     objectives,
     isLoading,
@@ -210,5 +229,6 @@ export function useOKRs(): UseOKRsResult {
     cycles,
     isLoadingCycles,
     createCycle: createCycle as any,
+    deleteCycle: deleteCycle_,
   }
 }

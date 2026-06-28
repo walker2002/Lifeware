@@ -103,6 +103,24 @@ export class ObjectiveRepository implements IObjectiveRepository {
     return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
+  /**
+   * [024] G1：列出某周期下挂载的所有 objectives（含 archived）。
+   *
+   * 用于 deleteCycle 前置检查「周期下是否还有目标」——
+   * 故不应用 findActive 那种过滤 archived 的策略，
+   * 任何状态下挂载的 objective 都应阻止周期删除。
+   *
+   * 复用 findObjRows（innerJoin cycles）保证 mapper 派生 period 一致。
+   */
+  async findByCycleId(cycleId: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Objective[]> {
+    const rows = await this.findObjRows(
+      and(eq(s.objectives.cycleId, cycleId), eq(s.objectives.userId, userId)),
+      tx,
+    )
+    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id), tx)
+    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
+  }
+
   async findByPeriod(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]> {
     // [022-T6] period 已迁至 cycles 表，故 between 过滤改用 s.cycles.periodStart
     const rows = await this.findObjRows(
