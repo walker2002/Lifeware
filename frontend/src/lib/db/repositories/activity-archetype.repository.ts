@@ -81,27 +81,29 @@ export class ActivityArchetypeRepository implements IActivityArchetypeRepository
     userId: USOM_ID,
     tx?: DbClient,
   ): Promise<ActivityArchetype> {
-    const client = tx ?? db
-    const [row] = await client
-      .insert(s.activityArchetypes)
-      .values({
-        userId,
-        l1Category: input.l1Category,
-        l2Name: input.l2Name,
-        energyCost: input.energyCost,
-        activityLabel: input.activityLabel,
-        isSystem: false,
+    const exec = async (client: DbClient) => {
+      const [row] = await client
+        .insert(s.activityArchetypes)
+        .values({
+          userId,
+          l1Category: input.l1Category,
+          l2Name: input.l2Name,
+          energyCost: input.energyCost,
+          activityLabel: input.activityLabel,
+          isSystem: false,
+        })
+        .returning()
+
+      const archetype = rowToArchetype(row)
+
+      // OQ-7: 写 audit log（同一事务）
+      await this._logAudit(client, userId, 'create', archetype.id, {
+        newValues: archetype as unknown as Record<string, unknown>,
       })
-      .returning()
 
-    const archetype = rowToArchetype(row)
-
-    // OQ-7: 写 audit log
-    await this._logAudit(client, userId, 'create', archetype.id, {
-      newValues: archetype as unknown as Record<string, unknown>,
-    })
-
-    return archetype
+      return archetype
+    }
+    return tx ? exec(tx) : db.transaction(exec)
   }
 
   async update(
@@ -110,64 +112,72 @@ export class ActivityArchetypeRepository implements IActivityArchetypeRepository
     userId: USOM_ID,
     tx?: DbClient,
   ): Promise<ActivityArchetype> {
-    const client = tx ?? db
-    const old = await this.findById(id, userId, tx)
-    if (!old) throw new Error(`ActivityArchetype ${id} not found`)
+    const exec = async (client: DbClient) => {
+      const old = await this.findById(id, userId, client)
+      if (!old) throw new Error(`ActivityArchetype ${id} not found`)
 
-    const changedFields: string[] = []
-    const setData: Record<string, unknown> = { updatedAt: new Date() }
+      const changedFields: string[] = []
+      const setData: Record<string, unknown> = { updatedAt: new Date() }
 
-    if (input.l1Category !== undefined) {
-      setData.l1Category = input.l1Category
-      changedFields.push('l1Category')
+      if (input.l1Category !== undefined) {
+        setData.l1Category = input.l1Category
+        changedFields.push('l1Category')
+      }
+      if (input.l2Name !== undefined) {
+        setData.l2Name = input.l2Name
+        changedFields.push('l2Name')
+      }
+      if (input.energyCost !== undefined) {
+        setData.energyCost = input.energyCost
+        changedFields.push('energyCost')
+      }
+      if (input.activityLabel !== undefined) {
+        setData.activityLabel = input.activityLabel
+        changedFields.push('activityLabel')
+      }
+
+      const [updated] = await client
+        .update(s.activityArchetypes)
+        .set(setData)
+        .where(and(eq(s.activityArchetypes.id, id), eq(s.activityArchetypes.userId, userId)))
+        .returning()
+
+      if (!updated) {
+        throw new Error(`ActivityArchetype ${id} 不存在（可能已被并发删除）`)
+      }
+
+      const archetype = rowToArchetype(updated)
+
+      // OQ-7: 写 audit log（同一事务）
+      await this._logAudit(client, userId, 'update', id, {
+        changedFields,
+        oldValues: this._pickFields(old, changedFields),
+        newValues: this._pickFields(archetype, changedFields),
+      })
+
+      return archetype
     }
-    if (input.l2Name !== undefined) {
-      setData.l2Name = input.l2Name
-      changedFields.push('l2Name')
-    }
-    if (input.energyCost !== undefined) {
-      setData.energyCost = input.energyCost
-      changedFields.push('energyCost')
-    }
-    if (input.activityLabel !== undefined) {
-      setData.activityLabel = input.activityLabel
-      changedFields.push('activityLabel')
-    }
-
-    const [updated] = await client
-      .update(s.activityArchetypes)
-      .set(setData)
-      .where(and(eq(s.activityArchetypes.id, id), eq(s.activityArchetypes.userId, userId)))
-      .returning()
-
-    const archetype = rowToArchetype(updated)
-
-    // OQ-7: 写 audit log
-    await this._logAudit(client, userId, 'update', id, {
-      changedFields,
-      oldValues: this._pickFields(old, changedFields),
-      newValues: this._pickFields(archetype, changedFields),
-    })
-
-    return archetype
+    return tx ? exec(tx) : db.transaction(exec)
   }
 
   async delete(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void> {
-    const client = tx ?? db
-    const archetype = await this.findById(id, userId, tx)
-    if (!archetype) throw new Error(`ActivityArchetype ${id} not found`)
-    if (archetype.isSystem) {
-      throw new Error(`系统内置 Archetype "${archetype.l2Name}" 不可删除`)
+    const exec = async (client: DbClient) => {
+      const archetype = await this.findById(id, userId, client)
+      if (!archetype) throw new Error(`ActivityArchetype ${id} not found`)
+      if (archetype.isSystem) {
+        throw new Error(`系统内置 Archetype "${archetype.l2Name}" 不可删除`)
+      }
+
+      await client
+        .delete(s.activityArchetypes)
+        .where(and(eq(s.activityArchetypes.id, id), eq(s.activityArchetypes.userId, userId)))
+
+      // OQ-7: 写 audit log（同一事务）
+      await this._logAudit(client, userId, 'delete', id, {
+        oldValues: archetype as unknown as Record<string, unknown>,
+      })
     }
-
-    await client
-      .delete(s.activityArchetypes)
-      .where(and(eq(s.activityArchetypes.id, id), eq(s.activityArchetypes.userId, userId)))
-
-    // OQ-7: 写 audit log
-    await this._logAudit(client, userId, 'delete', id, {
-      oldValues: archetype as unknown as Record<string, unknown>,
-    })
+    return tx ? exec(tx) : db.transaction(exec)
   }
 
   async seedDefaults(userId: USOM_ID, tx?: DbClient): Promise<number> {
