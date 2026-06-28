@@ -576,6 +576,10 @@ export const derivedSignals = pgTable('derived_signals', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
+  // R19 修订：类型复用 `EnergyCurve & { confidence: number }`，与 process.ts:67 同源。
+  // 运行时 jsonb 形状不变 `{peakHours, lowHours, confidence}`（A0.1 base 一致），无迁移。
+  // 类型用 EnergyCurve 引用而非内联形状——drizzle `$type<>` 与 EnergyCurve 兼容
+  // （EnergyCurve interface 不带 readonly 字段，R7 修订）。
   energyPattern: jsonb('energy_pattern').$type<(EnergyCurve & { confidence: number }) | null>(),
 
   activeTaskCount: integer('active_task_count').notNull().default(0),
