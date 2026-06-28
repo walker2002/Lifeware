@@ -89,6 +89,7 @@ describe('OKR 类型定义', () => {
         currentValue: 0,
         unit: '%',
         progressRate: 0,
+        confidence: 50,
         status: 'discarded',
         createdAt: '2026-05-11T00:00:00Z',
         updatedAt: '2026-05-11T00:00:00Z',
