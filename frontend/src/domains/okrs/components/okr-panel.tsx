@@ -231,7 +231,7 @@ export function OKRPanel({
         </div>
 
         {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map((kr, index) => (
-          <Card key={kr.id}>
+          <Card key={kr.id} className="border-hairline">
             <CardContent className="pt-4 space-y-2">
               <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} onConfidenceUpdate={onConfidenceUpdate} />
               {kr.status === "draft" && (
@@ -244,7 +244,7 @@ export function OKRPanel({
         ))}
 
         {isAddingKR && (
-          <Card>
+          <Card className="border-hairline">
             <CardContent className="pt-4 space-y-2">
               <Input placeholder="KR 标题" value={newKR.title} onChange={e => setNewKR({ ...newKR, title: e.target.value })} />
               <div className="flex gap-2">
