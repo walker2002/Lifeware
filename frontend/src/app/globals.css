@@ -336,3 +336,25 @@ body {
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--primary);
 }
+
+/* ========================================================================
+   细滚动条工具类 — 用于 flex 子容器内独立滚动区域（如 OKR 工作台左侧目录）
+   ======================================================================== */
+.lw-scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+}
+.lw-scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.lw-scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: 3px;
+}
+.lw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+.lw-scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -174,7 +174,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
       )}
       <div ref={containerRef} className={`flex ${standalone ? "flex-1 min-h-0" : "h-full"}`}>
       <div
-        className="shrink-0 overflow-y-auto"
+        className="shrink-0 overflow-y-auto min-h-0 lw-scrollbar-thin"
         style={{ width: leftWidth }}
       >
         <OKRDirectory
