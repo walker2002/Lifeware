@@ -56,9 +56,6 @@ export function OKRList() {
         onUpdateKRProgress={hook.updateKRProgress}
         onDeleteKR={hook.deleteKR}
         onBack={() => { setDetailId(null); hook.refresh() }}
-        cycles={hook.cycles}
-        isLoadingCycles={hook.isLoadingCycles}
-        onCreateCycle={hook.createCycle}
       />
     )
   }
@@ -68,9 +65,6 @@ export function OKRList() {
       <div className="max-w-2xl mx-auto p-4">
         <h2 className="text-lg font-semibold mb-4">创建新 OKR</h2>
         <OKRForm
-          cycles={hook.cycles}
-          isLoadingCycles={hook.isLoadingCycles}
-          onCreateCycle={hook.createCycle}
           onSubmit={async (fields: OKRFormFields) => {
             setIsCreating(true)
             const obj = await hook.create({
