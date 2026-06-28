@@ -206,7 +206,7 @@ export function OKRPanel({
               {actionLoading === sa.action ? "处理中..." : sa.label}
             </Button>
           ))}
-          {obj.status === "draft" && (
+          {(obj.status === "draft" || obj.status === "active") && (
             <Button variant="outline" onClick={onEdit}>编辑</Button>
           )}
           {obj.status === "archived" && (
