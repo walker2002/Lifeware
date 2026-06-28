@@ -115,13 +115,16 @@ export interface EnergyCurvePoint {
  * DerivedSignals.energyPattern / schema energyPattern jsonb），统一为本类型。
  * 归 ContextEngine 管理（EnergyStateManager.curve()），MVP 静态默认值。
  *
- * R2 + R7：`readonly` 配合 `DEFAULT_ENERGY_CURVE` 的 `Object.freeze` 防误改。
+ * R7 修正：仅用 `DEFAULT_ENERGY_CURVE` 的 `Object.freeze` 防误改。
+ * `readonly` 字段修饰与 drizzle `$type<>` 类型生成不兼容
+ * （derived-signals.repository.ts:19 会触发 10 tsc errors），
+ * 故 interface 字段不标 readonly（运行时形状不变 `{peakHours, lowHours}`）。
  */
 export interface EnergyCurve {
-  /** 高效时段（24h 制小时数组，如 [9, 10, 11]），只读 */
-  readonly peakHours: readonly number[]
-  /** 低效时段（24h 制小时数组，如 [14, 15, 16]），只读 */
-  readonly lowHours: readonly number[]
+  /** 高效时段（24h 制小时数组，如 [9, 10, 11]） */
+  peakHours: number[]
+  /** 低效时段（24h 制小时数组，如 [14, 15, 16]） */
+  lowHours: number[]
 }
 
 // ─── Energy Sensitivity ────────────────────────────────────────
