@@ -154,9 +154,14 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const succeeded: string[] = []
       const failed: { title: string; error: string }[] = []
       for (const it of items) {
-        const r = await submitDynamicIntent('timebox', 'createTimebox', it)
-        if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
-        else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+        try {
+          const r = await submitDynamicIntent('timebox', 'createTimebox', it)
+          if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
+          else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+        } catch (e) {
+          // [023] A2.5 review fix: 异常路径仍走 C3 succeeded/failed，不破坏「不回滚」契约
+          failed.push({ title: it.title ?? '未命名', error: e instanceof Error ? e.message : '创建失败' })
+        }
       }
       return {
         success: failed.length === 0,
