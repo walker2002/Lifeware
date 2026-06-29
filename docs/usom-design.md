@@ -906,6 +906,53 @@ export interface ActivityLabel {
 
 **配置管理权限（OQ-7）**：Activity Archetype 修改是配置变更（非业务执行写入口），走 Intent Engine 路由 + Repository 直写，修改留 `user_audit_log` DB 表。不走 SM（无 lifecycle），无需 Rule Engine 校验。
 
+### 3.12 TimeboxTemplate（时间盒模板，[023] A2）
+
+**对象意图**：用户定义的时间盒模板，锚定一日 7 段生存时间 + pull 订阅习惯/任务/主线，供后续 timebox 自动编排复用。
+
+> **配置类实体**（同 Activity Archetype）：不走 SM、不走 Rule Engine，每次 CUD 写 `user_audit_log`。
+
+**7 段生存时间模型**（design §2.1 锁定的归并方案，9 锚点 → 7 段）：
+
+| key | 中文 | 覆盖时段 |
+|-----|------|---------|
+| `wake` | 起床 | 默认起床时间锚点 |
+| `morning` | 晨间 | 上班通勤 + 早餐合并段 |
+| `workAm` | 上午上班 | 上午工作段 |
+| `noon` | 午间 | 午餐 + 午休合并段 |
+| `workPm` | 下午上班 | 下午工作段（含下班通勤合并到本段） |
+| `evening` | 晚间 | 晚餐 + 休息 + 下班通勤 |
+| `sleep` | 睡眠 | 默认睡眠时间锚点 |
+
+```typescript
+interface TimeboxTemplate {
+  id:                 USOM_ID
+  userId:             USOM_ID
+  schemaVersion:      number            // 默认 1
+  name:               string
+  /** 7 段锚点，每段起止时间（HH:mm），顺序固定 */
+  survivalSegments:   Record<SegmentKey, { start: string; end: string }>
+  /** pull 订阅源：当前用户可订阅的 habits / tasks / threads */
+  subscribedHabits:   USOM_ID[]
+  subscribedTasks:    USOM_ID[]
+  subscribedThreads:  USOM_ID[]
+  createdAt:          Timestamp
+  updatedAt:          Timestamp
+}
+
+type SegmentKey =
+  | 'wake' | 'morning' | 'workAm' | 'noon'
+  | 'workPm' | 'evening' | 'sleep'
+```
+
+**A3 owner-check**：写入前校验 `subscribedHabits/subscribedTasks/subscribedThreads` 中每个 id 归属当前 userId（参 §IX 三、Repository 模式）。Repository `create`/`update` 内逐 id 调 `findById(id, userId)`，任一不归属即抛错。
+
+**订阅语义（pull 模型）**：模板本身只存订阅 id 列表，不存习惯/任务/主线对象的实时快照。模板生效时（timebox 自动编排）再读取对象最新状态。
+
+**配置管理权限（OQ-7）**：TimeboxTemplate 修改是配置变更（非业务执行写入口），走 Intent Engine 路由 + Repository 直写 + `user_audit_log`。不走 SM（无 lifecycle），无需 Rule Engine 校验。
+
+**DB 落点**：`timebox_templates` 表（见 `docs/database-design.md` §7.8）。
+
 ---
 
 ## 四、系统流通对象（Process Objects）

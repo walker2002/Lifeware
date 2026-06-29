@@ -157,6 +157,9 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 用户行为分析
 └── user_activities        ← 用户行为埋点（统一分析入口，append-only）
 
+时间盒模板配置
+└── timebox_templates      ← 时间盒模板（[023] A2，7 段生存时间 + pull 订阅源，配置类不走 Nexus）
+
 AI 与记忆
 ├── ai_sessions            ← AI 会话
 ├── user_settings          ← 用户设置（LLM 配置、UI 偏好）
@@ -1220,6 +1223,38 @@ Connector Layer 预留，MVP 不实现。
 | created_at | timestamptz | NOT NULL DEFAULT now() | 操作时间 |
 
 索引：`(user_id, table_name, created_at DESC)`、`(user_id, created_at DESC)`
+
+### timebox_templates（时间盒模板，[023] A2）
+
+用户定义的时间盒模板。锚定 7 段生存时间（wake/morning/workAm/noon/workPm/evening/sleep），每段用 `{start, end}` 表示，并通过 JSONB 数组订阅（pull）habits/tasks/threads。**配置类实体**，不走 SM，每次 CUD 写 `user_audit_log`。
+
+| 列 | 类型 | 约束 | 说明 |
+|----|------|------|------|
+| id | uuid | PK, DEFAULT gen_random_uuid() | 主键 |
+| user_id | uuid | NOT NULL, FK→users(id) ON DELETE CASCADE | 多租户隔离 |
+| schema_version | integer | NOT NULL DEFAULT 1 | USOM 版本号 |
+| name | text | NOT NULL | 模板名称 |
+| survival_segments | jsonb | NOT NULL | 7 段锚点 `{wake, morning, workAm, noon, workPm, evening, sleep}`，每段 `{start: 'HH:mm', end: 'HH:mm'}` |
+| subscribed_habits | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 habit id 数组 |
+| subscribed_tasks | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 task id 数组 |
+| subscribed_threads | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 thread id 数组 |
+| created_at | timestamptz | NOT NULL DEFAULT now() | 创建时间 |
+| updated_at | timestamptz | NOT NULL DEFAULT now() | 更新时间 |
+
+索引：`(user_id)`
+
+**迁移**：`frontend/src/lib/db/migrations/0024_timebox_templates.sql`（手写，`IF NOT EXISTS` 幂等）
+
+**7 段生存时间模型**（见 `docs/usom-design.md` §3.12）：
+1. `wake` 起床 — 默认起床时间
+2. `morning` 晨间 — 通勤 + 早餐合并段
+3. `workAm` 上午上班 — 上午工作段
+4. `noon` 午间 — 午餐 + 午休合并段
+5. `workPm` 下午上班 — 下午工作段（含下班通勤）
+6. `evening` 晚间 — 晚餐 + 休息段
+7. `sleep` 睡眠 — 默认睡眠时间
+
+**A3 owner-check**：`create`/`update` 写入前校验 `subscribed_habits/tasks/threads` 中每个 id 归属当前 userId（跨用户 id 拒绝）。
 
 ---
 

@@ -723,6 +723,24 @@ export const activityArchetypes = pgTable('activity_archetypes', {
   index('idx_activity_archetypes_user_system').on(table.userId, table.isSystem),
 ])
 
+// ─── 7.6b timebox_templates (时间盒模板，[023] A2，配置类不走 Nexus) ─
+export const timeboxTemplates = pgTable('timebox_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  name: text('name').notNull(),
+  /** 7 段生存时间锚点 { wake, morning, workAm, noon, workPm, evening, sleep } 每段 {start, end} */
+  survivalSegments: jsonb('survival_segments').$type<Record<string, { start: string; end: string }>>().notNull(),
+  /** pull 订阅的 habits/tasks/threads id */
+  subscribedHabits: jsonb('subscribed_habits').$type<string[]>().notNull().default([]),
+  subscribedTasks: jsonb('subscribed_tasks').$type<string[]>().notNull().default([]),
+  subscribedThreads: jsonb('subscribed_threads').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_timebox_templates_user').on(table.userId),
+])
+
 // ─── 7.7 user_audit_log (配置变更审计日志，OQ-7) ──────────────
 export const userAuditLog = pgTable('user_audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
