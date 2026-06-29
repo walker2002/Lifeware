@@ -15,7 +15,7 @@ import type { USOM_ID } from '@/usom/types/primitives'
 
 import {
   FieldCompletenessRule,
-  DurationRangeRule,
+  EndTimeAfterStartRule,
   StartTimeInFutureRule,
   DelayedStartRule,
 } from './rules/timebox'
@@ -27,7 +27,7 @@ import { HabitConflictRule } from './rules/habit-conflict'
 /** 默认规则集（不含异步规则） */
 const BASE_RULES: Rule[] = [
   FieldCompletenessRule,
-  DurationRangeRule,
+  EndTimeAfterStartRule,
   StartTimeInFutureRule,
   DelayedStartRule,
   HabitConflictRule,
@@ -68,8 +68,8 @@ export interface RuleEngineDeps {
  * 创建 Rule Engine 实例
  *
  * 当前内置 timebox 规则集：
- * 1. FieldCompletenessRule — title/startTime/duration 非空
- * 2. DurationRangeRule — 5 ≤ duration ≤ 480 分钟
+ * 1. FieldCompletenessRule — title/startTime/endTime 非空
+ * 2. EndTimeAfterStartRule — endTime > startTime 且 ≤ 8 小时
  * 3. StartTimeInFutureRule — startTime > 当前时间
  * 4. TimeOverlapRule（需要 deps） — 检测时间区间冲突
  *

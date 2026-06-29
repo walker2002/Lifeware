@@ -441,9 +441,10 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
     endedAt: toDate(timebox.endedAt),
     loggedAt: toDate(timebox.loggedAt),
     // [023] A2: 关联 Activity Archetype + 软关联 taskIds/habitIds
+    // [023] A2 QA hot-fix: taskIds/habitIds 字段 DB 列 NOT NULL DEFAULT '{}'，不能用 ?? null 把空数组变 NULL
     activityArchetypeId: timebox.activityArchetypeId ?? null,
-    taskIds: timebox.taskIds ?? null,
-    habitIds: timebox.habitIds ?? null,
+    taskIds: timebox.taskIds ?? [],
+    habitIds: timebox.habitIds ?? [],
   }
 }
 

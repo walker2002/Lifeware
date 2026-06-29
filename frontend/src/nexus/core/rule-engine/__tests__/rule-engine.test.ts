@@ -9,6 +9,8 @@ import type { ContextSnapshot } from '@/usom/types/process'
 // ─── 测试用 mock 工厂 ─────────────────────────────────────────
 
 function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent {
+  const startTime = new Date(Date.now() + 3600000).toISOString() // 1 小时后
+  const endTime = new Date(Date.now() + 5400000).toISOString() // 1.5 小时后
   return {
     id: 'test-intent-001',
     intentionId: 'test-intention-001',
@@ -16,8 +18,8 @@ function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent
     action: 'create_timebox',
     fields: {
       title: '市场调研报告',
-      startTime: new Date(Date.now() + 3600000).toISOString(),
-      duration: 120,
+      startTime,
+      endTime,
       ...fields,
     },
     confidence: 0.9,
@@ -78,10 +80,11 @@ describe('createRuleEngine', () => {
     expect(result.warnings.length).toBeGreaterThan(0)
   })
 
-  it('时长超出范围的 intent → 返回 warning', async () => {
+  it('endTime 早于/等于 startTime 的 intent → 返回 warning', async () => {
     // Arrange
     const engine = createRuleEngine()
-    const intent = makeIntent({ duration: 500 })
+    const start = new Date(Date.now() + 3600000).toISOString()
+    const intent = makeIntent({ startTime: start, endTime: start }) // endTime === startTime
     const snapshot = makeSnapshot()
 
     // Act
@@ -110,10 +113,11 @@ describe('createRuleEngine', () => {
   it('多处违规 → 聚合所有 warning 消息', async () => {
     // Arrange
     const engine = createRuleEngine()
+    const start = new Date(Date.now() - 3600000).toISOString()
     const intent = makeIntent({
       title: '',
-      duration: 500,
-      startTime: new Date(Date.now() - 3600000).toISOString(),
+      startTime: start,
+      endTime: start, // endTime === startTime 触发 EndTimeAfterStart warning
     })
     const snapshot = makeSnapshot()
 
@@ -122,7 +126,7 @@ describe('createRuleEngine', () => {
 
     // Assert
     expect(result.severity).toBe('warning')
-    // 至少 3 条 warning（字段完整性、时长范围、过去时间）
+    // 至少 3 条 warning（字段完整性、endTime 早于 startTime、过去时间）
     expect(result.warnings.length).toBeGreaterThanOrEqual(3)
   })
 

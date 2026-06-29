@@ -1,10 +1,11 @@
 // Timebox 基础规则单元测试
-// TDD: 验证 FieldCompletenessRule / DurationRangeRule / StartTimeInFutureRule
+// TDD: 验证 FieldCompletenessRule / EndTimeAfterStartRule / StartTimeInFutureRule
+// [023] A2 QA hot-fix: 替代 DurationRangeRule（duration 字段已撤销）
 
 import { describe, it, expect } from 'vitest'
 import {
   FieldCompletenessRule,
-  DurationRangeRule,
+  EndTimeAfterStartRule,
   StartTimeInFutureRule,
 } from '../timebox'
 import type { StructuredIntent } from '@/usom/types/objects'
@@ -13,6 +14,8 @@ import type { ContextSnapshot } from '@/usom/types/process'
 // ─── 测试用 mock 工厂 ─────────────────────────────────────────
 
 function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent {
+  const startTime = new Date(Date.now() + 3600000).toISOString() // 1 小时后
+  const endTime = new Date(Date.now() + 5400000).toISOString() // 1.5 小时后（endTime > startTime）
   return {
     id: 'test-intent-001',
     intentionId: 'test-intention-001',
@@ -20,8 +23,8 @@ function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent
     action: 'create_timebox',
     fields: {
       title: '市场调研报告',
-      startTime: new Date(Date.now() + 3600000).toISOString(), // 1 小时后
-      duration: 120,
+      startTime,
+      endTime,
       ...fields,
     },
     confidence: 0.9,
@@ -80,12 +83,12 @@ describe('FieldCompletenessRule', () => {
     }
   })
 
-  it('缺少 duration → warning', async () => {
-    const intent = makeIntent({ duration: undefined })
+  it('缺少 endTime → warning（[023] A2 后改 endTime 替代 duration）', async () => {
+    const intent = makeIntent({ endTime: undefined })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
-      expect(result.message).toContain('duration')
+      expect(result.message).toContain('endTime')
     }
   })
 
@@ -96,68 +99,67 @@ describe('FieldCompletenessRule', () => {
   })
 
   it('多个字段缺失 → warning 列出所有缺失字段', async () => {
-    const intent = makeIntent({ title: undefined, duration: undefined })
+    const intent = makeIntent({ title: undefined, endTime: undefined })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
       expect(result.message).toContain('title')
-      expect(result.message).toContain('duration')
+      expect(result.message).toContain('endTime')
     }
   })
 })
 
-// ─── DurationRangeRule 测试 ────────────────────────────────────
+// ─── EndTimeAfterStartRule 测试（[023] A2 替代 DurationRangeRule）────
 
-describe('DurationRangeRule', () => {
-  const rule = DurationRangeRule
+describe('EndTimeAfterStartRule', () => {
+  const rule = EndTimeAfterStartRule
   const snapshot = makeSnapshot()
 
-  it('有效时长 120 分钟 → pass', async () => {
-    const intent = makeIntent({ duration: 120 })
+  it('endTime > startTime → pass', async () => {
+    const intent = makeIntent()
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
 
-  it('时长下界 5 分钟 → pass', async () => {
-    const intent = makeIntent({ duration: 5 })
-    const result = await rule.evaluate(intent, snapshot)
-    expect(result.severity).toBe('pass')
-  })
-
-  it('时长上界 480 分钟 → pass', async () => {
-    const intent = makeIntent({ duration: 480 })
-    const result = await rule.evaluate(intent, snapshot)
-    expect(result.severity).toBe('pass')
-  })
-
-  it('duration=0 → warning', async () => {
-    const intent = makeIntent({ duration: 0 })
+  it('endTime === startTime → warning', async () => {
+    const start = new Date(Date.now() + 3600000).toISOString()
+    const intent = makeIntent({ startTime: start, endTime: start })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
-      expect(result.message).toContain('duration')
+      expect(result.message).toContain('endTime')
     }
   })
 
-  it('duration=500 → warning（超过 480 分钟上限）', async () => {
-    const intent = makeIntent({ duration: 500 })
+  it('endTime < startTime → warning', async () => {
+    const start = new Date(Date.now() + 3600000).toISOString()
+    const end = new Date(Date.now() + 1800000).toISOString() // 30 min 后（早于 start）
+    const intent = makeIntent({ startTime: start, endTime: end })
+    const result = await rule.evaluate(intent, snapshot)
+    expect(result.severity).toBe('warning')
+  })
+
+  it('持续时间 > 8 小时 → warning（建议拆分）', async () => {
+    const start = new Date(Date.now() + 3600000).toISOString()
+    const end = new Date(Date.now() + 3600000 + 9 * 3600000).toISOString() // 9 小时后
+    const intent = makeIntent({ startTime: start, endTime: end })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('warning')
     if (result.severity === 'warning') {
-      expect(result.message).toContain('duration')
+      expect(result.message).toMatch(/8 小时|拆分/)
     }
   })
 
-  it('duration=-10 → warning（负值）', async () => {
-    const intent = makeIntent({ duration: -10 })
+  it('startTime 缺失 → pass（由 FieldCompletenessRule 负责）', async () => {
+    const intent = makeIntent({ startTime: undefined })
     const result = await rule.evaluate(intent, snapshot)
-    expect(result.severity).toBe('warning')
+    expect(result.severity).toBe('pass')
   })
 
-  it('duration 为非数字 → warning', async () => {
-    const intent = makeIntent({ duration: 'abc' })
+  it('endTime 缺失 → pass（由 FieldCompletenessRule 负责）', async () => {
+    const intent = makeIntent({ endTime: undefined })
     const result = await rule.evaluate(intent, snapshot)
-    expect(result.severity).toBe('warning')
+    expect(result.severity).toBe('pass')
   })
 })
 

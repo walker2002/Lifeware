@@ -32,9 +32,11 @@ function isValidNumber(value: unknown): boolean {
 }
 
 // ─── 1. FieldCompletenessRule ─────────────────────────────────
-// 验证 title / startTime / duration 非空
+// 验证 title / startTime / endTime 非空
 
-const REQUIRED_FIELDS = ['title', 'startTime', 'duration']
+// [023] A2 QA hot-fix: 改为校验 endTime 而非 duration（duration 字段已撤销，
+// 见 A2 OV#P1-#1 + 客户端把 duration 折成 endTime 上送）
+const REQUIRED_FIELDS = ['title', 'startTime', 'endTime']
 
 export const FieldCompletenessRule: Rule = {
   name: 'FieldCompletenessRule',
@@ -46,19 +48,9 @@ export const FieldCompletenessRule: Rule = {
 
     for (const field of REQUIRED_FIELDS) {
       const value = getField(intent, field)
-      // title 需要非空字符串；startTime 需要存在且非空；duration 需要是数字
-      if (field === 'title') {
-        if (!isNonEmptyString(value)) {
-          missing.push(field)
-        }
-      } else if (field === 'startTime') {
-        if (!isNonEmptyString(value)) {
-          missing.push(field)
-        }
-      } else if (field === 'duration') {
-        if (!isValidNumber(value)) {
-          missing.push(field)
-        }
+      // title 需要非空字符串；startTime/endTime 需要存在且非空
+      if (!isNonEmptyString(value)) {
+        missing.push(field)
       } else if (value === undefined || value === null || value === '') {
         missing.push(field)
       }
@@ -75,40 +67,44 @@ export const FieldCompletenessRule: Rule = {
   },
 }
 
-// ─── 2. DurationRangeRule ─────────────────────────────────────
-// 验证 5 ≤ duration ≤ 480 分钟
+// ─── 2. EndTimeAfterStartRule ─────────────────────────────────
+// [023] A2 QA hot-fix: 替代 DurationRangeRule（duration 字段已撤销）。
+// 验证 endTime > startTime 且 endTime 距 startTime ≤ 8 小时（合理上限）。
 
-const MIN_DURATION = 5
-const MAX_DURATION = 480
+const MAX_TIMEBOX_HOURS = 8
 
-export const DurationRangeRule: Rule = {
-  name: 'DurationRangeRule',
+export const EndTimeAfterStartRule: Rule = {
+  name: 'EndTimeAfterStartRule',
 
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
     if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
 
-    const duration = getField(intent, 'duration')
+    const startTime = getField(intent, 'startTime')
+    const endTime = getField(intent, 'endTime')
 
-    if (!isValidNumber(duration)) {
+    if (!isNonEmptyString(startTime) || !isNonEmptyString(endTime)) {
+      return { severity: 'pass' } // 缺失由 FieldCompletenessRule 负责
+    }
+
+    const start = Date.parse(startTime as string)
+    const end = Date.parse(endTime as string)
+
+    if (isNaN(start) || isNaN(end)) {
+      return { severity: 'pass' } // 无效格式由其他规则负责
+    }
+
+    if (end <= start) {
       return {
         severity: 'warning',
-        message: 'duration 不是有效数字',
+        message: 'endTime 必须晚于 startTime',
       }
     }
 
-    const d = duration as number
-
-    if (d < MIN_DURATION) {
+    const durationHours = (end - start) / 3_600_000
+    if (durationHours > MAX_TIMEBOX_HOURS) {
       return {
         severity: 'warning',
-        message: `duration 过短（${d} 分钟），建议至少 ${MIN_DURATION} 分钟`,
-      }
-    }
-
-    if (d > MAX_DURATION) {
-      return {
-        severity: 'warning',
-        message: `duration 过长（${d} 分钟），建议不超过 ${MAX_DURATION} 分钟`,
+        message: `时间盒持续 ${durationHours.toFixed(1)} 小时超过 ${MAX_TIMEBOX_HOURS} 小时上限，建议拆分`,
       }
     }
 

@@ -14,7 +14,8 @@ import { ThreadRepository } from '@/domains/tasks/repository/thread'
 import type { USOM_ID } from '@/usom/types/primitives'
 
 /** MVP 用户 ID（临时使用，与 activity-archetype.ts 一致） */
-export const MVP_USER_ID = '00000000-0000-0000-0000-000000000001' as USOM_ID
+// [023] A2 QA hot-fix: 'use server' file 禁止 export const/string（Next.js: 只能 export async function）
+const MVP_USER_ID = '00000000-0000-0000-0000-000000000001' as USOM_ID
 
 /** 操作结果 */
 export interface TimeboxTemplateActionResult<T = void> {

@@ -37,30 +37,27 @@ describe('timebox_title_required (realtime)', () => {
   })
 })
 
-describe('timebox_duration_range (realtime)', () => {
-  const check = realtime.timebox_duration_range.check
+describe('timebox_end_time_format (realtime) — [023] A2 替代 duration 校验', () => {
+  const check = realtime.timebox_end_time_format.check
 
-  it('5-480 整数 → 无错误', () => {
-    expect(check(5, {})).toEqual([])
-    expect(check(480, {})).toEqual([])
-    expect(check(60, {})).toEqual([])
+  it('有效 ISO 8601 → 无错误', () => {
+    expect(check('2026-06-28T15:00:00Z', {})).toEqual([])
+    expect(check('2026-06-28T15:00', {})).toEqual([])
   })
 
-  it('< 5 → 报错', () => {
-    expect(check(4, {})).toHaveLength(1)
+  it('无效格式 → 报错', () => {
+    expect(check('not-a-date', {})).toHaveLength(1)
+    expect(check(12345, {})).toHaveLength(1)
   })
 
-  it('> 480 → 报错', () => {
-    expect(check(481, {})).toHaveLength(1)
-  })
-
-  it('非整数 → 报错', () => {
-    expect(check(60.5, {})).toHaveLength(1)
-  })
-
-  it('非 number → 无错误（submit 兜底）', () => {
-    expect(check('abc', {})).toEqual([])
+  it('空值 → 无错误（submit 兜底）', () => {
+    expect(check('', {})).toEqual([])
     expect(check(undefined, {})).toEqual([])
+  })
+
+  it('endTime 早于/等于 startTime 由 submit 兜底（realtime 单字段规则）', () => {
+    // RealtimeCheck 按设计只检单字段；endTime > startTime 属多字段 → submit
+    expect(check('2026-06-28T10:00:00Z', {})).toEqual([])
   })
 })
 
@@ -98,7 +95,7 @@ describe('timebox_fields_valid (submit — 聚合规则，复刻原 onValidate)'
 
   it('全字段合法 → Passed', async () => {
     const result = await check(
-      baseIntent({ title: '写作', startTime: '2026-06-28T14:00:00Z', duration: 60 }),
+      baseIntent({ title: '写作', startTime: '2026-06-28T14:00:00Z', endTime: '2026-06-28T15:00:00Z' }),
       { repos: {}, userId: 'u' as any, now: 0 },
     )
     expect(result.kind).toBe('Passed')
@@ -106,15 +103,23 @@ describe('timebox_fields_valid (submit — 聚合规则，复刻原 onValidate)'
 
   it('缺 title → Rejected', async () => {
     const result = await check(
-      baseIntent({ startTime: '2026-06-28T14:00:00Z', duration: 60 }),
+      baseIntent({ startTime: '2026-06-28T14:00:00Z', endTime: '2026-06-28T15:00:00Z' }),
       { repos: {}, userId: 'u' as any, now: 0 },
     )
     expect(result.kind).toBe('Rejected')
   })
 
-  it('duration 超范围 → Rejected', async () => {
+  it('缺 endTime → Rejected（[023] A2 OV#P1-#1 后改校验 endTime）', async () => {
     const result = await check(
-      baseIntent({ title: '写作', startTime: '2026-06-28T14:00:00Z', duration: 600 }),
+      baseIntent({ title: '写作', startTime: '2026-06-28T14:00:00Z' }),
+      { repos: {}, userId: 'u' as any, now: 0 },
+    )
+    expect(result.kind).toBe('Rejected')
+  })
+
+  it('endTime 早于 startTime → Rejected', async () => {
+    const result = await check(
+      baseIntent({ title: '写作', startTime: '2026-06-28T14:00:00Z', endTime: '2026-06-28T13:00:00Z' }),
       { repos: {}, userId: 'u' as any, now: 0 },
     )
     expect(result.kind).toBe('Rejected')
@@ -122,7 +127,7 @@ describe('timebox_fields_valid (submit — 聚合规则，复刻原 onValidate)'
 
   it('startTime 无效 → Rejected', async () => {
     const result = await check(
-      baseIntent({ title: '写作', startTime: 'bad', duration: 60 }),
+      baseIntent({ title: '写作', startTime: 'bad', endTime: '2026-06-28T15:00:00Z' }),
       { repos: {}, userId: 'u' as any, now: 0 },
     )
     expect(result.kind).toBe('Rejected')

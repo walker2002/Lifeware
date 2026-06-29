@@ -55,7 +55,7 @@ const MAX_DURATION = 480
 /** timebox 规则提示文案（单源，与 realtime message 同源） */
 const TIMEBOX_RULE_MESSAGES = {
   titleRequired: 'title 不能为空',
-  durationRange: `duration 必须是 ${MIN_DURATION}~${MAX_DURATION} 之间的整数（分钟）`,
+  endTimeFormat: 'endTime 必须是有效的 ISO 8601 时间格式且晚于 startTime',
   startTimeFormat: 'startTime 必须是有效的 ISO 8601 时间格式',
   fieldsValid: '时间盒字段校验失败',
 } as const
@@ -69,18 +69,21 @@ const titleRequired: RealtimeCheck = (value) => {
   return []
 }
 
-const durationRange: RealtimeCheck = (value) => {
-  if (typeof value === 'number' && (!Number.isInteger(value) || value < MIN_DURATION || value > MAX_DURATION)) {
-    return [{ field: 'duration', message: TIMEBOX_RULE_MESSAGES.durationRange }]
-  }
-  return []
-}
-
 const startTimeFormat: RealtimeCheck = (value) => {
   if (value !== undefined && value !== null && value !== '') {
     if (typeof value !== 'string' || isNaN(Date.parse(value))) {
       return [{ field: 'startTime', message: TIMEBOX_RULE_MESSAGES.startTimeFormat }]
     }
+  }
+  return []
+}
+
+// [023] A2 QA hot-fix: duration 字段已被 A2 OV#P1-#1 撤销（客户端折成 endTime 上送），
+// realtime 只校验 endTime 是合法 ISO（单字段）；endTime > startTime 多字段校验进 SubmitCheck。
+const endTimeFormat: RealtimeCheck = (value) => {
+  if (value === undefined || value === null || value === '') return [] // 缺失由 submit 兜底
+  if (typeof value !== 'string' || isNaN(Date.parse(value))) {
+    return [{ field: 'endTime', message: TIMEBOX_RULE_MESSAGES.endTimeFormat }]
   }
   return []
 }
@@ -101,14 +104,26 @@ const timeboxFieldsValid: SubmitCheck = async (intent: StructuredIntent) => {
     errors.push(TIMEBOX_RULE_MESSAGES.startTimeFormat)
   }
 
-  const duration = fields['duration']
+  // [023] A2 QA hot-fix: 改为校验 endTime 而非 duration（duration 字段已撤销）
+  const endTime = fields['endTime']
   if (
-    typeof duration !== 'number' ||
-    !Number.isInteger(duration) ||
-    duration < MIN_DURATION ||
-    duration > MAX_DURATION
+    !endTime ||
+    typeof endTime !== 'string' ||
+    isNaN(Date.parse(endTime)) ||
+    (typeof startTime === 'string' && !isNaN(Date.parse(startTime)) && Date.parse(endTime) <= Date.parse(startTime))
   ) {
-    errors.push(TIMEBOX_RULE_MESSAGES.durationRange)
+    errors.push(TIMEBOX_RULE_MESSAGES.endTimeFormat)
+  }
+
+  // [023] A2 QA hot-fix: 8 小时上限（与 rule-engine EndTimeAfterStartRule 对齐）
+  if (
+    typeof startTime === 'string' && !isNaN(Date.parse(startTime)) &&
+    typeof endTime === 'string' && !isNaN(Date.parse(endTime))
+  ) {
+    const hours = (Date.parse(endTime) - Date.parse(startTime)) / 3_600_000
+    if (hours > 8) {
+      errors.push(`时间盒持续 ${hours.toFixed(1)} 小时超过 8 小时上限，建议拆分`)
+    }
   }
 
   return errors.length === 0 ? validationPassed() : validationRejected(errors)
@@ -121,21 +136,21 @@ export const timeboxRuleRegistry: DomainRuleRegistry = {
       fields: ['title'],
       message: TIMEBOX_RULE_MESSAGES.titleRequired,
     },
-    timebox_duration_range: {
-      check: durationRange,
-      fields: ['duration'],
-      message: TIMEBOX_RULE_MESSAGES.durationRange,
-    },
     timebox_start_time_format: {
       check: startTimeFormat,
       fields: ['startTime'],
       message: TIMEBOX_RULE_MESSAGES.startTimeFormat,
     },
+    timebox_end_time_format: {
+      check: endTimeFormat,
+      fields: ['endTime'],
+      message: TIMEBOX_RULE_MESSAGES.endTimeFormat,
+    },
   },
   submit: {
     timebox_fields_valid: {
       check: timeboxFieldsValid,
-      fields: ['title', 'startTime', 'duration'],
+      fields: ['title', 'startTime', 'endTime'],
       message: TIMEBOX_RULE_MESSAGES.fieldsValid,
     },
   },

@@ -37,7 +37,7 @@ vi.mock('@/domains/manifest-loader', () => ({
         createTimebox: [
           { name: 'title', label: '标题', type: 'text', required: true },
           { name: 'startTime', label: '开始时间', type: 'time', required: true },
-          { name: 'duration', label: '时长', type: 'number', required: true },
+          { name: 'endTime', label: '结束时间', type: 'time', required: true },
         ],
       },
       subscribed_events: ['TimeboxCreated', 'TimeboxStarted', 'TimeboxOvertime', 'TimeboxEnded', 'TimeboxCancelled', 'TimeboxLogged'],
@@ -48,6 +48,7 @@ vi.mock('@/domains/manifest-loader', () => ({
 import { timeboxPlugin } from '../index'
 
 // ─── 测试辅助：构造 StructuredIntent ─────────────────────────
+// [023] A2: duration → endTime（客户端派生）
 function makeIntent(overrides: Partial<StructuredIntent> = {}): StructuredIntent {
   return {
     id: 'intent-001' as USOM_ID,
@@ -57,7 +58,7 @@ function makeIntent(overrides: Partial<StructuredIntent> = {}): StructuredIntent
     fields: {
       title: '专注写作',
       startTime: '2026-05-03T09:00:00Z',
-      duration: 60,
+      endTime: '2026-05-03T10:00:00Z', // 1 小时后
     },
     confidence: 0.95,
     resolvedBy: 'ai',
@@ -211,12 +212,12 @@ describe('Timebox Domain Plugin — onValidate', () => {
     expect(rejectedErrors(result).some(e => e.includes('startTime'))).toBe(true)
   })
 
-  it('duration 为 0 应返回 valid=false', async () => {
+  it('endTime 早于 startTime 应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
         startTime: '2026-05-03T09:00:00Z',
-        duration: 0,
+        endTime: '2026-05-03T08:00:00Z', // 早于 startTime 1 小时
       },
     })
     const snapshot = makeSnapshot()
@@ -224,15 +225,15 @@ describe('Timebox Domain Plugin — onValidate', () => {
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.kind).toBe('Rejected')
-    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
+    expect(rejectedErrors(result).some(e => e.includes('endTime'))).toBe(true)
   })
 
-  it('duration 超过 480 分钟应返回 valid=false', async () => {
+  it('endTime === startTime 应返回 valid=false', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
         startTime: '2026-05-03T09:00:00Z',
-        duration: 500,
+        endTime: '2026-05-03T09:00:00Z',
       },
     })
     const snapshot = makeSnapshot()
@@ -240,15 +241,15 @@ describe('Timebox Domain Plugin — onValidate', () => {
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.kind).toBe('Rejected')
-    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
+    expect(rejectedErrors(result).some(e => e.includes('endTime'))).toBe(true)
   })
 
-  it('duration 小于 5 分钟应返回 valid=false', async () => {
+  it('持续超过 8 小时应返回 valid=false（[023] A2 替代 duration 范围）', async () => {
     const intent = makeIntent({
       fields: {
         title: '专注写作',
         startTime: '2026-05-03T09:00:00Z',
-        duration: 3,
+        endTime: '2026-05-03T19:00:00Z', // 10 小时
       },
     })
     const snapshot = makeSnapshot()
@@ -256,7 +257,7 @@ describe('Timebox Domain Plugin — onValidate', () => {
     const result = await timeboxPlugin.onValidate(intent, snapshot)
 
     expect(result.kind).toBe('Rejected')
-    expect(rejectedErrors(result).some(e => e.includes('duration'))).toBe(true)
+    expect(rejectedErrors(result).some(e => /8 小时|拆分/.test(e))).toBe(true)
   })
 })
 
