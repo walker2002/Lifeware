@@ -44,6 +44,7 @@ import { ArchetypePicker } from './archetype-picker'
 import {
   createTimebox,
   updateTimebox,
+  deleteTimebox,
   type CreateTimeboxInput,
 } from '@/app/actions/timebox'
 import type { Timebox } from '@/usom/types/objects'
@@ -72,8 +73,11 @@ function toLocalInput(d: Date): string {
 
 export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: TimeboxDrawerProps) {
   const [title, setTitle] = useState(editTarget?.title ?? '')
+  // [023] A2 final review hot-fix: editTarget 来自 getTimeboxById（runtime USOM 携带 activityArchetypeId），
+  // 但 usom/types/objects.ts Timebox 接口本轮未声明该字段（intentional, local change），
+  // 运行时数据实际有该字段，用 type narrow 读取而非 cast。
   const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(
-    editTarget?.activityArchetypeId,
+    editTarget ? (editTarget as unknown as { activityArchetypeId?: string }).activityArchetypeId : undefined,
   )
   const [startTime, setStartTime] = useState(() => {
     const s = editTarget
@@ -242,11 +246,22 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => {
-                  /* deleteTimebox= cancel，OV#8 守卫在 action 内 — T5 CNUI surface 接入 */
+                disabled={submitting}
+                onClick={async () => {
+                  if (!editTarget) return
+                  try {
+                    const r = await deleteTimebox(editTarget.id)
+                    if (r.status === 'ok') {
+                      toast.success('时间盒已取消')
+                      onSaved()
+                    }
+                  } catch (e) {
+                    // [023] A2 final review hot-fix: OV#8 守卫在 action 内，message 清晰（"已记录/结束"等）
+                    toast.error(e instanceof Error ? e.message : '删除失败')
+                  }
                 }}
               >
-                删除
+                {submitting ? <Loader2 className="size-3 animate-spin" /> : '删除'}
               </Button>
             ) : (
               <span />
