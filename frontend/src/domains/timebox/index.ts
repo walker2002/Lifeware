@@ -14,9 +14,9 @@ import { createTimeboxHooks } from './hooks'
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
 import { TimeboxList } from './cnui/surfaces/TimeboxList'
-import { CreateTimebox } from './cnui/surfaces/create-timebox'
-import { AdjustSchedule } from './cnui/surfaces/adjust-schedule'
-import { LogTimebox } from './cnui/surfaces/log-timebox'
+import { CreateTimebox } from './cnui/surfaces/CreateTimebox'
+import { AdjustSchedule } from './cnui/surfaces/AdjustSchedule'
+import { LogTimebox } from './cnui/surfaces/LogTimebox'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
