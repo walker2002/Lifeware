@@ -66,6 +66,8 @@ intent_triggers:
   - action: adjustRemainingSchedule
     shortcut: /adjustSchedule
     description: 根据剩余任务重新编排日程
+    response_type: cnui
+    cnui_surface: adjust-schedule
     examples:
       - 重新安排剩余时间
       - 调整今天下午的安排
@@ -286,5 +288,8 @@ cnui_surfaces:
     handler: ./cnui/handlers
   create-timebox:
     description: 多条 timebox 草稿创建（AI 解析→左右翻页→逐条提交）
+    handler: ./cnui/handlers
+  adjust-schedule:
+    description: 调整日程（按时间序列左右翻页，diff 提交，running/ended 禁取消）
     handler: ./cnui/handlers
 

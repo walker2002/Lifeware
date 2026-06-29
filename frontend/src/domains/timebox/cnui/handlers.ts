@@ -132,6 +132,18 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             endTime: t.endTime,
             status: t.status,
           })),
+          // [023] A2 OV#P2-#3：open 时注入 _origTitle/_origStart/_origEnd 初始快照，
+          // submit 比对（无改动不触发 updateTimebox，避免「重写整行」语义损失）。
+          items: timeboxes.map(t => ({
+            id: t.id,
+            title: t.title,
+            startTime: t.startTime,
+            endTime: t.endTime,
+            status: t.status,
+            _origTitle: t.title,
+            _origStart: t.startTime,
+            _origEnd: t.endTime,
+          })),
           remainingTasks: remainingTasks.map(t => ({
             id: t.id,
             title: t.title,
@@ -170,7 +182,34 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'createSmartSchedule' || action === 'adjustRemainingSchedule') {
+    // [023] A2.6 — adjustSchedule CNUI surface 提交：仅写 diff 项，字段走 updateTimebox 直调、
+    // cancel 走 deleteTimebox（OV#8 状态守卫），非死调 submitDynamicIntent
+    // （manifest 无 updateTimebox/cancelTimebox intent_trigger，路径不同）。
+    if (action === 'adjustRemainingSchedule') {
+      const { updateTimebox, deleteTimebox } = await import('@/app/actions/timebox')
+      const items = (fields.items as any[]) ?? []
+      for (const it of items) {
+        if (it.cancel) {
+          // cancel 走 deleteTimebox（=cancel + OV#8 状态守卫），非 raw submitDynamicIntent
+          try {
+            await deleteTimebox(it.id)
+          } catch (e) {
+            return { success: false, error: e instanceof Error ? e.message : '取消失败' }
+          }
+        } else if (it.title !== it._origTitle || it.startTime !== it._origStart || it.endTime !== it._origEnd) {
+          // 字段写直调 updateTimebox（mutation service.execute，OV-T2）
+          try {
+            await updateTimebox(it.id, { title: it.title, startTime: it.startTime, endTime: it.endTime })
+          } catch (e) {
+            return { success: false, error: e instanceof Error ? e.message : '更新失败' }
+          }
+        }
+        // else: 无改动跳过（diff 守护，OV#P2-#3）
+      }
+      return { success: true, data: { count: items.length } }
+    }
+
+    if (action === 'createSmartSchedule') {
       // 这里应该调用 AI scheduling handler
       // 暂时返回成功，实际实现需要调用 scheduling-handler
       return { success: true }
