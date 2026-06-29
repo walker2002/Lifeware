@@ -69,7 +69,16 @@ async function getPendingHabits(): Promise<Habit[]> {
 }
 
 export const timeboxCnuiHandler: CnuiSurfaceHandler = {
-  async open(action): Promise<CnuiSurfaceOpenResult> {
+  async open(action, intentFields): Promise<CnuiSurfaceOpenResult> {
+    // [023] A2.5 — AI 助手解析多条 timebox 草稿后透传 drafts
+    if (action === 'createTimebox') {
+      const drafts = (intentFields?.drafts as any[]) ?? []
+      return {
+        content: '请确认要创建的时间盒',
+        dataSnapshot: { items: drafts },
+      }
+    }
+
     if (action === 'createSmartSchedule') {
       const [timeboxes, tasks, habits] = await Promise.all([
         getTodayTimeboxes(),
@@ -137,6 +146,25 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
+    // [023] A2.5 — 多条 timebox 草稿逐条走 Nexus
+    if (action === 'createTimebox') {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      const items = (fields.items as any[]) ?? []
+      // C3：逐条提交不回滚，收集 succeeded/failed 明细
+      const succeeded: string[] = []
+      const failed: { title: string; error: string }[] = []
+      for (const it of items) {
+        const r = await submitDynamicIntent('timebox', 'createTimebox', it)
+        if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
+        else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+      }
+      return {
+        success: failed.length === 0,
+        error: failed.length ? `${failed.length} 条失败：${failed.map(f => f.title).join('、')}` : undefined,
+        data: { count: succeeded.length, succeeded, failed },
+      }
+    }
+
     if (action === 'createSmartSchedule' || action === 'adjustRemainingSchedule') {
       // 这里应该调用 AI scheduling handler
       // 暂时返回成功，实际实现需要调用 scheduling-handler

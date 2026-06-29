@@ -14,12 +14,18 @@ import { createTimeboxHooks } from './hooks'
 // ── CNUI Surface 注册 ────────────────────────────────────────
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
 import { TimeboxList } from './cnui/surfaces/TimeboxList'
+import { CreateTimebox } from './cnui/surfaces/create-timebox'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
 
 cnuiRegistry.register('timebox', 'timebox-list', {
   component: TimeboxList,
+  handlerModulePath,
+})
+
+cnuiRegistry.register('timebox', 'create-timebox', {
+  component: CreateTimebox,
   handlerModulePath,
 })
 
