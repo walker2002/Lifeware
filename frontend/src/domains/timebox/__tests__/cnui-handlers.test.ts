@@ -104,3 +104,94 @@ describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
     expect(deleteTimebox).not.toHaveBeenCalled()
   })
 })
+
+describe('[023] A2.7 logTimebox CNUI handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-log' } })
+  })
+
+  it('open 返回当日 ended timebox 列表（过滤非 ended）', async () => {
+    // [023] A2.7：open 调用 getTodayTimeboxes() 然后 filter status==='ended'
+    vi.doMock('@/domains/timebox/repository', () => ({
+      TimeboxRepository: class {
+        findByDateRange() {
+          return [
+            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'ended', taskIds: [] },
+            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'planned', taskIds: [] },
+            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'ended', taskIds: [] },
+          ]
+        }
+      },
+    }))
+    vi.resetModules()
+    const mod = await import('@/domains/timebox/cnui/handlers')
+    const r = await mod.timeboxCnuiHandler.open('logTimebox', {})
+    const items = (r.dataSnapshot as any).items
+    expect(items).toHaveLength(2)
+    expect(items.map((i: any) => i.id)).toEqual(['tb-1', 'tb-3'])
+  })
+
+  it('open targetId 置顶：intentFields.targetId 命中的项移到首位置', async () => {
+    vi.doMock('@/domains/timebox/repository', () => ({
+      TimeboxRepository: class {
+        findByDateRange() {
+          return [
+            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'ended', taskIds: [] },
+            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'ended', taskIds: [] },
+            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'ended', taskIds: [] },
+          ]
+        }
+      },
+    }))
+    vi.resetModules()
+    const mod = await import('@/domains/timebox/cnui/handlers')
+    const r = await mod.timeboxCnuiHandler.open('logTimebox', { targetId: 'tb-3' })
+    const items = (r.dataSnapshot as any).items
+    expect(items[0].id).toBe('tb-3')
+  })
+
+  it('submit 跳过的项不调用 submitDynamicIntent（state=skipped 或无 state）', async () => {
+    const r = await timeboxCnuiHandler.submit('logTimebox', {
+      items: [
+        { id: 'tb-1', title: '写作', state: 'completed' },
+        { id: 'tb-2', title: '会议', state: 'skipped' },
+        { id: 'tb-3', title: '做PPT' /* 无 state */ },
+        { id: 'tb-4', title: '复盘', state: 'incomplete' },
+      ],
+    })
+    expect(r.success).toBe(true)
+    expect((r.data as any).count).toBe(2)
+    expect(submitDynamicIntent).toHaveBeenCalledTimes(2)
+    // 跳过的不被调用
+    const calls = (submitDynamicIntent as any).mock.calls
+    const objectIds = calls.map((c: any[]) => c[2].objectId)
+    expect(objectIds).toEqual(['tb-1', 'tb-4'])
+    expect(objectIds).not.toContain('tb-2')
+    expect(objectIds).not.toContain('tb-3')
+  })
+
+  it('submit completed 调 logTimebox intent 且 completionStatus=completed', async () => {
+    const r = await timeboxCnuiHandler.submit('logTimebox', {
+      items: [{ id: 'tb-1', title: '写作', state: 'completed', notes: '顺利' }],
+    })
+    expect(r.success).toBe(true)
+    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
+      objectId: 'tb-1',
+      completionStatus: 'completed',
+      notes: '顺利',
+    })
+  })
+
+  it('submit incomplete 映射为 completionStatus=partial', async () => {
+    const r = await timeboxCnuiHandler.submit('logTimebox', {
+      items: [{ id: 'tb-1', title: '写作', state: 'incomplete', notes: '被打断' }],
+    })
+    expect(r.success).toBe(true)
+    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
+      objectId: 'tb-1',
+      completionStatus: 'partial',
+      notes: '被打断',
+    })
+  })
+})

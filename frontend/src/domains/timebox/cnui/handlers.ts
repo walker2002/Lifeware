@@ -112,6 +112,31 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    // [023] A2.7 — logTimebox CNUI surface 打开：查询当日 ended 时间盒
+    // 若 intentFields.targetId 指向某条，则置顶
+    if (action === 'logTimebox') {
+      const todayBoxes = await getTodayTimeboxes()
+      const ended = todayBoxes.filter(t => t.status === 'ended')
+      const targetId = (intentFields?.targetId as string | undefined) ?? null
+      const items = ended.map(t => ({
+        id: t.id,
+        title: t.title,
+        startTime: t.startTime,
+        endTime: t.endTime,
+      }))
+      if (targetId) {
+        const idx = items.findIndex(i => i.id === targetId)
+        if (idx > 0) {
+          const [picked] = items.splice(idx, 1)
+          items.unshift(picked)
+        }
+      }
+      return {
+        content: ended.length === 0 ? '今日没有已结束的时间盒需要打卡' : `请为 ${ended.length} 个已结束时间盒打卡`,
+        dataSnapshot: { items },
+      }
+    }
+
     if (action === 'adjustRemainingSchedule') {
       const [timeboxes, tasks] = await Promise.all([
         getTodayTimeboxes(),
@@ -213,6 +238,28 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       // 这里应该调用 AI scheduling handler
       // 暂时返回成功，实际实现需要调用 scheduling-handler
       return { success: true }
+    }
+
+    // [023] A2.7 — logTimebox CNUI surface 提交：逐条 log，跳过 state='skipped' 或无 state 的项
+    // completionStatus: 'completed'|'partial'，notes 透传
+    if (action === 'logTimebox') {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      const items = (fields.items as any[]) ?? []
+      const logged = items.filter(i => i.state && i.state !== 'skipped')
+      for (const it of items) {
+        if (!it.state || it.state === 'skipped') continue
+        try {
+          const r = await submitDynamicIntent('timebox', 'logTimebox', {
+            objectId: it.id,
+            completionStatus: it.state === 'completed' ? 'completed' : 'partial',
+            notes: it.notes,
+          })
+          if (!r.success) return { success: false, error: r.error ?? `${it.title} 打卡失败` }
+        } catch (e) {
+          return { success: false, error: e instanceof Error ? e.message : `${it.title} 打卡失败` }
+        }
+      }
+      return { success: true, data: { count: logged.length } }
     }
 
     return { success: false, error: `Unknown CN-UI action: timebox/${action}` }

@@ -41,10 +41,13 @@ intent_triggers:
   - action: logTimebox
     shortcut: /logTimebox
     description: 记录时间盒的执行结果
+    response_type: cnui
+    cnui_surface: log-timebox
     examples:
       - 记录执行结果
       - 这个时间盒完成度80%
-    keywords: [记录, log]
+      - 打卡所有时间盒
+    keywords: [记录, log, 打卡]
   - action: viewSchedule
     shortcut: /schedule
     description: 查看今日时间盒日程
@@ -291,5 +294,8 @@ cnui_surfaces:
     handler: ./cnui/handlers
   adjust-schedule:
     description: 调整日程（按时间序列左右翻页，diff 提交，running/ended 禁取消）
+    handler: ./cnui/handlers
+  log-timebox:
+    description: 批量打卡（三态：完成/未完成/跳过 + 备注，逐条走 logTimebox）
     handler: ./cnui/handlers
 

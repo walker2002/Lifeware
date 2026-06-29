@@ -16,6 +16,7 @@ import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
 import { TimeboxList } from './cnui/surfaces/TimeboxList'
 import { CreateTimebox } from './cnui/surfaces/create-timebox'
 import { AdjustSchedule } from './cnui/surfaces/adjust-schedule'
+import { LogTimebox } from './cnui/surfaces/log-timebox'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
@@ -33,6 +34,12 @@ cnuiRegistry.register('timebox', 'create-timebox', {
 // [023] A2.6 — adjustSchedule CNUI surface（按时间序列左右翻页，diff 提交）
 cnuiRegistry.register('timebox', 'adjust-schedule', {
   component: AdjustSchedule,
+  handlerModulePath,
+})
+
+// [023] A2.7 — logTimebox CNUI surface（批量打卡三态 + 备注）
+cnuiRegistry.register('timebox', 'log-timebox', {
+  component: LogTimebox,
   handlerModulePath,
 })
 
