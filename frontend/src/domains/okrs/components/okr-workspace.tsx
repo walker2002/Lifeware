@@ -225,7 +225,13 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
           <h1 className="text-base font-semibold text-ink">OKR 工作台</h1>
         </div>
       )}
-      <div ref={containerRef} className={`flex ${standalone ? "flex-1 min-h-0" : "h-full"}`}>
+      {/* [024.1] B5：AppShell 路径用 absolute inset-0 绕过 Chromium 顽固 bug——
+        被 stretch 的 flex item 的子元素 height:%/flex-basis:% 不解析为确定高度
+        （overflow-hidden + h-full + 去 flex-col 组合都救不了）。main 是 relative，
+        absolute inset-0 直接填满 main (712px)，彻底绕开 flex 百分比解析。standalone
+        路径保留 flex flex-1 min-h-0（父级是 explicit h-screen flex-col，无此 bug，
+        且有 header 兄弟需取剩余高度，h-full 会重叠 header）。 */}
+      <div ref={containerRef} className={`${standalone ? "flex flex-1 min-h-0" : "absolute inset-0 flex"}`}>
       <div
         className="shrink-0 overflow-y-auto min-h-0 lw-scrollbar-thin"
         style={{ width: leftWidth }}
