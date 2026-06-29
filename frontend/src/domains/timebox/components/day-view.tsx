@@ -10,16 +10,17 @@ interface DayViewProps {
   currentDate: Date
   onDateSelect?: (date: Date) => void
   onAction?: (timeboxId: string, action: string) => void
+  onEdit?: (tb: TimeboxSummary) => void   // [023] A2 C1：卡片标题点击进入编辑
 }
 
-export function DayView({ timeboxes, currentDate, onDateSelect, onAction }: DayViewProps) {
+export function DayView({ timeboxes, currentDate, onDateSelect, onAction, onEdit }: DayViewProps) {
   const sorted = [...timeboxes].sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
   )
 
   return (
     <div className="grid w-full gap-4 md:[grid-template-columns:30%_40%_30%] max-md:grid-cols-1">
-      <TimeboxList timeboxes={sorted} compact onAction={onAction} />
+      <TimeboxList timeboxes={sorted} compact onAction={onAction} onEdit={onEdit} />
       <TimeboxTimeline timeboxes={sorted} />
       <div className="hidden md:block">
         <MiniCalendar

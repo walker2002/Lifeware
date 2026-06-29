@@ -186,3 +186,8 @@ export async function deleteTimebox(timeboxId: string): Promise<TimeboxActionRes
   }
   return transitionTimebox(timeboxId, 'cancel', {})
 }
+
+/** 按 id 读完整 Timebox（编辑 Drawer 需要 activityArchetypeId/notes 等 summary 缺失字段） */
+export async function getTimeboxById(timeboxId: string): Promise<Timebox | null> {
+  return new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+}

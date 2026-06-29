@@ -9,6 +9,8 @@ interface TimeboxListProps {
   compact?: boolean;
   /** 状态转换操作回调 */
   onAction?: (timeboxId: string, action: string) => void;
+  /** [023] A2 C1：卡片标题点击进入编辑 Drawer */
+  onEdit?: (tb: TimeboxSummary) => void;
 }
 
 /**
@@ -18,7 +20,7 @@ interface TimeboxListProps {
  * compact=true: 单列紧凑列表。
  * 列表为空时显示空状态提示。
  */
-export function TimeboxList({ timeboxes, compact = false, onAction }: TimeboxListProps) {
+export function TimeboxList({ timeboxes, compact = false, onAction, onEdit }: TimeboxListProps) {
   if (timeboxes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-hairline bg-surface-card p-12">
@@ -31,7 +33,7 @@ export function TimeboxList({ timeboxes, compact = false, onAction }: TimeboxLis
     return (
       <div className="flex flex-col gap-2">
         {timeboxes.map((timebox) => (
-          <TimeboxCard key={timebox.id} timebox={timebox} compact onAction={onAction} />
+          <TimeboxCard key={timebox.id} timebox={timebox} compact onAction={onAction} onEdit={onEdit} />
         ))}
       </div>
     );
@@ -40,7 +42,7 @@ export function TimeboxList({ timeboxes, compact = false, onAction }: TimeboxLis
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {timeboxes.map((timebox) => (
-        <TimeboxCard key={timebox.id} timebox={timebox} onAction={onAction} />
+        <TimeboxCard key={timebox.id} timebox={timebox} onAction={onAction} onEdit={onEdit} />
       ))}
     </div>
   );

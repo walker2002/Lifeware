@@ -14,6 +14,7 @@ import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
 import { TimeboxRepository } from "@/domains/timebox/repository";
+import { ActivityArchetypeRepository } from "@/lib/db/repositories/activity-archetype.repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
 import { HabitRepository } from "@/domains/habits/repository/habit";
@@ -110,9 +111,10 @@ const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
 /**
  * 将 Timebox 对象转换为 TimeboxSummary
  * @param timebox - 时间盒对象
+ * @param archetypeName - 活动原型名（[023] A2 OV#4 死字段最小消费方），来自 ActivityArchetype.l2Name
  * @returns 时间盒摘要
  */
-function timeboxToSummary(timebox: Timebox): TimeboxSummary {
+function timeboxToSummary(timebox: Timebox, archetypeName?: string): TimeboxSummary {
   return {
     id: timebox.id,
     title: timebox.title,
@@ -126,7 +128,27 @@ function timeboxToSummary(timebox: Timebox): TimeboxSummary {
     endedAt: timebox.endedAt,
     loggedAt: timebox.loggedAt,
     executionRecord: timebox.executionRecord,
+    ...(archetypeName ? { archetypeName } : {}),
   };
+}
+
+/**
+ * 批量解析活动原型名（避免 N+1）
+ *
+ * [023] A2 OV#4：按 archetypeId 去重后单次 findById 查表，构造 Map 供 mapper 使用。
+ * 无 archetypeId 或查不到时返回空 Map，mapper 会跳过该字段。
+ */
+async function loadArchetypeNames(archetypeIds: string[]): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(archetypeIds.filter(Boolean)))
+  if (unique.length === 0) return new Map()
+  const repo = new ActivityArchetypeRepository()
+  const entries = await Promise.all(
+    unique.map(async id => {
+      const arch = await repo.findById(id as USOM_ID, MVP_USER_ID)
+      return [id, arch?.l2Name] as const
+    }),
+  )
+  return new Map(entries.filter(([, name]) => Boolean(name)) as Array<[string, string]>)
 }
 
 /**
@@ -147,7 +169,17 @@ async function fetchTimeboxSummariesByRange(
     MVP_USER_ID,
   );
 
-  return timeboxes.map(timeboxToSummary);
+  // 批量解析 archetype 名（去重后单查，避免 N+1）
+  const archetypeNames = await loadArchetypeNames(
+    timeboxes.map(t => t.activityArchetypeId).filter((id): id is string => Boolean(id)) as string[],
+  )
+
+  return timeboxes.map(timebox => {
+    const archName = timebox.activityArchetypeId
+      ? archetypeNames.get(timebox.activityArchetypeId as unknown as string)
+      : undefined
+    return timeboxToSummary(timebox, archName)
+  });
 }
 
 /**
@@ -675,7 +707,16 @@ export async function submitExecutionIntent(
       new Date(new Date().setHours(23, 59, 59, 999)).toISOString() as Timestamp,
       MVP_USER_ID,
     );
-    const summaries = allTimeboxes.map(timeboxToSummary);
+    // 批量解析 archetype 名（与 fetchTimeboxSummariesByRange 保持一致语义）
+    const archetypeNames = await loadArchetypeNames(
+      allTimeboxes.map(t => t.activityArchetypeId).filter((id): id is string => Boolean(id)) as string[],
+    )
+    const summaries = allTimeboxes.map(timebox => {
+      const archName = timebox.activityArchetypeId
+        ? archetypeNames.get(timebox.activityArchetypeId as unknown as string)
+        : undefined
+      return timeboxToSummary(timebox, archName)
+    });
 
     const matchedId = matchTarget(target, summaries);
     if (!matchedId) {

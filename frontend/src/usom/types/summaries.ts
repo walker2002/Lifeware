@@ -46,6 +46,8 @@ export interface TimeboxSummary {
   endedAt?: Timestamp
   loggedAt?: Timestamp
   executionRecord?: import('./objects').ExecutionRecord
+  /** [023] A2 OV#4 死字段最小消费方：活动原型名（来自 ActivityArchetype.l2Name） */
+  archetypeName?: string
 }
 
 export interface ObjectiveSummary {
