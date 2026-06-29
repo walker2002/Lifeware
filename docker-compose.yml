@@ -16,5 +16,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # 生产库（profile=production，端口 5433，与开发库数据完全分离）
+  postgres_prod:
+    image: postgres:16-alpine
+    profiles: ["production"]
+    environment:
+      POSTGRES_USER: lifeware
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-in-production}"
+      POSTGRES_DB: lifeware
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifeware"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  postgres_prod_data:
