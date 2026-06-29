@@ -209,6 +209,7 @@ export type SystemEventType =
   | 'TaskFieldUpdated'
   | 'HabitFieldUpdated'
   | 'OkrFieldUpdated'
+  | 'TimeboxFieldUpdated'
   | 'CycleCreated' | 'CyclePlanned' | 'CycleStarted' | 'CycleEnded' | 'CycleReviewed'
   | 'OnEventDispatchFailed'
 
