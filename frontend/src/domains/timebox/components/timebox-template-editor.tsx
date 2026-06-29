@@ -14,8 +14,9 @@
 
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, LayoutTemplate } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/empty-state'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   saveTimeboxTemplate,
   deleteTimeboxTemplate,
@@ -182,7 +189,12 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
 
         {/* 列表 */}
         {templates.length === 0 ? (
-          <p className="text-sm text-body py-12 text-center">还没有模板</p>
+          <EmptyState
+            icon={LayoutTemplate}
+            title="还没有模板"
+            description="新建一个时间盒模板，定义 7 段生存时间与订阅源"
+            action={{ label: '新建模板', onClick: () => { void ensureSources(); setEditing(blankTemplate()) } }}
+          />
         ) : (
           <div className="space-y-2">
             {templates.map((t) => (
@@ -243,19 +255,14 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
         )}
       </div>
 
-      {/* 编辑/新建 模态 */}
-      {editing && (
-        <div
-          className="fixed inset-0 z-modal flex items-center justify-center bg-scrim"
-          onClick={() => setEditing(null)}
-        >
-          <div
-            className="mx-4 w-full max-w-lg rounded-lg bg-canvas p-6 shadow-lg max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="mb-4 text-sm font-semibold text-ink">
-              {editing.id ? '编辑模板' : '新建模板'}
-            </h2>
+      {/* 编辑/新建 模态（[/review I6] 改用 Dialog 原语：自带 focus-trap/Esc/aria-modal/scroll-lock） */}
+      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing?.id ? '编辑模板' : '新建模板'}</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <>
 
             {/* 名称 */}
             <input
@@ -370,9 +377,10 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
                 )}
               </Button>
             </div>
-          </div>
-        </div>
-      )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 删除确认 AlertDialog */}
       <AlertDialog
@@ -392,7 +400,7 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               删除
             </AlertDialogAction>

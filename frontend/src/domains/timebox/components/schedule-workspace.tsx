@@ -15,7 +15,8 @@ import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
 import { getTimeboxesByRange } from '@/app/actions/intent'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { EmptyState } from '@/components/empty-state'
+import { Plus, CalendarOff } from 'lucide-react'
 import type { Timebox } from '@/usom/types/objects'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 
@@ -78,10 +79,12 @@ export function ScheduleWorkspace() {
               {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
             </div>
           ) : timeboxes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-sm text-body mb-3">今天还没有时间盒</p>
-              <Button size="sm" onClick={() => setDrawer({ mode: 'create' })}>新建一个</Button>
-            </div>
+            <EmptyState
+              icon={CalendarOff}
+              title="今天还没有时间盒"
+              description="创建一个时间盒，开始专注执行"
+              action={{ label: '新建一个', onClick: () => setDrawer({ mode: 'create' }) }}
+            />
           ) : (
             <DayView
               timeboxes={timeboxes}

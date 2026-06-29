@@ -12,6 +12,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Inbox } from 'lucide-react'
 import { getArchetypes } from '@/app/actions/activity-archetype'
 import { EnergyCostAccordion } from './energy-cost-accordion'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
@@ -46,7 +47,7 @@ export function ArchetypePicker({ value, onChange }: ArchetypePickerProps) {
   }, [value])
 
   return (
-    <div className="sub-card rounded-xl bg-surface-card p-5">
+    <div className="rounded-md bg-surface-card p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-ink">活动原型</h3>
         <button
@@ -75,7 +76,10 @@ export function ArchetypePicker({ value, onChange }: ArchetypePickerProps) {
       {pickerOpen && (
         <div className="mt-3 max-h-60 overflow-y-auto rounded-md border border-hairline bg-canvas">
           {archetypes.length === 0 ? (
-            <p className="p-3 text-xs text-body">暂无活动原型，请先到「活动原型配置」创建</p>
+            <p className="flex items-center gap-1.5 p-3 text-xs text-body">
+              <Inbox className="size-3.5 text-muted" />
+              暂无活动原型，请先到「活动原型配置」创建
+            </p>
           ) : (
             archetypes.map(a => (
               <button

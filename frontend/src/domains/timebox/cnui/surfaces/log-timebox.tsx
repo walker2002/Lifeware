@@ -55,10 +55,12 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
     <>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">打卡 ({page + 1}/{items.length})</span>
-        <div className="flex items-center gap-1.5">
-          <button type="button" disabled={page <= 0} onClick={() => setPage(p => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
-          <button type="button" disabled={page >= items.length - 1} onClick={() => setPage(p => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
-        </div>
+        {items.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button type="button" disabled={page <= 0} onClick={() => setPage(p => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
+            <button type="button" disabled={page >= items.length - 1} onClick={() => setPage(p => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
@@ -75,7 +77,9 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
             </button>
           ))}
         </div>
+        <label htmlFor="lt-notes" className="text-xs text-body">备注</label>
         <textarea
+          id="lt-notes"
           value={cur.notes ?? ''} onChange={e => update({ notes: e.target.value })} rows={2}
           placeholder="备注（可选）"
           className="w-full rounded border border-hairline bg-canvas px-2 py-1 text-sm text-ink resize-none"

@@ -4,9 +4,9 @@
  *
  * 纯 TS 模块（无 React / 无 fs），client + server 皆可 import。对齐 [018-G3]/[020]
  * tasks/habits 范式：
- * - realtime（phase: both）：单字段纯函数（title/duration/startTime），客户端 blur
+ * - realtime（phase: both）：单字段纯函数（title/startTime/endTime），客户端 blur
  * - submit（phase: submit）：timebox_fields_valid 聚合规则，复刻原 hooks.ts onValidate
- *   全分支（title 非空 / startTime 有效 ISO / duration 5-480 整数），返回
+ *   全分支（title 非空 / startTime 有效 ISO / endTime 晚于 startTime 且 ≤8 小时），返回
  *   validationRejected(全部 errors)
  *
  * [020] registry 即 SSOT：每条 rule 自带 { check, fields, message } meta。
@@ -34,7 +34,7 @@
  *   `Rejected`，经 `mapServerErrorsToFields` 按 message 匹配回填到 startTime 字段。
  *   用户提交后会立即看到该字段的错误。
  * - 强行在 realtime 给 missing 加 error 会破坏 [018-G3] 部分更新语义 + 与
- *   `titleRequired`/`durationRange`（同样 fail-OPEN for undefined）行为不一致。
+ *   `titleRequired`/`endTimeFormat`（同样 fail-OPEN for undefined）行为不一致。
  * - FieldIssue contract 无 severity 字段，无法区分"required hint"与"format error"。
  *   升级 contract 影响 habits/tasks/okrs 三域 G3 系统，超出 A0 范围。
  *
@@ -46,11 +46,6 @@
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { DomainRuleRegistry, RealtimeCheck, SubmitCheck } from '@/nexus/rules'
 import type { StructuredIntent } from '@/usom/types/objects'
-
-/** 最小持续时间（分钟） */
-const MIN_DURATION = 5
-/** 最大持续时间（分钟） */
-const MAX_DURATION = 480
 
 /** timebox 规则提示文案（单源，与 realtime message 同源） */
 const TIMEBOX_RULE_MESSAGES = {

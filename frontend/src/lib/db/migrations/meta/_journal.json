@@ -159,12 +159,26 @@
     {
       "idx": 22,
       "version": "7",
+      "when": 1782500000000,
+      "tag": "0021_activity_archetypes",
+      "breakpoints": false
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782550000000,
+      "tag": "0022_activity_archetypes_drop_activity_label_default",
+      "breakpoints": false
+    },
+    {
+      "idx": 24,
+      "version": "7",
       "when": 1782600000000,
       "tag": "0023_timebox_activity_archetype_fk",
       "breakpoints": false
     },
     {
-      "idx": 23,
+      "idx": 25,
       "version": "7",
       "when": 1782800000000,
       "tag": "0024_timebox_templates",

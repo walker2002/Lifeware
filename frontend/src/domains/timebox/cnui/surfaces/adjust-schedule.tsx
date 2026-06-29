@@ -56,20 +56,28 @@ export function AdjustSchedule({ dataModel, onDataChange, onConfirm, onCancel, i
     <>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">调整日程 ({page + 1}/{items.length})</span>
-        <div className="flex items-center gap-1.5">
-          <button type="button" disabled={page <= 0} onClick={() => setPage((p) => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
-          <button type="button" disabled={page >= items.length - 1} onClick={() => setPage((p) => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
-        </div>
+        {items.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button type="button" disabled={page <= 0} onClick={() => setPage((p) => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
+            <button type="button" disabled={page >= items.length - 1} onClick={() => setPage((p) => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
         <div>
-          <label className="text-xs text-body">标题</label>
-          <input type="text" value={cur.title} onChange={(e) => update({ title: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+          <label htmlFor="as-title" className="text-xs text-body">标题</label>
+          <input id="as-title" type="text" value={cur.title} onChange={(e) => update({ title: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
         </div>
         <div className="flex items-center gap-2">
-          <input type="text" value={cur.startTime} onChange={(e) => update({ startTime: e.target.value })} className="h-7 flex-1 rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
-          <input type="text" value={cur.endTime} onChange={(e) => update({ endTime: e.target.value })} className="h-7 flex-1 rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+          <div className="flex-1">
+            <label htmlFor="as-start" className="text-xs text-body">开始</label>
+            <input id="as-start" type="text" value={cur.startTime} onChange={(e) => update({ startTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+          </div>
+          <div className="flex-1">
+            <label htmlFor="as-end" className="text-xs text-body">结束</label>
+            <input id="as-end" type="text" value={cur.endTime} onChange={(e) => update({ endTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+          </div>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted">状态：{cur.status}</span>

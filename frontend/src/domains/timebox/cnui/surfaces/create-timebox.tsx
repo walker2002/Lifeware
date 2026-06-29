@@ -45,25 +45,27 @@ export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, is
     <>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-ink">创建时间盒 ({page + 1}/{items.length})</span>
-        <div className="flex items-center gap-1.5">
-          <button type="button" disabled={page <= 0} onClick={() => setPage(p => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
-          <button type="button" disabled={page >= items.length - 1} onClick={() => setPage(p => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
-        </div>
+        {items.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button type="button" disabled={page <= 0} onClick={() => setPage(p => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
+            <button type="button" disabled={page >= items.length - 1} onClick={() => setPage(p => p + 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">›</button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
         <div>
-          <label className="text-xs text-body">标题</label>
-          <input type="text" value={cur.title} onChange={e => update({ title: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+          <label htmlFor="ct-title" className="text-xs text-body">标题</label>
+          <input id="ct-title" type="text" value={cur.title} onChange={e => update({ title: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1">
-            <label className="text-xs text-body">开始</label>
-            <input type="text" value={cur.startTime} onChange={e => update({ startTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+            <label htmlFor="ct-start" className="text-xs text-body">开始</label>
+            <input id="ct-start" type="text" value={cur.startTime} onChange={e => update({ startTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
           </div>
           <div className="flex-1">
-            <label className="text-xs text-body">结束</label>
-            <input type="text" value={cur.endTime} onChange={e => update({ endTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+            <label htmlFor="ct-end" className="text-xs text-body">结束</label>
+            <input id="ct-end" type="text" value={cur.endTime} onChange={e => update({ endTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
           </div>
         </div>
       </div>

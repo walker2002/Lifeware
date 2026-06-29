@@ -20,6 +20,32 @@ import type { USOM_ID } from '@/usom/types/primitives'
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 /**
+ * [023] A2 /review fix（C2）：字段写白名单。
+ *
+ * updateTimebox 走 mutation service 直写（不经 SM），客户端是 RPC 可任意构造 fields。
+ * 若放行 status/startedAt/endedAt/loggedAt/overtimeAt 等生命周期列，客户端可绕过
+ * 状态机把 planned 直接写成 logged。故仅允许这些「编辑态」列；状态转换必须走
+ * transitionTimebox（SM）。
+ */
+const UPDATE_ALLOWED_FIELDS = new Set([
+  'title',
+  'startTime',
+  'endTime',
+  'activityArchetypeId',
+  'notes',
+])
+
+/** [023] A2 /review fix（C2）：edit 路径同样守住 endTime>startTime 且 ≤8h（与 rule-engine 对齐） */
+function assertEndTimeValid(startTime: unknown, endTime: unknown): void {
+  if (typeof startTime !== 'string' || typeof endTime !== 'string') return
+  const s = Date.parse(startTime)
+  const e = Date.parse(endTime)
+  if (isNaN(s) || isNaN(e)) return // 格式非法由字段执行器/规则层兜底
+  if (e <= s) throw new Error('结束时间必须晚于开始时间')
+  if ((e - s) / 3_600_000 > 8) throw new Error('时间盒持续超过 8 小时上限，建议拆分')
+}
+
+/**
  * A3 owner-check：activityArchetypeId 必须属于当前用户。
  * FK 约束只证「存在」不证「租户隔离」——跨用户 archetype id 仍能命中 FK，
  * 故写前显式按 (id, userId) 校验归属（参 learning fk-doesnt-enforce-tenant-isolation）。
@@ -135,9 +161,13 @@ export async function updateTimebox(
   try {
     // A3 owner-check：archetype 归属校验（字段写路径同样校验）
     if (typeof fields.activityArchetypeId === 'string') await assertArchetypeOwned(fields.activityArchetypeId)
+    // [023] A2 /review fix（C2）：字段白名单——丢弃 status 等生命周期列，堵住绕过状态机
     const fieldSteps = Object.entries(fields)
       .filter(([, v]) => v !== undefined)
+      .filter(([k]) => UPDATE_ALLOWED_FIELDS.has(k))
       .map(([field, value]) => ({ kind: 'field' as const, field, value }))
+    // 跨字段不变量：startTime/endTime 同现时校验（edit 路径不走 SM 的 EndTimeAfterStartRule）
+    assertEndTimeValid(fields.startTime, fields.endTime)
 
     // 无字段可写：直接读回当前时间盒返回（保持契约——成功且有 timebox）
     if (fieldSteps.length === 0) {
@@ -173,16 +203,18 @@ export async function updateTimebox(
 /**
  * 删除（cancel 软退场；硬删 MVP 不提供，编辑模式「删除」= cancel）
  *
- * [023] A2 OV#8 状态守卫：cancel 仅对 planned/running 合法。对 ended/logged/cancelled
- * 调 cancelTimebox 会触发 SM 非法转换错误（崩溃），故派发前显式拒绝并给清晰提示。
+ * [023] A2 OV#8 状态守卫：cancel 仅对 planned 合法（SM 只有 planned→cancelled 转换，
+ * 无 running→cancelled）。对 running/ended/logged/cancelled 调 cancelTimebox 会触发
+ * SM 非法转换错误（500），故派发前显式拒绝并给清晰提示。
+ * [/review I1] 原 CANCELABLE_STATUSES 误含 running（OV#8 注释声称可取消但 SM 拒绝）→ 已修正。
  */
-const CANCELABLE_STATUSES = new Set(['planned', 'running'])
+const CANCELABLE_STATUSES = new Set(['planned'])
 
 export async function deleteTimebox(timeboxId: string): Promise<TimeboxActionResult> {
   const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
   if (!CANCELABLE_STATUSES.has(tb.status)) {
-    throw new Error(`该时间盒已${tb.status === 'logged' ? '记录' : '结束'}，不可删除（仅未开始/进行中可取消）`)
+    throw new Error(`该时间盒${tb.status === 'running' ? '进行中' : tb.status === 'logged' ? '已记录' : '已结束'}，不可删除（仅未开始可取消；进行中请先结束）`)
   }
   return transitionTimebox(timeboxId, 'cancel', {})
 }

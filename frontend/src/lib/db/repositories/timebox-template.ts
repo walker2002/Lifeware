@@ -9,7 +9,7 @@
  * @see docs/database-design.md §7.8
  */
 
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import type { DbClient } from '@/lib/db'
 import * as s from '@/lib/db/schema'
@@ -226,37 +226,40 @@ export class TimeboxTemplateRepository {
   }
 
   private async _checkHabits(ids: string[], userId: USOM_ID, client: DbClient): Promise<void> {
-    // 内联查询（避免引入 HabitRepository 形成跨域耦合）
+    // [I2 perf] inArray 收窄到订阅 id（最多 ids.length 行），避免全用户表扫；userId 仍走索引前缀保租户隔离
+    const uniqueIds = [...new Set(ids)]
     const rows = await client
       .select({ id: s.habits.id })
       .from(s.habits)
-      .where(and(eq(s.habits.userId, userId)))
+      .where(and(eq(s.habits.userId, userId), inArray(s.habits.id, uniqueIds)))
     const owned = new Set(rows.map((r) => r.id))
-    const missing = ids.filter((id) => !owned.has(id as USOM_ID))
+    const missing = uniqueIds.filter((id) => !owned.has(id as USOM_ID))
     if (missing.length > 0) {
       throw new Error(`订阅的习惯 ${missing.join(', ')} 不存在或不属于当前用户`)
     }
   }
 
   private async _checkTasks(ids: string[], userId: USOM_ID, client: DbClient): Promise<void> {
+    const uniqueIds = [...new Set(ids)]
     const rows = await client
       .select({ id: s.tasks.id })
       .from(s.tasks)
-      .where(and(eq(s.tasks.userId, userId)))
+      .where(and(eq(s.tasks.userId, userId), inArray(s.tasks.id, uniqueIds)))
     const owned = new Set(rows.map((r) => r.id))
-    const missing = ids.filter((id) => !owned.has(id as USOM_ID))
+    const missing = uniqueIds.filter((id) => !owned.has(id as USOM_ID))
     if (missing.length > 0) {
       throw new Error(`订阅的任务 ${missing.join(', ')} 不存在或不属于当前用户`)
     }
   }
 
   private async _checkThreads(ids: string[], userId: USOM_ID, client: DbClient): Promise<void> {
+    const uniqueIds = [...new Set(ids)]
     const rows = await client
       .select({ id: s.threads.id })
       .from(s.threads)
-      .where(and(eq(s.threads.userId, userId)))
+      .where(and(eq(s.threads.userId, userId), inArray(s.threads.id, uniqueIds)))
     const owned = new Set(rows.map((r) => r.id))
-    const missing = ids.filter((id) => !owned.has(id as USOM_ID))
+    const missing = uniqueIds.filter((id) => !owned.has(id as USOM_ID))
     if (missing.length > 0) {
       throw new Error(`订阅的主线 ${missing.join(', ')} 不存在或不属于当前用户`)
     }
