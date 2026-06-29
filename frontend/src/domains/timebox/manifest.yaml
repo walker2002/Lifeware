@@ -215,19 +215,21 @@ subscribed_events:
   - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
+# 仅列真页面跳转（[023] A2.9 OV#P3-#6 锁定）：
+# - createTimebox 不绑 view_route（CNUI-only action，入口是 AI 助手翻页，
+#   不绑 view_route；OV#P3-#6 移除）
+# - 其余 view_route 沿用 src/app/<route>/page.tsx 路径，component 字段
+#   标识实际入口组件（[023] A2.3 / A2.8 真实页面）。
 view_routes:
-  createTimebox:
-    component: domains/timebox/pages/TimeboxFormPage
-    url: /timeboxes/new
-    params:
-      mode: create
-  view_schedule:
-    component: domains/timebox/pages/SchedulePage
+  viewSchedule:
+    component: app/schedule/page
     url: /schedule
+  config_timebox_templates:
+    component: app/timebox-templates/page
+    url: /timebox-templates
   config_activity_archetypes:
     component: app/config/activity-archetypes/page
     url: /config/activity-archetypes
-    params: {}
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
