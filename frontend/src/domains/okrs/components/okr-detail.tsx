@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
+import type { Objective, KeyResult } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -45,12 +45,6 @@ interface OKRDetailProps {
   onDeleteKR: (id: string) => Promise<boolean>
   /** 返回回调 */
   onBack: () => void
-  /** [022] 周期列表（透传至 OKRForm 编辑模式） */
-  cycles: Cycle[]
-  /** [022] 周期列表加载中 */
-  isLoadingCycles: boolean
-  /** [022] 新建周期回调 */
-  onCreateCycle: (cycle: Cycle) => Promise<Cycle>
 }
 
 /** 状态标签映射 */
@@ -66,7 +60,6 @@ const STATUS_LABELS: Record<string, string> = {
 export function OKRDetail({
   objectiveId, onLoad, onUpdate, onActivate, onChangeStatus,
   onAddKR, onUpdateKRProgress, onDeleteKR, onBack,
-  cycles, isLoadingCycles, onCreateCycle,
 }: OKRDetailProps) {
   const [data, setData] = useState<ObjectiveWithKR | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -179,9 +172,6 @@ export function OKRDetail({
           }}
           onSubmit={handleSaveEdit}
           onCancel={() => setIsEditing(false)}
-          cycles={cycles}
-          isLoadingCycles={isLoadingCycles}
-          onCreateCycle={onCreateCycle}
         />
       </div>
     )
@@ -240,7 +230,7 @@ export function OKRDetail({
                 {actionLoading === sa.action ? "处理中..." : sa.label}
               </Button>
             ))}
-            {obj.status === "draft" && (
+            {(obj.status === "draft" || obj.status === "active") && (
               <Button variant="outline" onClick={() => setIsEditing(true)}>编辑</Button>
             )}
             {obj.status === "archived" && (

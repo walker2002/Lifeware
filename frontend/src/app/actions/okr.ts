@@ -130,6 +130,39 @@ export async function createCycle(cycle: Cycle): Promise<OKRActionResult<Cycle>>
   }
 }
 
+/**
+ * 删除周期（[024] G1：周期管理重构）
+ *
+ * 业务规则：周期下若仍有挂载的目标（任意状态，含 archived），
+ * 一律拒绝删除，避免悬空引用。
+ *
+ * 与 createCycle 一致：单行硬删 + 前置读检查，
+ * 不经 mutation-service / orchestrator —— 不存在跨表副作用
+ * （KR recompute 路径不触发；event fan-out 暂无）。
+ *
+ * 例外登记：write-entry-guard.test.ts 的 allow 列表
+ *
+ * @param cycleId - 待删除周期 ID
+ * @returns success=true 表示已删；success=false 表示拒绝（附 error）
+ */
+export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void>> {
+  try {
+    const objRepo = new ObjectiveRepository();
+    const cycleRepo = new CycleRepository();
+    const objs = await objRepo.findByCycleId(cycleId, MVP_USER_ID);
+    if (objs.length > 0) {
+      return { success: false, error: "周期下仍有目标，请先处理后再删除" };
+    }
+    const deleted = await cycleRepo.delete(cycleId, MVP_USER_ID);
+    if (deleted === 0) {
+      return { success: false, error: "周期不存在或已删除" };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "删除周期失败" };
+  }
+}
+
 // ─── 操作 ────────────────────────────────────────────────────────
 
 /**

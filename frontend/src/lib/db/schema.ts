@@ -134,6 +134,9 @@ export const keyResults = pgTable('key_results', {
   unit: text('unit').notNull(),
   progressRate: numeric('progress_rate', { precision: 10, scale: 4 }).notNull().default('0'),
 
+  // [024] G2：达成信心度（0-100），默认 50；由 T1 migration 0021 加列
+  confidence: integer('confidence').notNull().default(50),
+
   dueDate: date('due_date'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -144,6 +147,7 @@ export const keyResults = pgTable('key_results', {
 }, (table) => [
   check('check_key_results_target_positive', sql`${table.targetValue} > 0`),
   check('check_key_results_current_within_target', sql`${table.currentValue} >= 0 AND ${table.currentValue} <= ${table.targetValue}`),
+  check('check_key_results_confidence_range', sql`${table.confidence} BETWEEN 0 AND 100`),
   index('idx_key_results_user_status').on(table.userId, table.status),
   index('idx_key_results_objective').on(table.objectiveId),
   index('idx_key_results_due_date').on(table.userId, table.dueDate),

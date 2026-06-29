@@ -1,3 +1,8 @@
+/**
+ * @file mappers
+ * @brief USOM ↔ DB 行类型双向映射函数
+ * @details 把 Drizzle 行对象转 USOM 对象（或反之），覆盖 User/Task/Habit/Objective/KeyResult 等核心域。
+ */
 // USOM <-> DB Mapping Functions
 // Bidirectional conversion between USOM objects and Drizzle row types.
 
@@ -504,6 +509,8 @@ type KeyResultRow = {
   title: string; description: string | null;
   targetValue: string; currentValue: string;
   unit: string; progressRate: string;
+  // [024] G2 confidence 映射（0-100；缺省回退 50，匹配 DB DEFAULT）
+  confidence: number;
   dueDate: string | null;
   createdAt: Date; updatedAt: Date;
   discardedAt: Date | null; completedAt: Date | null; archivedAt: Date | null;
@@ -519,6 +526,8 @@ export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
     currentValue: Number(row.currentValue),
     unit: row.unit,
     progressRate: Number(row.progressRate),
+    // [024] G2 confidence：缺省回退 50，对齐 DB DEFAULT
+    confidence: (row as any).confidence ?? 50,
     status: row.status as KeyResult['status'],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
     discardedAt: toISO(row.discardedAt),
@@ -543,6 +552,8 @@ export function keyResultUSOMToRow(kr: KeyResult, userId: USOM_ID) {
     currentValue: String(kr.currentValue),
     unit: kr.unit,
     progressRate: String(kr.progressRate),
+    // [024] G2 confidence：USOM 缺省回退 50
+    confidence: kr.confidence ?? 50,
     dueDate: kr.dueDate ?? null,
     discardedAt: toDate(kr.discardedAt),
   }

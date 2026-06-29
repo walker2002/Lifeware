@@ -116,7 +116,7 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
             data-okr-import-editor
             value={markdown}
             onChange={e => setMarkdown(e.target.value)}
-            className="w-full h-full min-h-[400px] p-3 rounded-md border font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full max-h-[60vh] p-3 rounded-md border font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring overflow-y-auto"
             placeholder="OKR Markdown 内容..."
           />
         ) : (
@@ -139,8 +139,8 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
           <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentObjIndex <= 0}>
             ← 上一个
           </Button>
-          <span className="text-xs text-muted-foreground min-w-[3rem] text-center">
-            {objectiveCount > 0 ? `${currentObjIndex + 1}/${objectiveCount}` : '0/0'}
+          <span className="text-xs text-muted-foreground min-w-[4rem] text-center">
+            {objectiveCount > 0 ? `目标 ${currentObjIndex + 1}/${objectiveCount}` : '目标 0/0'}
           </span>
           <Button variant="outline" size="sm" onClick={handleNext} disabled={currentObjIndex >= objectiveCount - 1}>
             下一个 →

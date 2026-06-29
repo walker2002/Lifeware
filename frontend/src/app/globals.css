@@ -336,3 +336,33 @@ body {
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--primary);
 }
+
+/* ========================================================================
+   细滚动条工具类 — 用于 flex 子容器内独立滚动区域（如 OKR 工作台左侧目录）
+   ======================================================================== */
+/* lw-scrollbar-thin：克制、与项目暖米色设计语言和谐的滚动条。
+   - track = surface-cream-strong（暖奶白面色）→ 与 canvas 微差，作为
+     浅 gutter 暗示"可滚动区域"
+   - thumb = muted-soft（暖中灰）→ 明显深于 track 但不刺眼，与次要文字
+     同色系
+   - width 8px（thin，不过分）
+   hover thumb → body-strong 给深色反馈
+   [024.1] B5：PostCSS 不保留 color-mix，track 用实色令牌。 */
+.lw-scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-soft) var(--surface-cream-strong);
+}
+.lw-scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.lw-scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--muted-soft);
+  border-radius: 4px;
+}
+.lw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--body-strong);
+}
+.lw-scrollbar-thin::-webkit-scrollbar-track {
+  background: var(--surface-cream-strong);
+}

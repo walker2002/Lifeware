@@ -234,6 +234,8 @@ export interface KeyResult {
   currentValue: number
   unit: string
   progressRate: number
+  // [024] 达成信心度（0-100 百分比），默认 50
+  confidence: number
   status: KeyResultStatus
   dueDate?: DateOnly
   discardedAt?: Timestamp

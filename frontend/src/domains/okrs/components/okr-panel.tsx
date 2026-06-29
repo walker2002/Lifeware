@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
+import type { Objective, KeyResult } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -29,14 +29,12 @@ interface OKRPanelProps {
   onChangeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<void>
   onAddKR?: (input: { title: string; description?: string; targetValue: number; unit: string }) => Promise<KeyResult | null>
   onUpdateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
+  /** [024] G2 信心度更新回调 */
+  onConfidenceUpdate?: (krId: string, confidence: number) => Promise<KeyResult | null>
   onDeleteKR: (id: string) => Promise<boolean>
   onReload?: () => Promise<void>
-  /** [022] 周期列表（透传至 OKRForm） */
-  cycles?: Cycle[]
-  /** [022] 周期列表加载中 */
-  isLoadingCycles?: boolean
-  /** [022] 新建周期回调 */
-  onCreateCycle?: (cycle: Cycle) => Promise<Cycle>
+  /** [024] G1：预设周期 ID，create 模式下透传至 OKRForm（来自工作台 CycleCreateDrawer 旁的「为该周期创建 OKR」入口） */
+  presetCycleId?: string
   /** [022] 3A-T2：触发外部 OKRImportDialog（由 OKRWorkspace 注入） */
   onImportTrigger?: () => void
 }
@@ -54,8 +52,8 @@ const PRIORITY_LABELS: Record<string, { label: string; variant: "destructive" | 
 
 export function OKRPanel({
   mode, data, isCreating, onBack, onEdit, onSaveCreate, onSaveEdit,
-  onActivate, onChangeStatus, onAddKR, onUpdateKRProgress, onDeleteKR, onReload,
-  cycles = [], isLoadingCycles = false, onCreateCycle = async (c) => c,
+  onActivate, onChangeStatus, onAddKR, onUpdateKRProgress, onConfidenceUpdate, onDeleteKR, onReload,
+  presetCycleId,
   onImportTrigger,
 }: OKRPanelProps) {
   const [isAddingKR, setIsAddingKR] = useState(false)
@@ -79,7 +77,7 @@ export function OKRPanel({
     return (
       <div className="p-4">
         <h2 className="text-lg font-semibold mb-4">创建新 OKR</h2>
-        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} cycles={cycles} isLoadingCycles={isLoadingCycles} onCreateCycle={onCreateCycle} onImportTrigger={onImportTrigger} />
+        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} presetCycleId={presetCycleId} onImportTrigger={onImportTrigger} />
       </div>
     )
   }
@@ -100,13 +98,10 @@ export function OKRPanel({
             okrType: obj.okrType,
             priority: obj.priority,
             cycleId: obj.cycleId,
-            keyResults: krs.map(kr => ({ title: kr.title, targetValue: kr.targetValue, unit: kr.unit })),
+            keyResults: krs.map(kr => ({ title: kr.title, targetValue: kr.targetValue, unit: kr.unit, confidence: kr.confidence })),
           }}
           onSubmit={onSaveEdit}
           onCancel={onBack}
-          cycles={cycles}
-          isLoadingCycles={isLoadingCycles}
-          onCreateCycle={onCreateCycle}
           onImportTrigger={onImportTrigger}
         />
       </div>
@@ -211,7 +206,7 @@ export function OKRPanel({
               {actionLoading === sa.action ? "处理中..." : sa.label}
             </Button>
           ))}
-          {obj.status === "draft" && (
+          {(obj.status === "draft" || obj.status === "active") && (
             <Button variant="outline" onClick={onEdit}>编辑</Button>
           )}
           {obj.status === "archived" && (
@@ -229,9 +224,9 @@ export function OKRPanel({
         </div>
 
         {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map((kr, index) => (
-          <Card key={kr.id}>
+          <Card key={kr.id} className="border-hairline">
             <CardContent className="pt-4 space-y-2">
-              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
+              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} onConfidenceUpdate={onConfidenceUpdate} />
               {kr.status === "draft" && (
                 <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
                   删除
@@ -242,7 +237,7 @@ export function OKRPanel({
         ))}
 
         {isAddingKR && (
-          <Card>
+          <Card className="border-hairline">
             <CardContent className="pt-4 space-y-2">
               <Input placeholder="KR 标题" value={newKR.title} onChange={e => setNewKR({ ...newKR, title: e.target.value })} />
               <div className="flex gap-2">

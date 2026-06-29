@@ -5,6 +5,8 @@
  * 提供 OKR 创建和编辑的表单界面。
  * [022] 1C-T15：period 三字段 → cycleId 选择器（四态：空/必填/两步写/loading）。
  * [022] 3A-T2：ModeSwitcher（手动 | AI 导入）+ TemplateSelector（3 个硬编码模板）。
+ * [024] G1：周期选择器 + 内联新建表单迁出至 CycleCreateDrawer/T13 工作台 wiring；
+ *       OKRForm 仅保留 presetCycleId 透传 + KR 信心度输入。
  */
 
 "use client"
@@ -22,8 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Cycle } from "@/usom/types/objects"
-import type { USOM_ID } from "@/usom/types/primitives"
 
 /**
  * OKR 表单字段
@@ -35,7 +35,7 @@ export interface OKRFormFields {
   priority: "P0" | "P1" | "P2"
   /** [022] 权威周期归属，替代原 periodType/periodStart/periodEnd */
   cycleId: string
-  keyResults: { title: string; targetValue: number; unit: string }[]
+  keyResults: { title: string; targetValue: number; unit: string; /** [024] G2 信心度（0-100），留空时提交时默认 50 */ confidence?: number }[]
 }
 
 /**
@@ -77,19 +77,41 @@ const TEMPLATES: OKRTemplate[] = [
   },
 ]
 
+/**
+ * [024.1] T3：导出 OKR 模板到 Markdown 字符串，供下载用。
+ *
+ * 格式与 okr-import 的解析器约定保持一致：
+ *   - ## Objective: <模板名> (type: <okrType>, priority: <priority>)
+ *   - ### KR <n>: <模板 KR title 或序号>
+ *     - 目标值: <targetValue><unit>
+ *
+ * 模板中 KR.title 为空时填「KR <n>」占位,保证解析后 KR 数与 keyResults.length 一致。
+ */
+export function okrExportTemplatesToMarkdown(): string {
+  const lines: string[] = ["# OKR 填写模板", ""]
+  lines.push("复制下面的 Objective/KR 段,填写后通过「导入 OKR」上传即可。")
+  lines.push("")
+  for (const tpl of TEMPLATES) {
+    lines.push(`## Objective: ${tpl.name} (type: ${tpl.objectiveDefaults.okrType}, priority: ${tpl.objectiveDefaults.priority})`)
+    tpl.keyResults.forEach((kr, i) => {
+      const krTitle = kr.title.trim() || `KR ${i + 1}`
+      lines.push(`### KR ${i + 1}: ${krTitle}`)
+      lines.push(`- 目标值: ${kr.targetValue}${kr.unit}`)
+    })
+    lines.push("")
+  }
+  return lines.join("\n")
+}
+
 interface OKRFormProps {
   initial?: Partial<OKRFormFields>
-  /** [022] 表单从外部获取周期列表（由 useOKRs / 调用方传入） */
-  cycles: Cycle[]
-  /** 周期列表加载中 */
-  isLoadingCycles: boolean
   /**
-   * 新建周期回调。
-   * [022] MVP 取舍：创建 cycle 与创建 objective 是两步 server action，
-   * objective 失败不会回滚已创建的 cycle（下次可直接选），
-   * 但表单保留已填内容 + errors 区提示「周期已创建，请重试保存目标」。
+   * [024] G1：预设周期 ID。
+   * 来自工作台 CycleCreateDrawer 旁的「为该周期创建 OKR」入口，
+   * 透传至表单以确保提交时 cycleId 必有值。
+   * edit 模式下不传（保留原 cycleId）。
    */
-  onCreateCycle: (cycle: Cycle) => Promise<Cycle>
+  presetCycleId?: string
   onSubmit: (fields: OKRFormFields) => void
   onCancel?: () => void
   isLoading?: boolean
@@ -102,32 +124,23 @@ interface OKRFormProps {
 }
 
 export function OKRForm({
-  initial, onSubmit, onCancel, isLoading, cycles, isLoadingCycles, onCreateCycle, onImportTrigger,
+  initial, presetCycleId, onSubmit, onCancel, isLoading, onImportTrigger,
 }: OKRFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [okrType, setOkrType] = useState<"visionary" | "committed">(initial?.okrType ?? "committed")
   const [priority, setPriority] = useState<"P0" | "P1" | "P2">(initial?.priority ?? "P1")
-  const [cycleId, setCycleId] = useState(initial?.cycleId ?? "")
-  const [showNewCycleForm, setShowNewCycleForm] = useState(false)
-  // 新建周期字段
-  const [newCycleType, setNewCycleType] = useState<Cycle['cycleType']>("quarterly")
-  const [newCycleName, setNewCycleName] = useState("")
-  const [newCycleStart, setNewCycleStart] = useState("")
-  const [newCycleEnd, setNewCycleEnd] = useState("")
-  const [keyResults, setKeyResults] = useState<{ title: string; targetValue: number; unit: string }[]>(
+  // [024] G1：周期由 presetCycleId 透传 + initial.cycleId（edit 模式）联合提供，
+  // 不再渲染周期选择器 UI。
+  const [cycleId] = useState(initial?.cycleId ?? presetCycleId ?? "")
+  const [keyResults, setKeyResults] = useState<{ title: string; targetValue: number; unit: string; confidence?: number }[]>(
     initial?.keyResults ?? [{ title: "", targetValue: 100, unit: "%" }],
   )
   const [errors, setErrors] = useState<string[]>([])
-  /** [022] 是否为内联新建 cycle 提交中（独立于外部 isLoading） */
-  const [isCreatingCycle, setIsCreatingCycle] = useState(false)
   /** [022] 3A-T2：表单模式——手动输入 | AI 导入 */
   const [formMode, setFormMode] = useState<"manual" | "ai-import">("manual")
   /** [022] 3A-T2：当前选中的模板 ID（用于 TemplateSelector 受控展示） */
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
-
-  // 四态-1：空状态——cycles 为空时自动展开新建表单
-  const cyclesEmpty = !isLoadingCycles && cycles.length === 0 && !showNewCycleForm
 
   /**
    * [022] 3A-T2：应用模板到表单。
@@ -155,7 +168,7 @@ export function OKRForm({
     setKeyResults(keyResults.filter((_, i) => i !== index))
   }
 
-  const updateKR = (index: number, field: string, value: string | number) => {
+  const updateKR = (index: number, field: string, value: string | number | undefined) => {
     const updated = [...keyResults]
     updated[index] = { ...updated[index], [field]: value }
     setKeyResults(updated)
@@ -165,7 +178,9 @@ export function OKRForm({
     const errs: string[] = []
     if (!title.trim()) errs.push("目标标题必填")
     if (title.length > 200) errs.push("标题不能超过 200 字符")
-    // 四态-2：cycleId 必填校验
+    // [024] G1：cycleId 校验保留——presetCycleId 模式下必有值，
+    // edit 模式沿用 initial.cycleId，无 presetCycleId 的创建入口（T13 透传）
+    // 不应出现在生产路径。
     if (!cycleId) errs.push("请选择或创建周期")
     keyResults.forEach((kr, i) => {
       if (!kr.title.trim()) errs.push(`KR${i + 1}: 标题必填`)
@@ -173,42 +188,6 @@ export function OKRForm({
       if (!kr.unit.trim()) errs.push(`KR${i + 1}: 单位必填`)
     })
     return errs
-  }
-
-  /**
-   * [022] 处理内联新建 Cycle 提交。
-   * 两步写：建 cycle 是第一步，建 objective 是第二步。
-   * cycle 成功但 objective 失败时，cycle 已持久化，下次可直接选。
-   */
-  const handleCreateCycle = async () => {
-    const now = new Date()
-    const start = newCycleStart || now.toISOString().slice(0, 10)
-    const end = newCycleEnd || (() => {
-      const d = new Date(now)
-      d.setMonth(d.getMonth() + 3)
-      return d.toISOString().slice(0, 10)
-    })()
-
-    setIsCreatingCycle(true)
-    try {
-      const cycle: Cycle = {
-        id: crypto.randomUUID() as USOM_ID,
-        cycleType: newCycleType,
-        name: newCycleName || `${start}~${end}`,
-        period: { start: start as any, end: end as any },
-        status: 'in_progress',
-        createdAt: now.toISOString() as any,
-        updatedAt: now.toISOString() as any,
-      }
-      const saved = await onCreateCycle(cycle)
-      setCycleId(saved.id)
-      setShowNewCycleForm(false)
-      setErrors([])
-    } catch {
-      setErrors(["创建周期失败，请重试"])
-    } finally {
-      setIsCreatingCycle(false)
-    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -225,7 +204,7 @@ export function OKRForm({
       okrType,
       priority,
       cycleId,
-      keyResults: keyResults.filter(kr => kr.title.trim()),
+      keyResults: keyResults.filter(kr => kr.title.trim()).map(kr => ({ ...kr, confidence: kr.confidence ?? 50 })),
     })
   }
 
@@ -320,78 +299,8 @@ export function OKRForm({
             </div>
           </div>
 
-          {/* [022] Cycle 选择器 —— 替换原 periodType/periodStart/periodEnd 三字段 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>周期</Label>
-              {!cyclesEmpty && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowNewCycleForm(!showNewCycleForm)}>
-                  {showNewCycleForm ? "取消新建" : "+ 新建周期"}
-                </Button>
-              )}
-            </div>
-
-            {/* 四态-4 loading：cycles 列表 fetching 时下拉 disabled + Spinner */}
-            {isLoadingCycles ? (
-              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                加载周期列表...
-              </div>
-            ) : cyclesEmpty ? (
-              /* 四态-1 空状态：下拉禁用 + placeholder「尚无周期，请先新建」+ 默认展开内联新建 */
-              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-muted/20 text-sm text-muted-foreground">
-                尚无周期，请先新建
-              </div>
-            ) : (
-              <Select value={cycleId} onValueChange={v => setCycleId(v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="选择周期..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {cycles.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} ({c.period.start} ~ {c.period.end})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* 内联新建 Cycle 表单 */}
-            {(showNewCycleForm || cyclesEmpty) && (
-              <div className="rounded-md border border-border p-3 space-y-3 bg-muted/20">
-                <div className="space-y-2">
-                  <Label className="text-xs">周期类型</Label>
-                  <select value={newCycleType} onChange={e => setNewCycleType(e.target.value as Cycle['cycleType'])}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
-                    <option value="quarterly">季度</option>
-                    <option value="semi_annual">半年度</option>
-                    <option value="monthly">月度</option>
-                    <option value="annual">年度</option>
-                    <option value="custom">自定义</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">周期名称（可选）</Label>
-                  <Input value={newCycleName} onChange={e => setNewCycleName(e.target.value)} placeholder="例如：2026 Q3" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">开始日期</Label>
-                    <Input type="date" value={newCycleStart} onChange={e => setNewCycleStart(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">结束日期</Label>
-                    <Input type="date" value={newCycleEnd} onChange={e => setNewCycleEnd(e.target.value)} />
-                  </div>
-                </div>
-                <Button type="button" variant="default" size="sm" onClick={handleCreateCycle} disabled={isCreatingCycle}>
-                  {isCreatingCycle && <Loader2 className="size-4 animate-spin mr-1" />}
-                  创建周期
-                </Button>
-              </div>
-            )}
-          </div>
+          {/* [024] G1：周期字段已迁出至 CycleCreateDrawer / T13 工作台 wiring，
+              cycleId 由 presetCycleId 或 initial.cycleId 透传，不再渲染 UI。 */}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -406,6 +315,15 @@ export function OKRForm({
                   <div className="flex gap-2">
                     <Input type="number" value={kr.targetValue} onChange={e => updateKR(i, "targetValue", Number(e.target.value))} placeholder="目标值" className="w-24" min={0} />
                     <Input value={kr.unit} onChange={e => updateKR(i, "unit", e.target.value)} placeholder="单位" className="w-20" maxLength={20} />
+                  </div>
+                  {/* [024] G2 信心度输入：留空时提交时默认 50 */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">信心</Label>
+                    <Input type="number" min={0} max={100}
+                      value={kr.confidence ?? ''}
+                      onChange={e => updateKR(i, "confidence", e.target.value === '' ? undefined as any : Number(e.target.value))}
+                      placeholder="50" className="w-16 h-7 text-xs" />
+                    <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 </div>
                 {keyResults.length > 1 && (
