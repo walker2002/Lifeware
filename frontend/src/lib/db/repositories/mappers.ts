@@ -381,6 +381,7 @@ export function templateHabitRowToItem(row: { habitId: string; sortOrder: number
 }
 
 // --- Timebox (taskIds/habitIds injected by repository via junction queries) ---
+// [023] A2: activityArchetypeId/taskIds/habitIds 落库（详见 0023 迁移）
 type TimeboxRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string;
@@ -391,20 +392,26 @@ type TimeboxRow = {
   createdAt: Date; updatedAt: Date;
   startedAt: Date | null; overtimeAt: Date | null;
   endedAt: Date | null; loggedAt: Date | null;
+  activityArchetypeId: string | null;
+  taskIds: string[] | null;
+  habitIds: string[] | null;
 }
 
-export function timeboxRowToUSOM(row: TimeboxRow, taskIds: USOM_ID[] = [], habitIds: USOM_ID[] = []): Timebox {
+export function timeboxRowToUSOM(row: TimeboxRow, taskIds?: USOM_ID[], habitIds?: USOM_ID[]): Timebox {
   return {
     id: row.id,
     status: row.status as Timebox['status'],
     title: row.title,
     startTime: row.startTime.toISOString() as Timestamp,
     endTime: row.endTime.toISOString() as Timestamp,
-    taskIds,
-    habitIds,
+    // [023] A2: 行内 taskIds/habitIds 优先；未传时回退到 row 中的软关联列
+    taskIds: taskIds ?? row.taskIds ?? [],
+    habitIds: habitIds ?? row.habitIds ?? [],
     isRecurring: row.isRecurring,
     recurrenceRule: row.recurrenceRule as Timebox['recurrenceRule'],
     tags: row.tags ?? [],
+    // [023] A2: 关联 Activity Archetype
+    activityArchetypeId: row.activityArchetypeId ?? undefined,
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     startedAt: toISO(row.startedAt),
@@ -433,6 +440,10 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
     overtimeAt: toDate(timebox.overtimeAt),
     endedAt: toDate(timebox.endedAt),
     loggedAt: toDate(timebox.loggedAt),
+    // [023] A2: 关联 Activity Archetype + 软关联 taskIds/habitIds
+    activityArchetypeId: timebox.activityArchetypeId ?? null,
+    taskIds: timebox.taskIds ?? null,
+    habitIds: timebox.habitIds ?? null,
   }
 }
 

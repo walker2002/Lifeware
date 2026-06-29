@@ -392,6 +392,12 @@ export const timeboxes = pgTable('timeboxes', {
   recurrenceRule: jsonb('recurrence_rule').$type<{ frequency: string; interval: number; endDate?: string }>(),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
 
+  // [023] A2: 关联 Activity Archetype（nullable，ON DELETE SET NULL）
+  activityArchetypeId: uuid('activity_archetype_id').references(() => activityArchetypes.id, { onDelete: 'set null' }),
+  // [023] A2 OV#P1-#2: USOM 类型已声明 taskIds/habitIds，DB 列补齐（D7 LinkPicker 数据落库依赖）
+  taskIds: uuid('task_ids').array().notNull().default([]),  // 软关联，无 FK 外键
+  habitIds: uuid('habit_ids').array().notNull().default([]), // 软关联，无 FK 外键
+
   executionRecord: jsonb('execution_record').$type<Record<string, unknown>>(),
 
   notes: text('notes'),

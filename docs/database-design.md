@@ -727,8 +727,15 @@ CREATE TABLE timeboxes (
   recurrence_rule jsonb,
   tags            jsonb not null default '[]',
 
+  -- [023] A2: 关联活动原型，nullable（logTimebox 时带入能量消耗源）
+  activity_archetype_id  uuid  REFERENCES activity_archetypes(id) ON DELETE SET NULL,
+
   -- JSONB 允许：执行记录，记录实际执行情况
   execution_record jsonb,  -- ExecutionRecord（SimpleExecutionRecord | DetailedExecutionRecord）
+
+  -- [023] A2 OV#P1-#2: USOM taskIds/habitIds 落库列（软关联，无 FK；强一致性由 Repository 负责）
+  task_ids  uuid[] not null default '{}',
+  habit_ids uuid[] not null default '{}',
 
   -- 审计字段
   notes         text,
@@ -744,13 +751,15 @@ CREATE TABLE timeboxes (
 CREATE INDEX idx_timeboxes_user_status ON timeboxes(user_id, status);
 CREATE INDEX idx_timeboxes_user_start ON timeboxes(user_id, start_time);
 CREATE INDEX idx_timeboxes_user_end ON timeboxes(user_id, end_time);
+-- [023] A2: 用户维度按 archetype 过滤
+CREATE INDEX idx_timeboxes_user_archetype ON timeboxes(user_id, activity_archetype_id);
 
 -- 约束
 ALTER TABLE timeboxes ADD CONSTRAINT check_timeboxes_end_after_start
   CHECK (end_time > start_time);
 ```
 
-> **注意**：`taskIds` 和 `habitIds` 不在本表存储，通过 `timebox_tasks` 和 `timebox_habits` 关联表维护（见第五章）。USOM 中的数组字段在 Repository 层聚合后注入到 USOM 对象。
+> **注意**：`taskIds` 和 `habitIds` 软关联落库于本表 `task_ids` / `habit_ids`（[023] A2 OV#P1-#2 起）；`timebox_tasks` / `timebox_habits` 关联表仍保留供后续扩展（强一致性写入路径使用），USOM 中的数组字段在 Repository 层读取 `task_ids` / `habit_ids` 列后注入到 USOM 对象。`activityArchetypeId` 强外键引用 `activity_archetypes.id`，ON DELETE SET NULL。
 
 ---
 

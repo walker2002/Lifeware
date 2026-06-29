@@ -644,6 +644,8 @@ export interface Timebox {
   isRecurring: boolean
   recurrenceRule?: RecurrenceRule
   tags: Tag[]
+  /** [023] A2: 关联 Activity Archetype（nullable，logTimebox 时带入能量消耗源） */
+  activityArchetypeId?: USOM_ID
   createdAt: Timestamp
   updatedAt: Timestamp
   startedAt?: Timestamp

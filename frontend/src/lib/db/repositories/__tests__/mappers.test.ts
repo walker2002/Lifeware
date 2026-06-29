@@ -2,10 +2,11 @@
  * @file mappers.test
  * @brief USOM ↔ DB mapper 双向映射单元测试
  * @details [024] G2 KeyResult.confidence 字段双向映射
+ *   + [023] A2 Timebox.activityArchetypeId/taskIds/habitIds 字段双向映射
  */
 
 import { describe, it, expect } from 'vitest'
-import { keyResultRowToUSOM, keyResultUSOMToRow } from '../mappers'
+import { keyResultRowToUSOM, keyResultUSOMToRow, timeboxRowToUSOM, timeboxUSOMToRow } from '../mappers'
 
 // ── 极简 row fixture：仅覆盖 mapper 关心的字段，其它用 any 兜底 ─────────
 const baseRow = {
@@ -49,5 +50,60 @@ describe('[024] KeyResult mapper confidence', () => {
     const row = { ...baseRow } as any
     delete row.confidence
     expect(keyResultRowToUSOM(row).confidence).toBe(50)
+  })
+})
+
+// ── [023] A2: Timebox.activityArchetypeId / taskIds / habitIds 双向映射 ──
+describe('timebox mapper — activityArchetypeId ([023] A2)', () => {
+  const baseTimeboxRow = {
+    id: 'tb-1',
+    userId: 'u-1',
+    schemaVersion: 1,
+    status: 'planned',
+    title: '写作',
+    startTime: new Date('2026-06-29T09:00:00Z'),
+    endTime: new Date('2026-06-29T10:00:00Z'),
+    isRecurring: false,
+    recurrenceRule: null,
+    tags: [],
+    notes: null,
+    executionRecord: null,
+    createdAt: new Date('2026-06-29T00:00:00Z'),
+    updatedAt: new Date('2026-06-29T00:00:00Z'),
+    startedAt: null,
+    overtimeAt: null,
+    endedAt: null,
+    loggedAt: null,
+    activityArchetypeId: null,
+    taskIds: null,
+    habitIds: null,
+  }
+
+  it('row 有 archetypeId → USOM 带上', () => {
+    const tb = timeboxRowToUSOM({ ...baseTimeboxRow, activityArchetypeId: 'arch-1' } as any)
+    expect(tb.activityArchetypeId).toBe('arch-1')
+  })
+
+  it('row archetypeId 为 null → USOM undefined', () => {
+    const tb = timeboxRowToUSOM({ ...baseTimeboxRow, activityArchetypeId: null } as any)
+    expect(tb.activityArchetypeId).toBeUndefined()
+  })
+
+  it('USOM → row：undefined → null', () => {
+    const usom = {
+      id: 'tb-1',
+      status: 'planned',
+      title: 'x',
+      startTime: '2026-06-29T09:00:00Z' as any,
+      endTime: '2026-06-29T10:00:00Z' as any,
+      taskIds: [],
+      habitIds: [],
+      isRecurring: false,
+      tags: [],
+      createdAt: 'x' as any,
+      updatedAt: 'x' as any,
+    } as any
+    const row = timeboxUSOMToRow(usom, 'u-1')
+    expect(row.activityArchetypeId).toBeNull()
   })
 })
