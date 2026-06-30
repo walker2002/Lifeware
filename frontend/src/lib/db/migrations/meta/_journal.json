@@ -183,6 +183,13 @@
       "when": 1782800000000,
       "tag": "0024_timebox_templates",
       "breakpoints": false
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782900000000,
+      "tag": "0025_a3_m1_tasks_habits_archetype_id",
+      "breakpoints": false
     }
   ]
 }

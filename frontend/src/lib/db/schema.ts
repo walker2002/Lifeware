@@ -243,6 +243,9 @@ export const tasks = pgTable('tasks', {
   schedulingConstraint: text('scheduling_constraint', { enum: ['hard_deadline', 'soft_target', 'opportunistic', 'recurring'] }),
   tracking: text('tracking', { enum: ['none', 'check_in', 'log', 'review'] }).notNull().default('check_in'),
 
+  // [023] A3: 关联 Activity Archetype（nullable，ON DELETE SET NULL，对齐 timeboxes:396）
+  activityArchetypeId: uuid('activity_archetype_id').references(() => activityArchetypes.id, { onDelete: 'set null' }),
+
   // AI 辅助扩展数据
   aiTags: jsonb('ai_tags').notNull().$type<Record<string, unknown>>().default({}),
 
@@ -288,6 +291,9 @@ export const habits = pgTable('habits', {
 
   daysOfWeek: jsonb('days_of_week').$type<number[] | null>(),
   tags: jsonb('tags').notNull().$type<string[]>().default([]),
+
+  // [023] A3: 关联 Activity Archetype（nullable，ON DELETE SET NULL）
+  activityArchetypeId: uuid('activity_archetype_id').references(() => activityArchetypes.id, { onDelete: 'set null' }),
 
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
