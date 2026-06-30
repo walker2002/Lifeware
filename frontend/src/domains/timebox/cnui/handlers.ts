@@ -266,7 +266,17 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
   },
 }
 
-/** 所有 timebox domain 的 CNUI surface handler 映射 */
+/**
+ * 所有 timebox domain 的 CNUI surface handler 映射
+ *
+ * manifest 区块 K 声明的每个 cnui_surface 都须在此登记一个 entry，
+ * key = surface 名（intent_triggers.cnui_surface / generation_actions.cnui_surface_type），
+ * 由 intent.ts 的 CNUI_HANDLERS 合并后供 openCnuiSurface 按 surfaceType 查找。
+ * 单个 timeboxCnuiHandler 内部按 action 分支处理，故 4 个 surface 共用同一 handler。
+ */
 export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'timebox-list': timeboxCnuiHandler,
+  'create-timebox': timeboxCnuiHandler,
+  'log-timebox': timeboxCnuiHandler,
+  'adjust-schedule': timeboxCnuiHandler,
 }
