@@ -1,10 +1,10 @@
 /**
  * @file energy-cost-accordion
- * @brief 4 维 EnergyCost 展示/校准（[023] A2，design C.R1 + C.R2）
+ * @brief 4 维 EnergyCost 展示/校准（跨域共享，[023] A3.2 从 timebox 公共化）
  *
  * C.R2 默认收起：header 显示当前 4 维值「8 / 2 / 3 / 5」，点 header 展开。
  * C.R1 数字可输入 + 进度条仅可视化：每行 name | track(width=val*10%) | number input。
- * 只读模式（archetype 预览 / Drawer 全程）不显示 input，仅展示当前值（D6 + 校准分离原则）。
+ * 只读模式（archetype 预览 / 详情）不显示 input，仅展示当前值（D6 + 校准分离原则）。
  *
  * 设计补丁：track 用 bg-surface-card（而非 bg-muted，确保跨主题一致），
  * fill 用 bg-accent-teal（design 令牌）提升能耗进度条识别度。

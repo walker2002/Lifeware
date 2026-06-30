@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArchetypePicker } from './archetype-picker'
+import { ArchetypePickerCard } from '@/components/archetype/archetype-picker-card'
 import {
   createTimebox,
   updateTimebox,
@@ -200,7 +200,7 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
               />
             </div>
 
-            <ArchetypePicker
+            <ArchetypePickerCard
               value={activityArchetypeId}
               onChange={id => setActivityArchetypeId(id)}
             />
