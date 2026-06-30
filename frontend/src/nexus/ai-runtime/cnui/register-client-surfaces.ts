@@ -11,11 +11,17 @@ import { HabitCreationCard } from '@/domains/habits/cnui/surfaces/HabitCreationC
 
 // Timebox surfaces
 import { TimeboxList } from '@/domains/timebox/cnui/surfaces/TimeboxList'
+import { CreateTimebox } from '@/domains/timebox/cnui/surfaces/CreateTimebox'
+import { LogTimebox } from '@/domains/timebox/cnui/surfaces/LogTimebox'
+import { AdjustSchedule } from '@/domains/timebox/cnui/surfaces/AdjustSchedule'
 
 cnuiRegistry.register('habits', 'habit-action-panel', { component: HabitActionPanel })
 cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckinPanel })
 cnuiRegistry.register('habits', 'habit-creation-card', { component: HabitCreationCard })
 cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })
+cnuiRegistry.register('timebox', 'create-timebox', { component: CreateTimebox })
+cnuiRegistry.register('timebox', 'log-timebox', { component: LogTimebox })
+cnuiRegistry.register('timebox', 'adjust-schedule', { component: AdjustSchedule })
 
 // Tasks surfaces
 import { TaskCreationCard } from '@/domains/tasks/cnui/surfaces/TaskCreationCard'
