@@ -105,7 +105,7 @@ export function taskRowToUSOM(row: TaskRow): Task {
     decomposition: (row.decomposition as DecompositionLevel) ?? undefined,
     // 用户管理标签
     captureMode: row.captureMode as CaptureMode,
-    // [023] A3.1.2: row.archetypeId (snake_case) ↔ activityArchetypeId (camelCase)
+    // [023] A3.1.2: DB 列 activity_archetype_id ↔ USOM activityArchetypeId（Drizzle 自动 snake→camel）
     activityArchetypeId: row.activityArchetypeId ?? undefined,
     schedulingConstraint: (row.schedulingConstraint as SchedulingConstraint) ?? undefined,
     tracking: row.tracking as TrackingMode,
@@ -194,7 +194,7 @@ export function habitRowToUSOM(row: HabitRow): Habit {
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     suspendedAt: toISO(row.suspendedAt),
     archivedAt: toISO(row.archivedAt),
-    // [023] A3.1.2: row.archetypeId (snake_case) ↔ activityArchetypeId (camelCase)
+    // [023] A3.1.2: DB 列 activity_archetype_id ↔ USOM activityArchetypeId（Drizzle 自动 snake→camel）
     activityArchetypeId: row.activityArchetypeId ?? undefined,
     notes: row.notes ?? undefined,
   }

@@ -188,9 +188,6 @@ type DecompositionLevel = 'atomic' | 'splittable' | 'splitting_in_progress' | 'd
 ### CaptureMode
 type CaptureMode = 'scheduled' | 'ad_hoc' | 'retrospective'
 
-### EnergyProfile
-type EnergyProfile = 'light' | 'deep' | 'admin' | 'creative' | 'reactive'
-
 ### SchedulingConstraint
 type SchedulingConstraint = 'hard_deadline' | 'soft_target' | 'opportunistic' | 'recurring'
 
