@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea"
 // （构建报 Can't resolve 'fs'）。client 须直接 import 各 client-safe 子模块。
 import { useManifestRules, useServerErrorBackfill } from "@/nexus/rules/use-manifest-rules"
 import { habitRuleRegistry } from "../rules-registry"
+// [023] A3.2：裸版 ArchetypePicker（公共化，无自带视觉盒/标题）
+import { ArchetypePicker } from "@/components/archetype/archetype-picker"
 
 /**
  * 习惯表单字段
@@ -34,6 +36,8 @@ export interface HabitFormFields {
   daysOfWeek?: number[]
   startDate: string
   endDate?: string
+  // [023] A3.2：archetypeId 是可选 nullable ContentField（标签式）
+  activityArchetypeId?: string
 }
 
 interface HabitFormProps {
@@ -100,6 +104,8 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
+  // [023] A3.2：archetype 选择（编辑模式由 initial 回填）
+  const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(initial?.activityArchetypeId)
   // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
   const { errors: fieldErrors, validateField, validateAll } = useManifestRules(habitRuleRegistry)
   const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, habitRuleRegistry)
@@ -158,6 +164,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       daysOfWeek: frequencyType !== "daily" ? daysOfWeek : undefined,
       startDate,
       endDate: endDate || undefined,
+      activityArchetypeId,
     }
 
     // [018-G3] R1：客户端预检仅跑 phase: both 规则（尽力而为，服务端 onValidate 权威兜底）
@@ -370,6 +377,15 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
             onChange={(e) => { setEndDate(e.target.value); onDirtyChange?.(true) }}
           />
         </div>
+      </div>
+
+      {/* 活动原型 */}
+      <div className="flex flex-col gap-1.5">
+        <Label>活动原型</Label>
+        <ArchetypePicker
+          value={activityArchetypeId}
+          onChange={id => { setActivityArchetypeId(id); onDirtyChange?.(true) }}
+        />
       </div>
 
       {/* 校验错误 */}

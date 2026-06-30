@@ -63,6 +63,7 @@ function formatTaskDetail(t: any): Record<string, unknown> {
     status: t.status,
     threadId: t.threadId,
     dueDate: t.endDate,
+    activityArchetypeId: t.activityArchetypeId,
   }
 }
 
@@ -82,6 +83,7 @@ function formatTaskList(tasks: any[]): Record<string, unknown>[] {
     startDate: t.startDate,
     endDate: t.endDate,
     actualDuration: t.actualDuration,
+    activityArchetypeId: t.activityArchetypeId,
   }))
 }
 

@@ -175,6 +175,11 @@ field_metadata:
   daysOfWeek:
     type: json
     mutation_mode: FactField
+  # [023] A3.2 archetype 接入：archetypeId 是 nullable ContentField
+  # （用户标签式，非业务事实，不发系统事件——C3 已知现实偏差见 spec）
+  activityArchetypeId:
+    type: string
+    mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

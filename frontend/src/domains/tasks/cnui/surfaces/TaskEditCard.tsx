@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 // [018-G3] R3：client 组件不可从 barrel @/nexus/rules import
 import { useManifestRules, useServerErrorBackfill } from '@/nexus/rules/use-manifest-rules'
 import { taskRuleRegistry } from '../../rules-registry'
+// [023] A3.2：裸版 ArchetypePicker（公共化，无自带视觉盒/标题）
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 
 // ─── 类型定义 ──────────────────────────────────────────────────────
 
@@ -27,6 +29,7 @@ interface TaskItem {
   estimatedDuration: number
   status: string
   threadId?: string | null
+  activityArchetypeId?: string | null
 }
 
 /** TaskEditCard 组件属性 */
@@ -84,6 +87,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   const [editPriority, setEditPriority] = useState('medium')
   const [editDuration, setEditDuration] = useState('60')
   const [editThreadId, setEditThreadId] = useState<string | null>(null)
+  const [editArchetypeId, setEditArchetypeId] = useState<string | undefined>(undefined)
   const [showSubtaskInput, setShowSubtaskInput] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
 
@@ -105,6 +109,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
     setEditPriority((detail.priority as string) ?? 'medium')
     setEditDuration(String(detail.estimatedDuration ?? 60))
     setEditThreadId((detail.threadId as string) ?? null)
+    setEditArchetypeId((detail.activityArchetypeId as string) ?? undefined)
   }
 
   // ─── 完成状态 ─────────────────────────────────────────────────
@@ -122,6 +127,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
     setEditPriority(task.priority)
     setEditDuration(String(task.estimatedDuration ?? 60))
     setEditThreadId(task.threadId ?? null)
+    setEditArchetypeId(task.activityArchetypeId ?? undefined)
     setShowSubtaskInput(false)
     setSubtaskTitle('')
   }
@@ -135,6 +141,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
       description: editDescription,
       priority: editPriority,
       estimatedDuration: Number(editDuration),
+      activityArchetypeId: editArchetypeId,
     })
   }
 
@@ -147,6 +154,9 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
       description: editDescription,
       priority: editPriority,
       estimatedDuration: Number(editDuration),
+      // [023] A3.2 C2（/autoplan CRITICAL）：第二 onConfirm 写路径必须对称补 activityArchetypeId
+      // 否则「改 archetype → 加子任务」丢变更
+      activityArchetypeId: editArchetypeId,
       createSubtask: { title: subtaskTitle.trim(), parentId: editingId, threadId: editThreadId },
     })
     setSubtaskTitle('')
@@ -210,6 +220,15 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
               <p className="text-xs text-error mt-0.5">{fieldErrors.estimatedDuration || serverFieldErrors.estimatedDuration}</p>
             )}
           </div>
+        </div>
+
+        {/* 活动原型 */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-body">活动原型</label>
+          <ArchetypePicker
+            value={editArchetypeId}
+            onChange={id => setEditArchetypeId(id)}
+          />
         </div>
 
         {/* 子任务创建 */}

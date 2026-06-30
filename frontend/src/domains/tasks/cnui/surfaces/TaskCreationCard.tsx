@@ -14,6 +14,8 @@ import { useState, useEffect } from 'react'
 import { useManifestRules, useServerErrorBackfill } from '@/nexus/rules/use-manifest-rules'
 import { taskRuleRegistry } from '../../rules-registry'
 import { durationHours, durationMinutes, parseDurationToMinutes } from '@/lib/format-duration'
+// [023] A3.2：裸版 ArchetypePicker（公共化，无自带视觉盒/标题）
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 
 /** 优先级选项 */
 const PRIORITY_OPTIONS = [
@@ -65,6 +67,10 @@ export function TaskCreationCard({
   const [threadId, setThreadId] = useState<string | null>(
     (dataModel.threadId as string) ?? null,
   )
+  // [023] A3.2：archetype 选择（optional nullable，dataModel 默认值透传）
+  const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(
+    (dataModel.activityArchetypeId as string) ?? undefined,
+  )
 
   // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
   const { errors: fieldErrors, validateField } = useManifestRules(taskRuleRegistry)
@@ -82,6 +88,7 @@ export function TaskCreationCard({
       priority: priority || undefined,
       estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
       threadId: threadId || undefined,
+      activityArchetypeId,
     })
   }
 
@@ -207,6 +214,18 @@ export function TaskCreationCard({
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* 活动原型 */}
+        <div>
+          <label className="text-xs text-body mb-1 block">活动原型</label>
+          <ArchetypePicker
+            value={activityArchetypeId}
+            onChange={id => {
+              setActivityArchetypeId(id)
+              onDataChange({ ...dataModel, activityArchetypeId: id })
+            }}
+          />
         </div>
 
         {/* 表单级错误 */}
