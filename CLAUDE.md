@@ -117,7 +117,7 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 | 第二层：协同维护 | `docs/` | 用户定义意图，Claude 保证与代码一致 |
 | 第三层：Claude 自动维护 | 根目录 + `.specify/` | Claude 维护，用户审批 |
 
-完整文档索引与版本历史见 `manifest.md`（项目根目录）。`docs/` 与 `mydocs/` 下各文档（usom-design、database-design、UI-DESIGN-SPEC 等）若有修改，**MUST** 同步更新 `manifest.md`。
+完整文档索引见 `manifest.md`（项目根目录），版本历史见 `CHANGELOG.md`。`docs/` 与 `mydocs/` 下各文档（usom-design、database-design、UI-DESIGN-SPEC 等）若有修改，**MUST** 同步更新 `CHANGELOG.md`。
 
 ---
 

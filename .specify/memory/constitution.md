@@ -50,6 +50,26 @@
     - manifest.md                                     (版本历史同步)
 -->
 
+<!--
+  Sync Impact Report
+  ==================
+  Version change: 2.1.0 → 2.1.1
+  Rationale: PATCH — version tracking 职责由 manifest.md 迁至独立的 CHANGELOG.md
+    （职责解耦：manifest 回归纯索引）。纯措辞/指向修订，无原则变更。
+
+  Modified sections:
+    - Governance / Tier 3 documents 清单：manifest.md (version tracking) → manifest.md (document index) + CHANGELOG.md (version tracking)
+    - Amendment Procedure Step 5：Update manifest.md version history → Update CHANGELOG.md
+
+  Modified principles: 无（wording fix only）
+
+  Follow-up documents requiring updates:
+    - manifest.md                                       (删除版本历史段，回归纯索引)
+    - CHANGELOG.md                                      (新建，承接版本历史)
+    - CLAUDE.md                                         (文档归属段指向更新)
+    - ~/.claude/skills/lifeware-neat/SKILL.md           (规则 1 同步目标改为 CHANGELOG.md)
+-->
+
 # Lifeware Constitution
 
 ## Core Principles
@@ -1193,7 +1213,8 @@ is the authoritative source for all visual and interaction standards;
 UI code MUST comply with its color tokens, typography scale, spacing
 system, and component conventions.
 
-**Tier 3 documents**: `manifest.md` (version tracking), `CLAUDE.md`
+**Tier 3 documents**: `manifest.md` (document index), `CHANGELOG.md`
+(version tracking), `CLAUDE.md`
 (developer guidance), this constitution, and `specs/` (speckit
 artifacts). Claude updates these mechanically when triggered by
 workflow events or document changes.
@@ -1210,7 +1231,7 @@ workflow events or document changes.
      guidance.
    - **PATCH**: Clarifications, wording fixes, non-semantic refinements.
 4. Run consistency propagation across all Spec Kit templates.
-5. Update `manifest.md` version history.
+5. Update `CHANGELOG.md`.
 
 ### Compliance Review
 
@@ -1270,6 +1291,8 @@ tokens is DESIGN.md; the downstream implementation is `globals.css`.
 MVP scope is Web only; mobile layout specifications are pre-designed
 for future iteration.
 
-**Version**: 2.1.0 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-06-24
+**Version**: 2.1.1 | **Ratified**: 2026-05-02 | **Last Amended**: 2026-07-01
 
 **[020]** MINOR: §IX 规则三层收敛 registry 即 SSOT（manifest 不再声明 rules，registry 自带 phase/fields/message meta）+ §III 字段三分类 FactField/UX 正交澄清 + §VIII 规则三层治理更新。
+
+**[PATCH v2.1.1]** version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 文档清单 + Amendment Procedure Step 5 措辞更新；manifest 回归纯索引）。
