@@ -15,3 +15,7 @@ mydocs/dev/
 .gstack
 # 个人 claude 启动便捷脚本（claude --dangerously-skip-permissions），非项目组成文件
 .cc
+# 生产库备份产物（backup-prod.sh 的 pg_dump 输出，含真实数据，禁止入库）
+frontend/backups/
+# 临时文件目录
+tmp/
