@@ -12,7 +12,7 @@ import type {
   CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
   ThreadStatus, AISessionStatus,
   ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
-  EnergyProfile, SchedulingConstraint, TrackingMode,
+  SchedulingConstraint, TrackingMode,
 } from './primitives'
 
 // ─── 3.1 User ─────────────────────────────────────────────────
@@ -324,7 +324,6 @@ export interface Thread {
  * @property complexity - 复杂度标签列表
  * @property decomposition - 分解等级
  * @property captureMode - 捕获模式
- * @property energyProfile - 能量画像
  * @property schedulingConstraint - 调度约束
  * @property tracking - 追踪模式
  * @property aiTags - AI 辅助扩展数据
@@ -355,7 +354,6 @@ export interface Task {
   complexity: ComplexityTag[]
   decomposition?: DecompositionLevel
   captureMode: CaptureMode
-  energyProfile?: EnergyProfile
   /** [023] A3: 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId） */
   activityArchetypeId?: USOM_ID
   schedulingConstraint?: SchedulingConstraint

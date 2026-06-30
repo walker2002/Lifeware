@@ -7,7 +7,7 @@
  * T-03: Nexus 组件不直接处理 userId
  */
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode, Notes } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, SchedulingConstraint, TrackingMode, Notes } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
@@ -93,8 +93,6 @@ export interface TaskFilters {
   clarity?: ClarityLevel | ClarityLevel[]
   /** 复杂度标签 */
   complexity?: ComplexityTag
-  /** 能量画像 */
-  energyProfile?: EnergyProfile
   /** 调度约束 */
   schedulingConstraint?: SchedulingConstraint
   /** 追踪模式 */
@@ -127,8 +125,6 @@ export interface CreateTaskInput {
   decomposition?: DecompositionLevel
   /** 捕获模式（默认 ad_hoc） */
   captureMode?: CaptureMode
-  /** 能量画像 */
-  energyProfile?: EnergyProfile
   /** [023] A3: 关联 Activity Archetype */
   activityArchetypeId?: USOM_ID
   /** 调度约束 */

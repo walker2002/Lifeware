@@ -139,7 +139,6 @@ describe('task mapper — activityArchetypeId ([023] A3.1)', () => {
     complexity: [],
     decomposition: null,
     captureMode: 'manual',
-    energyProfile: null,
     schedulingConstraint: null,
     tracking: 'simple',
     aiTags: {},

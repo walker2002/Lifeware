@@ -239,7 +239,6 @@ export const tasks = pgTable('tasks', {
 
   // ── 用户管理标签 ──
   captureMode: text('capture_mode', { enum: ['scheduled', 'ad_hoc', 'retrospective'] }).notNull().default('ad_hoc'),
-  energyProfile: text('energy_profile', { enum: ['light', 'deep', 'admin', 'creative', 'reactive'] }),
   schedulingConstraint: text('scheduling_constraint', { enum: ['hard_deadline', 'soft_target', 'opportunistic', 'recurring'] }),
   tracking: text('tracking', { enum: ['none', 'check_in', 'log', 'review'] }).notNull().default('check_in'),
 
@@ -258,7 +257,6 @@ export const tasks = pgTable('tasks', {
   index('idx_tasks_user_parent').on(table.userId, table.parentId),
   index('idx_tasks_user_thread').on(table.userId, table.threadId),
   index('idx_tasks_user_priority').on(table.userId, table.priority),
-  index('idx_tasks_user_energy').on(table.userId, table.energyProfile),
   index('idx_tasks_user_constraint').on(table.userId, table.schedulingConstraint),
   index('idx_tasks_user_tracking').on(table.userId, table.tracking),
   index('idx_tasks_due_date').on(table.userId, table.dueDate),

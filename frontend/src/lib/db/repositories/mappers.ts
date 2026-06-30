@@ -6,7 +6,7 @@
 // USOM <-> DB Mapping Functions
 // Bidirectional conversion between USOM objects and Drizzle row types.
 
-import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, EnergyProfile, SchedulingConstraint, TrackingMode, EnergyCurve } from '../../../usom/types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, SchedulingConstraint, TrackingMode, EnergyCurve } from '../../../usom/types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog, Contribution,
@@ -70,7 +70,7 @@ type TaskRow = {
   createdAt: Date; updatedAt: Date;
   completedAt: Date | null; archivedAt: Date | null;
   clarity: string; complexity: string[]; decomposition: string | null;
-  captureMode: string; energyProfile: string | null;
+  captureMode: string;
   // [023] A3.1.2: 关联 Activity Archetype（nullable，对齐 timebox A2 范式）
   activityArchetypeId: string | null;
   schedulingConstraint: string | null; tracking: string;
@@ -105,7 +105,6 @@ export function taskRowToUSOM(row: TaskRow): Task {
     decomposition: (row.decomposition as DecompositionLevel) ?? undefined,
     // 用户管理标签
     captureMode: row.captureMode as CaptureMode,
-    energyProfile: (row.energyProfile as EnergyProfile) ?? undefined,
     // [023] A3.1.2: row.archetypeId (snake_case) ↔ activityArchetypeId (camelCase)
     activityArchetypeId: row.activityArchetypeId ?? undefined,
     schedulingConstraint: (row.schedulingConstraint as SchedulingConstraint) ?? undefined,
@@ -142,7 +141,6 @@ export function taskUSOMToRow(task: Task, userId: USOM_ID) {
     decomposition: task.decomposition ?? null,
     // 用户管理标签
     captureMode: task.captureMode,
-    energyProfile: task.energyProfile ?? null,
     // [023] A3.1.2: USOM activityArchetypeId (undefined) → row null
     activityArchetypeId: task.activityArchetypeId ?? null,
     schedulingConstraint: task.schedulingConstraint ?? null,

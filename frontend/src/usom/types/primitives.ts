@@ -318,16 +318,6 @@ export type DecompositionLevel = 'atomic' | 'splittable' | 'splitting_in_progres
 export type CaptureMode = 'scheduled' | 'ad_hoc' | 'retrospective'
 
 /**
- * 能量画像
- * - light: 轻量任务，低认知负荷
- * - deep: 深度任务，需要专注
- * - admin: 行政事务
- * - creative: 创造性工作
- * - reactive: 响应式工作
- */
-export type EnergyProfile = 'light' | 'deep' | 'admin' | 'creative' | 'reactive'
-
-/**
  * 调度约束
  * - hard_deadline: 硬性截止日期
  * - soft_target: 软性目标日期

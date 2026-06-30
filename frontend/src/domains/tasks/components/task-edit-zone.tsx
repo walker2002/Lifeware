@@ -9,7 +9,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Brain, Cloud, ClipboardList, Sparkles, Flame, Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X } from 'lucide-react'
 import type { Task } from '../../../usom/types/objects'
 import { Priority, EnergyLevel } from '../../../usom/types/primitives'
 import type { TrackingMode } from '../../../usom/types/primitives'
@@ -34,15 +34,6 @@ interface TaskEditZoneProps {
 }
 
 // ─── 常量映射 ──────────────────────────────────────────────────────────
-
-/** 能量画像 → 图标映射 */
-const ENERGY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  deep: Brain,
-  light: Cloud,
-  admin: ClipboardList,
-  creative: Sparkles,
-  reactive: Flame,
-}
 
 /** 优先级标签映射 */
 const PRIORITY_LABELS: Record<string, string> = {
@@ -274,13 +265,10 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
     updateDraft('notes', JSON.stringify(current))
   }
 
-  const EnergyIcon = task.energyProfile ? ENERGY_ICONS[task.energyProfile] : null
-
   return (
     <div className="flex flex-col gap-5">
-      {/* ── 标题行（含能量图标）── */}
+      {/* ── 标题行 ── */}
       <div className="flex items-start gap-2">
-        {EnergyIcon && <EnergyIcon className="size-5 mt-1 text-muted-soft shrink-0" />}
         <InlineEdit
           value={(draft.title as string) ?? task.title}
           onSave={async val => updateDraft('title', val)}

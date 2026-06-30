@@ -190,6 +190,13 @@
       "when": 1782900000000,
       "tag": "0025_a3_m1_tasks_habits_archetype_id",
       "breakpoints": false
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1783000000000,
+      "tag": "0026_a3_m2_drop_tasks_energy_profile",
+      "breakpoints": false
     }
   ]
 }
