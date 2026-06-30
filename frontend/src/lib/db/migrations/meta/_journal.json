@@ -197,6 +197,13 @@
       "when": 1783000000000,
       "tag": "0026_a3_m2_drop_tasks_energy_profile",
       "breakpoints": false
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1783100000000,
+      "tag": "0022_rename_latest_end_time_to_latest_start_time",
+      "breakpoints": false
     }
   ]
 }
