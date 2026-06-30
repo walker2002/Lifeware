@@ -1,3 +1,4 @@
+<!-- /autoplan restore point: /home/walker/.gstack/projects/walker2002-lifeware/main-autoplan-restore-20260630-190252.md -->
 # [023] A3.3 — habitsTemplates 硬删 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -13,7 +14,7 @@
 - **语言**：所有注释/文案/commit message 用简体中文；每个新建 TS/JS 文件须有 `/** @file … @brief … */` 头（本计划仅新建 SQL，不新建 TS）。
 - **迁移手写**：`db:generate`/`db:migrate` 跑不通（snapshot 债）——一律手写 SQL + `psql` 执行 + 登记 `migrations/meta/_journal.json`（**注意**：journal 在 `meta/` 下，非 `migrations/_journal.json`）。dev 库 = `lifeware_dev@localhost:5432`。
 - **质量门禁**：`tsc --noEmit` 与 `vitest run` 用 **base/head 失败集合对比**（对比 main 基线，零新增；删除模板测试导致失败数下降是预期）。**禁止硬编码预存失败数**。
-- **零残留 grep**：`grep -rniE 'habit.?templates?|HabitTemplate|template_habits|TemplateHabit|habit_templates' src/`（该模式**不**命中通用 `template_form`/`parseTemplateForm`/`template-parser`/`template_file`/`markdown_templates`，这些都是通用 intent-form 或 AI 生成模板机制，**保留**）。
+- **零残留 grep**：`grep -rniE 'habit.?templates?|HabitTemplate|template_habits|TemplateHabit|habit_templates' src/ --exclude-dir=migrations`（须 `--exclude-dir=migrations`：`migrations/0002_habit_enhancements.sql` 是历史 CREATE、`0027_..._drop_...sql` 是新 DROP，二者合法引用表名，非残留。该模式**不**命中通用 `template_form`/`parseTemplateForm`/`template-parser`/`template_file`/`markdown_templates`，这些都是通用 intent-form 或 AI 生成模板机制，**保留**）。
 - **Tier 2 文档同步强制**（constitution）：DB/USOM 变更必须先同步 `docs/` 再登记 `manifest.md`。
 - **误删红线**：`template_form`（intent-engine 通用表单机制）、`parseTemplateForm`/`submitTemplateIntent`/`TemplateFormFields`（`app/actions/intent.ts` L31/L477/L1205）、`templates.markdown.createHabit` + `template_file: markdown_templates/create_habit.md`（manifest 区块 H 的 AI 生成模板）、`SOURCE_WEIGHT.planned`（合法 sourceType 值）——**一律保留**，它们与 `habit_templates` 表无关。
 
@@ -33,6 +34,7 @@
 - `frontend/src/app/actions/intent.ts` — 删 Template Server Actions 块（L1028-1166）
 - `frontend/src/components/views/action-view.tsx` — 删 `view_templates` 路由
 - `frontend/src/domains/timebox/handlers/scheduling-handler.ts` — 删 `habitTemplates` context 消费
+- `frontend/src/domains/timebox/manifest.yaml` — 删 `createSmartSchedule.contexts` 的 `habitTemplates`/`templates_for_date` query（**C1**，与 scheduling-handler 同任务，保 manifest↔handler 一致）
 - `frontend/src/domains/habits/repository/habit.ts` — `checkReferences` 删 `templateHabits` 计数
 - `frontend/src/domains/habits/pages/HabitListPage.tsx` — 归档守卫删 `templateHabits`
 - `frontend/src/domains/habits/rules-registry.ts` — 删 4 个 template action 校验（L76-104）
@@ -247,6 +249,8 @@ import type { ITimeboxRepository, ITaskRepository, IHabitRepository } from '@/us
 
 (d) **保留** 区块 H `templates.markdown.createHabit`（L246-253，AI 生成模板，与 habit_templates 表无关）。
 
+(e) **`domains/timebox/manifest.yaml`（C1，autoplan 发现）** —— `generation_actions.createSmartSchedule.contexts` 删 `habitTemplates`/`templates_for_date` query 三行（约 L257-259）。该 query 唯一 provider 是 `habit-templates-provider.ts`（T2 删），且 T1 已删 scheduling-handler 消费；不删则 `/smartSchedule` AI 流残留死 query 且破坏零残留。**保留** timebox 区块 H `templates.markdown.createTimebox`（与 habit_templates 无关）。
+
 - [ ] **Step 1.12: 测试 — `habit-domain.test.ts`**
 
 (a) L34 `habit_action_fields_valid` 的 fields 数组，删模板字段。把：
@@ -284,7 +288,10 @@ import type { ITimeboxRepository, ITaskRepository, IHabitRepository } from '@/us
     const habitIdx = sourceTypes.indexOf('habit')
     const taskIdx = sourceTypes.indexOf('task')
 
-    if (habitIdx >= 0 && taskIdx >= 0) expect(habitIdx).toBeLessThan(taskIdx)
+    // fixture 含 1 habit + 1 task，二者必出 proposals；habit(source 权重 1) 必排 task(权重 2) 前
+    expect(habitIdx).toBeGreaterThanOrEqual(0)
+    expect(taskIdx).toBeGreaterThanOrEqual(0)
+    expect(habitIdx).toBeLessThan(taskIdx)
   })
 ```
 
@@ -346,6 +353,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 **Files:**
 - Delete: `repository/habit-template.ts` + `providers/habit-templates-provider.ts`
 - Modify: `usom/types/objects.ts` + `usom/interfaces/irepository.ts` + `lib/db/repositories/mappers.ts` + `lib/db/schema.ts`
+- Modify: `scripts/validate-domain-structure.ts` + `scripts/__tests__/validate-domain-structure.test.ts`（**M1**，删 `HabitTemplateRepository` 例外 + 测试，否则 T2 删 repo 后测试 import 断裂）
 
 **Interfaces:**
 - Consumes: Task 1 产出（所有消费者已移除，生产者无引用）
@@ -358,6 +366,12 @@ cd frontend
 rm src/domains/habits/repository/habit-template.ts
 rm src/domains/habits/providers/habit-templates-provider.ts
 ```
+
+- [ ] **Step 2.1b: `scripts/validate-domain-structure` 删 HabitTemplateRepository 例外（M1，autoplan 发现）**
+
+T2 删 `habit-template.ts` repo 后，`scripts/__tests__/validate-domain-structure.test.ts:217` 的 `import { HabitTemplateRepository } from '@/domains/habits/repository/habit-template'` 会断裂 → tsc/vitest 失败。同步清理：
+- `scripts/validate-domain-structure.ts`：删 `CONFIG_REPOSITORY_EXCEPTIONS` 中的 `'HabitTemplateRepository'`（L65）+ 文件头/注释提及（L13、L200）。
+- `scripts/__tests__/validate-domain-structure.test.ts`：删 `it('配置例外（HabitTemplate）→ false…')`（L132-133）+ `it('配置例外 repo（HabitTemplate）裸写 → 不报')`（L215-219）两个测试块。
 
 - [ ] **Step 2.2: `usom/types/objects.ts` 删 HabitTemplate / TemplateHabitItem**
 
@@ -383,7 +397,7 @@ rm src/domains/habits/providers/habit-templates-provider.ts
 cd frontend
 npx tsc --noEmit 2>&1 | tee /tmp/a33-tsc-t2.txt
 npx vitest run 2>&1 | tee /tmp/a33-vitest-t2.txt
-grep -rniE 'habit.?templates?|HabitTemplate|template_habits|TemplateHabit|habit_templates' src/ || echo "ZERO RESIDUE ✓"
+grep -rniE 'habit.?templates?|HabitTemplate|template_habits|TemplateHabit|habit_templates' src/ --exclude-dir=migrations || echo "ZERO RESIDUE ✓"
 ```
 预期：tsc/vitest 相对 main 零新增；grep 输出 `ZERO RESIDUE ✓`（无任何命中）。若 grep 仍有命中，按报错定位残留并删。
 
@@ -431,11 +445,13 @@ DROP TABLE IF EXISTS template_habits;
 DROP TABLE IF EXISTS habit_templates;
 ```
 
-- [ ] **Step 3.2: 登记 journal idx=29**
+- [ ] **Step 3.2: 登记 journal idx=29（H2：先确认 idx=28 仍为最后一条）**
 
-`frontend/src/lib/db/migrations/meta/_journal.json` —— 在 idx=28 条目后追加：
+```bash
+cd frontend && tail -8 src/lib/db/migrations/meta/_journal.json
+```
+确认最后一条是 `idx: 28 / tag 0022_rename_latest_end_time_to_latest_start_time`（commit f43b950 登入）。若是，在其闭合 `}` 后追加逗号 + 新条目（新条目成为最后一项，其后无逗号，保 JSON 合法）：
 ```json
-    ,
     {
       "idx": 29,
       "version": "7",
@@ -444,6 +460,7 @@ DROP TABLE IF EXISTS habit_templates;
       "breakpoints": false
     }
 ```
+tag `0027` > `0026`（上一条 SQL 文件）单调递增。
 
 - [ ] **Step 3.3: 对 dev 库执行迁移**
 
@@ -467,12 +484,17 @@ psql "$DATABASE_URL" -c "\dt habit_templates"   # 预期：Did not find any rela
 - 2026_06_30：DROP `habit_templates` + `template_habits`（A3.3，已被 timebox-templates 取代）
 ```
 
-- [ ] **Step 3.5: 检查并同步 `docs/usom-design.md`**
+- [ ] **Step 3.5: 检查并同步全部 docs/（M4，autoplan 发现 — 范围比 usom-design 更广）**
 
 ```bash
-grep -niE 'habit.?templates?|HabitTemplate|template_habits|TemplateHabit' docs/usom-design.md
+grep -rniE 'habit_templates|template_habits|HabitTemplate|TemplateHabit|habitTemplates|/habits/templates|/habit-templates' docs/ --exclude-dir=superpowers
 ```
-若有命中，删除对应 USOM 对象/仓储契约描述（与代码一致）。若无命中，跳过。
+命中文件须同步（与代码一致）：
+- `docs/usom-design.md`：删 §3.8a HabitTemplate/TemplateHabitItem 接口（约 L696-721）+ L1804 引用 + L26 changelog 加 DROP 备注。
+- `docs/route-generation-spec.md`：L44/82/83/100/103/139/148 以 `HabitTemplatePage` / `/habits/templates` 作 kebab 示例 —— 删或换非模板示例。
+- `docs/UI-REDESIGN.md:170`：删 `HabitTemplatePage` 引用。
+- `docs/domain-development-guide.md`：若有 `habit_templates` 上下文示例（约 L1448-1449），删/换。
+- **不动**：`docs/superpowers/plans/*`（历史 plan，记录不可改）。
 
 - [ ] **Step 3.6: 登记 `manifest.md`**
 
@@ -503,3 +525,84 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - [ ] DROP 顺序先 junction 再主表；SELECT count 守护输出
 - [ ] Tier 2 文档（database-design / usom-design）+ manifest.md 同步
 - [ ] 通用 `template_form` 机制、AI 生成模板（`templates.markdown.createHabit`）未被误删（红线核对）
+
+---
+
+## GSTACK REVIEW REPORT (/autoplan, 2026-06-30)
+
+> 双声音：Codex **unavailable**（exit 127，wrapper 未载入）→ `[subagent-only]` + 主审独立对仓库实读核验。所有 CRITICAL/HIGH 已逐行核验，并剔除子代理 2 处偏差。
+
+### 审查范围（scope 检测）
+- **UI scope**：关键词命中（component×10 / form×6 / page×3）但**语义为删除**（删组件/页面，非新增 UI）→ Design 维度 **N/A**（已检视：无新 UI 层级 / 交互状态 / 空态 loading error 可设计）。
+- **DX scope**：关键词命中（import×23 / action×15 / migration×9）但**语义为删除**（删 action / 加 DROP 迁移，非新增开发者面）→ DX 维度 **N/A**（已检视：无新 API/CLI/错误信息面）。
+- **CEO**：前提「templates 已被 timebox-templates 取代」上游已定（父 spec + brainstorm + memory [023]）；范围 sanity 通过；无战略替代被错杀。
+- **Eng**：全深度，主审逐符号核验 + 子代理独立审查。
+
+### ENG 双声音共识表（subagent + 主审核验）
+| 维度 | 子代理 | 主审核验 | 共识 |
+|---|---|---|---|
+| 爆炸半径完整？ | 否（C1 timebox manifest） | 否（C1 + M1 + grep 范围 + M4 docs） | DISAGREE → 已补全 |
+| T1/T2 tsc 边界成立？ | 是（逐符号追踪） | 是（独立复核） | CONFIRMED |
+| 迁移安全？ | 顺序对、依据错（H1） | 同意 H1 | CONFIRMED（顺序）+ 修正依据 |
+| scheduling-handler 重构？ | 逻辑成立 | 成立 | CONFIRMED |
+| 红线 keep-list 正确？ | 全部无关、保留对 | 全部核对一致 | CONFIRMED |
+| 测试覆盖？ | 重写偏弱（M3） | 同意 M3 | 已加强 |
+
+### 子代理偏差（主审剔除 / 纠正）
+- 子代理称路径 `src/scripts/validate-domain-structure.ts` → 实际 `frontend/scripts/`（在 src 外）。**M1 本身真实**（T2 删 repo 后 test import 断裂），但「grep 会 fail」机制误判（scripts 不在 src grep 范围）。主审重定位为 test import 断裂。
+- 子代理 M4 docs 残留 → 主审首次正则 grep 漏报（`.?` 交替 bug），literal 复核确认 **M4 真实**（route-generation-spec / UI-REDESIGN / usom-design / domain-development-guide）。
+
+### 决策审计（auto-decided，6 principles）
+| # | 发现 | 级别 | 决策 | 原则 | 落实 |
+|---|---|---|---|---|---|
+| 1 | C1 timebox/manifest.yaml `habitTemplates` query 漏删 | CRITICAL | 补 T1 Step 1.11(e) | P2 boil lakes | ✓ plan |
+| 2 | M1 scripts/validate-domain-structure 例外+test 漏清 | HIGH | 补 T2 Step 2.1b | P2 | ✓ plan |
+| 3 | grep 误命中 migrations/0002 + 0027 | HIGH | Step 2.6 + 约束加 `--exclude-dir=migrations` | P5 explicit | ✓ plan |
+| 4 | M4 docs 同步过窄（仅 usom-design） | MEDIUM | Step 3.5 扩 route-generation-spec/UI-REDESIGN/domain-development-guide | P1 完整 | ✓ plan |
+| 5 | H1 DROP 依据错（habit_id RESTRICT） | HIGH | spec §4.3 + R4 纠正为 template_id FK | P5 | ✓ spec |
+| 6 | H2 journal 拼接风险 | MEDIUM | Step 3.2 加「确认 idx=28 末位 + JSON 合法性」 | P5 | ✓ plan |
+| 7 | M3 sort 测试 if-guard 偏弱 | LOW | Step 1.13 改直接断言 | P1 | ✓ plan |
+
+### 架构图（删除依赖序）
+```
+T1 删消费者（生产者仍存在但无引用 → tsc 绿）
+  UI/page/hooks ─┐
+  5 barrels ─────┤
+  intent.ts 块(1028-1166) ┤
+  rules-registry(4 校验) ┤
+  scheduling-handler + timebox/manifest.yaml(C1) ─┤  ← manifest↔handler 必须同任务
+  checkReferences 链(habit.ts / irepository 字段 / HabitListPage / orchestrator mock)
+  register-providers(全清) + habits/manifest + action-view + 3 测试
+
+T2 删生产者+类型+schema（消费者已去 → grep 零残留）
+  habit-template.ts repo + habit-templates-provider.ts(删文件)
+   → USOM objects(HabitTemplate/TemplateHabitItem)
+   → irepository(IHabitTemplateRepository + Create/Update/TemplateHabitOverrides)
+   → mappers + schema(两表) + repositories/index
+   → scripts/validate-domain-structure 例外+test(M1)  ← test import 依赖 repo，须同任务
+
+T3 DROP 迁移
+  0027 SQL(template_habits 先 → habit_templates 后) + journal idx=29 + docs(全) + manifest.md
+```
+
+### 测试图（codepath → 覆盖）
+| codepath / 分支 | 覆盖 | 说明 |
+|---|---|---|
+| scheduling 排序（habit<task，无 planned） | Step 1.13 重写 | planned 源已删，断言 habit<task |
+| habit 归档守卫（无模板关联） | HabitListPage 现有测试 | templateHabits 字段移除 + 文案改 |
+| orchestrator applyTemplate | Step 1.14 删 describe.skip 块 | 死代码随类型删 |
+| domain validate template actions | Step 1.12 删 describe 块 | 规则随 rules-registry 删 |
+| tsc 编译（T1/T2 各绿） | Step 1.15 / 2.6 base=head | 零新增 |
+| 零残留 | Step 2.6 grep `--exclude-dir=migrations` | 排除历史 CREATE + 新 DROP |
+
+### Failure Modes Registry
+| 模式 | 级别 | 缓解 |
+|---|---|---|
+| timebox manifest 残留死 query → /smartSchedule 运行时错 | CRITICAL | C1 已补 T1 |
+| validate-domain test import 断裂 → vitest 红 | HIGH | M1 已补 T2 |
+| DROP 主表先于 junction → FK 阻断 | HIGH | SQL 顺序固定 + H1 依据纠正 |
+| grep 误报 migrations → 阻塞 gate | MEDIUM | `--exclude-dir=migrations` |
+| prod 存量 template 行 | LOW | SELECT count 守护 + prod 人工确认 |
+
+### 结论
+**APPROVED with fixes applied.** 7 项发现（1 CRITICAL / 3 HIGH / 3 LOW-MED）已全部折入 plan（C1/M1/M3/M4/H2）+ spec（H1）。核心结构（爆炸半径、T1/T2 tsc 边界、红线 keep-list、迁移顺序、scheduling 重构）经子代理 + 主审双路径核验稳健。Codex 不可用，共识为 subagent + 主审双核验。
