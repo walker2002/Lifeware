@@ -281,6 +281,8 @@ export class TaskRepository implements ITaskRepository {
       // 用户管理标签（默认值）
       captureMode: data.captureMode ?? 'ad_hoc',
       energyProfile: data.energyProfile,
+      // [023] A3.1.2: 透传 activityArchetypeId 到 USOM Task
+      activityArchetypeId: data.activityArchetypeId,
       schedulingConstraint: data.schedulingConstraint,
       tracking: data.tracking ?? 'check_in',
 
@@ -317,6 +319,8 @@ export class TaskRepository implements ITaskRepository {
       ...(data.decomposition !== undefined && { decomposition: data.decomposition }),
       ...(data.captureMode !== undefined && { captureMode: data.captureMode }),
       ...(data.energyProfile !== undefined && { energyProfile: data.energyProfile }),
+      // [023] A3.1.2: update 透传 activityArchetypeId（undefined 时跳过）
+      ...(data.activityArchetypeId !== undefined && { activityArchetypeId: data.activityArchetypeId }),
       ...(data.schedulingConstraint !== undefined && { schedulingConstraint: data.schedulingConstraint }),
       ...(data.tracking !== undefined && { tracking: data.tracking }),
       updatedAt: new Date().toISOString() as Timestamp,

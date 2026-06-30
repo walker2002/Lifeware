@@ -79,4 +79,12 @@ describe('TaskRepository', () => {
       expect(result).toBeDefined()
     })
   })
+
+  // [023] A3.1.2: archetypeId 字段透传校验
+  describe('create archetypeId 透传 ([023] A3.1)', () => {
+    it('create 应透传 activityArchetypeId 到返回的 Task', async () => {
+      const result = await repo.create({ title: 'task-arch', activityArchetypeId: 'arch-1' } as any, userId)
+      expect(result.activityArchetypeId).toBe('arch-1')
+    })
+  })
 })

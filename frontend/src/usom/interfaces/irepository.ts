@@ -129,6 +129,8 @@ export interface CreateTaskInput {
   captureMode?: CaptureMode
   /** 能量画像 */
   energyProfile?: EnergyProfile
+  /** [023] A3: 关联 Activity Archetype */
+  activityArchetypeId?: USOM_ID
   /** 调度约束 */
   schedulingConstraint?: SchedulingConstraint
   /** 追踪模式（默认 check_in） */
@@ -540,6 +542,8 @@ export interface CreateHabitInput {
   endDate?: DateOnly
   /** 标签列表 */
   tags?: string[]
+  /** [023] A3: 关联 Activity Archetype */
+  activityArchetypeId?: USOM_ID
 }
 
 /** 更新习惯输入 */

@@ -356,6 +356,8 @@ export interface Task {
   decomposition?: DecompositionLevel
   captureMode: CaptureMode
   energyProfile?: EnergyProfile
+  /** [023] A3: 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId） */
+  activityArchetypeId?: USOM_ID
   schedulingConstraint?: SchedulingConstraint
   tracking: TrackingMode
   aiTags: Record<string, unknown>
@@ -469,6 +471,8 @@ export interface Habit {
   updatedAt: Timestamp
   suspendedAt?: Timestamp
   archivedAt?: Timestamp
+  /** [023] A3: 关联 Activity Archetype（nullable） */
+  activityArchetypeId?: USOM_ID
   notes?: Notes
 }
 

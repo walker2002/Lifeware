@@ -76,6 +76,8 @@ export class HabitRepository implements IHabitRepository {
       longestStreak: 0,
       completionRate7d: 0,
       tags: data.tags ?? [],
+      // [023] A3.1.2: 透传 activityArchetypeId 到 USOM Habit
+      activityArchetypeId: data.activityArchetypeId,
       createdAt: now,
       updatedAt: now,
     }
@@ -107,6 +109,8 @@ export class HabitRepository implements IHabitRepository {
       ...(data.startDate !== undefined && { startDate: data.startDate as DateOnly }),
       ...(data.endDate !== undefined && { endDate: data.endDate as DateOnly }),
       ...(data.tags !== undefined && { tags: data.tags }),
+      // [023] A3.1.2: update 透传 activityArchetypeId（undefined 时跳过）
+      ...(data.activityArchetypeId !== undefined && { activityArchetypeId: data.activityArchetypeId }),
       updatedAt: new Date().toISOString() as Timestamp,
     }
     const row = habitUSOMToRow(updated, userId)

@@ -71,6 +71,8 @@ type TaskRow = {
   completedAt: Date | null; archivedAt: Date | null;
   clarity: string; complexity: string[]; decomposition: string | null;
   captureMode: string; energyProfile: string | null;
+  // [023] A3.1.2: 关联 Activity Archetype（nullable，对齐 timebox A2 范式）
+  activityArchetypeId: string | null;
   schedulingConstraint: string | null; tracking: string;
   aiTags: Record<string, unknown>;
 }
@@ -104,6 +106,8 @@ export function taskRowToUSOM(row: TaskRow): Task {
     // 用户管理标签
     captureMode: row.captureMode as CaptureMode,
     energyProfile: (row.energyProfile as EnergyProfile) ?? undefined,
+    // [023] A3.1.2: row.archetypeId (snake_case) ↔ activityArchetypeId (camelCase)
+    activityArchetypeId: row.activityArchetypeId ?? undefined,
     schedulingConstraint: (row.schedulingConstraint as SchedulingConstraint) ?? undefined,
     tracking: row.tracking as TrackingMode,
     // AI 辅助扩展
@@ -139,6 +143,8 @@ export function taskUSOMToRow(task: Task, userId: USOM_ID) {
     // 用户管理标签
     captureMode: task.captureMode,
     energyProfile: task.energyProfile ?? null,
+    // [023] A3.1.2: USOM activityArchetypeId (undefined) → row null
+    activityArchetypeId: task.activityArchetypeId ?? null,
     schedulingConstraint: task.schedulingConstraint ?? null,
     tracking: task.tracking,
     // AI 辅助扩展
@@ -160,6 +166,8 @@ type HabitRow = {
   notes: string | null;
   createdAt: Date; updatedAt: Date;
   suspendedAt: Date | null; archivedAt: Date | null;
+  // [023] A3.1.2: 关联 Activity Archetype（nullable）
+  activityArchetypeId: string | null;
 }
 
 export function habitRowToUSOM(row: HabitRow): Habit {
@@ -188,6 +196,8 @@ export function habitRowToUSOM(row: HabitRow): Habit {
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     suspendedAt: toISO(row.suspendedAt),
     archivedAt: toISO(row.archivedAt),
+    // [023] A3.1.2: row.archetypeId (snake_case) ↔ activityArchetypeId (camelCase)
+    activityArchetypeId: row.activityArchetypeId ?? undefined,
     notes: row.notes ?? undefined,
   }
 }
@@ -214,6 +224,8 @@ export function habitUSOMToRow(habit: Habit, userId: USOM_ID) {
     daysOfWeek: habit.frequency.daysOfWeek ?? null,
     tags: habit.tags,
     notes: habit.notes ?? null,
+    // [023] A3.1.2: USOM activityArchetypeId (undefined) → row null
+    activityArchetypeId: habit.activityArchetypeId ?? null,
     suspendedAt: toDate(habit.suspendedAt),
     archivedAt: toDate(habit.archivedAt),
   }
