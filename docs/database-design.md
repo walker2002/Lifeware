@@ -491,7 +491,10 @@ CREATE TABLE tasks (
 
   -- ── 用户管理标签（执行轴）──
   capture_mode      text not null default 'ad_hoc' check (capture_mode in ('scheduled', 'ad_hoc', 'retrospective')),
-  energy_profile    text check (energy_profile in ('light', 'deep', 'admin', 'creative', 'reactive')),
+  -- [023] A3.1：energy_profile 5 值 enum 已废弃，由 activity_archetype_id 取代
+  --   迁移：0025（M1 加列+D4 backfill） + 0026（M2 删列）
+  --   旧值映射：见下文「[023] A3.1 D4 映射表（永久记录）」
+  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（取代 energy_profile）
   scheduling_constraint text check (scheduling_constraint in ('hard_deadline', 'soft_target', 'opportunistic', 'recurring')),
   tracking          text not null default 'check_in' check (tracking in ('none', 'check_in', 'log', 'review')),
 
@@ -508,7 +511,7 @@ CREATE INDEX idx_tasks_user_clarity ON tasks(user_id, clarity);
 CREATE INDEX idx_tasks_user_thread ON tasks(user_id, thread_id);
 CREATE INDEX idx_tasks_user_parent ON tasks(user_id, parent_id);
 CREATE INDEX idx_tasks_user_priority ON tasks(user_id, priority);
-CREATE INDEX idx_tasks_user_energy ON tasks(user_id, energy_profile);
+CREATE INDEX idx_tasks_user_archetype ON tasks(user_id, activity_archetype_id);  -- [023] A3.1：取代 idx_tasks_user_energy
 CREATE INDEX idx_tasks_user_constraint ON tasks(user_id, scheduling_constraint);
 CREATE INDEX idx_tasks_user_tracking ON tasks(user_id, tracking);
 CREATE INDEX idx_tasks_due_date ON tasks(user_id, due_date);
@@ -588,6 +591,9 @@ CREATE TABLE habits (
   -- 可追踪标记
   trackable    boolean not null default true,  -- true=可追踪打卡, false=仅占时（不计入 streak）
 
+  -- ── Activity Archetype 归属 ──
+  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（任务类型归类）
+
   -- 统计字段（冗余，便于查询）
   streak           integer not null default 0,
   longest_streak   integer not null default 0,
@@ -612,8 +618,36 @@ CREATE TABLE habits (
 -- 索引
 CREATE INDEX idx_habits_user_status ON habits(user_id, status) where archived_at is null;
 CREATE INDEX idx_habits_start_date ON habits(user_id, start_date);
+CREATE INDEX idx_habits_user_archetype ON habits(user_id, activity_archetype_id);  -- [023] A3.1
 -- 注：idx_habits_key_result 已在 Phase 2 移除（迁移至 contributions junction）
 ```
+
+---
+
+### 4.5.1 [023] A3.1 迁移记录 + D4 永久映射表
+
+**迁移**：
+
+| 迁移 | 文件 | 性质 | 说明 |
+|------|------|------|------|
+| 0025 | `frontend/src/lib/db/migrations/0025_a3_m1_tasks_habits_archetype_id.sql` | M1 | tasks/habits 加 `activity_archetype_id` 列 + 索引 + D4 backfill（`energy_profile → activity_archetype_id`） |
+| 0026 | `frontend/src/lib/db/migrations/0026_a3_m2_drop_tasks_energy_profile.sql` | M2 | tasks 删 `energy_profile` 列 + `idx_tasks_user_energy` 索引 |
+
+> 设计背景：[023] A3 设计将任务的「能量画像 5 值 enum」升级为「Activity Archetype 分类引用」（语义更丰富：mental/physical/creative/social 四维 energy cost + L1/L2 层级）。[D11 B→C 迁移] 走两阶段：M1 加列 + backfill，M2 删旧列（保证可回滚）。
+
+### [023] A3.1 D4 映射表（永久记录）
+
+> M1 (0025) backfill 的 `tasks.energy_profile → activity_archetype_id` 映射。`light` 与 `admin` 合并到「日常事务」是不可逆决策（archetype seed 无独立「轻度工作」）。M2 (0026) 删 `energy_profile` 列后，本表为唯一回查入口。
+
+| energy_profile | → archetype（l1=工作, l2Name） | 依据 |
+|----------------|-------------------------------|------|
+| `deep`     | 深度专注   | mental=9, 深度工作 |
+| `creative` | 方案设计   | creative=9 |
+| `admin`    | 日常事务   | mental=4, 行政琐事 |
+| `light`    | 日常事务   | mental=4, 轻度低能耗 |
+| `reactive` | 响应式工作 | 响应式 |
+
+> 参考：[023] A3 design doc §3 D4 + §4.1 M1 backfill CASE。Seed L2 名逐字核对已通过 A3.1.1 Step 1.5 (R7)。
 
 ---
 

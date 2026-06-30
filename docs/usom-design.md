@@ -511,9 +511,11 @@ interface Task {
 
   // ── 用户管理标签（执行轴）──
   captureMode:           CaptureMode             // 捕获模式
-  energyProfile?:        EnergyProfile           // 能量画像
   schedulingConstraint?: SchedulingConstraint    // 调度约束
   tracking:              TrackingMode            // 追踪模式
+
+  // ── Activity Archetype 归属 ──
+  activityArchetypeId?:  USOM_ID                 // [023] A3.1：nullable FK → activity_archetypes.id（取代旧 energyProfile）
 
   // ── AI 辅助扩展 ──
   aiTags:                Record<string, unknown> // AI 辅助扩展数据
@@ -526,6 +528,14 @@ interface Task {
   acceptance_criteria?:  string             // 验收标准（占位）
   expected_output?:      string             // 预期产出物描述（占位）
 }
+
+**Task / Habit 接入 Activity Archetype**（[023] A3）：
+- `activityArchetypeId?: USOM_ID`（nullable FK → activity_archetypes.id）
+- 语义：[D3] ContentField，optional，不进 onValidate；走正常 mutation（不发业务事件）
+- 取代旧 `Task.energyProfile` 5 值 enum（D11 B→C 迁移已落 M1/M2 0025/0026）
+- 映射表：见 [R9] docs/database-design.md D4 永久映射表
+
+> 参考：[023] A3 design doc §3 D2-D4。
 
 type TaskStatus = 'todo' | 'planned' | 'in_progress' | 'completed' | 'archived'
 
@@ -621,6 +631,7 @@ interface Habit {
   trackable:        boolean          // true=可追踪打卡, false=仅占时
   startDate:        DateOnly
   endDate?:         DateOnly
+  activityArchetypeId?: USOM_ID       // [023] A3.1：nullable FK → activity_archetypes.id（习惯类型归类）
   streak:           number           // 当前连续天数
   longestStreak:    number
   completionRate7d: number           // 最近 7 天完成率，0-1
