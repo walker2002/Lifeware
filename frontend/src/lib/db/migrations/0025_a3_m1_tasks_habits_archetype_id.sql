@@ -9,6 +9,9 @@ ALTER TABLE habits ADD COLUMN IF NOT EXISTS activity_archetype_id uuid
 -- archetype 是 per-user 且无 slug/id 常量，必须按 (user_id, l1='工作', l2_name) 子查询匹配。
 -- 映射（design D4，修正父 plan light→响应式 为 light→日常事务）：
 --   deep→深度专注 / creative→方案设计 / admin→日常事务 / light→日常事务 / reactive→响应式工作
+-- [/review 加固] activity_archetypes 无 (user_id, l1, l2_name) UNIQUE 约束，子查询加
+--   ORDER BY + LIMIT 1 保证确定性（取最早创建那条），避免重复行触发
+--   "more than one row returned by a subquery" 硬错崩掉整个迁移。
 UPDATE tasks t SET activity_archetype_id = (
   SELECT a.id FROM activity_archetypes a
   WHERE a.user_id = t.user_id
@@ -20,6 +23,8 @@ UPDATE tasks t SET activity_archetype_id = (
       WHEN 'light'    THEN '日常事务'
       WHEN 'reactive' THEN '响应式工作'
     END
+  ORDER BY a.created_at, a.id
+  LIMIT 1
 ) WHERE t.energy_profile IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_archetype  ON tasks(user_id, activity_archetype_id);
