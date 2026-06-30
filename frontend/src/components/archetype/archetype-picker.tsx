@@ -27,23 +27,38 @@ interface ArchetypePickerProps {
 export function ArchetypePicker({ value, onChange, readOnly = false }: ArchetypePickerProps) {
   const [archetypes, setArchetypes] = useState<ActivityArchetype[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  // [023] M-1: 区分 "无 archetype"（空态）vs "加载失败"（error 态）。失败时给用户 retry 入口。
+  const [loadError, setLoadError] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   // [H4 /autoplan] archetypes 只在挂载时拉一次（不再随 [value] 重拉）。
   // selected 由 archetypes + value 派生（useMemo），消除「选后闪一下未选择再回填」的抖动。
+  // [023] M-1: 失败时设 error 态；点「重试」递增 nonce 触发 effect 重跑。
   useEffect(() => {
     let cancelled = false
+    setLoadError(false)
     getArchetypes()
       .then(r => {
         if (cancelled) return
-        setArchetypes(r.success && r.data ? r.data : [])
+        if (r.success && r.data) {
+          setArchetypes(r.data)
+        } else {
+          setArchetypes([])
+        }
       })
-      .catch(() => {
-        /* 静默失败（无 archetype 不阻塞表单） */
+      .catch((err) => {
+        if (cancelled) return
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.warn('[ArchetypePicker] getArchetypes failed:', err)
+        }
+        setArchetypes([])
+        setLoadError(true)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [retryNonce])
 
   const selected = useMemo(
     () => archetypes.find(a => a.id === value),
@@ -67,6 +82,9 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
             <button
               type="button"
               onClick={() => setPickerOpen(o => !o)}
+              aria-haspopup="listbox"
+              aria-expanded={pickerOpen}
+              aria-label="更换活动原型"
               className="shrink-0 text-xs text-primary"
             >
               更换
@@ -80,6 +98,9 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
             <button
               type="button"
               onClick={() => setPickerOpen(o => !o)}
+              aria-haspopup="listbox"
+              aria-expanded={pickerOpen}
+              aria-label="选择活动原型"
               className="text-xs text-primary"
             >
               选择
@@ -89,17 +110,34 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
       )}
 
       {!readOnly && pickerOpen && (
-        <div className="mt-2 max-h-60 overflow-y-auto rounded-md border border-hairline bg-canvas">
+        <div
+          role="listbox"
+          aria-label="活动原型列表"
+          className="mt-2 max-h-60 overflow-y-auto rounded-md border border-hairline bg-canvas"
+        >
           {archetypes.length === 0 ? (
-            <p className="flex items-center gap-1.5 p-3 text-xs text-body">
-              <Inbox className="size-3.5 text-muted" />
-              暂无活动原型，请先到「活动原型配置」创建
-            </p>
+            loadError ? (
+              // [023] M-1: 失败态 — 让用户能 retry，而非静默 "暂无活动原型"。
+              <button
+                type="button"
+                onClick={() => setRetryNonce(n => n + 1)}
+                className="flex w-full items-center gap-1.5 p-3 text-left text-xs text-primary hover:bg-hover-overlay"
+              >
+                加载失败，点此重试
+              </button>
+            ) : (
+              <p className="flex items-center gap-1.5 p-3 text-xs text-body">
+                <Inbox className="size-3.5 text-muted" />
+                暂无活动原型，请先到「活动原型配置」创建
+              </p>
+            )
           ) : (
             archetypes.map(a => (
               <button
                 key={a.id}
                 type="button"
+                role="option"
+                aria-selected={a.id === value}
                 onClick={() => {
                   onChange?.(a.id, a)
                   setPickerOpen(false)

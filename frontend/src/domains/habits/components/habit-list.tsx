@@ -42,8 +42,8 @@ interface HabitItem {
   startDate: string
   endDate?: string
   daysOfWeek?: number[]
-  /** [023] A3.2：关联 Activity Archetype ID（nullable，HabitListPage 习惯定义为 string | null） */
-  activityArchetypeId?: string | null
+  /** [023] A3.2：关联 Activity Archetype ID（[023] I-1 type narrowing: 统一为 string | undefined，对齐 USOM 源类型） */
+  activityArchetypeId?: string
 }
 
 const STATUS_GROUPS = [
@@ -98,8 +98,12 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         for (const a of list) map[a.id] = a
         setArchetypeMap(map)
       })
-      .catch(() => {
-        /* 静默失败（无 archetype 不阻塞列表渲染） */
+      .catch((err) => {
+        // [023] M-1: 静默失败 + dev 警告。生产环境无 archetype 不阻塞列表，但 dev 需可观察。
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.warn('[HabitList] getArchetypes failed:', err)
+        }
       })
     return () => {
       cancelled = true
@@ -181,7 +185,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         daysOfWeek: editingHabit.daysOfWeek,
         startDate: editingHabit.startDate,
         endDate: editingHabit.endDate,
-        activityArchetypeId: editingHabit.activityArchetypeId ?? undefined,
+        activityArchetypeId: editingHabit.activityArchetypeId,
       }
     : undefined
 

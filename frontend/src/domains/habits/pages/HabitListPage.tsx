@@ -47,7 +47,7 @@ interface HabitItem {
   startDate: string
   endDate?: string
   daysOfWeek?: number[]
-  activityArchetypeId?: string | null
+  activityArchetypeId?: string
 }
 
 function habitToItem(h: Habit): HabitItem {
