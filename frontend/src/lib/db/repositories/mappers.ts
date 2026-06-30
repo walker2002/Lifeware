@@ -11,7 +11,6 @@ import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitFrequency, HabitLog, Contribution,
   Timebox, Review, ReviewSection, ReviewMetrics,
-  HabitTemplate, TemplateHabitItem,
   AISession, ChatMessage, TaskExecutionLog,
   RecurrenceRule,
   Cycle,
@@ -330,63 +329,6 @@ export function taskExecutionLogUSOMToRow(log: TaskExecutionLog, userId: USOM_ID
     energyLevel: log.energyLevel ?? null,
     note: log.note ?? null,
     source: log.source,
-  }
-}
-
-// --- HabitTemplate -------------------------------------------------
-type HabitTemplateRow = {
-  id: string; userId: string; schemaVersion: number;
-  name: string; description: string | null;
-  icon: string | null; status: string;
-  applicableDays: number[];
-  createdAt: Date; updatedAt: Date;
-}
-
-export function habitTemplateRowToUSOM(row: HabitTemplateRow, habits: TemplateHabitItem[] = []): HabitTemplate {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description ?? undefined,
-    icon: row.icon ?? undefined,
-    status: row.status as HabitTemplate['status'],
-    applicableDays: row.applicableDays ?? [],
-    habits,
-    createdAt: row.createdAt.toISOString() as Timestamp,
-    updatedAt: row.updatedAt.toISOString() as Timestamp,
-  }
-}
-
-export function habitTemplateUSOMToRow(template: HabitTemplate, userId: USOM_ID) {
-  return {
-    id: template.id,
-    userId: userId,
-    name: template.name,
-    description: template.description ?? null,
-    icon: template.icon ?? null,
-    status: template.status,
-    applicableDays: template.applicableDays,
-  }
-}
-
-export function templateHabitItemToRow(
-  templateId: USOM_ID,
-  item: TemplateHabitItem,
-) {
-  return {
-    templateId,
-    habitId: item.habitId,
-    sortOrder: item.sortOrder,
-    timeOverride: item.timeOverride ?? null,
-    durationOverride: item.durationOverride ?? null,
-  }
-}
-
-export function templateHabitRowToItem(row: { habitId: string; sortOrder: number; timeOverride: string | null; durationOverride: number | null }): TemplateHabitItem {
-  return {
-    habitId: row.habitId,
-    sortOrder: row.sortOrder,
-    timeOverride: row.timeOverride ?? undefined,
-    durationOverride: row.durationOverride ?? undefined,
   }
 }
 

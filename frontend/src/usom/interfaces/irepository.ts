@@ -11,7 +11,6 @@ import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Pr
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
-  HabitTemplate, TemplateHabitItem,
   AISession, AISessionSummary, ChatMessage, UserSettings, TaskExecutionLog,
   RecurrenceRule, Contribution,
 } from '../types/objects'
@@ -542,98 +541,6 @@ export interface CreateHabitInput {
 
 /** 更新习惯输入 */
 export type UpdateHabitInput = Partial<CreateHabitInput>
-
-// ─── HabitTemplate ─────────────────────────────────────────────
-
-/**
- * 习惯模板仓储接口
- */
-export interface IHabitTemplateRepository {
-  /**
-   * 根据 ID 查找习惯模板
-   * @param id - 模板 ID
-   * @param userId - 用户 ID
-   * @returns 习惯模板或 null
-   */
-  findById(id: USOM_ID, userId: USOM_ID): Promise<HabitTemplate | null>
-
-  /**
-   * 根据用户 ID 查找习惯模板
-   * @param userId - 用户 ID
-   * @returns 习惯模板列表
-   */
-  findByUserId(userId: USOM_ID): Promise<HabitTemplate[]>
-
-  /**
-   * 创建习惯模板
-   * @param data - 创建数据
-   * @param userId - 用户 ID
-   * @returns 创建的习惯模板
-   */
-  create(data: CreateTemplateInput, userId: USOM_ID): Promise<HabitTemplate>
-
-  /**
-   * 更新习惯模板
-   * @param id - 模板 ID
-   * @param data - 更新数据
-   * @param userId - 用户 ID
-   * @returns 更新后的习惯模板
-   */
-  update(id: USOM_ID, data: UpdateTemplateInput, userId: USOM_ID): Promise<HabitTemplate>
-
-  /**
-   * 删除习惯模板
-   * @param id - 模板 ID
-   * @param userId - 用户 ID
-   */
-  delete(id: USOM_ID, userId: USOM_ID): Promise<void>
-
-  /**
-   * 向模板添加习惯
-   * @param templateId - 模板 ID
-   * @param habitId - 习惯 ID
-   * @param overrides - 覆盖配置
-   * @param userId - 用户 ID
-   */
-  addHabit(templateId: USOM_ID, habitId: USOM_ID, overrides: TemplateHabitOverrides | undefined, userId: USOM_ID): Promise<void>
-
-  /**
-   * 从模板移除习惯
-   * @param templateId - 模板 ID
-   * @param habitId - 习惯 ID
-   * @param userId - 用户 ID
-   */
-  removeHabit(templateId: USOM_ID, habitId: USOM_ID, userId: USOM_ID): Promise<void>
-}
-
-/**
- * 创建模板输入
- */
-export interface CreateTemplateInput {
-  /** 模板名称 */
-  name: string
-  /** 模板描述 */
-  description?: string
-  /** 模板图标 */
-  icon?: string
-  /** 适用的日期（周几） */
-  applicableDays: number[]
-}
-
-/** 更新模板输入 */
-export type UpdateTemplateInput = Partial<CreateTemplateInput>
-
-/**
- * 模板习惯覆盖配置
- */
-export interface TemplateHabitOverrides {
-  /** 排序顺序 */
-  sortOrder?: number
-  /** 时间覆盖 */
-  timeOverride?: string
-  /** 时长覆盖 */
-  durationOverride?: number
-}
 
 // ─── HabitLog (immutable fact records) ─────────────────────────
 

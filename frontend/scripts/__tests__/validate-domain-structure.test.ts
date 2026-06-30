@@ -129,9 +129,6 @@ describe('isBusinessFactRepo（目录判据）', () => {
     expect(isBusinessFactRepo('IntentionRepository', '@/lib/db/repositories/intention.repository')).toBe(false)
     expect(isBusinessFactRepo('AISessionRepository', '@/lib/db/repositories/session.repository')).toBe(false)
   })
-  it('配置例外（HabitTemplate）→ false（即使 domains/）', () => {
-    expect(isBusinessFactRepo('HabitTemplateRepository', '@/domains/habits/repository/habit-template')).toBe(false)
-  })
   it('无 import 信息 → 保守 true', () => {
     expect(isBusinessFactRepo('TaskRepository', undefined)).toBe(true)
   })
@@ -210,17 +207,6 @@ describe('analyzeSourceFile', () => {
     const diags = analyzeSourceFile('/actions/tasks.ts', code, new Set(), ACTIONS)
     expect(diags).toHaveLength(1)
     expect(diags[0].message).toContain('repo.update')
-  })
-
-  it('配置例外 repo（HabitTemplate）裸写 → 不报', () => {
-    const code = `
-      import { HabitTemplateRepository } from '@/domains/habits/repository/habit-template'
-      export async function createTemplate() {
-        const repo = new HabitTemplateRepository()
-        await repo.create({} as any)
-      }
-    `
-    expect(analyzeSourceFile('/actions/intent.ts', code, new Set(), ACTIONS)).toHaveLength(0)
   })
 
   it('豁免文件（okr.ts）→ 不报', () => {

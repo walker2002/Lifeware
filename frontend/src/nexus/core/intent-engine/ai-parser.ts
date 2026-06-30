@@ -81,40 +81,6 @@ const HABIT_SYSTEM_PROMPT = (now: Date) => `
   "confidence": 0-1
 }
 
-2. 创建模板：
-{
-  "targetDomain": "habits",
-  "action": "createTemplate",
-  "fields": {
-    "name": "string（模板名称）",
-    "applicableDays": "number[]（适用星期）"
-  },
-  "confidence": 0-1
-}
-
-3. 添加习惯到模板：
-{
-  "targetDomain": "habits",
-  "action": "addHabitToTemplate",
-  "fields": {
-    "templateName": "string",
-    "habitTitle": "string",
-    "timeOverride": "HH:MM（可选覆盖时间）"
-  },
-  "confidence": 0-1
-}
-
-4. 应用模板：
-{
-  "targetDomain": "habits",
-  "action": "applyTemplate",
-  "fields": {
-    "templateName": "string",
-    "date": "YYYY-MM-DD 或 today"
-  },
-  "confidence": 0-1
-}
-
 格式规则（严格遵守）：
 - defaultTime 必须是 "HH:MM" 格式的24小时制字符串
 - defaultDuration 必须是整数分钟数

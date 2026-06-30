@@ -484,45 +484,6 @@ export interface HabitFrequency {
   daysOfWeek?: number[] // 0=Sunday ... 6=Saturday
 }
 
-// ─── 3.8a HabitTemplate ────────────────────────────────────────
-/**
- * 习惯模板接口
- * @property id - 模板唯一标识
- * @property name - 模板名称
- * @property description - 模板描述
- * @property icon - 模板图标
- * @property status - 模板状态（草稿/活跃）
- * @property applicableDays - 适用日期（0=周日，6=周六）
- * @property habits - 习惯列表
- * @property createdAt - 创建时间
- * @property updatedAt - 更新时间
- */
-export interface HabitTemplate {
-  id: USOM_ID
-  name: string
-  description?: string
-  icon?: string
-  status: 'draft' | 'active'
-  applicableDays: number[] // 0=Sunday ... 6=Saturday
-  habits: TemplateHabitItem[]
-  createdAt: Timestamp
-  updatedAt: Timestamp
-}
-
-/**
- * 模板习惯项接口
- * @property habitId - 习惯ID
- * @property sortOrder - 排序顺序
- * @property timeOverride - 时间覆盖（HH:MM）
- * @property durationOverride - 持续时间覆盖（分钟）
- */
-export interface TemplateHabitItem {
-  habitId: USOM_ID
-  sortOrder: number
-  timeOverride?: string // HH:MM
-  durationOverride?: DurationMinutes
-}
-
 // ─── 3.9 HabitLog ─────────────────────────────────────────────
 /**
  * 习惯打卡记录接口

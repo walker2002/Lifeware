@@ -352,35 +352,6 @@ export const taskExecutionLogs = pgTable('task_execution_logs', {
   index('idx_task_exec_logs_user_logged').on(table.userId, table.loggedAt),
 ])
 
-// ─── 4.5a habit_templates ──────────────────────────────────────
-export const habitTemplates = pgTable('habit_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  schemaVersion: integer('schema_version').notNull().default(1),
-
-  name: text('name').notNull(),
-  description: text('description'),
-  icon: text('icon'),
-  status: text('status', { enum: ['draft', 'active'] }).notNull().default('draft'),
-  applicableDays: jsonb('applicable_days').notNull().$type<number[]>(),
-
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index('idx_habit_templates_user_status').on(table.userId, table.status),
-])
-
-// ─── 4.5b template_habits ──────────────────────────────────────
-export const templateHabits = pgTable('template_habits', {
-  templateId: uuid('template_id').notNull().references(() => habitTemplates.id, { onDelete: 'cascade' }),
-  habitId: uuid('habit_id').notNull().references(() => habits.id, { onDelete: 'restrict' }),
-  sortOrder: integer('sort_order').notNull().default(0),
-  timeOverride: text('time_override'),
-  durationOverride: integer('duration_override'),
-}, (table) => [
-  primaryKey({ columns: [table.templateId, table.habitId] }),
-])
-
 // ─── 4.6 timeboxes ────────────────────────────────────────────
 export const timeboxes = pgTable('timeboxes', {
   id: uuid('id').primaryKey().defaultRandom(),

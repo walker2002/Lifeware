@@ -9,8 +9,7 @@
  * 校验策略（对应 docs/domain-development-guide.md §4）：
  *   - orchestrator-溯源：扫 src/app/actions/** 的 export async function 入口，
  *     识别「业务事实 repo」直接写（不经 executeIntent / mutationService.{update,execute}）= 违宪。
- *   - 业务事实 repo 判据（目录判据）：domains 目录下 repository 受查；lib/db/repositories 不查；
- *     HabitTemplateRepository（配置语义）例外。
+ *   - 业务事实 repo 判据（目录判据）：domains 目录下 repository 受查；lib/db/repositories 不查。
  *   - rules-registry 存在性：有 manifest.yaml 的域须有 rules-registry.ts（带豁免）。
  */
 import * as fs from 'node:fs'
@@ -59,11 +58,6 @@ export const WRITE_METHODS = new Set([
 
 /** repo 类名命名约定 */
 const REPO_TYPE_RE = /(Repository|Repo)$/
-
-/** 配置语义的 domain repo 例外（domain 下但非业务事实） */
-export const CONFIG_REPOSITORY_EXCEPTIONS = new Set([
-  'HabitTemplateRepository',
-])
 
 // ─── 入口函数识别 ────────────────────────────────────────────
 
@@ -197,7 +191,6 @@ export function buildReceiverMap(
 /**
  * 判定 repo 类是否「业务事实 repo」（受写入口约束）。
  * 判据（目录判据）：
- *   - 配置例外（HabitTemplateRepository 等）→ 非业务
  *   - import 路径含 lib/db → 非业务（系统记录）
  *   - import 路径含 domains/ → 业务事实
  *   - 无 import 信息（同文件定义/未 import）→ 保守视为业务（报 + 提示确认）
@@ -206,7 +199,6 @@ export function isBusinessFactRepo(
   className: string | undefined,
   importPath: string | undefined,
 ): boolean {
-  if (className && CONFIG_REPOSITORY_EXCEPTIONS.has(className)) return false
   if (importPath && importPath.includes('lib/db')) return false
   if (importPath && importPath.includes('domains/')) return true
   return true // 无 import 信息：保守报
