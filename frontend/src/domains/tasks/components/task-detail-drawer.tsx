@@ -20,6 +20,7 @@ import { TaskEditZone } from './task-edit-zone'
 import { SystemCognitionPanel } from './system-cognition-panel'
 import { SubtaskList } from './subtask-list'
 import { TaskCompleteZone } from './task-complete-zone'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -394,6 +395,14 @@ export function TaskDetailDrawer({
 
               {/* ── A 区：任务编辑 ── */}
               <TaskEditZone task={currentTask} onTaskUpdate={handleTaskUpdate} onDirtyChange={handleDirtyChange} />
+
+              {/* ── 活动原型（只读，[023] A3.2）── */}
+              {currentTask.activityArchetypeId !== undefined && (
+                <div>
+                  <label className="text-xs text-body mb-1 block">活动原型</label>
+                  <ArchetypePicker value={currentTask.activityArchetypeId} readOnly />
+                </div>
+              )}
 
               {/* ── 小屏：展开按钮 ── */}
               <div className="block sm:hidden">

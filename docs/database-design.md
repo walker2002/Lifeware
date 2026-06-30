@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_06_30 (refactor)**：[023] A3.2 UI 层接入 — `tasks.activity_archetype_id` / `habits.activity_archetype_id` 列说明补「UI 层已接入（CNUI 表单 + 详情只读）；FK ON DELETE SET NULL → 详情行整块不渲染（M3）」
 - **2026_06_26 (refactor)**：OKR Domain 重组 [022] Tier-2 文档先行 — 新增 §4.0 `cycles` 表（OKR 周期一级对象，cycle_type/status/period_start/period_end/三时间戳，健康度读时聚合不落库）；`objectives` 表删除 `period_type`/`period_start`/`period_end` 三列 + `check_objectives_period_end_after_start` 约束 + `idx_objectives_period` 索引，新增 `cycle_id uuid NOT NULL REFERENCES cycles(id) ON DELETE RESTRICT` + `idx_objectives_cycle` 索引；周期信息上移至 cycles 表，Objective 经 cycle_id 归属；§11.2 映射表补 `Objective.cycleId` 与 `Objective.period`（派生）说明
 - **2026_06_26 (refactor)**：[022] Phase 2 — 新增 §4.3 contributions 表（KR 贡献记录 junction）；§4.5 habits 表移除 `key_result_id` 列与 `idx_habits_key_result` 索引
 - **2026_06_03 (refactor)**：Task Domain 重构 — `projects` → `threads` 表（`project_id` → `thread_id`，移除 `planning` 状态）；删除 `project_templates`/`task_templates` 表（MVP 不实现模板）；`tasks` 表新增双轴标签列（AI 维护：`clarity`/`complexity`/`decomposition`，用户管理：`capture_mode`/`energy_profile`/`scheduling_constraint`/`tracking`）+ `ai_tags` 扩展数据列；新增 8 个相关索引
@@ -494,7 +495,7 @@ CREATE TABLE tasks (
   -- [023] A3.1：energy_profile 5 值 enum 已废弃，由 activity_archetype_id 取代
   --   迁移：0025（M1 加列+D4 backfill） + 0026（M2 删列）
   --   旧值映射：见下文「[023] A3.1 D4 映射表（永久记录）」
-  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（取代 energy_profile）
+  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（取代 energy_profile）；A3.2 UI 层已接入（CNUI 表单 + 详情只读）；FK ON DELETE SET NULL → 详情行整块不渲染（M3）
   scheduling_constraint text check (scheduling_constraint in ('hard_deadline', 'soft_target', 'opportunistic', 'recurring')),
   tracking          text not null default 'check_in' check (tracking in ('none', 'check_in', 'log', 'review')),
 
@@ -592,7 +593,7 @@ CREATE TABLE habits (
   trackable    boolean not null default true,  -- true=可追踪打卡, false=仅占时（不计入 streak）
 
   -- ── Activity Archetype 归属 ──
-  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（任务类型归类）
+  activity_archetype_id uuid references activity_archetypes(id) on delete set null,  -- [023] A3.1：Activity Archetype FK（任务类型归类）；A3.2 UI 层已接入（CNUI 表单 HabitForm + habit-card 小标签）；FK ON DELETE SET NULL
 
   -- 统计字段（冗余，便于查询）
   streak           integer not null default 0,

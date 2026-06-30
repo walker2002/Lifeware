@@ -42,6 +42,8 @@ interface HabitCardProps {
   status?: string
   /** 频率类型 */
   frequencyType?: string
+  /** 活动原型显示名（[023] A3.2 只读小标签，由父组件 resolve 后传入） */
+  archetypeLabel?: string
   /** 编辑回调 */
   onEdit?: () => void
   /** 状态切换回调（暂停/恢复/归档/删除） */
@@ -117,6 +119,7 @@ export function HabitCard({
   completionRate7d = 0,
   status = "active",
   frequencyType,
+  archetypeLabel,
   onEdit,
   onStatusChange,
   todayLogged,
@@ -174,6 +177,9 @@ export function HabitCard({
             </Badge>
             {frequencyType && frequencyType !== "daily" && (
               <Badge variant="outline">{frequencyType === "weekly" ? "每周" : "自定义"}</Badge>
+            )}
+            {archetypeLabel && (
+              <Badge variant="outline">{archetypeLabel}</Badge>
             )}
             {/* 状态标签 */}
             {isDraft && (

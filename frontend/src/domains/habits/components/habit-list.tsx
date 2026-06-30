@@ -18,6 +18,8 @@ import {
 import { HabitCard } from "./habit-card"
 import { HabitForm, type HabitFormFields } from "./habit-form"
 import { ChevronDown, ChevronRight } from "lucide-react"
+import { getArchetypes } from "@/app/actions/activity-archetype"
+import type { ActivityArchetype } from "@/usom/activity-archetype/types"
 
 /**
  * 习惯列表项
@@ -40,6 +42,8 @@ interface HabitItem {
   startDate: string
   endDate?: string
   daysOfWeek?: number[]
+  /** [023] A3.2：关联 Activity Archetype ID（nullable，HabitListPage 习惯定义为 string | null） */
+  activityArchetypeId?: string | null
 }
 
 const STATUS_GROUPS = [
@@ -81,6 +85,26 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
+
+  // [023] A3.2：mount-time 拉一次 archetype 全集，构造 id→archetype 映射供 HabitCard 解析 l2Name
+  const [archetypeMap, setArchetypeMap] = useState<Record<string, ActivityArchetype>>({})
+  useEffect(() => {
+    let cancelled = false
+    getArchetypes()
+      .then(r => {
+        if (cancelled) return
+        const list = r.success && r.data ? r.data : []
+        const map: Record<string, ActivityArchetype> = {}
+        for (const a of list) map[a.id] = a
+        setArchetypeMap(map)
+      })
+      .catch(() => {
+        /* 静默失败（无 archetype 不阻塞列表渲染） */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (autoOpenCreate && panelMode === null) {
@@ -157,6 +181,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
         daysOfWeek: editingHabit.daysOfWeek,
         startDate: editingHabit.startDate,
         endDate: editingHabit.endDate,
+        activityArchetypeId: editingHabit.activityArchetypeId ?? undefined,
       }
     : undefined
 
@@ -326,6 +351,7 @@ export function HabitList({ habits, onCreate, onStatusChange, onUpdateHabit, onR
                           completionRate7d={habit.completionRate7d}
                           status={habit.status}
                           frequencyType={habit.frequencyType}
+                          archetypeLabel={habit.activityArchetypeId ? archetypeMap[habit.activityArchetypeId]?.l2Name : undefined}
                           onEdit={() => setPanelMode(habit.id)}
                           onStatusChange={(action) => onStatusChange(habit.id, action)}
                           onLog={onLogHabit ? (() => onLogHabit(habit.id)) : undefined}
