@@ -138,7 +138,8 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── template_habits        ← 模板-习惯关联表（多对多）
 ├── timeboxes              ← 时间盒
 ├── task_execution_logs    ← 任务执行记录（新增 2026-05-28）
-└── reviews                ← 复盘
+├── reviews                ← 复盘
+└── activity_archetypes    ← 活动原型（[023] A1：7 L1 + 30 L2，配置类不走 SM）
 
 关联表（Junction Tables）
 ├── timebox_tasks          ← Timebox ↔ Task（多对多）
@@ -154,6 +155,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── system_events          ← 事件存储（Memory Framework 原始数据源，append-only）
 ├── action_surfaces        ← 行动切面快照（审计用）
 ├── derived_signals        ← Memory Framework 计算缓存（每用户一行）
+└── user_audit_log         ← 用户操作审计日志（[023] A2 引入 0024 迁移；timebox_templates 等配置类 CUD 写入）
 
 用户行为分析
 └── user_activities        ← 用户行为埋点（统一分析入口，append-only）
@@ -1631,5 +1633,5 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_06_10*
+*文档版本：2026_06_30*
 *关联上游文档：docs/usom-design.md*

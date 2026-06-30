@@ -1,3 +1,7 @@
+/**
+ * @file HabitListPage
+ * @brief 习惯列表页（含创建/编辑 Drawer、批量操作）；[023] I-1 type narrowing: HabitItem.activityArchetypeId 由 string | null 统一为 string | undefined
+ */
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
