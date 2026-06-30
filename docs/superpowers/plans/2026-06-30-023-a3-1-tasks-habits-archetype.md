@@ -767,3 +767,89 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - habits/repository 是否还有其他写 energyProfile 的入口：grep（A3.1.3 Step 10）兜底，D2 已确认 habits 从未有 energyProfile
 
 **5. Change Gate 基线**：每个 task 末尾 vitest/tsc 用 base/head 失败集合对比，不用硬编码失败数（记忆 [feedback_change-gate-baseline]）。✓
+
+---
+
+## Review 修订清单（plan-eng-review + outside voice）
+
+本 plan 经 plan-eng-review（4 section + Claude subagent outside voice，codex 超时 fallback）评审，产生以下修订 overlay。**实现时以本清单为准**（覆盖前文对应 step 的原始描述）。
+
+### NOT in scope（review 确认）
+- UI 接入（ArchetypePicker 表单 + 详情只读）→ A3.2
+- lifecycle-configs require 债（N-5）→ 保持 defer neat
+- applyEvent 能量扣减（D9/OQ-6）→ 不接
+- habitsTemplates 硬删 → A3.3
+
+### What already exists（复用，不重建）
+- A1 activity_archetypes 表 + Repository + seed（backfill 目标 + archetype 本体）
+- A2 timebox archetype 接入范式（schema FK:396 + mapper 双向:400-449 + ArchetypePicker）→ tasks/habits 照抄
+- [025] mutation 范式 + drizzle 手写迁移约定
+
+### R1 — Finding 1：prod 迁移验证 step（prior learning [drizzle-migrate-state-desync-fix]）
+**覆盖**：A3.1.1 Step 5 后 + A3.1.3 Step 11 后
+**改动**：各加一步 prod 迁移验证——`to_regclass`/信息_schema查列存在 + 命中率 SQL 重跑；plan Global Constraints 追加「prod 部署必走 prod.sh（含 pg_dump 备份）+ 验证」ship checklist。理由：M1 是 5 条语句 breakpoints:false 迁移，drizzle migrate 偶发状态紊乱（hash 记了 DDL 没落），prod 部署需显式验证。
+
+### R2 — Finding 2：backfill 前置 archetype seed 强制验证
+**覆盖**：A3.1.1 Step 5 前
+**改动**：加前置 `SELECT count(*) FROM activity_archetypes`，为 0 则 abort 并提示先跑 A1 seedDefaults，非零才进 backfill。
+
+### R3 — Finding 3：A3.1.2 Step 1 测试 import 写法清晰化
+**覆盖**：A3.1.2 Step 1
+**改动**：删除自相矛盾的"局部 import + 注明删掉"写法。直接给：① 第 9 行扩展为单行 import（含 8 个 mapper：keyResultRowToUSOM/keyResultUSOMToRow/timeboxRowToUSOM/timeboxUSOMToRow/taskRowToUSOM/taskUSOMToRow/habitRowToUSOM/habitUSOMToRow）；② 测试块**不含**任何局部 import。implementer 照抄即对，避免重复 import 的 TS/lint error。
+
+### R4 — Finding 4：task-edit-zone 父容器布局验证
+**覆盖**：A3.1.3 Step 8
+**改动**：Step 8 加一步——Read task-edit-zone.tsx :277-283 父容器结构，确认删 :283 的 `{EnergyIcon && ...}` 后无 dangling wrapper / 空隙；必要时清空父容器。明示「A3.1 ship 后到 A3.2 ship 前，task 详情区能量图标位置留白」为已知中间态（非 bug）。
+
+### R5 — Finding 5：repository archetypeId 专项 case
+**覆盖**：A3.1.2 Step 1
+**改动**：在 `task.repository.test.ts` + habits repository 测试各加 1 个轻量 case——`create({..., activityArchetypeId: 'arch-x'})` → 验证返回 Task 含该字段（透传落库语义）。对齐用户「too many tests」偏好。
+
+### R6 — OV1（P1 必纳）：grep pattern 精确化
+**覆盖**：A3.1.3 Step 10
+**改动**：grep pattern **去掉裸词 `EnergyIcon`**，改为 `grep -rn "energyProfile\|EnergyProfile\|energy_profile\|ENERGY_ICONS" src --include="*.ts" --include="*.tsx"`。明示白名单：`task-tree-view.tsx` 的 `ENERGY_ICON`（**单数**，:187/529/830，用 `task.energyRequired`）**不在删除范围，必须忽略**。原 pattern 含裸词 `EnergyIcon` 会误命中 task-tree-view 7 处无关代码，机械清除会破坏 energyRequired 图标逻辑（outside voice 已验证）。
+
+### R7 — OV2：seed l2_name 核对 + abort 判据
+**覆盖**：A3.1.1 Step 1 前 + Step 6
+**改动**：Step 1 前加 `SELECT DISTINCT l2_name FROM activity_archetypes WHERE l1_category='工作'` 核对 5 个目标字符串（深度专注/方案设计/日常事务/响应式工作）逐字存在（防简繁/空格不符）；Step 6 加 abort 判据——`missed / has_profile` 比例超阈值（如 >10%）则 abort 不进 A3.1.3 删列，人工排查 seed。调研阶段 Agent 1 已确认 seed 工作 L2 含这 4 个名称，本步为防御性显式核对。
+
+### R8 — OV3：prod 命中率 gate
+**覆盖**：A3.1.1/A3.1.3 prod 验证（扩展 R1）
+**改动**：plan 显式 prod gate——**prod M1（0025）跑后、prod M2（0026）跑前**，必须执行命中率 SQL（Step 6 同款），`missed=0`（或可解释的 seed 缺失）才允许 prod 跑 0026。否则 M2 删列后 energy_profile→archetype 映射无法回查。dev 命中率 100% 不代表 prod 100%（prod 可能多用户/seed 漏跑/脏值）。
+
+### R9 — OV4：D4 映射表永久记录
+**覆盖**：A3.1.4 Step 1
+**改动**：`docs/database-design.md` 迁移历史段**永久嵌入 D4 映射表**（5 行：deep→深度专注/creative→方案设计/admin→日常事务/light→日常事务/reactive→响应式工作），不只引用 design doc。M2 删列后 admin+light 合并不可逆，需永久可追溯。
+
+### R10 — OV5：baseTaskRow fixture 补全
+**覆盖**：A3.1.2 Step 1
+**改动**：`baseTaskRow` fixture 补 `schedulingConstraint: null` + `decomposition: null` 等 TaskRow 字段；或在测试块注明「fixture 用 `as any` 是刻意简化（对齐 timebox 范式 :56-109），非生产类型契约」。
+
+### Failure modes（review 核查）
+- backfill 子查询 NULL → activity_archetype_id NULL：archetype optional，可接受（已覆盖）✓
+- A3.1.1→A3.1.2 中间态 insert 不带 archetype key → DB 列默认 null：不崩（drizzle schema 有列、mapper 未带 key 时省略落默认）✓
+- M2 删列后代码漏清 → tsc 即报（同 commit 内修复）✓
+- prod backfill 静默失败 → R1+R8 prod gate 覆盖 ✓
+- 0 critical gap（无"无测试 + 无错误处理 + 静默失败"三无路径）
+
+### Worktree parallelization
+Sequential implementation, no parallelization opportunity——A3.1.1→A3.1.2→A3.1.3→A3.1.4 严格顺序（M1 先于 mapper 加字段先于 M2 删列先于文档），共享同一批文件（schema/mapper/objects/irepository），不可并行。
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review`（outside voice，codex exec 超时 290s EXIT 124） | Independent 2nd opinion | 0 (fallback) | — | —（codex 超时，Claude subagent 替补） |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean | 10 issues（Arch 2 + CodeQuality 2 + Test 1 + Outside voice 5），全部 fold 为 R1-R10 修订 overlay，0 unresolved |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | —（A3.1 无 UI，留 A3.2） |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **OUTSIDE VOICE:** Claude subagent（codex 超时 fallback）实际 Read 代码核对，确认 6 项无问题（save 自动带 archetypeId / TaskFilters.energyProfile 无消费方 / journal when 无冲突 / backfill CASE 完备 / mapper import 无漏清 / 中间态 insert 落 null 安全），抓到 review 漏的 1 个 **P1**（grep 裸词 EnergyIcon 误命中 task-tree-view → R6）+ 2 P2（seed l2_name 未核对 → R7 / prod 命中率 gate → R8）+ 1 P2（D4 映射表永久记录 → R9）+ 1 P3（fixture 不全 → R10）。全部 verify 真实，5 项采纳。
+- **CROSS-MODEL:** 无 tension。outside voice 与 4-section review 同向（都是加强 plan），非反对。OV1 是 review 真正漏掉的 P1，outside voice 补充价值兑现。
+- **PRIOR LEARNINGS applied:** [drizzle-migrate-state-desync-fix]（confidence 9）→ R1；[drizzle-journal-must-register-every-sql]（confidence 9）→ journal 登记 step 已遵守，R1 强化 prod 验证。
+- **VERDICT:** ENG CLEARED（outside voice via Claude subagent）— A3.1 plan 经 plan-eng-review 4 section + Claude subagent outside voice，10 个 finding 全部落入修订清单 R1-R10，0 unresolved / 0 critical gap，可进入实现。Step 0 scope proceed as-is（12 文件是删字段必然 ripple，0 新类）。
+
+NO UNRESOLVED DECISIONS
