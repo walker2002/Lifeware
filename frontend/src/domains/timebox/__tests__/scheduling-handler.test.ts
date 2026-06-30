@@ -36,7 +36,6 @@ describe('SchedulingHandler', () => {
       pendingHabits: [
         { id: 'h1', title: '晨跑', defaultTime: '07:00', defaultDuration: 30, frequencyType: 'daily' },
       ],
-      habitTemplates: [],
       energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
@@ -61,7 +60,6 @@ describe('SchedulingHandler', () => {
         { id: 't1', title: '任务A', priority: 'P1', energyRequired: 'medium', estimatedDuration: 60, threadId: null },
       ],
       pendingHabits: [],
-      habitTemplates: [],
       energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
@@ -78,7 +76,6 @@ describe('SchedulingHandler', () => {
       existingTimeboxes: [],
       activeTasks: [],
       pendingHabits: [],
-      habitTemplates: [],
       energyCurve: { peakHours: [], lowHours: [], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
@@ -95,7 +92,6 @@ describe('SchedulingHandler', () => {
         { id: 't1', title: '高能任务', priority: 'high', energyRequired: 'high', estimatedDuration: 60, threadId: null },
       ],
       pendingHabits: [],
-      habitTemplates: [],
       energyCurve: { peakHours: [9, 10, 11], lowHours: [14, 15], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
 
@@ -108,7 +104,7 @@ describe('SchedulingHandler', () => {
     expect(proposal.energyMatch!.score).toBeLessThanOrEqual(1)
   })
 
-  it('sorts by priority: planned > habit > task', async () => {
+  it('sorts by priority: habit before task', async () => {
     const request = makeRequest({
       existingTimeboxes: [],
       activeTasks: [
@@ -117,31 +113,18 @@ describe('SchedulingHandler', () => {
       pendingHabits: [
         { id: 'h1', title: '独立习惯', defaultTime: '08:00', defaultDuration: 20, frequencyType: 'daily' },
       ],
-      habitTemplates: [
-        {
-          id: 'tmpl1', name: '晨间模板', habits: [
-            { habitId: 'h2', durationOverride: 30 },
-          ],
-        },
-      ],
       energyCurve: { peakHours: [9, 10], lowHours: [14], source: 'test' }, // fixture 自定义值，非 SSOT DEFAULT_ENERGY_CURVE；handler 不校验曲线数学
     })
-
-    // Manually inject h2 into pendingHabits so template matching works
-    request.contexts.pendingHabits = [
-      { id: 'h1', title: '独立习惯', defaultTime: '08:00', defaultDuration: 20, frequencyType: 'daily' },
-      { id: 'h2', title: '模板习惯', defaultTime: '07:00', defaultDuration: 30, frequencyType: 'daily' },
-    ]
 
     const result = await handler.handle(request)
 
     const sourceTypes = result.proposalSet.proposals.map(p => p.sourceType)
-    // planned should come before habit, habit before task
-    const plannedIdx = sourceTypes.indexOf('planned')
     const habitIdx = sourceTypes.indexOf('habit')
     const taskIdx = sourceTypes.indexOf('task')
 
-    if (plannedIdx >= 0 && habitIdx >= 0) expect(plannedIdx).toBeLessThan(habitIdx)
-    if (habitIdx >= 0 && taskIdx >= 0) expect(habitIdx).toBeLessThan(taskIdx)
+    // fixture 含 1 habit + 1 task，二者必出 proposals；habit(source 权重 1) 必排 task(权重 2) 前
+    expect(habitIdx).toBeGreaterThanOrEqual(0)
+    expect(taskIdx).toBeGreaterThanOrEqual(0)
+    expect(habitIdx).toBeLessThan(taskIdx)
   })
 })

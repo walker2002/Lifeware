@@ -1,7 +1,6 @@
 "use client"
 
 import { HabitListPage } from "@/domains/habits/pages/HabitListPage"
-import { HabitTemplatePage } from "@/domains/habits/pages/HabitTemplatePage"
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
 import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
 import { OkrWorkspacePage } from "@/domains/okrs/pages/OkrWorkspacePage"
@@ -10,7 +9,6 @@ import { ScheduleView } from "@/components/views/schedule-view"
 const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
   habits: {
     view_list: HabitListPage,
-    view_templates: HabitTemplatePage,
     createHabit: HabitListPage,
     view_statistics: HabitStatisticsPage,
   },

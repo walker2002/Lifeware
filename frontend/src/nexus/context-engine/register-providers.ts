@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { registerContextCapability } from './registry'
 import { TimeboxProvider, EnergyCurveProvider } from '@/domains/timebox/providers'
 import { ActiveTasksProvider, CompletedTasksProvider } from '@/domains/tasks/providers'
-import { PendingHabitsProvider, HabitTemplatesProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
-import type { ITimeboxRepository, ITaskRepository, IHabitRepository, IHabitTemplateRepository } from '@/usom/interfaces/irepository'
+import { PendingHabitsProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
+import type { ITimeboxRepository, ITaskRepository, IHabitRepository } from '@/usom/interfaces/irepository'
 
 const TimeboxArraySchema = z.array(z.object({
   id: z.string(),
@@ -38,13 +38,6 @@ const HabitArraySchema = z.array(z.object({
   frequencyType: z.string(),
 }))
 
-const TemplateArraySchema = z.array(z.object({
-  id: z.string(),
-  name: z.string(),
-  icon: z.string().optional(),
-  habits: z.array(z.any()),
-}))
-
 /**
  * EnergyCurve Schema（F3 [023] A0 post-review）
  *
@@ -67,7 +60,6 @@ export interface ProviderDeps {
   timeboxRepo?: ITimeboxRepository
   taskRepo?: ITaskRepository
   habitRepo?: IHabitRepository
-  habitTemplateRepo?: IHabitTemplateRepository
 }
 
 export function registerAllProviders(deps: ProviderDeps): void {
@@ -117,16 +109,6 @@ export function registerAllProviders(deps: ProviderDeps): void {
       })),
       description: '活跃习惯列表（供跨域贡献关联搜索）',
       provider: new ActiveHabitsProvider(deps.habitRepo),
-    })
-  }
-
-  if (deps.habitTemplateRepo) {
-    registerContextCapability({
-      id: 'habitTemplates',
-      visibility: 'planning',
-      schema: TemplateArraySchema,
-      description: '习惯模板',
-      provider: new HabitTemplatesProvider(deps.habitTemplateRepo),
     })
   }
 

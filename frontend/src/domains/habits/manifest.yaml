@@ -78,15 +78,6 @@ intent_triggers:
       - 有哪些习惯
     keywords: [习惯列表, 查看]
     view_route: /habits
-  - action: view_templates
-    shortcut: /habitTemplates
-    description: 习惯模板配置
-    response_type: page
-    examples:
-      - 查看习惯模板
-      - 有什么模板可以用
-    keywords: [模板, template]
-    view_route: /habits/templates
   - action: view_statistics
     shortcut: /habitStatsView
     description: 习惯统计
@@ -236,9 +227,6 @@ view_routes:
   view_list:
     component: domains/habits/pages/HabitListPage
     url: /habits
-  view_templates:
-    component: domains/habits/pages/HabitTemplatePage
-    url: /habits/templates
   view_statistics:
     component: domains/habits/pages/HabitStatisticsPage
     url: /habits/statistics
@@ -258,9 +246,6 @@ generation_actions:
     contexts:
       - id: activeHabits
         query: active_habits
-        params: [userId]
-      - id: habitTemplates
-        query: habit_templates
         params: [userId]
     response_mode: cnui
     cnui_surface_type: habit-creation-card

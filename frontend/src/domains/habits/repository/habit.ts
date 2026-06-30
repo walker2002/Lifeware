@@ -179,25 +179,20 @@ export class HabitRepository implements IHabitRepository {
   }
 
   async checkReferences(id: USOM_ID, userId: USOM_ID): Promise<HabitReferenceInfo> {
-    const [logs, templates, timeboxes] = await Promise.all([
+    const [logs, timeboxes] = await Promise.all([
       db.select({ id: s.habitLogs.id }).from(s.habitLogs)
         .where(and(eq(s.habitLogs.habitId, id), eq(s.habitLogs.userId, userId)))
-        .limit(1),
-      db.select({ id: s.templateHabits.templateId }).from(s.templateHabits)
-        .where(eq(s.templateHabits.habitId, id))
         .limit(1),
       db.select({ id: s.timeboxHabits.timeboxId }).from(s.timeboxHabits)
         .where(eq(s.timeboxHabits.habitId, id))
         .limit(1),
     ])
     const habitLogs = logs.length
-    const templateHabits = templates.length
     const timeboxHabits = timeboxes.length
     return {
       habitLogs,
-      templateHabits,
       timeboxHabits,
-      hasReferences: habitLogs > 0 || templateHabits > 0 || timeboxHabits > 0,
+      hasReferences: habitLogs > 0 || timeboxHabits > 0,
     }
   }
 

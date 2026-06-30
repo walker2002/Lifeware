@@ -185,11 +185,11 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
         if (action === "archive") {
           const refResult = await checkHabitReferences(habitId)
           if (refResult.success && refResult.references) {
-            const { habitLogs, templateHabits, timeboxHabits } = refResult.references
-            const total = habitLogs + templateHabits + timeboxHabits
+            const { habitLogs, timeboxHabits } = refResult.references
+            const total = habitLogs + timeboxHabits
             if (total > 0) {
               setSubmitError(
-                `该习惯有 ${habitLogs} 条打卡记录、${templateHabits} 个模板关联、${timeboxHabits} 个时间盒关联，将归档而非删除。`
+                `该习惯有 ${habitLogs} 条打卡记录、${timeboxHabits} 个时间盒关联，将归档而非删除。`
               )
             }
           }

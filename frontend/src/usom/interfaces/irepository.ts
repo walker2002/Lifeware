@@ -367,8 +367,6 @@ export interface IThreadRepository {
 export interface HabitReferenceInfo {
   /** 习惯日志数量 */
   habitLogs: number
-  /** 模板习惯数量 */
-  templateHabits: number
   /** 时间盒习惯数量 */
   timeboxHabits: number
   /** 是否有引用 */

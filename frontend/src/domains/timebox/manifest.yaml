@@ -254,9 +254,6 @@ generation_actions:
       - id: pendingHabits
         query: unlogged_for_date
         params: [date, userId]
-      - id: habitTemplates
-        query: templates_for_date
-        params: [date, userId]
       - id: energyCurve
         query: energy_curve
         params: []

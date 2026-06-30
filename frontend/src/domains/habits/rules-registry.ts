@@ -73,36 +73,6 @@ const actionFieldsValid: SubmitCheck = async (intent) => {
     if (!habitId || typeof habitId !== 'string') errors.push('habitId 必填')
   }
 
-  if (action === 'createTemplate') {
-    const name = fields['name']
-    if (!name || (typeof name === 'string' && name.trim() === '')) errors.push('name 必填')
-    const applicableDays = fields['applicableDays']
-    if (!Array.isArray(applicableDays) || applicableDays.length === 0) errors.push('applicableDays 不能为空')
-  }
-
-  if (action === 'addHabitToTemplate') {
-    const templateId = fields['templateId']
-    if (!templateId || typeof templateId !== 'string') errors.push('templateId 必填')
-    const habitId = fields['habitId']
-    if (!habitId || typeof habitId !== 'string') errors.push('habitId 必填')
-    const timeOverride = fields['timeOverride']
-    if (timeOverride !== undefined && !isValidHHMM(timeOverride)) errors.push('timeOverride 必须是有效的 HH:MM 格式')
-  }
-
-  if (action === 'removeHabitFromTemplate') {
-    const templateId = fields['templateId']
-    if (!templateId || typeof templateId !== 'string') errors.push('templateId 必填')
-    const habitId = fields['habitId']
-    if (!habitId || typeof habitId !== 'string') errors.push('habitId 必填')
-  }
-
-  if (action === 'applyTemplate') {
-    const templateId = fields['templateId']
-    if (!templateId || typeof templateId !== 'string') errors.push('templateId 必填')
-    const date = fields['date']
-    if (!date || typeof date !== 'string') errors.push('date 必填')
-  }
-
   return errors.length === 0 ? validationPassed() : validationRejected(errors)
 }
 

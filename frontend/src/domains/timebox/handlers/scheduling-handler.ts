@@ -22,7 +22,6 @@ import type {
 } from '@/usom/types/process'
 import type { TaskSummary, HabitSummary, TimeboxSummary } from '@/usom/types/summaries'
 import type { AIRuntime } from '@/nexus/ai-runtime'
-import type { HabitTemplate } from '@/usom/types/objects'
 import type { EnergyCurve } from '@/usom/types/primitives'
 import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
 
@@ -143,13 +142,12 @@ export class SchedulingHandler implements DomainHandler {
   // ─── collectMaterials: 从通用 contexts 提取类型化数据 ──────
 
   private collectMaterials(contexts: Record<string, unknown>) {
-    const habitTemplates = (contexts.habitTemplates ?? []) as HabitTemplate[]
     const pendingHabits = (contexts.pendingHabits ?? []) as HabitSummary[]
     const activeTasks = (contexts.activeTasks ?? []) as TaskSummary[]
     const existingTimeboxes = (contexts.existingTimeboxes ?? []) as TimeboxSummary[]
     const energyCurve = (contexts.energyCurve ?? DEFAULT_ENERGY_CURVE) as EnergyCurve
 
-    return { habitTemplates, pendingHabits, activeTasks, existingTimeboxes, energyCurve }
+    return { pendingHabits, activeTasks, existingTimeboxes, energyCurve }
   }
 
   // ─── buildScheduleItems: 将 4 个来源统一为 ScheduleItem ────
@@ -157,31 +155,9 @@ export class SchedulingHandler implements DomainHandler {
   private buildScheduleItems(materials: ReturnType<typeof this.collectMaterials>): ScheduleItem[] {
     const items: ScheduleItem[] = []
 
-    // 来源 1: habitTemplates 中的 planned habits
-    for (const template of materials.habitTemplates) {
-      for (const item of template.habits) {
-        const habit = materials.pendingHabits.find(h => h.id === item.habitId)
-        if (!habit || habit.todayLogged) continue
-
-        items.push({
-          id: crypto.randomUUID(),
-          title: habit.title,
-          sourceType: 'planned',
-          priority: 'P0',
-          durationMinutes: item.durationOverride ?? 30,
-          energyRequired: 'low',
-          relatedObjectId: habit.id,
-        })
-      }
-    }
-
-    // 来源 2: pendingHabits（未被模板覆盖的）
-    const templateHabitIds = new Set(
-      materials.habitTemplates.flatMap(t => t.habits.map(h => h.habitId)),
-    )
+    // 来源 1: pendingHabits
     for (const habit of materials.pendingHabits) {
       if (habit.todayLogged) continue
-      if (templateHabitIds.has(habit.id)) continue
 
       items.push({
         id: crypto.randomUUID(),
@@ -194,7 +170,7 @@ export class SchedulingHandler implements DomainHandler {
       })
     }
 
-    // 来源 3: activeTasks
+    // 来源 2: activeTasks
     for (const task of materials.activeTasks) {
       items.push({
         id: crypto.randomUUID(),

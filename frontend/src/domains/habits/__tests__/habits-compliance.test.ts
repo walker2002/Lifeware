@@ -37,9 +37,9 @@ describe('T007: Habits manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toMatch(/action:\s*reactivateHabit/)
   })
 
-  it('intent_triggers 应包含 view_list 和 view_templates 含 view_route', () => {
+  it('intent_triggers 应包含 view_list 和 view_statistics 含 view_route', () => {
     expect(manifestContent).toMatch(/action:\s*view_list/)
-    expect(manifestContent).toMatch(/action:\s*view_templates/)
+    expect(manifestContent).toMatch(/action:\s*view_statistics/)
     expect(manifestContent).toMatch(/view_route:/)
   })
 

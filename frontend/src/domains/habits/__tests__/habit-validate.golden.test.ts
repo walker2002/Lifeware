@@ -103,14 +103,4 @@ describe('[golden] habitsPlugin.onValidate 精确输出', () => {
     const r = await habitsPlugin.onValidate(makeIntent({ action: 'logHabit', fields: { status: 'completed' } }), snap_ as any)
     expect(snap(r)).toEqual({ kind: 'Rejected', errors: ['habitId 必填'] })
   })
-
-  it('createTemplate name 空 → Rejected「name 必填」', async () => {
-    const r = await habitsPlugin.onValidate(makeIntent({ action: 'createTemplate', fields: { name: '', applicableDays: [1, 2, 3, 4, 5] } }), snap_ as any)
-    expect(snap(r)).toEqual({ kind: 'Rejected', errors: ['name 必填'] })
-  })
-
-  it('applyTemplate 缺 date → Rejected「date 必填」', async () => {
-    const r = await habitsPlugin.onValidate(makeIntent({ action: 'applyTemplate', fields: { templateId: 'tpl-001' } }), snap_ as any)
-    expect(snap(r)).toEqual({ kind: 'Rejected', errors: ['date 必填'] })
-  })
 })
