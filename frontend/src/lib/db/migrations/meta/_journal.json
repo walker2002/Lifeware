@@ -204,6 +204,13 @@
       "when": 1783100000000,
       "tag": "0022_rename_latest_end_time_to_latest_start_time",
       "breakpoints": false
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1783200000000,
+      "tag": "0027_a3_m3_drop_habit_templates",
+      "breakpoints": false
     }
   ]
 }

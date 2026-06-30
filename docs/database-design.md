@@ -28,6 +28,7 @@
 - 2026_05_11 (enhancement)：objectives 新增 objective_number/priority 列、period_type 枚举新增 semi_annual
 - 2026_05_11：objectives 表新增 okr_type/discarded_at 列、key_results 表新增 discarded_at 列、状态枚举新增 discarded
 - 2026_05_09：habits 表时间模型升级（三字段时间窗口 + 双时长 + trackable）、新增 habit_templates 和 template_habits 表、timeboxes 状态枚举更新（paused→overtime, 新增 cancelled）、system_events.triggered_by 新增 template_apply
+- 2026_06_30：DROP `habit_templates` + `template_habits`（[023] A3.3，已被 timebox-templates 取代）
 - 2026_03_21：新增能量账户设计（energy_logs 表、user_calibration 能量字段、context_snapshots.energy_state）、整合评审意见（多租户、JSONB 规范、关联表）
 - 2026_03_20：初始版本
 
@@ -134,8 +135,6 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── tasks                  ← 任务
 ├── habits                 ← 习惯
 ├── habit_logs             ← 习惯打卡记录（独立表）
-├── habit_templates        ← 习惯模板（一组习惯的打包方案）
-├── template_habits        ← 模板-习惯关联表（多对多）
 ├── timeboxes              ← 时间盒
 ├── task_execution_logs    ← 任务执行记录（新增 2026-05-28）
 ├── reviews                ← 复盘
@@ -696,53 +695,6 @@ CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 ```
 
 ---
-
-### 4.6a habit_templates（习惯模板表）
-
-对应 USOM `HabitTemplate`。一组习惯的打包方案，可一键应用到某天生成多个 Timebox。
-
-```sql
-CREATE TABLE habit_templates (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references users(id) on delete cascade,
-  schema_version integer not null default 1,
-
-  -- 查询关键字段（独立列）
-  name        text not null,
-  description text,
-  icon        text,  -- 图标标识，e.g. "sunrise", "focus"
-  status      text not null check (status in ('draft', 'active')) default 'draft',
-
-  -- JSONB 允许：applicableDays 不参与 WHERE 过滤
-  applicable_days jsonb not null,  -- number[]，适用星期（0=Sunday ... 6=Saturday）
-
-  -- 审计字段
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-
--- 索引
-CREATE INDEX idx_habit_templates_user_status ON habit_templates(user_id, status);
-```
-
----
-
-### 4.6b template_habits（模板-习惯关联表）
-
-对应 USOM `TemplateHabitItem`。模板与习惯的多对多关系，支持覆盖时间和时长。
-
-```sql
-CREATE TABLE template_habits (
-  template_id       uuid not null references habit_templates(id) on delete cascade,
-  habit_id          uuid not null references habits(id) on delete restrict,
-  sort_order        integer not null default 0,
-  time_override     text,     -- 覆盖习惯默认时间 HH:MM，null 则使用习惯自身 default_time
-  duration_override integer,  -- 覆盖习惯默认时长（分钟），null 则使用习惯自身 default_duration
-  primary key (template_id, habit_id)
-);
-```
-
-> **设计说明**：`habit_id` 使用 `on delete restrict`，防止习惯被删除时模板残留无效引用。`time_override` 和 `duration_override` 允许模板内习惯使用不同于默认的时间/时长。
 
 ### 4.7 timeboxes（时间盒表）
 
@@ -1476,7 +1428,7 @@ interface DerivedSignalsRepository {
 | `Habit.latestStartTime` | `latest_start_time` text | snake_case 映射 |
 | `Habit.defaultDuration` | `default_duration` integer | snake_case 映射 |
 | `Habit.minDuration` | `min_duration` integer | snake_case 映射 |
-| `HabitTemplate.habits` | `template_habits` 关联表 | Repository 联查后聚合为 `TemplateHabitItem[]` |
+| `HabitTemplate.habits` | （已 DROP 2026-06-30）| [023] A3.3 硬删，迁移 0027 |
 | `Review.sections` | JSONB | 直接 JSON 序列化/反序列化 |
 | `Review.metrics` | JSONB | 同上 |
 | `Task.tags` / `Habit.tags` | JSONB | `string[]` 序列化 |
@@ -1501,8 +1453,6 @@ interface DerivedSignalsRepository {
 | `tasks` | 任务表 |
 | `habits` | 习惯表 |
 | `habit_logs` | 习惯打卡记录表 |
-| `habit_templates` | 习惯模板表 |
-| `template_habits` | 模板-习惯关联表 |
 | `timeboxes` | 时间盒表 |
 |  | 任务执行记录表（新增 2026-05-28） |
 | `timebox_tasks` | Timebox-Task 关联表 |

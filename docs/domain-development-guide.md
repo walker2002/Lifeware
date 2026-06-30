@@ -1445,9 +1445,6 @@ generation_actions:
       - id: existingHabits
         query: active_habits
         params: [userId]
-      - id: habitTemplates
-        query: habit_templates
-        params: [userId]
     response_mode: cnui
     cnui_surface_type: habit-creation-card
     session_enabled: true

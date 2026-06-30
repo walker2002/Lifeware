@@ -34,14 +34,12 @@
 frontend/
 ├── app/                          # 框架层（自动生成 + 框架级路由）
 │   ├── habits/page.tsx           # ← 自动生成，勿手动编辑
-│   ├── habits/templates/page.tsx # ← 自动生成
 │   ├── projects/page.tsx         # ← 自动生成
 │   └── _layout.tsx               # 框架级布局
 ├── domains/                      # Domain 层（独立模块）
 │   ├── habits/
 │   │   ├── pages/                # Domain 页面组件
 │   │   │   ├── HabitListPage.tsx
-│   │   │   └── HabitTemplatePage.tsx
 │   │   ├── handlers/             # Domain 处理器
 │   │   ├── providers/            # Context Providers
 │   │   └── manifest.yaml         # Domain 声明（含路由定义）
@@ -78,10 +76,6 @@ view_routes:
     params:                         # 可选：路径参数
       mode: list
 
-  view_templates:
-    component: domains/habits/pages/HabitTemplatePage
-    url: /habits/templates
-
   view_detail:
     component: domains/habits/pages/HabitDetailPage
     url: /habits/[id]               # 支持 Next.js 动态路由语法
@@ -97,10 +91,10 @@ view_routes:
 
 ### 3.3 URL 命名规范
 
-- 使用 kebab-case：`/habit-templates` 而非 `/habitTemplates`
+- 使用 kebab-case：`/okr-objectives` 而非 `/okrObjectives`
 - 复数形式表示列表：`/habits`、`/projects`
 - 单数形式表示详情：`/habits/[id]`、`/projects/[id]`
-- 子资源使用路径嵌套：`/habits/templates`
+- 子资源使用路径嵌套：`/okrs/objectives`
 
 ---
 
@@ -136,7 +130,7 @@ export default function HabitsListPage() {
 |---|---|---|
 | 文件位置 | `app/{url_path}/page.tsx`（去掉开头的 `/`） |
 | 动态路由 | `[id]` 转换为 Next.js 的 `[id]` 目录 |
-| 嵌套路径 | `/habits/templates` → `app/habits/templates/page.tsx` |
+| 嵌套路径 | `/okrs/objectives` → `app/okrs/objectives/page.tsx` |
 | 覆盖策略 | 默认不覆盖已存在文件（除非 `--force`） |
 | 空目录处理 | 自动创建中间目录 |
 
@@ -145,7 +139,7 @@ export default function HabitsListPage() {
 | manifest url | 生成文件路径 |
 |---|---|
 | `/habits` | `app/habits/page.tsx` |
-| `/habits/templates` | `app/habits/templates/page.tsx` |
+| `/okrs/objectives` | `app/okrs/objectives/page.tsx` |
 | `/habits/[id]` | `app/habits/[id]/page.tsx` |
 | `/projects` | `app/projects/page.tsx` |
 

@@ -165,9 +165,7 @@ npx shadcn@latest add tabs skeleton sonner
 - `timebox-timeline.tsx:22`：`bg-gray-300/20 border-gray-300` → `bg-surface-card/50 border-hairline`
 - `habit-form.tsx:338`：`bg-red-50 border-red-300 text-red-800` → `bg-error-soft border-error text-error`
 - `habit-list.tsx:256,294,363`：`bg-amber-500 hover:bg-amber-600` → `bg-warning hover:bg-warning/90`；`bg-gray-500 hover:bg-gray-600` → `bg-muted hover:bg-muted/80`；`bg-red-50 border-red-300 text-red-800` → `bg-error-soft border-error text-error`
-- `habit-template-view.tsx:94,100`：`bg-amber-100 text-amber-800 border-amber-300` → `bg-warning-soft text-warning border-warning`；`text-amber-600` → `text-warning`
 - `habit-card.tsx:157`：`text-gray-400` → `text-muted`
-- `HabitTemplatePage.tsx:88,93`：同 HabitListPage 模式
 - `kr-progress.tsx:34,38-39`：`bg-gray-400` / `bg-gray-300` → `bg-muted` / `bg-hairline`
 - `okr-import-panel.tsx:68`：`bg-red-50 text-red-800 border-red-200` → `bg-error-soft text-error border-error`
 - `okr-form.tsx:167,175`：`bg-red-600 text-white` → `bg-error text-on-primary`；`bg-gray-500 text-white` → `bg-muted text-on-primary`
