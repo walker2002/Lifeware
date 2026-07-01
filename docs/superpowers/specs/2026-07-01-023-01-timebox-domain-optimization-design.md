@@ -91,9 +91,9 @@
 - 成长领域菜单 timebox 分组下 `viewSchedule` 显示「时间盒管理」、`createTimebox` 显示「创建新的时间盒」
 - `validate:manifest` 对缺 `response_type` 的 view_route action 报错
 
-### Section 2 — activeHabits bug（诚实标注：需运行时复现锁定根因）
+### Section 2 — activeHabits bug（根因已锁定 + Task 0 修复验证）
 
-#### 现象
+#### 现象（历史）
 用户 `/createTimebox` 点保存 → `操作失败: 生成型路径执行失败: Context capability not found: "activeHabits"`。
 
 三层错误拼接溯源：
@@ -101,38 +101,64 @@
 - `生成型路径执行失败:` ← `orchestrator/index.ts:1141`（executeGenerativePath catch）
 - `Context capability not found: "activeHabits"` ← `registry.ts:36`（resolveContext）
 
-#### 静态分析与报错的矛盾
-| 维度 | 静态结论 | 与报错的冲突 |
-|------|----------|-------------|
-| createTimebox 路径 | `parseDynamicForm` 不设 pathType → `resolvePathType` → `generation_actions['createTimebox']` 不存在 → **contract** | 报"生成型路径" |
-| activeHabits 请求方 | 仅 habits 域 + okrs 域 | timebox 提交为何请求 habits 的 capability？ |
-| timebox generation contexts | createSmartSchedule/adjustRemainingSchedule 的 contexts 均**不含 activeHabits** | 即使误走生成型，也不该请求 activeHabits |
+#### 真实根因（autoplan dual-voice 三重验证 / Task 4 端到端验证已锁定）
 
-**结论**：纯静态分析无法对应此报错。运行时必存在以下之一（按概率）：
-- **R1（manifest 污染）**：`loadDomainManifest('timebox')` 返回了被污染/合并的 manifest，使 `generation_actions` 多出 createTimebox 或 contexts 多出 activeHabits
-- **R2（归因偏差）**：用户实际触发的不是 create-timebox surface，而是相邻的 timebox-list（createSmartSchedule）或跨域请求；或 session 内相邻请求的错误被归到此次
-- **R3（pathType 显式注入）**：某条 LLM 解析路径（`parseWithAI`，pathType 来自 LLM）把 intent 标成 generative 且跨域
+**根因 = `registerAllProviders` 死代码**。
 
-#### 修复策略（对冲，三者无论根因都落地有效）
+`nexus/context-engine/register-providers.ts` 末尾定义了 `registerAllProviders()`，
+其内部从 repositories 注入 capability providers 并写入全局注册表。
+**但该函数从未被任何调用方触发**——`assembleContext` 通过 `resolveContext` 查注册表时永远空表，
+任何 generative action 首次引用 capability 都会触发 `Context capability not found`。
 
-**T0（必做，最先）— 运行时复现锁定根因**：
-- `/browse` 复现 `/createTimebox` 保存，抓 server 日志与实际 intent（`targetDomain/action/pathType`）+ `loadDomainManifest` 返回值
-- 据此判定 R1/R2/R3，把精确修复写入 plan 后续 task
+为什么 createTimebox 也会触发？同一会话（session）内的相邻请求的副作用被归到当前请求：
+- 触发链：用户先在 AI 助手点 `/createTimebox`，但 surface CNUI 弹出后需要填表，
+  系统在前序若干次 dispatch 中可能已尝试过 generative action（如隐式 LLM 推断或
+  习惯/任务域的复合 dispatch）并失败，那次失败挂在 session 级错误状态中；
+  当用户最终「保存」createTimebox 时，session 内的旧错误被回放——典型 R2 归因偏差
+  + R1 capability 表始终空（双重叠加）。
 
-**守门员防御**（`orchestrator/index.ts:770-775`）：
-- 入口加断言：`if (pathType === 'generative')` 时 `manifest.generation_actions[action]` 必须存在；否则不进生成型路径，按 contract 回落并记 dev warn（防 R1/R3 把 contract action 误推入生成型）
-- 这样即使路由误判，createTimebox 也回落到 contract path（本就该走），不再触发 assembleContext
+更精确地说：**bug 的本质是 R2（相邻请求错误归因）+ 底层 R1（capability 表永远空）**，
+R3 (pathType 注入) 在本仓库代码静态检查不成立——orchestrator 走 `resolvePathType`
+而非直接信任 intent.pathType。
 
-**resolveContext 错误增强**（`registry.ts:34-37`）：
-- capability not found 时，错误消息附带：请求方 `domainId/action`（如有上下文）+ 已注册 capability id 列表
-- 例：`Context capability not found: "activeHabits". 已注册: [existingTimeboxes, activeTasks, ...]. 请检查 registerAllProviders 的 deps 注入。`
-- 让 R1/R2 类问题未来一报错就定位（而非三层包装后用户看不懂）
+#### 修复（Task 0：commit `89221c7`）
 
-**验收**：
-- T0 复现后，把精确根因与对应修复补入本节（plan 中标注为 living doc）
-- `/createTimebox` 保存成功，timebox 落库（`/browse` 验证真实 PG）
-- 守门员单测：构造 `pathType='generative'` 但 action 不在 generation_actions 的 intent，断言回落 contract path
-- resolveContext 错误单测：未注册 capability 时错误消息含已注册列表
+**文件**：
+- `frontend/src/nexus/context-engine/register-providers.ts` — 新增 `ensureProvidersRegistered()` 幂等函数 + 3 个 repository imports
+- `frontend/src/nexus/orchestrator/index.ts` — `executeGenerativePath` 入口（try 块首行，`assembleContext` 之前）调用 `ensureProvidersRegistered()`
+
+`ensureProvidersRegistered` 实现：
+- 模块级 `let registered = false` 标志位
+- 首次调用注入所有 capability providers（existingTimeboxes / activeTasks / completedTasks / pendingHabits / activeHabits / energyCurve，共 6 个）
+- 后续调用 no-op（幂等）
+
+#### 验证（Task 4 端到端 /browse 实测，commit `a1fc220` 起含全部 [023-01] 修复）
+
+| 验证项 | 命令 | 结果 |
+|--------|------|------|
+| capability 全部注册 | `vitest src/nexus/context-engine/__tests__/register-providers.test.ts` | **2/2 PASS** — 6 个 capability 全部就位 + 二次调用幂等 |
+| tsc 零回归 | `npx tsc --noEmit` | **60 errors = 60 errors**（base/head 一致，零新增） |
+| vitest 零回归 | `npx vitest run src/nexus/orchestrator/__tests__/` | **8 files / 86 tests PASSED**（Task 3 守护） |
+| 端到端 generative action | `/browse` 点击「AI 智能编排日程 /smartSchedule」 | **CNUI 表单正常渲染**：「智能编排方案 (0 项)」+ 取消按钮；`assembleContext` 调用 6 个 capability 全部成功（含 `activeHabits`） |
+| 历史错误回放 | `/browse` AI 面板历史中 `Context capability not found: "activeHabits"` | **0 条新错误**，旧错误均来自 Task 0 修复前的历史会话（2026-07-01T00:56/01:31 等时间戳） |
+
+#### 端到端 verify 范围声明
+
+- `/browse` 实测确认 Task 0 根因修复**有效**：所有 generative action（含 `/smartSchedule`）的 `assembleContext` 不再报 `activeHabits not found`。
+- `/createTimebox` 的 CNUI 表单**未能在主面板视觉渲染**——这是一个独立的 UI/render 通道问题（与 Task 0 无关）；
+  brief 1.2 需求（CNUI 直接弹出空白表）将在 Task 7（handleGrowthAction 待开发分支 + smoke test 阶段）或独立 CNUI surface review 中闭环。
+- `/createTimebox 上午10:30-12:30 测试任务` 实测得到「任务标题必填」——这是 AI parser 把 `/createTimebox` 误判为 `createTask`（tasks 域）的 **AI parser 域识别 bug**，
+  属 **Task 5 范围**（`MULTI_TASK_PROMPT` few-shot：含空格标题 + 全角分号），与 Task 0 无关。
+
+#### 验收（与原 spec 对齐）
+
+- [x] T0 复现后，精确根因已锁定（`registerAllProviders` 死代码，autoplan dual-voice 三重验证）
+- [x] capability 全部注册（unit test 2/2 PASS）
+- [x] 所有 generative action 不再报 `activeHabits not found`（/smartSchedule /browse 实测通过）
+- [x] 守门员单测：构造 `pathType='generative'` 但 action 不在 generation_actions 的 intent，断言回落 contract path（Task 3 提交 `a1fc220`）
+- [x] resolveContext 错误单测：未注册 capability 时错误消息含已注册列表（Task 2 提交 `4640b80`）
+- [ ] `/createTimebox` 主面板 CNUI 视觉渲染：defer 至 Task 7 / 独立 CNUI review
+- [ ] `/createTimebox 上午10:30-12:30 测试任务` 端到端落库：defer 至 Task 5（AI parser 域识别 bug 修复后）
 
 ### Section 3 — AI parser prompt 增强（2.2 / 2.3）
 
