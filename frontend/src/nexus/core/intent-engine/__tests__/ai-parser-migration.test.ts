@@ -163,6 +163,23 @@ describe('parseMultiTask (migrated to AIRuntime)', () => {
     expect(result.success).toBe(true)
     expect(result.intents).toHaveLength(2)
   })
+
+  it('应正确解析含空格标题的多任务（全角分号分隔）', async () => {
+    const { parseMultiTask } = await import('../ai-parser')
+    const aiRuntime = createMockAIRuntime({
+      generate: {
+        content: { tasks: [
+          { title: 'OKR 季度计划', startTime: '2026-07-01T10:30:00+08:00', duration: 120, confidence: 0.92 },
+          { title: '带孩子出去玩', startTime: '2026-07-01T16:00:00+08:00', duration: 120, confidence: 0.9 },
+        ] },
+      },
+    })
+    const result = await parseMultiTask('上午10:30-12:30 OKR 季度计划；下午16:00-18:00 带孩子出去玩', 'intention-456', aiRuntime)
+    expect(result.success).toBe(true)
+    expect(result.intents).toHaveLength(2)
+    expect(result.intents[0].fields.title).toBe('OKR 季度计划')
+    expect(result.intents[1].fields.title).toBe('带孩子出去玩')
+  })
 })
 
 // ── T014: parseHabitWithAI migration ──
