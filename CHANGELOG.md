@@ -103,6 +103,35 @@
 - 2026_06_26 — [022] Phase 1：Cycle 升格一级对象（cycles 表）+ §III 写入口扶正 + FactField / FieldExecutor
 - 2026_06_25 — OKR/Task 边界设计（office-hours）：分离 + OKR 拥有 junction，先读时聚合后建跨域分发器
 
+## Timebox 域优化（[023-01]）
+
+> 2026_07_01 — 根因修复 + 9 个增量 Task（基线 5085813）。**根因反转**：plan 原本以为 timebox 路由错乱，经 codex 独立验证 + Claude subagent dual-voice 评审共识，**真实病根**是 `registerAllProviders` 死代码（6 capability 从未注册），导致 activeHabits 拉取失败，进而 timebox 路由 fallback；其他 8 个 Task 围绕 SSOT 显式化、守门员、可观察性、链路完整性收尾。spec/plan/design 三件套同步更新到 `docs/superpowers/specs/2026-07-01-023-01-timebox-domain-optimization-design.md`。
+
+### 核心根因修复（Task 0）
+- **fix(context-engine)** 通电 capability 注册体系 — `ensureProvidersRegistered()` 接入 orchestrator 生成型路径入口（`nexus/orchestrator/index.ts`），幂等保护；修复原 `registerAllProviders` 死代码导致 6 capability 从未注册、生成型路径全部走 fallback 的根因。
+- **spec Section 2 回填** — 根因反转写入 spec（plan 原本假设 timebox 路由错乱，实为 capability 注册死代码 + Task 0 通电修复，方向 A）。
+
+### 增量 Task（Task 1-8，按依赖顺序）
+- **Task 1** — `manifest.yaml viewSchedule` 补 `response_type:page`；validate-manifest 守门员新增规则 `A-view-route-needs-page`，CI 防回退
+- **Task 2** — `resolveContext` 错误消息附带已注册列表，提升生成型路径失败可观察性
+- **Task 3** — orchestrator 生成型路径加 dev-warn（纯可观察性，不改行为 — 行为本就回落 contract）
+- **Task 4** — /browse 端到端验证 Task 0 修复（activeHabits 真能拉到 + smartSchedule capability 全注册）+ spec Section 2 根因回填 commit
+- **Task 5** — `MULTI_TASK_PROMPT` 加 few-shot：含空格标题「上午10:30-12:30 OKR 季度计划」+ 全角分号「；」切分守护（chat 走 parseWithAI 不读 MULTI_TASK_PROMPT → LLM 路由 createTimebox 而非 createTask）
+- **Task 6** — 新建 `usom/manifest-utils.ts`，显式声明 SSOT（getResponseType / getActionSurface），**删 view_routes fallback**（与显式声明哲学冲突 + 读不同字段：intent_triggers[].view_route vs 顶层 view_routes 块）
+- **Task 7** — `getActionResponse` 委派 manifest-utils SSOT，返回类型从 `string` 收紧为 `'cnui' | 'page' | 'text' | 'unimplemented'`；`use-intent-handler.ts` 加 `'unimplemented'` 分支弹「该功能（${domainId}/${action}）待开发」+ 3 条 narrowing smoke test
+- **Task 8** — FAB label 同步联动 `manifest.description`（**删异步化过度设计**：`getActionDescription` 是同步函数，无需 useEffect；FALLBACK_LABEL 兜底 + 4 条 vitest）
+
+### autoplan dual-voice 评审吸收（共 9 finding）
+- ✅ **F1 CRITICAL**（codex 三重验证）`registerAllProviders` 死代码 → Task 0 通电修复
+- ✅ **F2 HIGH**（codex + Claude subagent 共识）Task 3 守门员只 dev warn → 诚实命名为「可观察性」，根因归 Task 0
+- ✅ **F3 HIGH**（Claude subagent H-2 + codex Point 3）`view_routes` fallback 冲突 → Task 6 删 fallback
+- ✅ **F4 HIGH**（Claude subagent H-3）FAB 异步化过度设计 → Task 8 同步化
+- ✅ **F5 MEDIUM**（Claude subagent H-1/M-2）Task 4 应在修复后验证 + R1 分支诚实标注为「届时新开」
+- ✅ **F6 MEDIUM**（codex Point 5）Task 7 type narrowing 需 smoke test + Task 8 需 vitest
+- ✅ **F7**（codex Point 4 + Claude 共识实测）守门员 A-view-route-needs-page 零误伤（仅 timebox 有 view_route），规则保留
+- ✅ **F8 MEDIUM**（codex 战略盲点 2）commit message 含 why → Global Constraints + 各 task commit message
+- ✅ **F9 MEDIUM**（Claude subagent M-3）Task 6→Task 1 隐性依赖未声明 → Task 6 显式声明依赖；Task 5 Step 2 修正预期
+
 ## Timebox / Activity Archetype（[023]）
 
 - 2026_06_30 — A3.3 habitsTemplates 硬删（消费者 → 生产者 → DB DROP，迁移 0027）
