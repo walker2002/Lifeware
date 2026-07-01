@@ -10,7 +10,7 @@ vi.mock('@/nexus/ai-runtime', () => ({
   createAIRuntime: vi.fn(() => ({})),
 }))
 
-import { parseHabitIntentOnly } from '../intent'
+import { parseHabitIntentOnly, getActionResponse } from '../intent'
 import { parseHabitWithAI } from '@/nexus/core/intent-engine/ai-parser'
 
 const mockParseHabitWithAI = vi.mocked(parseHabitWithAI)
@@ -76,5 +76,26 @@ describe('parseHabitIntentOnly', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('解析失败')
+  })
+})
+
+// [023-01] Task 7 smoke test（codex Point 5）：
+//   getActionResponse 收紧返回类型为 'cnui' | 'page' | 'text' | 'unimplemented'
+//   后，调用方 use-intent-handler.ts 必须能拿到精确的 'page' 字面量以做 narrowing。
+//   端到端验证 getActionResponse → manifest-utils.getResponseType 链路不断。
+describe('getActionResponse（[023-01] type narrowing smoke）', () => {
+  it('viewSchedule 返回 page（依赖 Task 1 显式声明 + Task 6 manifest-utils SSOT）', async () => {
+    const result = await getActionResponse('timebox', 'viewSchedule')
+    expect(result.responseType).toBe('page')
+  })
+
+  it('createTimebox 返回 cnui（manifest 显式声明 cnui_surface）', async () => {
+    const result = await getActionResponse('timebox', 'createTimebox')
+    expect(result.responseType).toBe('cnui')
+  })
+
+  it('未声明 action 返回 unimplemented（manifest-utils fallback）', async () => {
+    const result = await getActionResponse('timebox', 'nonExistent')
+    expect(result.responseType).toBe('unimplemented')
   })
 })

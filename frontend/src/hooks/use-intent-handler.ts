@@ -294,6 +294,18 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
         return
       }
 
+      // [023-01] 无实现 action 提示待开发（manifest 未声明或显式 unimplemented）
+      if (responseType === "unimplemented") {
+        deps.ensureConversationView()
+        const msg: ChatMessage = {
+          role: "assistant",
+          content: `该功能（${domainId}/${action}）待开发`,
+          timestamp: new Date().toISOString(),
+        }
+        deps.addChatMessage(msg)
+        return
+      }
+
       // 未定义 response_type 或其他情况
       setMainViewState({ type: "action", domainId, action })
     },

@@ -1268,13 +1268,13 @@ export async function isCnuiSurface(domainId: string, action: string): Promise<b
 }
 
 /** 获取 action 的响应类型（服务端查询） */
+// [023-01] 委托给 manifest-utils.getResponseType SSOT（Task 6 落定）。
+//   返回类型从 string 收紧为 'cnui' | 'page' | 'text' | 'unimplemented'，
+//   客户端 use-intent-handler.ts 可据此做 type narrowing + 'unimplemented' 待开发分支。
+//   smoke test 见 __tests__/intent.test.ts:getActionResponse。
+import { getResponseType } from '@/usom/manifest-utils'
 export async function getActionResponse(domainId: string, action: string): Promise<{
-  responseType: string
+  responseType: 'cnui' | 'page' | 'text' | 'unimplemented'
 }> {
-  const fullManifest = getFullManifest(domainId) as Record<string, any> | undefined
-  const intentTriggers = (fullManifest?.intent_triggers as Array<Record<string, any>> | undefined) ?? []
-  const trigger = intentTriggers.find((t) => t.action === action)
-  return {
-    responseType: trigger?.response_type ?? 'text',
-  }
+  return { responseType: getResponseType(domainId, action) }
 }
