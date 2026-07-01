@@ -175,6 +175,16 @@
 - **fix(hook)** `handleCnuiConfirm` 成功分支对 `domainId === 'timebox'` 调 `deps.loadTimeboxes()`，让 `tb.timeboxes` 即时刷新，Home/主面板 schedule 视图立刻反映新时间盒（无需整页刷新）。
 - /browse 实测：chat 创建 `ZZTEST-REFRESH-*` → "操作成功" → 点「回到主页」→ schedule 视图 DOM 含新标题（无 full reload）。tsc 零新增。
 
+### [023-01+] v4 — 未注册 slash 命令误路由 + 跨域列表刷新
+> 2026_07_01 — 用户报两个问题：(1) `/createTime 19:30-20:00看世界杯` 弹出「习惯信息」CNUI（应为 timebox）；
+> (2) 补跨域刷新（v3 只修了 timebox，其他域 CNUI 提交后列表仍 stale）。
+
+**问题1 根因（systematic-debugging）**：`/createTime` 不在注册表（注册的是 `/createTimebox`），`getActionByShortcut` 精确匹配返回 undefined → `resolveShortcut` 返回 null。但 `resolveSlashCommand` 仍按语法解析为合法 slash 命令（`action:'createTime'`），timebox 路由条件（`action === 'createTimebox'`）不满足 → **落入 `parseHabitIntentOnly`**，习惯 LLM 解析器把"看世界杯"误判为习惯 → 弹错误域的 CNUI。防御缺口：未注册命令被当成「无域」放行进任意域解析器。
+
+- **fix(lib)** 新增 `suggestShortcut(action, shortcuts)` 纯函数：唯一前缀匹配返回该 shortcut（createTime→/createTimebox），多义/无匹配返回 undefined。+7 单测。
+- **fix(hook)** `handleConversationSend` slash 分支加守卫：`!shortcut && !resolvedDomainId` → 拦截，给「未识别的命令 /xxx。你是否想输入 /yyy？」提示，不进任何域管道。（产品决策：未注册命令一律提示，不自动补全。）`intentTriggers` 入 deps 防闭包 stale。
+- **fix(refresh)** `handleCnuiConfirm` 成功后广播 `window` 事件 `lifeware:data-changed`（detail `{domainId, action}`）。`ActionView` 经 `mainViewState.type==='action'` **内联挂载** `HabitListPage`/`TaskTreePage` 于 page.tsx（非独立路由），CNUI 提交时仍 mounted → 之前 stale。现各加 `useEffect` 监听器按 `domainId` 自行 reload（habits→loadHabits / tasks→handleDataChanged）。timebox 仍走 `deps.loadTimeboxes`。OKR 无 create 快捷方式 + 刷新入口深埋 → defer。
+
 ## Timebox / Activity Archetype（[023]）
 
 - 2026_06_30 — A3.3 habitsTemplates 硬删（消费者 → 生产者 → DB DROP，迁移 0027）

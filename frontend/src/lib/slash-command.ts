@@ -88,3 +88,39 @@ export function resolveSlashCommand(
     payload: rest?.trim() || undefined,
   }
 }
+
+/**
+ * 未识别 slash 命令的「did you mean」提示。
+ *
+ * 给定用户输入的 action（不含前导 `/`，如 "createTime"）和已注册快捷方式列表，
+ * 找出**唯一**以该 action 为前缀的快捷方式（如 "/createTimebox"）。
+ * - 唯一前缀匹配 → 返回该 shortcut（用于提示「你是否想输入 /createTimebox？」）
+ * - 多义（如 "create" 同时匹配 createHabit/createTask/createTimebox）或无匹配 → 返回 undefined
+ *
+ * @remarks
+ * 仅用于**提示**，不自动路由（产品决策：未注册命令一律提示，不猜测意图）。
+ * 大小写不敏感。shortcut 形如 "/createTimebox"，比较时去掉前导 `/`。
+ *
+ * @param action - 用户输入的 action 名（resolveSlashCommand 返回的 action 字段）
+ * @param shortcuts - 已注册的快捷方式字符串列表（含前导 `/`）
+ * @returns 唯一前缀匹配的 shortcut，或 undefined
+ */
+export function suggestShortcut(
+  action: string,
+  shortcuts: Array<{ shortcut: string } | string>,
+): string | undefined {
+  const lower = action.toLowerCase()
+  if (!lower) return undefined
+  const matches = new Set<string>()
+  for (const item of shortcuts) {
+    const shortcut = typeof item === 'string' ? item : item.shortcut
+    if (!shortcut) continue
+    // shortcut 形如 "/createTimebox"，去掉 `/` 后判断是否以 action 开头
+    if (shortcut.replace(/^\//, '').toLowerCase().startsWith(lower)) {
+      matches.add(shortcut)
+    }
+  }
+  // 唯一匹配 → 返回；多义/无匹配 → undefined（调用方给通用提示）
+  if (matches.size === 1) return Array.from(matches)[0]
+  return undefined
+}

@@ -133,6 +133,19 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
     loadHabits()
   }, [loadHabits])
 
+  // [023-01+ v4] 跨域刷新：监听 CNUI 在对话面板创建/更新习惯后广播的数据变更事件。
+  //   本组件经 ActionView 内联挂载于 page.tsx，CNUI 提交时仍 mounted → 需主动 reload。
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ domainId?: string }>).detail
+      if (detail?.domainId === 'habits') {
+        void loadHabits()
+      }
+    }
+    window.addEventListener('lifeware:data-changed', handler)
+    return () => window.removeEventListener('lifeware:data-changed', handler)
+  }, [loadHabits])
+
   // ─── 创建/更新处理 ──────────────────────────────────────────────
 
   const handleCreate = useCallback(

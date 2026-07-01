@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveSlashCommand } from '@/lib/slash-command'
+import { resolveSlashCommand, suggestShortcut } from '@/lib/slash-command'
 
 describe('resolveSlashCommand', () => {
   describe('非 slash 命令', () => {
@@ -142,5 +142,43 @@ describe('resolveSlashCommand', () => {
         payload: '每天 @晚上 22:00，跑步 30min!',
       })
     })
+  })
+})
+
+// [023-01+ v4] suggestShortcut：未识别命令的「did you mean」提示
+//   场景：/createTime 拼写错误（注册的是 /createTimebox），不应静默落到习惯解析器
+describe('suggestShortcut', () => {
+  // 真实注册的快捷方式子集（来自各域 manifest）
+  const triggers = [
+    '/createHabit', '/createTask', '/createThread', '/createTimebox',
+    '/startTimebox', '/logHabit', '/tasks', '/habits',
+  ].map((shortcut) => ({ shortcut }))
+
+  it('唯一前缀匹配 → 返回该 shortcut（createTime → createTimebox）', () => {
+    expect(suggestShortcut('createTime', triggers)).toBe('/createTimebox')
+  })
+
+  it('大小写不敏感', () => {
+    expect(suggestShortcut('CreateTime', triggers)).toBe('/createTimebox')
+  })
+
+  it('多义前缀 → undefined（create 同时匹配 createHabit/createTask/createThread/createTimebox）', () => {
+    expect(suggestShortcut('create', triggers)).toBeUndefined()
+  })
+
+  it('完全无匹配 → undefined', () => {
+    expect(suggestShortcut('createXYZ', triggers)).toBeUndefined()
+  })
+
+  it('空 action → undefined', () => {
+    expect(suggestShortcut('', triggers)).toBeUndefined()
+  })
+
+  it('接受纯字符串数组形式', () => {
+    expect(suggestShortcut('startTime', ['/startTimebox', '/logHabit'])).toBe('/startTimebox')
+  })
+
+  it('接受 action 恰好等于某 shortcut 名（完整匹配也算前缀）', () => {
+    expect(suggestShortcut('createHabit', triggers)).toBe('/createHabit')
   })
 })

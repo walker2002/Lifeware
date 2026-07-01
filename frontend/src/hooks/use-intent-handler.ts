@@ -34,7 +34,7 @@ import { recordActivity } from "@/app/actions/activity-recorder"
 import { fetchFrequentIntents } from "@/app/actions/activity"
 import { checkLLMConfigured } from "@/app/actions/llm-config"
 import { getTraceConfig } from "@/lib/config/trace-config"
-import { resolveSlashCommand } from "@/lib/slash-command"
+import { resolveSlashCommand, suggestShortcut } from "@/lib/slash-command"
 import { HABIT_USER_FACING } from "@/lib/constants/habit-messages"
 import type { IntentSubmissionResult } from "@/app/actions/intent"
 import type { CnuiSubmitResult } from '@/components/cnui/use-cnui-lifecycle'
@@ -415,6 +415,16 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           if (domainId === 'timebox') {
             void deps.loadTimeboxes()
           }
+          // [023-01+ v4] 跨域刷新：广播数据变更事件。
+          //   CNUI 在对话面板提交后，ActionView 内联挂载的其他域列表（HabitListPage/
+          //   TaskTreePage 等）不会自动失效——它们是各自路由组件，不在 page.tsx deps 树内。
+          //   用 window CustomEvent 解耦：各列表页按 detail.domainId 自行决定是否 reload。
+          //   timebox 已由上面 deps.loadTimeboxes 处理，事件对它无害（无监听器）。
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('lifeware:data-changed', { detail: { domainId, action } }),
+            )
+          }
         } else {
           // [019.0] Lane B：失败仍发一条 system 消息（表单级可见），同时把字段级 errors 回传
           const msg: ChatMessage = {
@@ -484,6 +494,26 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
             timestamp: new Date().toISOString(),
           }
           deps.addChatMessage(navMsg)
+          return
+        }
+
+        // [023-01+ v4] 未注册 slash 命令防御
+        //   场景：/createTime（注册的是 /createTimebox）等拼写错误。
+        //   之前：语法合法但 shortcut 未注册 → timebox 路由条件不满足 →
+        //         落入 parseHabitIntentOnly → LLM 把任意 payload 误判为习惯，
+        //         弹出"习惯信息"CNUI（错误域）。
+        //   现在：shortcut 未注册且无显式 domain → 拦截，给「未识别 + did you mean」提示，
+        //         不进入任何域解析管道。产品决策：未注册命令一律提示，不自动补全。
+        if (!shortcut && !resolvedDomainId) {
+          const suggestion = suggestShortcut(slashResult.action, intentTriggers)
+          const hint = suggestion
+            ? `未识别的命令「/${slashResult.action}」。你是否想输入 ${suggestion}？`
+            : `未识别的命令「/${slashResult.action}」。（输入 / 查看可用命令）`
+          deps.addChatMessage({
+            role: "assistant",
+            content: hint,
+            timestamp: new Date().toISOString(),
+          })
           return
         }
 
@@ -757,7 +787,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
         setIsLoading(false)
       }
     },
-    [traceEnabled]
+    [traceEnabled, intentTriggers]
   )
 
   const handleCloseSplit = useCallback(() => {

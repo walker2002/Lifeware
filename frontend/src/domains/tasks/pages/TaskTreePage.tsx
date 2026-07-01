@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ChevronUp, Plus, PanelLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -98,6 +98,19 @@ export default function TaskTreePage() {
   const handleDataChanged = useCallback(() => {
     setRefreshKey(k => k + 1)
   }, [])
+
+  // [023-01+ v4] 跨域刷新：监听 CNUI 在对话面板创建/更新任务后广播的数据变更事件。
+  //   本组件经 ActionView 内联挂载于 page.tsx，CNUI 提交时仍 mounted → 需主动刷新。
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ domainId?: string }>).detail
+      if (detail?.domainId === 'tasks') {
+        handleDataChanged()
+      }
+    }
+    window.addEventListener('lifeware:data-changed', handler)
+    return () => window.removeEventListener('lifeware:data-changed', handler)
+  }, [handleDataChanged])
 
   /** 进入全屏模式 */
   const enterFullscreen = useCallback((taskId: string) => {
