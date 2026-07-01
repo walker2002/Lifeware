@@ -148,6 +148,21 @@
 - 测试：handlers.test +4 / intent.test +3 / ai-parser-migration.test +3 = +10 PASS（base 18 failed = head 18 failed，零新增）
 - 4 commits（`bfe6713` / `1a147d0` / `e45f67f` / `f854185`）接 [023-01] 14 commits 落地
 
+### [023-01+] 二次修复（v2）— 上一轮 7 commits 未解决的真正根因
+> 2026_07_01 — 用户再次实测，3 场景仍未解决。systematic-debugging 重新调查发现：
+> 上一轮 Commit 4（chat 路由到 parseMultiTask）是**死代码**——其路由条件
+> `(resolvedDomainId === "timebox")` 依赖 `resolveShortcut`，而 `matchShortcut`
+> 正则以 `$` 结尾 + 传整条 rawInput，**任何 `/cmd [payload]` 都解析为 null**，
+> 导致条件恒 false，chat 落到 `submitIntent → parseWithAI`（非确定性）→
+> 时灵时不灵地路由到 tasks 域（"任务标题必填"）/ 失败（"处理失败"）。
+> 复现：`matchShortcut("/createTimebox 晚上 21:00-23:00 外出看电影")` → `undefined`。
+
+- **fix(intent) RC-1（核心）** `resolveShortcut` 取首个空白前的 command token 再 `matchShortcut`，使 `/createTimebox [payload]` 正确解析出 timebox/createTimebox。仅 resolveShortcut payload-aware；`matchShortcut`/`parse` 保持精确匹配（保留 parse()「纯快捷方式→template_form」vs「带 payload→AI 解析」语义），零回归。
+- **fix(ai-parser) RC-2** `parseMultiTask` 过滤器不再硬要求 `duration`：缺 duration 时从 `(endTime - startTime)` 反推（显式区间场景如 21:00-23:00 LLM 常漏 duration 被丢弃）。
+- **feat(timebox cnui) RC-4 时区** 新增 `time-input-helpers.ts`（`isoToLocalDatetimeInput` / `localDatetimeInputToIso`）；`CreateTimebox.tsx` 开始/结束改 `<input type="datetime-local">`，用户按本地时区输入/查看，后台仍存 ISO。
+- **问题1（/createTimebox 无输入）**：路由原语经复现确认**当前已正确**（matchShortcut 无 payload 时命中 timebox → openCnuiSurface → RC-C 空白 draft）。用户此前看到的校验报错为 dev server 未重启（Next.js server action 不热重载），修复后须重启 `npm run dev` 再测。
+- 测试：intent.test +4（resolveShortcut payload）/ ai-parser-migration.test +1（RC-2 duration 反推）/ time-input-helpers.test +8 = +13 PASS；vitest base 19 = head 18（零新增）；tsc 我改文件零新增。
+
 ## Timebox / Activity Archetype（[023]）
 
 - 2026_06_30 — A3.3 habitsTemplates 硬删（消费者 → 生产者 → DB DROP，迁移 0027）
