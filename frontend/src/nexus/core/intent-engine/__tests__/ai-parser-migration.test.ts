@@ -180,6 +180,58 @@ describe('parseMultiTask (migrated to AIRuntime)', () => {
     expect(result.intents[0].fields.title).toBe('OKR 季度计划')
     expect(result.intents[1].fields.title).toBe('带孩子出去玩')
   })
+
+  // [023-01+] 模糊时间默认值回归（问题2）：
+  //   之前 LLM 收到"上午完成OKR计划"返回 startTime=null/incomplete，
+  //   parseMultiTask line 419 过滤掉 → 报"任务标题必填"
+  //   强化 prompt 后：LLM 给出默认 09:00 + 120 分钟
+  it('应解析模糊时间"上午"为默认 09:00-11:00 + 标题含空格', async () => {
+    const { parseMultiTask } = await import('../ai-parser')
+    const aiRuntime = createMockAIRuntime({
+      generate: {
+        content: { tasks: [
+          { title: '完成OKR计划', startTime: '2026-07-01T09:00:00+08:00', duration: 120, confidence: 0.85 },
+        ] },
+      },
+    })
+    const result = await parseMultiTask('上午完成OKR计划', 'intention-789', aiRuntime)
+    expect(result.success).toBe(true)
+    expect(result.intents).toHaveLength(1)
+    expect(result.intents[0].fields.title).toBe('完成OKR计划')
+    expect(result.intents[0].fields.startTime).toBe('2026-07-01T09:00:00+08:00')
+    expect(result.intents[0].fields.duration).toBe(120)
+    // endTime 由 parseMultiTask 内部按 UTC 计算（line 423: new Date + setMinutes + toISOString）
+    expect(result.intents[0].fields.endTime).toBe('2026-07-01T03:00:00.000Z')
+  })
+
+  // [023-01+] 显式时间区间 + 标题含空格（问题3 真实场景）
+  it('应解析"10:30-12:30 完成OKR计划"为单条任务，title 含空格', async () => {
+    const { parseMultiTask } = await import('../ai-parser')
+    const aiRuntime = createMockAIRuntime({
+      generate: {
+        content: { tasks: [
+          { title: '完成OKR计划', startTime: '2026-07-01T10:30:00+08:00', duration: 120, confidence: 0.92 },
+        ] },
+      },
+    })
+    const result = await parseMultiTask('10:30-12:30 完成OKR计划', 'intention-790', aiRuntime)
+    expect(result.success).toBe(true)
+    expect(result.intents).toHaveLength(1)
+    expect(result.intents[0].fields.title).toBe('完成OKR计划')
+  })
+
+  // [023-01+] prompt 内容断言：模糊时间默认值已写入 MULTI_TASK_PROMPT
+  //   防止未来 prompt 改动无意间丢失规则
+  it('MULTI_TASK_PROMPT 应包含模糊时间默认值规则', async () => {
+    const { parseMultiTask } = await import('../ai-parser')
+    const aiRuntime = createMockAIRuntime()
+    await parseMultiTask('test input', 'intention-000', aiRuntime)
+    const callArg = (aiRuntime.generate as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(callArg.systemPrompt).toContain('"上午"')
+    expect(callArg.systemPrompt).toContain('"下午"')
+    expect(callArg.systemPrompt).toContain('"晚上"')
+    expect(callArg.systemPrompt).toContain('duration = 120')
+  })
 })
 
 // ── T014: parseHabitWithAI migration ──
