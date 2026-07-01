@@ -9,6 +9,7 @@
 'use client'
 
 import { useState } from 'react'
+import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
 
 interface TimeboxDraft {
   id: string
@@ -66,11 +67,12 @@ export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, is
         <div className="flex items-center gap-2">
           <div className="flex-1">
             <label htmlFor="ct-start" className="text-xs text-body">开始</label>
-            <input id="ct-start" type="text" value={cur.startTime} onChange={e => update({ startTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+            {/* [023-01+ v2] datetime-local：用户按本地时区输入/查看；后台仍存 ISO（互转在 onChange/value 边界） */}
+            <input id="ct-start" type="datetime-local" value={isoToLocalDatetimeInput(cur.startTime)} onChange={e => update({ startTime: localDatetimeInputToIso(e.target.value) })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
           </div>
           <div className="flex-1">
             <label htmlFor="ct-end" className="text-xs text-body">结束</label>
-            <input id="ct-end" type="text" value={cur.endTime} onChange={e => update({ endTime: e.target.value })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
+            <input id="ct-end" type="datetime-local" value={isoToLocalDatetimeInput(cur.endTime)} onChange={e => update({ endTime: localDatetimeInputToIso(e.target.value) })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
           </div>
         </div>
       </div>
