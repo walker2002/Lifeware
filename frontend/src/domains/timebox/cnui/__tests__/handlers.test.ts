@@ -150,7 +150,7 @@ describe('timeboxCnuiHandler', () => {
   })
 
   describe('open - createTimebox（[023-01+] 空白 draft 初始化回归）', () => {
-    it('无 intentFields → 初始化单条空白 draft（uuid + 空 title + 当前时间 + 1h 区间）', async () => {
+    it('无 intentFields → 初始化单条空白 draft（uuid + 空 title + 下一整点 + 1h 区间）', async () => {
       const before = Date.now()
       const result = await timeboxCnuiHandler.open('createTimebox', undefined)
       const after = Date.now()
@@ -159,10 +159,15 @@ describe('timeboxCnuiHandler', () => {
       expect(items).toHaveLength(1)
       expect(items[0].title).toBe('')
       expect(items[0].id).toBeTruthy()
-      // startTime 应在 before/after 之间（容忍 50ms 时差）
+      // [023-01+] RC-C：startTime 默认是下一整点（next round hour），
+      //   必须 > after（即严格在未来，避免 StartTimeInFutureRule 失败）
       const startMs = new Date(items[0].startTime).getTime()
-      expect(startMs).toBeGreaterThanOrEqual(before - 50)
-      expect(startMs).toBeLessThanOrEqual(after + 50)
+      expect(startMs).toBeGreaterThan(after)
+      // 必须是整点（HH:00:00.000）：minutes/seconds/ms 全 0
+      const startDate = new Date(startMs)
+      expect(startDate.getMinutes()).toBe(0)
+      expect(startDate.getSeconds()).toBe(0)
+      expect(startDate.getMilliseconds()).toBe(0)
       // endTime 应为 startTime + 1h
       const endMs = new Date(items[0].endTime).getTime()
       expect(endMs - startMs).toBe(60 * 60 * 1000)
@@ -199,6 +204,28 @@ describe('timeboxCnuiHandler', () => {
       const items = result.dataSnapshot.items as Array<{ id: string; title: string }>
       expect(items).toHaveLength(1)
       expect(items[0].title).toBe('')
+    })
+
+    // [023-01+] RC-C 修复：初始 draft startTime 必须 > now（避免 StartTimeInFutureRule
+    //   触发"startTime 在过去"warning）。
+    //   之前：startTime = now.toISOString()（创建瞬间的时间），用户填好 title
+    //   提交时已过去几分钟 → rule warning → "操作失败: 1 条失败"
+    //   现在：startTime 默认 = 下一个整点（next round hour）+ 1h endTime，
+    //   保证任何时候提交都通过 StartTimeInFutureRule
+    it('空白 draft startTime 应默认为未来时间（下一个整点或 now + 5min），不是 now', async () => {
+      const before = Date.now()
+      const result = await timeboxCnuiHandler.open('createTimebox', undefined)
+      const after = Date.now()
+
+      const items = result.dataSnapshot.items as Array<{ startTime: string; endTime: string }>
+      const startMs = new Date(items[0].startTime).getTime()
+      const endMs = new Date(items[0].endTime).getTime()
+
+      // 关键断言：startTime 必须严格 > now（即在 after 之后）
+      // 失败行为：startMs <= after（说明 startTime = 创建时刻的 now，用户提交时已过去）
+      expect(startMs).toBeGreaterThan(after)
+      // endTime 必须为 startTime + 1h（默认时长不变）
+      expect(endMs - startMs).toBe(60 * 60 * 1000)
     })
   })
 

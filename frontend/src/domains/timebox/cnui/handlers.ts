@@ -76,11 +76,19 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       // [023-01+] 无 drafts → 初始化单条空白 draft 让用户填表
       //   场景：/createTimebox 单独无输入（chat 路径 line 564 openCnuiSurface 不传 intentFields）
       //   之前：空数组 → CreateTimebox.tsx:36 渲染"未识别到时间盒"
-      //   现在：1 个 uuid + 当前时间 + 1h 区间的空白 draft，用户可直接填
+      //   现在：1 个 uuid + 下一个整点开始 + 1h 区间的空白 draft，用户可直接填
+      // [023-01+] RC-C：startTime 默认 = 下一个整点（next round hour）
+      //   原因：原版本 startTime = now.toISOString()，用户填好 title 提交时已过几分钟
+      //   → StartTimeInFutureRule（timebox.ts:142）触发 "startTime 在过去" warning
+      //   → 所有空白 CNUI 创建的 timebox 都失败（即使 title 有填）
+      //   修复：startTime 推到下一个整点（HH:00），endTime = startTime + 1h，
+      //   保证任何时候提交都通过 StartTimeInFutureRule
       if (drafts.length === 0) {
         const now = new Date()
-        const startIso = now.toISOString()
-        const endIso = new Date(now.getTime() + 60 * 60 * 1000).toISOString()
+        const nextRound = new Date(now)
+        nextRound.setHours(now.getHours() + 1, 0, 0, 0)  // HH:00:00.000（下一个整点）
+        const startIso = nextRound.toISOString()
+        const endIso = new Date(nextRound.getTime() + 60 * 60 * 1000).toISOString()
         drafts = [{ id: crypto.randomUUID(), title: '', startTime: startIso, endTime: endIso }]
       }
       return {
