@@ -10,13 +10,15 @@ description: 时间盒管理 — 将时间结构化为可执行的专注单元
 intent_triggers:
   - action: createTimebox
     shortcut: /createTimebox
-    description: 创建一个新的时间盒
+    description: 创建新的时间盒
     response_type: cnui
     cnui_surface: create-timebox
     examples:
       - 帮我创建一个时间盒
       - 明天9点安排1小时专注写作
       - 下午2点到3点做代码审查
+      - 上午10:30-12:30 OKR 季度计划
+      - 上午10:30-12:30 OKR 季度计划；下午16:00-18:00 带孩子出去玩
     keywords: [时间盒, timebox, 安排, 计划, 专注]
   - action: startTimebox
     shortcut: /startTimebox
@@ -50,7 +52,8 @@ intent_triggers:
     keywords: [记录, log, 打卡]
   - action: viewSchedule
     shortcut: /schedule
-    description: 查看今日时间盒日程
+    description: 时间盒管理
+    response_type: page
     examples:
       - 查看今天的日程
       - 今天有什么安排

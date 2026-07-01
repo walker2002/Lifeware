@@ -263,6 +263,12 @@ function validateDomain(domainId: string): void {
         `intent_trigger "${action}" 引用的 cnui_surface "${trigger.cnui_surface}" 在 cnui_surfaces 块中不存在`)
     }
 
+    // [023-01] 守门员：view_route 存在则 response_type 必须 page（防落入 text fallback）
+    if (trigger.view_route && responseType !== 'page') {
+      addError(domainId, 'A-view-route-needs-page',
+        `intent_trigger "${action}" 有 view_route "${trigger.view_route}" 但 response_type 不是 page（当前: "${responseType ?? '未声明'}"），会导致导航落入 text fallback`)
+    }
+
     // generation_actions 中已声明的 action 不需要重复声明 cnui_surface
     if (responseType === 'cnui' && trigger.cnui_surface && generationActions[action]?.cnui_surface_type) {
       addInfo(domainId, 'A-redundant-cnui-surface',
