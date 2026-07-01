@@ -1,25 +1,30 @@
 /**
  * @file fab.test
- * @brief FAB label 同步联动 [023-01] — 守护 getActionDescription 同步调用 + SSR 安全
+ * @brief FAB label 静态断言 — [023-01] /qa CRITICAL regression: Task 8 manifest 同步方案撤回
  *
- * [023-01] Task 8：原 plan 把 FAB label 异步化（useState/useEffect），被 autoplan H-3
- * 共识修订驳回（getActionDescription 是同步函数）。本测试验证：
- * 1. FAB 渲染时同步调用 getActionDescription，无 useEffect/useState 异步化
- * 2. SSR 安全（jsdom 渲染即可，触达同步读 manifest 路径无异常）
- * 3. manifest description 为空时 FALLBACK_LABEL 兜底
+ * [023-01] /qa ISSUE-001：Task 8 的 `getActionDescription` 同步联动方案
+ * 因 registry.ts import chain 拉扯 `manifest-loader/loader.ts` (含 `import fs from 'fs'`)
+ * 进入 Client Component bundle，编译失败 500 / 真实 dev server 不可用。
+ *
+ * /qa 修复回滚 fab.tsx 到 pre-Task-8 状态（硬编码 label '创建时间盒/打卡习惯/新建任务'）；
+ * 同步重写本测试为静态 label 断言 + 外部 quickActions prop override 测试，
+ * 不再 mock 不存在的 getActionDescription 调用。
+ *
+ * 真正"manifest 联动"的正确解法（下一轮 /lifeware-neat 或独立 task）：
+ * - server component 包装 + 把 label 作为 prop 透传给 FAB（client）
+ * - 或 registry.ts 拆 server/client 两份 manifest loader
+ *
+ * 回归测试（确保 issue 不再发）：
+ * 1. 默认 DEFAULT_ACTIONS 显示硬编码「创建时间盒 / 打卡习惯 / 新建任务」
+ * 2. 外部 quickActions prop 可覆盖 label
+ * 3. 点击动作正确触发 onAction
+ * 4. FAB toggle 展开/收起
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Fab } from '../fab'
-import { getActionDescription } from '@/domains/registry'
-
-vi.mock('@/domains/registry', () => ({
-  getActionDescription: vi.fn((domainId: string, action: string) =>
-    `${domainId}/${action}-desc`
-  ),
-}))
 
 // Sheet 内部用 Radix UI Dialog，本测试不展开菜单即可；mock 简化
 vi.mock('@/components/ui/sheet', () => ({
@@ -30,75 +35,70 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
-describe('FAB label 同步联动（[023-01]）', () => {
-  beforeEach(() => {
-    // 既有 mock 实现（manifest desc 返回非空）+ 调用历史都还原
-    vi.resetAllMocks()
-    vi.mocked(getActionDescription).mockImplementation(
-      (domainId: string, action: string) => `${domainId}/${action}-desc`
-    )
-  })
-
-  it('展开时同步调用 getActionDescription 渲染 label', async () => {
+describe('FAB 静态 label + 交互（[023-01] /qa ISSUE-001 回归）', () => {
+  it('展开后显示硬编码 DEFAULT_ACTIONS 三项 label', async () => {
     const user = userEvent.setup()
     render(<Fab growthContent={<div>g</div>} onAction={vi.fn()} />)
 
     // 点击 FAB 展开菜单
     await user.click(screen.getByLabelText('打开快捷菜单'))
 
-    // 触发后立即断言：所有 3 个 label 已渲染（同步链路，无 loading 占位）
-    // 用 function matcher：宽松匹配穿越多 textNode 的字符串
-    expect(
-      screen.getAllByRole('button').some(b => b.textContent?.includes('timebox/createTimebox-desc'))
-    ).toBe(true)
-    expect(
-      screen.getAllByRole('button').some(b => b.textContent?.includes('habits/checkinHabits-desc'))
-    ).toBe(true)
-    expect(
-      screen.getAllByRole('button').some(b => b.textContent?.includes('tasks/createTask-desc'))
-    ).toBe(true)
-
-    // mock 函数被同步调用（不是 useEffect 里）
-    expect(getActionDescription).toHaveBeenCalledWith('timebox', 'createTimebox')
-    expect(getActionDescription).toHaveBeenCalledWith('habits', 'checkinHabits')
-    expect(getActionDescription).toHaveBeenCalledWith('tasks', 'createTask')
-  })
-
-  it('manifest 返回空字符串时用 FALLBACK_LABEL 兜底', async () => {
-    // 模拟 manifest 未注册/无 description
-    vi.mocked(getActionDescription).mockReturnValue('')
-
-    const user = userEvent.setup()
-    render(<Fab growthContent={<div>g</div>} onAction={vi.fn()} />)
-    await user.click(screen.getByLabelText('打开快捷菜单'))
-
-    // 兜底中文文案（非空、非 undefined）
+    // 三个硬编码 label 均渲染
     expect(screen.getByText('创建时间盒')).toBeInTheDocument()
     expect(screen.getByText('打卡习惯')).toBeInTheDocument()
     expect(screen.getByText('新建任务')).toBeInTheDocument()
   })
 
-  it('点击动作触发 onAction 并关闭菜单', async () => {
+  it('外部 quickActions prop 可覆盖 label（保持外部注入能力）', async () => {
+    const user = userEvent.setup()
+    render(
+      <Fab
+        quickActions={[
+          { label: 'Custom Timebox', icon: () => null, domainId: 'timebox', action: 'createTimebox' },
+        ]}
+        growthContent={<div>g</div>}
+        onAction={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByLabelText('打开快捷菜单'))
+
+    expect(screen.getByText('Custom Timebox')).toBeInTheDocument()
+    expect(screen.queryByText('创建时间盒')).not.toBeInTheDocument()
+  })
+
+  it('点击 action 触发 onAction 并关闭菜单', async () => {
     const onAction = vi.fn()
     const user = userEvent.setup()
 
     render(<Fab growthContent={<div>g</div>} onAction={onAction} />)
     await user.click(screen.getByLabelText('打开快捷菜单'))
-
-    // 找渲染了目标 label 的按钮（穿越多 textNode）
-    const timeboxBtn = screen.getAllByRole('button').find(b =>
-      b.textContent?.includes('timebox/createTimebox-desc')
-    ) as HTMLElement
-    expect(timeboxBtn).toBeTruthy()
-    await user.click(timeboxBtn)
+    await user.click(screen.getByText('创建时间盒'))
 
     expect(onAction).toHaveBeenCalledWith('timebox', 'createTimebox')
   })
 
-  it('SSR 安全：初次渲染不抛异常（jsdom 模拟浏览器环境）', () => {
-    // 渲染不应抛错（getActionDescription 是同步读 manifest 缓存，无 IO/无 hydration mismatch）
-    expect(() =>
-      render(<Fab growthContent={<div>g</div>} onAction={vi.fn()} />)
-    ).not.toThrow()
+  it('SSR 安全：初次 render 不抛异常 + 默认折叠', () => {
+    render(<Fab growthContent={<div>g</div>} onAction={vi.fn()} />)
+
+    expect(screen.getByLabelText('打开快捷菜单')).toBeInTheDocument()
+    // 折叠态：NONE of the action buttons 渲染
+    expect(screen.queryByText('创建时间盒')).not.toBeInTheDocument()
+  })
+
+  it('FAB toggle：第 1 次点击展开，第 2 次收起', async () => {
+    const user = userEvent.setup()
+    render(<Fab growthContent={<div>g</div>} onAction={vi.fn()} />)
+
+    // 初始折叠
+    expect(screen.queryByText('创建时间盒')).not.toBeInTheDocument()
+
+    // 第 1 次点击
+    await user.click(screen.getByLabelText('打开快捷菜单'))
+    expect(screen.getByText('创建时间盒')).toBeInTheDocument()
+
+    // 第 2 次点击收起
+    await user.click(screen.getByLabelText('关闭快捷菜单'))
+    expect(screen.queryByText('创建时间盒')).not.toBeInTheDocument()
   })
 })
