@@ -132,6 +132,22 @@
 - ✅ **F8 MEDIUM**（codex 战略盲点 2）commit message 含 why → Global Constraints + 各 task commit message
 - ✅ **F9 MEDIUM**（Claude subagent M-3）Task 6→Task 1 隐性依赖未声明 → Task 6 显式声明依赖；Task 5 Step 2 修正预期
 
+### /qa 后 follow-up（[023-01+]）— 实测三场景修复
+> 2026_07_01 — /qa 报告 ship-ready 后实测发现 3 个 brief 范围真实 bug 未修：
+> 1. `/createTimebox`（单独无输入）→ 显示「未识别到时间盒」（handler.open 空白 draft 未初始化）
+> 2. `/createTimebox "上午完成OKR计划"` → ISO 校验失败（MULTI_TASK_PROMPT 无模糊时间默认值）
+> 3. `/createTimebox 10:30-12:30 完成OKR计划` → 「任务标题必填」（chat 路径未路由到 parseMultiTask）
+>
+> 加 1 个失败语义约定（用户额外明确）：
+> 4. `/createTimebox [无关payload]` → 显式返回「请输入有效的时间盒标题和事件」（不 silent fall through）
+
+- **fix(timebox)** handler.open createTimebox 空白 draft 初始化 — `intentFields.drafts` 为空时初始化单条空白（uuid + 当前时间 + 1h 区间），content 切换「请填写时间盒信息」
+- **feat(intent)** 新增 `parseTimeboxBatchIntentOnly` server action（dry-run 模式，仅解析返回 drafts 不提交）
+- **feat(ai-parser)** MULTI_TASK_PROMPT 强化：上午=09:00-11:00 / 下午=14:00-16:00 / 晚上=19:00-21:00 / 中午=12:00-13:00 / 凌晨=02:00-03:00；新增 2 个 few-shot 示例覆盖问题2/3
+- **feat(hook)** chat 路径把 `/createTimebox [payload]` 路由到 `parseTimeboxBatchIntentOnly`，成功→打开 CNUI with drafts，失败→「请输入有效的时间盒标题和事件」
+- 测试：handlers.test +4 / intent.test +3 / ai-parser-migration.test +3 = +10 PASS（base 18 failed = head 18 failed，零新增）
+- 4 commits（`bfe6713` / `1a147d0` / `e45f67f` / `f854185`）接 [023-01] 14 commits 落地
+
 ## Timebox / Activity Archetype（[023]）
 
 - 2026_06_30 — A3.3 habitsTemplates 硬删（消费者 → 生产者 → DB DROP，迁移 0027）
