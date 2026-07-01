@@ -1027,7 +1027,15 @@ export async function updateHabit(
 
 export async function resolveShortcut(rawInput: string): Promise<{ domainId: string; action: string; view_route?: string } | null> {
   const { matchShortcut } = await import("@/nexus/core/intent-engine/shortcut-matcher");
-  const result = matchShortcut(rawInput);
+  // [023-01+ v2] RC-1 修复：取首个空白前的 command token 再 matchShortcut，
+  //   使 /createTimebox [payload] 也能解析出 domain/action（路由用）。
+  //   根因：matchShortcut 正则以 $ 结尾，整条 rawInput 含 payload 时恒不匹配 →
+  //   resolveShortcut 返回 null → use-intent-handler 的 timebox 路由条件恒 false
+  //   → chat 落到 submitIntent → parseWithAI 非确定性（tasks 域"任务标题必填" / "处理失败"）。
+  //   注意：仅 resolveShortcut（路由解析）payload-aware；matchShortcut/parse 仍精确匹配，
+  //   保留 parse()「纯快捷方式 → template_form」vs「带 payload → AI 解析」的区分语义，零回归。
+  const commandToken = rawInput.split(/\s/)[0];
+  const result = matchShortcut(commandToken);
   if (result) {
     const { getIntentTriggerViewRoute } = await import("@/domains/registry");
     const view_route = getIntentTriggerViewRoute(result.domainId, result.action);

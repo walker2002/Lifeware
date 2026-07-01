@@ -11,7 +11,7 @@ vi.mock('@/nexus/ai-runtime', () => ({
   createAIRuntime: vi.fn(() => ({})),
 }))
 
-import { parseHabitIntentOnly, parseTimeboxBatchIntentOnly, getActionResponse } from '../intent'
+import { parseHabitIntentOnly, parseTimeboxBatchIntentOnly, getActionResponse, resolveShortcut } from '../intent'
 import { parseHabitWithAI, parseMultiTask } from '@/nexus/core/intent-engine/ai-parser'
 
 const mockParseHabitWithAI = vi.mocked(parseHabitWithAI)
@@ -178,5 +178,38 @@ describe('parseTimeboxBatchIntentOnly（[023-01+] chat dry-run）', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('LLM 网络超时')
+  })
+})
+
+// [023-01+ v2] resolveShortcut payload-aware 回归
+//   根因 RC-1：matchShortcut 正则用 $ 结尾 + resolveShortcut 传整条 rawInput，
+//   导致 /createTimebox [payload] 解析为 null → Commit 4 路由条件恒 false
+//   → chat 落到 submitIntent → parseWithAI 非确定性（tasks/"任务标题必填" or "处理失败"）
+//   修复：resolveShortcut 取首个空白前的 command token 再 matchShortcut
+describe('resolveShortcut（[023-01+ v2] /cmd [payload] 须能解析出 domain/action）', () => {
+  it('/createTimebox 晚上 21:00-23:00 外出看电影 → timebox/createTimebox（RC-1 核心）', async () => {
+    const r = await resolveShortcut('/createTimebox 晚上 21:00-23:00 外出看电影')
+    // 修复前：返回 null（matchShortcut 正则 $ 拒绝 payload）
+    expect(r).not.toBeNull()
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('createTimebox')
+  })
+
+  it('/createTimebox（无 payload）→ timebox/createTimebox（回归守护）', async () => {
+    const r = await resolveShortcut('/createTimebox')
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('createTimebox')
+  })
+
+  it('/createHabit 每天跑步 → habits/createHabit（跨域守护）', async () => {
+    const r = await resolveShortcut('/createHabit 每天跑步')
+    expect(r?.domainId).toBe('habits')
+    expect(r?.action).toBe('createHabit')
+  })
+
+  it('/createTimebox 上午完成OKR计划（含空格标题）→ timebox/createTimebox', async () => {
+    const r = await resolveShortcut('/createTimebox 上午完成OKR计划')
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('createTimebox')
   })
 })
