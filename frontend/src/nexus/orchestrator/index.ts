@@ -773,6 +773,15 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         if (genActionConfig) {
           return orchestrator.executeGenerativePath(intent, userId, manifest, genActionConfig)
         }
+        // [023-01] 可观察性（非行为变更）：pathType=generative 但 action 不在
+        // generation_actions 时本就落到 contract path（上方 if 未命中）。此处仅
+        // dev warn 让未来 LLM 误标 pathType（R3）可定位。真实根因见 Task 0。
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(
+            `[Orchestrator] pathType=generative 但 ${intent.targetDomain}/${intent.action} ` +
+            `不在 generation_actions，回落 contract path（行为不变，仅可观察性）`,
+          )
+        }
       }
 
       // pathType === 'contract' — 继续走现有被动型路径
