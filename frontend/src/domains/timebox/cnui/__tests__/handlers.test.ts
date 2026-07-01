@@ -144,6 +144,59 @@ describe('timeboxCnuiHandler', () => {
     })
   })
 
+  describe('open - createTimebox（[023-01+] 空白 draft 初始化回归）', () => {
+    it('无 intentFields → 初始化单条空白 draft（uuid + 空 title + 当前时间 + 1h 区间）', async () => {
+      const before = Date.now()
+      const result = await timeboxCnuiHandler.open('createTimebox', undefined)
+      const after = Date.now()
+
+      const items = result.dataSnapshot.items as Array<{ id: string; title: string; startTime: string; endTime: string }>
+      expect(items).toHaveLength(1)
+      expect(items[0].title).toBe('')
+      expect(items[0].id).toBeTruthy()
+      // startTime 应在 before/after 之间（容忍 50ms 时差）
+      const startMs = new Date(items[0].startTime).getTime()
+      expect(startMs).toBeGreaterThanOrEqual(before - 50)
+      expect(startMs).toBeLessThanOrEqual(after + 50)
+      // endTime 应为 startTime + 1h
+      const endMs = new Date(items[0].endTime).getTime()
+      expect(endMs - startMs).toBe(60 * 60 * 1000)
+      // 内容：空白 draft 应提示「请填写」而非「请确认」
+      expect(result.content).toBe('请填写时间盒信息')
+    })
+
+    it('intentFields={}（无 drafts 字段）→ 同上初始化空白 draft', async () => {
+      const result = await timeboxCnuiHandler.open('createTimebox', {})
+
+      const items = result.dataSnapshot.items as Array<{ id: string; title: string }>
+      expect(items).toHaveLength(1)
+      expect(items[0].title).toBe('')
+    })
+
+    it('intentFields.drafts 已透传 → 不覆盖，沿用传入草稿', async () => {
+      const passedDrafts = [
+        { id: 'd1', title: 'OKR 季度计划', startTime: '2026-07-01T10:30:00Z', endTime: '2026-07-01T12:30:00Z' },
+        { id: 'd2', title: '带孩子出去玩', startTime: '2026-07-01T16:00:00Z', endTime: '2026-07-01T18:00:00Z' },
+      ]
+      const result = await timeboxCnuiHandler.open('createTimebox', { drafts: passedDrafts })
+
+      const items = result.dataSnapshot.items as Array<{ id: string; title: string }>
+      expect(items).toHaveLength(2)
+      expect(items[0].title).toBe('OKR 季度计划')
+      expect(items[1].title).toBe('带孩子出去玩')
+      // 有内容时 content 用「请确认」
+      expect(result.content).toBe('请确认要创建的时间盒')
+    })
+
+    it('intentFields.drafts=[]（空数组）→ 仍初始化单条空白 draft', async () => {
+      const result = await timeboxCnuiHandler.open('createTimebox', { drafts: [] })
+
+      const items = result.dataSnapshot.items as Array<{ id: string; title: string }>
+      expect(items).toHaveLength(1)
+      expect(items[0].title).toBe('')
+    })
+  })
+
   describe('submit - createSmartSchedule', () => {
     it('应返回成功（暂未实现）', async () => {
       const result = await timeboxCnuiHandler.submit('createSmartSchedule', {})

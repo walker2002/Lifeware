@@ -72,9 +72,19 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
   async open(action, intentFields): Promise<CnuiSurfaceOpenResult> {
     // [023] A2.5 — AI 助手解析多条 timebox 草稿后透传 drafts
     if (action === 'createTimebox') {
-      const drafts = (intentFields?.drafts as any[]) ?? []
+      let drafts = (intentFields?.drafts as any[]) ?? []
+      // [023-01+] 无 drafts → 初始化单条空白 draft 让用户填表
+      //   场景：/createTimebox 单独无输入（chat 路径 line 564 openCnuiSurface 不传 intentFields）
+      //   之前：空数组 → CreateTimebox.tsx:36 渲染"未识别到时间盒"
+      //   现在：1 个 uuid + 当前时间 + 1h 区间的空白 draft，用户可直接填
+      if (drafts.length === 0) {
+        const now = new Date()
+        const startIso = now.toISOString()
+        const endIso = new Date(now.getTime() + 60 * 60 * 1000).toISOString()
+        drafts = [{ id: crypto.randomUUID(), title: '', startTime: startIso, endTime: endIso }]
+      }
       return {
-        content: '请确认要创建的时间盒',
+        content: drafts.every(d => d.title === '') ? '请填写时间盒信息' : '请确认要创建的时间盒',
         dataSnapshot: { items: drafts },
       }
     }
