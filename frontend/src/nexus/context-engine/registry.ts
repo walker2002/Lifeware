@@ -33,7 +33,11 @@ export async function resolveContext(
 ): Promise<unknown> {
   const cap = capabilities.get(capabilityId)
   if (!cap) {
-    throw new Error(`Context capability not found: "${capabilityId}"`)
+    const registered = Array.from(capabilities.keys())
+    throw new Error(
+      `Context capability not found: "${capabilityId}"。已注册: [${registered.join(', ')}]。` +
+      `请检查 ensureProvidersRegistered/registerAllProviders 是否调用（capability 未注册通常因对应 repo 未传入）。`,
+    )
   }
 
   if (requiredVisibility && cap.visibility !== requiredVisibility && cap.visibility !== 'system') {

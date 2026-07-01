@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { z } from 'zod'
 import {
   registerContextCapability,
@@ -60,6 +60,18 @@ describe('Context Registry', () => {
     registerContextCapability(makeCap('cap1', { items: [] }))
     registerContextCapability(makeCap('cap2', { items: [] }))
     expect(getRegisteredCapabilities()).toEqual(expect.arrayContaining(['cap1', 'cap2']))
+  })
+
+  describe('resolveContext error messages', () => {
+    afterEach(() => {
+      clearRegistry()
+    })
+
+    it('未注册 capability 时错误消息含已注册列表', async () => {
+      registerContextCapability(makeCap('existingTimeboxes', { items: [] }))
+      await expect(resolveContext('activeHabits', 'q', {})).rejects.toThrow(/activeHabits/)
+      await expect(resolveContext('activeHabits', 'q', {})).rejects.toThrow(/existingTimeboxes/)
+    })
   })
 
   it('handles concurrent calls to the same capability', async () => {
