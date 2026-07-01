@@ -23,7 +23,7 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-repo-adapter";
 import { createHabitsGenericRepo } from "@/domains/habits/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
-import { parseHabitWithAI } from "../../nexus/core/intent-engine/ai-parser";
+import { parseHabitWithAI, parseMultiTask } from "../../nexus/core/intent-engine/ai-parser";
 import type { AIParserResult } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
@@ -1134,6 +1134,55 @@ export async function parseHabitIntentOnly(rawInput: string): Promise<HabitParse
   } catch (err) {
     const message = err instanceof Error ? err.message : HABIT_ERRORS.PARSE_FAILED;
     return { success: false, error: message };
+  }
+}
+
+// ─── Timebox 多任务意图仅解析（[023-01+] dry-run Server Action）──
+
+/**
+ * [023-01+] 仅解析 timebox 多任务意图（不提交），返回 drafts 给 CNUI surface 预填。
+ *
+ * 与 submitBatchIntent 的区别：submitBatchIntent 解析后立即逐条提交；
+ * 本函数是 dry-run，仅返回 drafts 让用户在 CNUI 表单里编辑确认后再提交。
+ *
+ * 路由来源：use-intent-handler.ts:483+ hasPayload 分支检测
+ *   targetDomain === 'timebox' && targetAction === 'createTimebox'
+ * 时调用，避免 chat 路径走 submitIntent → parseWithAI（弱 systemPrompt）
+ * 的老 bug（模糊时间 / 含空格标题识别失败）。
+ *
+ * 复用 parseMultiTask（ai-parser.ts:383），MULTI_TASK_PROMPT 在 Commit 3
+ * 强化过「上午/下午/晚上」默认值 + few-shot 示例。
+ */
+export interface TimeboxBatchParseResult {
+  success: boolean
+  drafts?: Array<{ title: string; startTime: string; endTime: string; duration?: number }>
+  error?: string
+}
+
+export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<TimeboxBatchParseResult> {
+  try {
+    const intentionId = crypto.randomUUID() as USOM_ID
+    const aiRuntime = createAIRuntime()
+    const parseResult = await parseMultiTask(rawInput, intentionId, aiRuntime)
+
+    if (!parseResult.success || parseResult.intents.length === 0) {
+      return { success: false, error: parseResult.error ?? '未识别到有效的时间盒任务' }
+    }
+
+    const drafts = parseResult.intents.map((intent) => {
+      const f = intent.fields as Record<string, unknown>
+      return {
+        title: String(f.title ?? ''),
+        startTime: String(f.startTime ?? ''),
+        endTime: String(f.endTime ?? ''),
+        duration: typeof f.duration === 'number' ? f.duration : undefined,
+      }
+    })
+
+    return { success: true, drafts }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '解析失败'
+    return { success: false, error: message }
   }
 }
 
