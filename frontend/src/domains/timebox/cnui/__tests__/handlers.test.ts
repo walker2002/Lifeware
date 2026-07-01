@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { timeboxCnuiHandler } from '../handlers'
 import type { CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 
+// [023-01+] mock submitDynamicIntent（让 submit 测试可控）
+vi.mock('@/app/actions/intent', () => ({
+  submitDynamicIntent: vi.fn().mockResolvedValue({ success: true, object: { id: 'tb-x' } }),
+}))
+
 // Mock repositories 使用类构造函数
 vi.mock('@/domains/timebox/repository', () => ({
   TimeboxRepository: class {
@@ -194,6 +199,49 @@ describe('timeboxCnuiHandler', () => {
       const items = result.dataSnapshot.items as Array<{ id: string; title: string }>
       expect(items).toHaveLength(1)
       expect(items[0].title).toBe('')
+    })
+  })
+
+  describe('submit - createTimebox（[023-01+] 错误原因透传回归）', () => {
+    // [023-01+] RC-B 修复：handlers.submit 失败时 error 字符串拼接 failed[i].error
+    //   之前："1 条失败："（只显示 count + title，title 空 → 用户看不到原因）
+    //   现在："1 条失败：未命名（缺少必需字段: title）"（含 error 原因）
+    it('空 title 失败 → error 字符串应包含具体 error 原因', async () => {
+      // mock submitDynamicIntent 返回"缺少必需字段: title"失败
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      vi.mocked(submitDynamicIntent).mockResolvedValueOnce({
+        success: false,
+        timeboxes: [],
+        error: '缺少必需字段: title',
+      })
+
+      const result = await timeboxCnuiHandler.submit('createTimebox', {
+        items: [{ id: 'd1', title: '', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z' }],
+      })
+
+      expect(result.success).toBe(false)
+      // RC-B：error 字符串必须包含具体 error 原因，不能只显示 "1 条失败："
+      expect(result.error).toContain('缺少必需字段')
+      expect(result.error).toContain('title')
+      expect(result.error).not.toBe('1 条失败：')  // 旧 bug 行为
+    })
+
+    it('多条失败 → error 字符串拼接所有失败原因（分号分隔）', async () => {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      vi.mocked(submitDynamicIntent)
+        .mockResolvedValueOnce({ success: false, timeboxes: [], error: '缺少必需字段: title' })
+        .mockResolvedValueOnce({ success: false, timeboxes: [], error: 'endTime 必须晚于 startTime' })
+
+      const result = await timeboxCnuiHandler.submit('createTimebox', {
+        items: [
+          { id: 'd1', title: '', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z' },
+          { id: 'd2', title: 'B', startTime: '2026-07-01T12:00:00Z', endTime: '2026-07-01T11:00:00Z' },
+        ],
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('缺少必需字段')
+      expect(result.error).toContain('endTime 必须晚于 startTime')
     })
   })
 

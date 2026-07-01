@@ -212,7 +212,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
       return {
         success: failed.length === 0,
-        error: failed.length ? `${failed.length} 条失败：${failed.map(f => f.title).join('、')}` : undefined,
+        // [023-01+] RC-B 修复：error 字符串拼接 failed[i].error（具体原因）+ title（兜底）
+        //   之前："1 条失败："（title 空 → 用户完全看不到原因）
+        //   现在："1 条失败：未命名（缺少必需字段: title）"（用户能直接看到错误原因）
+        error: failed.length
+          ? `${failed.length} 条失败：${failed.map(f => `${f.title || '未命名'}（${f.error}）`).join('；')}`
+          : undefined,
         data: { count: succeeded.length, succeeded, failed },
       }
     }
