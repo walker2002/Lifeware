@@ -132,6 +132,11 @@ import { HabitRepository } from '@/domains/habits/repository/habit'
  * 从未注册，任何生成型路径 action 报 "Context capability not found"。
  * 由 orchestrator executeGenerativePath 入口调用（lazy + 幂等：仅生成型路径
  * 需要 capability，contract 路径不浪费）。
+ *
+ * ⚠️ 覆盖范围：仅 executeGenerativePath 入口。query 路径（executeQueryPath）
+ * 当前 manifest 无 query_actions 声明 capability，暂无即时问题；若未来
+ * query action 引用 capability，需在 executeQueryPath 入口也调
+ * ensureProvidersRegistered()（保持幂等，重复调用安全）。
  */
 let _providersRegistered = false
 export function ensureProvidersRegistered(): void {
