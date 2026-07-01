@@ -384,6 +384,7 @@ interface LLMMultiTaskResponse {
   tasks: Array<{
     title: string
     startTime?: string | null
+    endTime?: string | null
     duration?: number | null
     confidence: number
     incomplete?: boolean
@@ -434,11 +435,28 @@ export async function parseMultiTask(
     for (const task of parsed.tasks) {
       // 跳过不完整的任务
       if (task.incomplete || task.confidence < 0.5) continue
-      if (!task.title || !task.startTime || !task.duration) continue
+      if (!task.title || !task.startTime) continue
+
+      // [023-01+ v2] RC-2：duration 不再必需。
+      //   显式区间场景（如"21:00-23:00 外出看电影"）LLM 常返回 startTime+endTime
+      //   但漏掉 duration —— 之前 filter `!task.duration` 直接丢弃 → intents 空。
+      //   现在：缺 duration 时从 (endTime - startTime) 反推（分钟）。
+      let duration: number
+      if (task.duration) {
+        duration = task.duration
+      } else if (task.endTime) {
+        duration = Math.round(
+          (new Date(task.endTime).getTime() - new Date(task.startTime).getTime()) / 60000,
+        )
+      } else {
+        // 既无 duration 又无 endTime：无法确定时长，跳过
+        continue
+      }
+      if (!Number.isFinite(duration) || duration <= 0) continue
 
       // 计算 endTime
       const start = new Date(task.startTime)
-      start.setMinutes(start.getMinutes() + task.duration)
+      start.setMinutes(start.getMinutes() + duration)
       const endTime = start.toISOString()
 
       intents.push({
@@ -449,7 +467,7 @@ export async function parseMultiTask(
         fields: {
           title: task.title,
           startTime: task.startTime,
-          duration: task.duration,
+          duration,
           endTime,
         },
         confidence: task.confidence,

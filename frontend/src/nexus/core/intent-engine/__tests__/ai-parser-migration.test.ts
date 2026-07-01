@@ -220,6 +220,27 @@ describe('parseMultiTask (migrated to AIRuntime)', () => {
     expect(result.intents[0].fields.title).toBe('完成OKR计划')
   })
 
+  // [023-01+ v2] RC-2：显式区间场景，LLM 给了 startTime+endTime 但没给 duration
+  //   之前：filter `!task.duration` → 丢弃 → intents 空 → "所有子任务信息不完整"
+  //   修复：缺 duration 时从 (endTime - startTime) 反推
+  it('LLM 返回 startTime+endTime 但无 duration → 反推 duration，不丢弃', async () => {
+    const { parseMultiTask } = await import('../ai-parser')
+    const aiRuntime = createMockAIRuntime({
+      generate: {
+        content: { tasks: [
+          // 显式区间 21:00-23:00 = 120 分钟，但 LLM 没回 duration
+          { title: '外出看电影', startTime: '2026-07-01T21:00:00+08:00', endTime: '2026-07-01T23:00:00+08:00', confidence: 0.9 },
+        ] },
+      },
+    })
+    const result = await parseMultiTask('晚上 21:00-23:00 外出看电影', 'intention-791', aiRuntime)
+    expect(result.success).toBe(true)
+    expect(result.intents).toHaveLength(1)
+    expect(result.intents[0].fields.title).toBe('外出看电影')
+    // 反推 duration = 120 分钟
+    expect(result.intents[0].fields.duration).toBe(120)
+  })
+
   // [023-01+] prompt 内容断言：模糊时间默认值已写入 MULTI_TASK_PROMPT
   //   防止未来 prompt 改动无意间丢失规则
   it('MULTI_TASK_PROMPT 应包含模糊时间默认值规则', async () => {
