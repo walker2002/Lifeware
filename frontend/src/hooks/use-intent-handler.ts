@@ -23,6 +23,7 @@ import {
   resolveShortcut,
   fetchDomainActions,
   parseHabitIntentOnly,
+  parseTimeboxBatchIntentOnly,  // [023-01+] chat 路径 dry-run 入口
   openCnuiSurface,
   submitCnuiSurface,
   isCnuiSurface,
@@ -484,6 +485,41 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
           // 有附加内容 → AI 解析字段 → 在对话流内打开 CN-UI 表面
           setIsLoading(true)
           try {
+            // [023-01+] timebox 创建意图 → 走批量解析（强化过模糊时间 + 含空格标题）
+            //   路由条件：domain 解析为 timebox 且 action 是 createTimebox
+            //   之前：chat 路径只调 parseHabitIntentOnly，timebox 落空走 submitIntent
+            //         → parseWithAI（弱 systemPrompt，无 few-shot）→ 模糊时间/含空格失败
+            //   现在：直接调 parseTimeboxBatchIntentOnly → MULTI_TASK_PROMPT（Commit 3 强化）
+            if (
+              (resolvedDomainId === "timebox" || slashResult.domainId === "timebox") &&
+              slashResult.action === "createTimebox"
+            ) {
+              const tbParse = await parseTimeboxBatchIntentOnly(content)
+              if (tbParse.success && tbParse.drafts && tbParse.drafts.length > 0) {
+                const cnuiResult = await openCnuiSurface("timebox", "createTimebox", { drafts: tbParse.drafts })
+                const cnuiMsg: ChatMessage = {
+                  role: "assistant",
+                  content: `已识别 ${tbParse.drafts.length} 个时间盒，请确认：`,
+                  timestamp: new Date().toISOString(),
+                  cnuiSurface: cnuiResult.surface,
+                }
+                deps.addChatMessage(cnuiMsg)
+                setIsLoading(false)
+                return
+              }
+              // [023-01+] 解析失败/低 confidence/完全无关 → 显式提示，不 silent fall through
+              //   用户额外明确：判定指令内容与快捷方式完全无关，无法提取有效信息
+              //   应返回「请输入有效的时间盒标题和事件」
+              const errMsg: ChatMessage = {
+                role: "assistant",
+                content: "请输入有效的时间盒标题和事件",
+                timestamp: new Date().toISOString(),
+              }
+              deps.addChatMessage(errMsg)
+              setIsLoading(false)
+              return
+            }
+
             const habitParse = await parseHabitIntentOnly(content)
             if (
               habitParse.success &&
