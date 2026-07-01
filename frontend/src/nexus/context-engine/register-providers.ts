@@ -120,3 +120,26 @@ export function registerAllProviders(deps: ProviderDeps): void {
     provider: new EnergyCurveProvider(),
   })
 }
+
+import { TimeboxRepository } from '@/domains/timebox/repository'
+import { TaskRepository } from '@/domains/tasks/repository'
+import { HabitRepository } from '@/domains/habits/repository/habit'
+
+/**
+ * [023-01] 幂等保证 capability 已注册。
+ *
+ * registerAllProviders 原是死代码（零调用方），导致 6 个 capability provider
+ * 从未注册，任何生成型路径 action 报 "Context capability not found"。
+ * 由 orchestrator executeGenerativePath 入口调用（lazy + 幂等：仅生成型路径
+ * 需要 capability，contract 路径不浪费）。
+ */
+let _providersRegistered = false
+export function ensureProvidersRegistered(): void {
+  if (_providersRegistered) return
+  registerAllProviders({
+    timeboxRepo: new TimeboxRepository(),
+    taskRepo: new TaskRepository(),
+    habitRepo: new HabitRepository(),
+  })
+  _providersRegistered = true
+}

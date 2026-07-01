@@ -33,6 +33,7 @@ import { createEventBus } from '../infrastructure/event-bus'
 import { findDomain, findHandler, domainRegistry } from '@/domains/registry'
 import { buildActionMap, resolveObjectType, getLifecycleFromManifest } from './lifecycle-configs'
 import { assembleContext } from '@/nexus/context-engine'
+import { ensureProvidersRegistered } from '@/nexus/context-engine/register-providers'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 import { evaluateProposals } from '@/nexus/core/rule-engine'
 import { createAIRuntime } from '@/nexus/ai-runtime'
@@ -1054,6 +1055,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       _actionConfig: unknown,
     ): Promise<OrchestratorResult> {
       try {
+        // [023-01] 通电 capability 注册（lazy + 幂等）：registerAllProviders 原死代码
+        ensureProvidersRegistered()
+
         // ContextEngine 组装
         const ceStart = Date.now()
         trace(deps.onTrace, 'ContextEngine', 'start', { input: { intentId: intent.id, action: intent.action } })
