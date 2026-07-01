@@ -409,6 +409,12 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
             targetDomain: domainId,
             targetAction: action,
           })
+          // [023-01+ v3] CNUI 创建 timebox 成功后刷新时间盒列表，否则 Home/主面板
+          //   schedule 视图仍显旧数据（tb.timeboxes 不会自动失效）。对比 handleSubmit
+          //   已在 submitIntent 后调 loadTimeboxes；CNUI 路径之前漏了。
+          if (domainId === 'timebox') {
+            void deps.loadTimeboxes()
+          }
         } else {
           // [019.0] Lane B：失败仍发一条 system 消息（表单级可见），同时把字段级 errors 回传
           const msg: ChatMessage = {

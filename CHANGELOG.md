@@ -163,6 +163,18 @@
 - **问题1（/createTimebox 无输入）**：路由原语经复现确认**当前已正确**（matchShortcut 无 payload 时命中 timebox → openCnuiSurface → RC-C 空白 draft）。用户此前看到的校验报错为 dev server 未重启（Next.js server action 不热重载），修复后须重启 `npm run dev` 再测。
 - 测试：intent.test +4（resolveShortcut payload）/ ai-parser-migration.test +1（RC-2 duration 反推）/ time-input-helpers.test +8 = +13 PASS；vitest base 19 = head 18（零新增）；tsc 我改文件零新增。
 
+### [023-01+] v3 — CNUI 创建 timebox 后列表不刷新（误判"没保存"）
+> 2026_07_01 — 用户报"操作成功但查看时间盒没保存"。systematic-debugging + 真实 DB 集成实测确认
+> **落库路径正常**（submitDynamicIntent → DB 有行，/schedule 能查到），根因是 `handleCnuiConfirm`
+> 成功后**不刷新 `tb.timeboxes`**（对比 `handleSubmit` 会调 `loadTimeboxes`，CNUI 路径漏了）。
+> 导致用户点 Home/成长领域 查看时主面板仍显旧数据，误以为没保存。
+>
+> 另：CNUI 提交有"确定要保存吗？"二次确认框，须点「确认」才真正落库（之前 /browse 实测按 Escape
+> 会静默取消提交）。
+
+- **fix(hook)** `handleCnuiConfirm` 成功分支对 `domainId === 'timebox'` 调 `deps.loadTimeboxes()`，让 `tb.timeboxes` 即时刷新，Home/主面板 schedule 视图立刻反映新时间盒（无需整页刷新）。
+- /browse 实测：chat 创建 `ZZTEST-REFRESH-*` → "操作成功" → 点「回到主页」→ schedule 视图 DOM 含新标题（无 full reload）。tsc 零新增。
+
 ## Timebox / Activity Archetype（[023]）
 
 - 2026_06_30 — A3.3 habitsTemplates 硬删（消费者 → 生产者 → DB DROP，迁移 0027）
