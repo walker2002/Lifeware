@@ -139,6 +139,7 @@ lifecycle:
     transitions:
       - { from: null, to: draft, trigger: intent, action: create, event_type: CycleCreated }
       - { from: draft, to: not_started, trigger: intent, action: plan, event_type: CyclePlanned }
+      - { from: draft, to: in_progress, trigger: intent, action: start, event_type: CycleStarted }
       - { from: not_started, to: in_progress, trigger: intent, action: start, event_type: CycleStarted }
       - { from: in_progress, to: ended, trigger: intent, action: end, event_type: CycleEnded }
       - { from: ended, to: reviewed, trigger: intent, action: review, event_type: CycleReviewed }
