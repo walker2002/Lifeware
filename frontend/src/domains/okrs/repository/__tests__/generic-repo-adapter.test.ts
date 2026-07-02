@@ -33,6 +33,7 @@ function makeMockCycleRepo() {
     findById: vi.fn(),
     save: vi.fn(),
     updateFields: vi.fn(),
+    findByPeriod: vi.fn(),
   }
 }
 

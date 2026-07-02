@@ -30,6 +30,26 @@ export class CycleRepository {
   }
 
   /**
+   * 按自然键 (userId, periodStart, periodEnd) 查找 cycle。
+   * 供 adapter.cycle.create 前置查重使用，避免 onConflictDoUpdate 覆写已有 status。
+   */
+  async findByPeriod(
+    userId: USOM_ID,
+    periodStart: string,
+    periodEnd: string,
+    tx: DbClient = db,
+  ): Promise<Cycle | null> {
+    const rows = await tx.select().from(s.cycles)
+      .where(and(
+        eq(s.cycles.userId, userId),
+        eq(s.cycles.periodStart, periodStart),
+        eq(s.cycles.periodEnd, periodEnd),
+      ))
+      .limit(1)
+    return rows[0] ? cycleRowToUSOM(rows[0] as any) : null
+  }
+
+  /**
    * 保存 cycle（按自然键 upsert）。
    *
    * [022] 1A-T8：改按自然键 (user_id, period_start, period_end) 冲突更新，
@@ -40,10 +60,21 @@ export class CycleRepository {
    */
   async save(cycle: Cycle, userId: USOM_ID, tx: DbClient = db): Promise<Cycle> {
     const row = cycleUSOMToRow(cycle, userId)
-    const { id: _id, createdAt: _createdAt, ...rowWithoutIdAndCreatedAt } = row
+    // [022.01] iter 3 修复：onConflictDoUpdate 的 SET 子句必须排除生命周期字段
+    // (status/startedAt/endedAt/reviewedAt)，避免同自然键已有 in_progress cycle 被
+    // adapter.create 构造的 draft 降级。仅更新 name/cycleType/updatedAt 等可写字段。
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      status: _status,
+      startedAt: _startedAt,
+      endedAt: _endedAt,
+      reviewedAt: _reviewedAt,
+      ...rowWithoutLifecycle
+    } = row
     await tx.insert(s.cycles).values(row).onConflictDoUpdate({
       target: [s.cycles.userId, s.cycles.periodStart, s.cycles.periodEnd],
-      set: rowWithoutIdAndCreatedAt,
+      set: rowWithoutLifecycle,
     })
     // 按自然键回查，获取实际持久化的行（id 可能因冲突而不同于输入 cycle.id）
     const rows = await tx

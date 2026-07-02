@@ -8,7 +8,8 @@
  */
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
-import type { USOM_ID } from '@/usom/types/primitives'
+import type { USOM_ID, Timestamp, DateOnly } from '@/usom/types/primitives'
+import type { Cycle } from '@/usom/types/objects'
 import type { DbClient } from '@/lib/db'
 
 /**
@@ -34,6 +35,7 @@ interface OkrsRepoPair {
     findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
     save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    findByPeriod(userId: USOM_ID, periodStart: string, periodEnd: string, tx?: DbClient): Promise<Record<string, unknown> | null>
   }
 }
 
@@ -150,8 +152,28 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       async save(obj, userId, tx) {
         return repos.cycleRepo.save(obj, userId, tx)
       },
-      async create(_fields, _userId, _tx) {
-        throw new Error('Cycle 不支持通过 GenericRepo 创建，请使用 CycleRepository')
+      async create(fields, userId, tx) {
+        const now = new Date().toISOString() as Timestamp
+        const periodStart = fields.periodStart as string
+        const periodEnd = fields.periodEnd as string
+
+        // ⚠️ iter 3: 前置 SELECT 查重 —— 防止 onConflictDoUpdate 覆写已有 cycle 的 status
+        // 同自然键已存在 → 直接返回已有行（不写 DB），保护已有 cycle 不被降级为 draft
+        const existing = await repos.cycleRepo.findByPeriod(
+          userId, periodStart, periodEnd, tx,
+        )
+        if (existing) return existing
+
+        const cycle: Cycle = {
+          id: crypto.randomUUID() as USOM_ID,
+          cycleType: (fields.cycleType as Cycle['cycleType']) ?? 'custom',
+          name: (fields.name as string) ?? `${periodStart}~${periodEnd}`,
+          period: { start: periodStart as DateOnly, end: periodEnd as DateOnly },
+          status: 'draft', // manifest initial_state，强制 draft
+          createdAt: now,
+          updatedAt: now,
+        }
+        return repos.cycleRepo.save(cycle as unknown as Record<string, unknown>, userId, tx)
       },
       async updateStatus(_id, _toStatus, _userId, _tx) {
         throw new Error('Cycle 不支持通过 GenericRepo 状态转换')
