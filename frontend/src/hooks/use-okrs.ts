@@ -1,8 +1,12 @@
 /**
  * @file use-okrs
  * @brief OKR 管理 Hook
- * 
+ *
  * 提供 OKR 的增删改查等操作
+ *
+ * [022.01] Task 4：refresh 保留 ObjectiveStatus 签名以兼容 okr-list.tsx 等
+ * 独立的 OKR 列表页面；Cycle 状态筛选在 client 端（okr-workspace 调用方）
+ * 通过 filterObjectivesByCycleStatus 派生，不依赖 server 端 cycle 过滤。
  */
 
 "use client"
@@ -37,7 +41,15 @@ interface UseOKRsResult {
   objectives: Objective[]
   isLoading: boolean
   error: string | null
-  refresh: (status?: ObjectiveStatus) => Promise<void>
+  /**
+   * [022.01] Task 4：保留原签名（status?: ObjectiveStatus）以兼容
+   * okr-list.tsx 等独立 OKR 列表页面。Phase 2 的 Cycle 状态筛选
+   * 在 okr-workspace / okr-directory 端用纯函数 filterObjectivesByCycleStatus
+   * 做 client-side 过滤，未变更 server 端行为。
+   * 保留循环论点的 type-narrowing：参数名 cycleStatus 更准确，但接收
+   * ObjectiveStatus（保留向后兼容；okr-list 仍以 ObjectiveStatus 过滤）。
+   */
+  refresh: (cycleStatus?: ObjectiveStatus) => Promise<void>
   updateLocal: (id: string, updated: Objective) => void
   loadDetail: (id: string) => Promise<ObjectiveWithKR | null>
   create: (input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" }) => Promise<Objective | null>
@@ -75,11 +87,15 @@ export function useOKRs(): UseOKRsResult {
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [isLoadingCycles, setIsLoadingCycles] = useState(true)
 
-  const refresh = useCallback(async (status?: ObjectiveStatus) => {
+  const refresh = useCallback(async (cycleStatus?: ObjectiveStatus) => {
     try {
       setIsLoading(true)
       setError(null)
-      const result = await getObjectives(status)
+      // [022.01] Task 4：cycleStatus 沿用 ObjectiveStatus 透传给 server，
+      // 保留向后兼容（okr-list.tsx 等独立 OKR 列表页面的调用路径）。
+      // okr-workspace 的 Cycle 状态筛选由 client 端 filterObjectivesByCycleStatus
+      // 在 hook 返回后做派生，不依赖 server-side cycle 状态过滤。
+      const result = await getObjectives(cycleStatus)
       if (result.success && result.data) {
         setObjectives(result.data)
       } else {

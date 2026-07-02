@@ -4,6 +4,8 @@
  *
  * 整合 OKRDirectory（左侧目录）+ OKRPanel（右侧详情/编辑）+ 周期抽屉与删除确认。
  * [024] G1 wiring：周期创建抽屉、目标添加到指定周期、删除周期确认、目标状态菜单。
+ * [022.01] Task 4：statusFilter 改为 Cycle['status'] | "all"，按 parent cycle
+ * 状态过滤 objectives（复用 okr-directory 导出的 filterObjectivesByCycleStatus）。
  */
 
 "use client"
@@ -11,8 +13,8 @@
 import { useState, useCallback, useEffect } from "react"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { ObjectiveStatus } from "@/usom/types/primitives"
-import { OKRDirectory } from "./okr-directory"
+import type { Cycle, Objective } from "@/usom/types/objects"
+import { OKRDirectory, filterObjectivesByCycleStatus } from "./okr-directory"
 import { OKRPanel } from "./okr-panel"
 import { useOKRs } from "@/hooks/use-okrs"
 import type { OKRFormFields } from "./okr-form"
@@ -50,7 +52,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   // 避免 useEffect 触发的 1-frame 闪烁。
   const [selectedId, setSelectedId] = useState<string | null>(initialDetailId ?? null)
   const [mode, setMode] = useState<PanelMode>("empty")
-  const [statusFilter, setStatusFilter] = useState<ObjectiveStatus | "all">("all")
+  const [statusFilter, setStatusFilter] = useState<Cycle["status"] | "all">("all")
   const [detailData, setDetailData] = useState<ObjectiveWithKR | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -60,9 +62,13 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null)
   const [deleteCycleTarget, setDeleteCycleTarget] = useState<string | null>(null)
 
-  const filteredObjectives = statusFilter === "all"
-    ? hook.objectives.filter(o => o.status !== "archived")
-    : hook.objectives.filter(o => o.status === statusFilter)
+  // [022.01] Task 4：按 parent cycle 状态筛选（语义与 okr-directory 一致）。
+  // archived objective 一律不展示；其余按 cycle.status 过滤。
+  const filteredObjectives: Objective[] = filterObjectivesByCycleStatus(
+    hook.objectives.filter((o) => o.status !== "archived"),
+    hook.cycles,
+    statusFilter,
+  )
 
   const handleSelect = useCallback(async (id: string) => {
     setSelectedId(id)

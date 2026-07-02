@@ -2,10 +2,11 @@
  * @file okr-directory
  * @brief OKR 工作台左侧目录（周期-目标二级树 + ⋯ 菜单 + 折叠/展开）
  *
- * 重构要点（[024] G1 + [024.1] T1）：
+ * 重构要点（[024] G1 + [024.1] T1 + [022.01] T4）：
  *  - 顶层节点由 Cycle 驱动（不再是按 objective.period 派生的字符串分组）
  *  - 每个 cycle 下挂载 objectives.filter(o => o.cycleId === cycle.id)
- *  - 状态筛选作用于目标层（cycle 始终展示）
+ *  - 顶部筛选 tabs：[022.01] Task 4 改为 Cycle 状态（draft/not_started/in_progress/ended/reviewed）；
+ *    筛选作用于 parent cycle 状态，voice D8：非匹配 cycle 不渲染（解决 (0) 空卡问题）
  *  - 周期 ⋯：添加目标 / 删除周期（有目标时禁用）
  *  - 目标 ⋯：按状态显示动作（暂停/完成/废弃/恢复/归档）
  *  - 周期折叠：默认展开「含 active 目标」的周期；其他收起；点击 ChevronDown/Right 切换
@@ -14,6 +15,8 @@
  *  - 移除了 getPeriodGroupKey（旧实现用 objective.period 派生分组键；现在以 cycle 为权威）
  *  - 顶部按钮 +新建 → +OKR周期（onCreateCycleClick）
  *  - 列表区域单击目标行触发 onSelect(id)
+ *  - [022.01] Task 4：filterObjectivesByCycleStatus 为导出 pure function，
+ *    给 okr-workspace 复用 + 测试用例断言；cycles / objectives 同时按 cycle.status 过滤
  */
 
 "use client"
@@ -30,12 +33,15 @@ import { Button } from "@/components/ui/button"
 import type { Cycle, Objective } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 
+type CycleStatus = Cycle["status"]
+type CycleFilter = CycleStatus | "all"
+
 interface OKRDirectoryProps {
   cycles: Cycle[]
   objectives: Objective[]
   selectedId: string | null
-  statusFilter: ObjectiveStatus | "all"
-  onStatusFilterChange: (filter: ObjectiveStatus | "all") => void
+  statusFilter: CycleFilter
+  onStatusFilterChange: (filter: CycleFilter) => void
   onSelect: (id: string) => void
   onCreateCycleClick?: () => void
   onAddObjectiveToCycle?: (cycleId: string) => void
@@ -45,14 +51,37 @@ interface OKRDirectoryProps {
   onImport?: () => void
 }
 
-const STATUS_TABS: { key: ObjectiveStatus | "all"; label: string }[] = [
+// [022.01] Task 4：顶部筛选 tabs 改为 Cycle 状态。
+// 筛选作用于 objective 所属 cycle 的状态，而非 objective 自身状态
+// （voice D8：非匹配 cycle 不应显示为 (0) 空卡）。
+const CYCLE_STATUS_TABS: { key: CycleFilter; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "draft", label: "草稿" },
-  { key: "active", label: "进行中" },
-  { key: "paused", label: "已暂停" },
-  { key: "completed", label: "已完成" },
-  { key: "discarded", label: "已废弃" },
+  { key: "not_started", label: "未开始" },
+  { key: "in_progress", label: "进行中" },
+  { key: "ended", label: "已结束" },
+  { key: "reviewed", label: "已复盘" },
 ]
+
+/**
+ * [022.01] Task 4：按 parent cycle 状态筛选 objectives（pure function，便于测试）。
+ *
+ * @param objectives - 所有 objective（含不同 cycle）
+ * @param cycles - 所有 cycle（用于查 cycle.status）
+ * @param filter - "all" 保留所有；否则仅保留 cycle.status === filter 的 objective
+ * @returns 过滤后的 objective 列表
+ */
+export function filterObjectivesByCycleStatus(
+  objectives: Objective[],
+  cycles: Cycle[],
+  filter: CycleFilter,
+): Objective[] {
+  if (filter === "all") return objectives
+  const matchedCycleIds = new Set(
+    cycles.filter((c) => c.status === filter).map((c) => c.id),
+  )
+  return objectives.filter((o) => matchedCycleIds.has(o.cycleId))
+}
 
 type ObjectiveAction = "pause" | "complete" | "discard" | "resume" | "archive"
 
@@ -135,7 +164,7 @@ export function OKRDirectory({
       </div>
 
       <div className="flex gap-1 flex-wrap">
-        {STATUS_TABS.map(tab => (
+        {CYCLE_STATUS_TABS.map(tab => (
           <button key={tab.key} type="button"
             onClick={() => onStatusFilterChange(tab.key)}
             className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
@@ -155,11 +184,15 @@ export function OKRDirectory({
       )}
 
       <div className="space-y-3">
-        {cycles.map(cycle => {
-          const cycleObjectives = objectives.filter(
-            o => o.cycleId === cycle.id && (statusFilter === "all" || o.status === statusFilter)
-          )
-          const hasObjectives = cycleObjectives.length > 0
+        {cycles
+          // [022.01] Task 4：cycles 也按 cycle.status 过滤，
+          // 非匹配 cycle 不显示（解决 voice D8「(0) 空卡」问题）。
+          .filter(cycle => statusFilter === "all" || cycle.status === statusFilter)
+          .map(cycle => {
+            const cycleObjectives = objectives.filter(
+              o => o.cycleId === cycle.id
+            )
+            const hasObjectives = cycleObjectives.length > 0
           const isCollapsed = collapsedCycleIds.has(cycle.id)
           return (
             <div key={cycle.id}>

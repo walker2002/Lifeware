@@ -14,7 +14,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { OKRDirectory } from '../okr-directory'
+import { OKRDirectory, filterObjectivesByCycleStatus } from '../okr-directory'
 
 const cycles = [{ id: 'c1', name: '2026 Q3', period: { start: '2026-07-01', end: '2026-09-30' } }] as any
 const objectives = [{ id: 'o1', title: '提升质量', cycleId: 'c1', status: 'active', objectiveNumber: 'O1' }] as any
@@ -107,5 +107,47 @@ describe('[024.1] OKRDirectory 周期折叠', () => {
     await user.click(screen.getByLabelText('展开周期'))
     expect(screen.getByText('已完成目标')).toBeInTheDocument()
     expect(screen.getByLabelText('收起周期')).toBeInTheDocument()
+  })
+})
+
+/**
+ * [022.01] Task 4: 顶部筛选 tabs 改为 Cycle 状态
+ *  - 筛选作用于 objective 所属 cycle 的状态，而非 objective 自身状态
+ *  - statusFilter="all" → 显示所有 objective
+ *  - statusFilter="in_progress" → 只显示 cycle.status==="in_progress" 的 objective
+ */
+describe('[022.01] OKRDirectory filterObjectivesByCycleStatus 按 cycle 状态筛选', () => {
+  const cInProgress = {
+    id: 'c1',
+    name: '2026 Q3 进行中',
+    status: 'in_progress',
+    period: { start: '2026-07-01', end: '2026-09-30' },
+  } as any
+  const cDraft = {
+    id: 'c2',
+    name: '2026 Q4 草稿',
+    status: 'draft',
+    period: { start: '2026-10-01', end: '2026-12-31' },
+  } as any
+  // 注意：objective 的 status 与所属 cycle 的 status 解耦：
+  //  - inProgress cycle 下挂一个 active objective + 一个 paused objective
+  //  - draft cycle 下挂一个 draft objective
+  const objs = [
+    { id: 'o1', title: 'Active 目标 (in_progress cycle)', cycleId: 'c1', status: 'active' },
+    { id: 'o2', title: 'Paused 目标 (in_progress cycle)', cycleId: 'c1', status: 'paused' },
+    { id: 'o3', title: 'Draft 目标 (draft cycle)', cycleId: 'c2', status: 'draft' },
+  ] as any
+
+  it('statusFilter="in_progress" → 只显示对应 cycle 下的 objectives（无论 objective 自身 status）', () => {
+    const result = filterObjectivesByCycleStatus(objs, [cInProgress, cDraft], 'in_progress')
+    expect(result.map((o: any) => o.id).sort()).toEqual(['o1', 'o2'])
+    expect(result.find((o: any) => o.id === 'o1')).toBeDefined()
+    expect(result.find((o: any) => o.id === 'o2')).toBeDefined()
+    expect(result.find((o: any) => o.id === 'o3')).toBeUndefined()
+  })
+
+  it('statusFilter="all" → 显示所有 objectives（所有 cycle 下挂的都包含）', () => {
+    const result = filterObjectivesByCycleStatus(objs, [cInProgress, cDraft], 'all')
+    expect(result.map((o: any) => o.id).sort()).toEqual(['o1', 'o2', 'o3'])
   })
 })
