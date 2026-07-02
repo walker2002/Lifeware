@@ -13,40 +13,38 @@ import { resolve } from 'node:path'
 const FILES = ['okr.ts', 'okr-import.ts']
 
 /**
- * 例外白名单：仅限单行 upsert 且无跨表副作用的写操作
- * - createCycle: Cycle 自然键 upsert（userId+periodStart+periodEnd），
- *   无 KR recompute、无 event fan-out
+ * 例外白名单：空。[022.01] Phase 1 退役 createCycle 旧例外——
+ * createCycle 已改走 executeIntent，不再需要直写豁免。
  */
-const ALLOWED_DIRECT_WRITES: Array<{ file: string; method: string; reason: string }> = [
-  { file: 'okr.ts', method: 'createCycle', reason: 'Cycle 单行 upsert，无跨表副作用' },
-]
+const ALLOWED_DIRECT_WRITES: Array<{ file: string; method: string; reason: string }> = []
+
+/**
+ * 剥离块注释 + 行注释，避免 JSDoc 示例方法名（如「ContentField → repo.updateFields」）
+ * 中的示例误判为真实调用。顺序很重要：先剥块注释，再剥行注释。
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n')
+}
 
 describe('[022] OKR 写入口守卫（action 层无 repo 直写）', () => {
   for (const f of FILES) {
     it(`app/actions/${f} 无 .save/.updateProgress/.updateFields 直写`, () => {
       const src = readFileSync(resolve(__dirname, '../../../app/actions', f), 'utf8')
+      const code = stripComments(src)
 
-      // [Review fix 2026-06-26] 先剥离 /* ... */ 块注释，再过滤 // 行注释，
-      // 避免 JSDoc 多行块注释（如「ContentField → repo.updateFields」示例）
-      // 中的示例方法名误判为真实调用。顺序很重要：先剥块注释，再剥行注释。
-      const code = src
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .split('\n')
-        .filter((l) => !l.trim().startsWith('//'))
-        .join('\n')
+      // allow-list 为空，无需剥离
+      expect(code).not.toMatch(/\.(save|updateProgress|updateFields)\s*\(/)
+    })
 
-      // 识别 allow-list 中的函数体内的 .save 调用（其他写路径仍必须走 mutation-service）
-      const allowsForFile = ALLOWED_DIRECT_WRITES.filter((a) => a.file === f)
-      const codeWithoutAllows = allowsForFile.reduce((acc, allow) => {
-        // 粗略地从对应函数体内删除 .save 调用（基于函数签名识别）
-        const re = new RegExp(
-          `(export\\s+async\\s+function\\s+${allow.method}[\\s\\S]*?)(\\.(save|updateProgress|updateFields)\\s*\\()`,
-          'g',
-        )
-        return acc.replace(re, '$1/* allow-listed: ' + allow.reason + ' */(')
-      }, code)
-
-      expect(codeWithoutAllows).not.toMatch(/\.(save|updateProgress|updateFields)\s*\(/)
+    // [022.01] 新增：.insert(s.cycles) 拦截（精准拦截 findOrCreateCycle 类直写）
+    it(`app/actions/${f} 无 .insert(s.cycles) 直写`, () => {
+      const src = readFileSync(resolve(__dirname, '../../../app/actions', f), 'utf8')
+      const code = stripComments(src)
+      expect(code).not.toMatch(/\.insert\(\s*s\.cycles\s*\)/)
     })
   }
 })
