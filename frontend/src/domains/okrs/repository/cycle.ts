@@ -132,4 +132,54 @@ export class CycleRepository {
     return deleted.length
   }
 
+  /**
+   * 更新周期状态（[022.01] Phase 2：供 SM 状态转换持久化使用）。
+   *
+   * CycleRepository.save 的 onConflictDoUpdate SET 排除了 status 等生命周期字段
+   * （Phase 1 iter 3 防降级），因此状态更新必须走独立的 UPDATE 路径。
+   *
+   * 时间戳规则（按 manifest cycle lifecycle transitions）：
+   * - in_progress → startedAt = now
+   * - ended → endedAt = now（保留已有 startedAt）
+   * - reviewed → reviewedAt = now（保留已有 startedAt/endedAt）
+   * - draft/not_started → 无特殊时间戳（仅 updatedAt）
+   *
+   * @param id - 周期 ID
+   * @param status - 目标状态（draft | not_started | in_progress | ended | reviewed）
+   * @param userId - 用户 ID（多租户 T-02）
+   * @param tx - 可选事务句柄
+   * @returns 更新后的完整 Cycle
+   */
+  async updateStatus(
+    id: USOM_ID,
+    status: Cycle['status'],
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<Cycle> {
+    const existing = await this.findById(id, userId, tx)
+    if (!existing) throw new Error(`Cycle ${id} not found`)
+
+    const now = new Date()
+    const updates: Record<string, unknown> = {
+      status,
+      updatedAt: now,
+    }
+    if (status === 'in_progress') updates.startedAt = now
+    if (status === 'ended') updates.endedAt = now
+    if (status === 'reviewed') updates.reviewedAt = now
+
+    await tx.update(s.cycles)
+      .set(updates)
+      .where(and(eq(s.cycles.id, id), eq(s.cycles.userId, userId)))
+
+    return {
+      ...existing,
+      status,
+      updatedAt: now.toISOString() as Timestamp,
+      ...(status === 'in_progress' && { startedAt: now.toISOString() as Timestamp }),
+      ...(status === 'ended' && { endedAt: now.toISOString() as Timestamp }),
+      ...(status === 'reviewed' && { reviewedAt: now.toISOString() as Timestamp }),
+    }
+  }
+
 }

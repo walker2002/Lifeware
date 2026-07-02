@@ -34,6 +34,7 @@ interface OkrsRepoPair {
   cycleRepo: {
     findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
     save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    updateStatus(id: USOM_ID, status: Cycle['status'], userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     findByPeriod(userId: USOM_ID, periodStart: string, periodEnd: string, tx?: DbClient): Promise<Record<string, unknown> | null>
   }
@@ -175,8 +176,13 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
         }
         return repos.cycleRepo.save(cycle as unknown as Record<string, unknown>, userId, tx)
       },
-      async updateStatus(_id, _toStatus, _userId, _tx) {
-        throw new Error('Cycle 不支持通过 GenericRepo 状态转换')
+      async updateStatus(id, toStatus, userId, tx) {
+        return repos.cycleRepo.updateStatus(
+          id as USOM_ID,
+          toStatus as Cycle['status'],
+          userId,
+          tx,
+        ) as Promise<Record<string, unknown>>
       },
       async updateFields(id, fields, userId, tx) {
         return repos.cycleRepo.updateFields(id, fields, userId, tx)
