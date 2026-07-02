@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_07_02 (refactor)**：[022.01] Phase 3 — 移除 Objective/KR 独立状态 — `objectives` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_objectives_user_status` 索引；`key_results` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_key_results_user_status` 索引。状态权威迁移至 `cycles.status`（§4.0）。迁移：idx=30（待 Task 6 落地）。`findAll` 过滤逻辑变更：`ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`。`paused` 语义永久丢失（迁移有损可接受）
 - **2026_06_30 (refactor)**：[023] A3.2 UI 层接入 — `tasks.activity_archetype_id` / `habits.activity_archetype_id` 列说明补「UI 层已接入（CNUI 表单 + 详情只读）；FK ON DELETE SET NULL → 详情行整块不渲染（M3）」
 - **2026_06_26 (refactor)**：OKR Domain 重组 [022] Tier-2 文档先行 — 新增 §4.0 `cycles` 表（OKR 周期一级对象，cycle_type/status/period_start/period_end/三时间戳，健康度读时聚合不落库）；`objectives` 表删除 `period_type`/`period_start`/`period_end` 三列 + `check_objectives_period_end_after_start` 约束 + `idx_objectives_period` 索引，新增 `cycle_id uuid NOT NULL REFERENCES cycles(id) ON DELETE RESTRICT` + `idx_objectives_cycle` 索引；周期信息上移至 cycles 表，Objective 经 cycle_id 归属；§11.2 映射表补 `Objective.cycleId` 与 `Objective.period`（派生）说明
 - **2026_06_26 (refactor)**：[022] Phase 2 — 新增 §4.3 contributions 表（KR 贡献记录 junction）；§4.5 habits 表移除 `key_result_id` 列与 `idx_habits_key_result` 索引
@@ -319,7 +320,11 @@ CREATE INDEX idx_cycles_period ON cycles(user_id, period_start, period_end);
 
 ### 4.1 objectives（目标表）
 
-对应 USOM `Objective`。
+对应 USOM `Objective`（v2 — since 2026-07-02: removed status column）。
+
+> **v2 变更（2026-07-02，[022.01] Phase 3）**：移除 `status text` 列与 `status` CHECK 约束，同步移除 `idx_objectives_user_status` 索引。状态权威已迁移至 `cycles.status`（§4.0）。迁移：idx=30（待 Task 6 落地）。
+>
+> **`findAll` 过滤逻辑变更**：原 `ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`（discard 同步被排除，对齐 USOM 软删除语义）。
 
 ```sql
 CREATE TABLE objectives (
@@ -328,7 +333,7 @@ CREATE TABLE objectives (
   schema_version integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status      text not null check (status in ('draft', 'active', 'paused', 'completed', 'discarded', 'archived')),
+  -- [022.01] Phase 3：移除 status 列（迁移 idx=30）
   okr_type    text not null default 'committed' check (okr_type in ('visionary', 'committed')),
   title       text not null,
   description text,
@@ -355,7 +360,7 @@ CREATE TABLE objectives (
 );
 
 -- 索引
-CREATE INDEX idx_objectives_user_status ON objectives(user_id, status) where archived_at is null;
+-- [022.01] Phase 3：移除 idx_objectives_user_status（迁移 idx=30）
 CREATE INDEX idx_objectives_cycle ON objectives(user_id, cycle_id);
 CREATE INDEX idx_objectives_parent ON objectives(parent_id) where parent_id is not null;
 ```
@@ -366,7 +371,11 @@ CREATE INDEX idx_objectives_parent ON objectives(parent_id) where parent_id is n
 
 ### 4.2 key_results（关键结果表）
 
-对应 USOM `KeyResult`。
+对应 USOM `KeyResult`（v2 — since 2026-07-02: removed status column）。
+
+> **v2 变更（2026-07-02，[022.01] Phase 3）**：移除 `status text` 列与 `status` CHECK 约束，同步移除 `idx_key_results_user_status` 索引。完成语义由 `progress_rate` 承载（`progress_rate >= 1.0` → `completed_at` 自动设置）。迁移：idx=30（待 Task 6 落地）。
+>
+> **`findAll` 过滤逻辑变更**：原 `ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`（discard 同步被排除，对齐 USOM 软删除语义）。
 
 ```sql
 CREATE TABLE key_results (
@@ -375,7 +384,7 @@ CREATE TABLE key_results (
   schema_version integer not null default 1,
 
   -- 查询关键字段（独立列）
-  status       text not null check (status in ('draft', 'active', 'paused', 'completed', 'discarded', 'archived')),
+  -- [022.01] Phase 3：移除 status 列（迁移 idx=30）
   objective_id uuid not null references objectives(id) on delete cascade,
   title        text not null,
   description  text,
@@ -401,7 +410,7 @@ CREATE TABLE key_results (
 );
 
 -- 索引
-CREATE INDEX idx_key_results_user_status ON key_results(user_id, status);
+-- [022.01] Phase 3：移除 idx_key_results_user_status（迁移 idx=30）
 CREATE INDEX idx_key_results_objective ON key_results(objective_id);
 CREATE INDEX idx_key_results_due_date ON key_results(user_id, due_date) where due_date is not null;
 
