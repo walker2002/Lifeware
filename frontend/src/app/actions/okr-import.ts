@@ -10,8 +10,7 @@
 import type { ParsedObjective, ImportReport, ImportResult, SaveImportResult } from "@/lib/okr-import/types"
 import { renderOKRsToMarkdown, parseOKRMarkdown } from "@/lib/okr-import/markdown-parser"
 import { createAIRuntime } from "@/nexus/ai-runtime"
-import { createObjective, createKeyResult } from "./okr"
-import { CycleRepository } from "@/domains/okrs/repository/cycle"
+import { createObjective, createKeyResult, createCycle } from "./okr"
 
 /** MVP 阶段固定用户 ID（与 actions/okr.ts 一致） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -162,22 +161,28 @@ export async function saveImportedOKRs(markdown: string): Promise<SaveImportResu
       return { success: false, error: criticalErrors.join('；') }
     }
 
-    const cycleRepo = new CycleRepository()
     let savedCount = 0
     for (const okr of okrs) {
       const periodType = okr.periodType ?? inferPeriodType(okr.periodStart!, okr.periodEnd!)
-      // [024.2] 导入创建的周期必须为 in_progress：左侧目录只渲染 in_progress 周期，
-      // 若用默认 draft，导入的目标会挂到不可见周期下 → "保存后什么都看不到"。
-      // 与 CycleCreateDrawer（手动建周期 status="in_progress"）对齐。
-      // 边界：findOrCreateCycle 按自然键 (userId,period) 幂等查找，命中已有 draft 周期时
-      // 原样返回不提升。若 prod 存在历史导入遗留的同周期 draft 周期，部署前需一次性 repair：
-      //   UPDATE cycles SET status='in_progress'
-      //   WHERE status='draft' AND EXISTS (SELECT 1 FROM objectives o WHERE o.cycle_id = cycles.id);
-      const cycle = await cycleRepo.findOrCreateCycle(
-        MVP_USER_ID, periodType, okr.periodStart!, okr.periodEnd!, 'in_progress',
-      )
+      // [022.01] Phase 1 Task 3：cycle 创建改走 createCycle server action（executeIntent → SM create→draft），
+      // 退役 [024.2] 临时修复（in_progress 硬编码）。目录可见性后续由 Task 5（draft→in_progress transition）
+      // 与 Task 6（CycleCreateDrawer draft 文案）一并解决。
+      // Cycle.cycleType 枚举仅允许 annual/quarterly/monthly/semi_annual/custom——'weekly' 映射为 'custom'。
+      const cycleType = (['annual', 'quarterly', 'monthly', 'semi_annual'] as const).includes(periodType as any)
+        ? periodType
+        : 'custom'
+      const cycleResult = await createCycle({
+        cycleType,
+        name: `${okr.periodStart}~${okr.periodEnd}`,
+        periodStart: okr.periodStart!,
+        periodEnd: okr.periodEnd!,
+      })
+      if (!cycleResult.success || !cycleResult.data) {
+        return { success: false, error: `创建周期失败: ${cycleResult.error ?? '未知错误'}` }
+      }
+      const cycleId = cycleResult.data.id
       const objResult = await createObjective({
-        cycleId: cycle.id,
+        cycleId,
         title: okr.title,
         description: okr.description,
         okrType: okr.okrType ?? 'committed',
