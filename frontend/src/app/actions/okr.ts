@@ -13,6 +13,7 @@ import type { ObjectiveStatus } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";
+import { assertEditable } from "@/domains/okrs/guard";
 import { createOkrsMutationService } from "./okrs/mutation-service";
 import { createOKROrchestrator, makeIntent } from "@/domains/okrs/wiring";
 import type { USOM_ID } from "@/usom/types/primitives";
@@ -157,6 +158,12 @@ export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void
   try {
     const objRepo = new ObjectiveRepository();
     const cycleRepo = new CycleRepository();
+    // [022.01] Phase 2 — 权限守卫：仅 draft 状态可删除
+    // 若 cycle 已不存在（null），不阻断：后续 deleted===0 检查已覆盖
+    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (cycle) {
+      assertEditable(cycle, 'delete_cycle');
+    }
     const objs = await objRepo.findByCycleId(cycleId, MVP_USER_ID);
     if (objs.length > 0) {
       return { success: false, error: "周期下仍有目标，请先处理后再删除" };
