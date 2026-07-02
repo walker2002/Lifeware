@@ -1,3 +1,11 @@
+/**
+ * @file okr-import-panel
+ * @brief OKR 模板导入后的编辑/保存面板
+ *
+ * 代码视图直接展示整个 Markdown（无分页）：textarea 固定 60vh 高度 + 内部滚动，
+ * 取代旧的「上一个/下一个 目标」目标级翻页导航。底部仅保留 取消 / 保存全部。
+ */
+
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
@@ -14,42 +22,14 @@ interface OKRImportPanelProps {
 export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OKRImportPanelProps) {
   const [markdown, setMarkdown] = useState(initialMarkdown)
   const [viewMode, setViewMode] = useState<'code' | 'preview'>('code')
-  const [currentObjIndex, setCurrentObjIndex] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // 保存按钮标签与禁用态依赖的目标数（## Objective: 计数）
   const objectiveCount = useMemo(() => {
     const matches = markdown.match(/^## Objective:/gm)
     return matches ? matches.length : 0
   }, [markdown])
-
-  const handlePrev = () => {
-    setCurrentObjIndex(Math.max(0, currentObjIndex - 1))
-    scrollToObjective(currentObjIndex - 1)
-  }
-
-  const handleNext = () => {
-    setCurrentObjIndex(Math.min(objectiveCount - 1, currentObjIndex + 1))
-    scrollToObjective(currentObjIndex + 1)
-  }
-
-  const scrollToObjective = (index: number) => {
-    const textarea = document.querySelector<HTMLTextAreaElement>('[data-okr-import-editor]')
-    if (!textarea) return
-
-    const lines = markdown.split('\n')
-    const totalLines = lines.length
-    let objCount = -1
-    for (let i = 0; i < totalLines; i++) {
-      if (lines[i].startsWith('## Objective:')) {
-        objCount++
-        if (objCount === index) {
-          textarea.scrollTop = (i / totalLines) * textarea.scrollHeight
-          break
-        }
-      }
-    }
-  }
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -109,14 +89,14 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
         </button>
       </div>
 
-      {/* 编辑器/预览区 */}
+      {/* 编辑器/预览区：代码视图固定 60vh，内部滚动浏览整个 .md */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {viewMode === 'code' ? (
           <textarea
             data-okr-import-editor
             value={markdown}
             onChange={e => setMarkdown(e.target.value)}
-            className="w-full max-h-[60vh] p-3 rounded-md border font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring overflow-y-auto"
+            className="w-full h-[60vh] p-3 rounded-md border font-mono text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring overflow-y-auto"
             placeholder="OKR Markdown 内容..."
           />
         ) : (
@@ -133,28 +113,14 @@ export function OKRImportPanel({ initialMarkdown, report, onSave, onCancel }: OK
         </div>
       )}
 
-      {/* 底部操作栏 */}
-      <div className="border-t px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentObjIndex <= 0}>
-            ← 上一个
-          </Button>
-          <span className="text-xs text-muted-foreground min-w-[4rem] text-center">
-            {objectiveCount > 0 ? `目标 ${currentObjIndex + 1}/${objectiveCount}` : '目标 0/0'}
-          </span>
-          <Button variant="outline" size="sm" onClick={handleNext} disabled={currentObjIndex >= objectiveCount - 1}>
-            下一个 →
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={isSaving}>
-            取消
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || objectiveCount === 0}>
-            {isSaving ? '保存中...' : `保存全部 (${objectiveCount})`}
-          </Button>
-        </div>
+      {/* 底部操作栏：仅取消 / 保存全部（已取消目标级分页导航） */}
+      <div className="border-t px-4 py-3 flex items-center justify-end gap-2">
+        <Button variant="outline" onClick={onCancel} disabled={isSaving}>
+          取消
+        </Button>
+        <Button onClick={handleSave} disabled={isSaving || objectiveCount === 0}>
+          {isSaving ? '保存中...' : `保存全部 (${objectiveCount})`}
+        </Button>
       </div>
     </div>
   )

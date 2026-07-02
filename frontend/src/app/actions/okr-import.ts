@@ -166,8 +166,15 @@ export async function saveImportedOKRs(markdown: string): Promise<SaveImportResu
     let savedCount = 0
     for (const okr of okrs) {
       const periodType = okr.periodType ?? inferPeriodType(okr.periodStart!, okr.periodEnd!)
+      // [024.2] 导入创建的周期必须为 in_progress：左侧目录只渲染 in_progress 周期，
+      // 若用默认 draft，导入的目标会挂到不可见周期下 → "保存后什么都看不到"。
+      // 与 CycleCreateDrawer（手动建周期 status="in_progress"）对齐。
+      // 边界：findOrCreateCycle 按自然键 (userId,period) 幂等查找，命中已有 draft 周期时
+      // 原样返回不提升。若 prod 存在历史导入遗留的同周期 draft 周期，部署前需一次性 repair：
+      //   UPDATE cycles SET status='in_progress'
+      //   WHERE status='draft' AND EXISTS (SELECT 1 FROM objectives o WHERE o.cycle_id = cycles.id);
       const cycle = await cycleRepo.findOrCreateCycle(
-        MVP_USER_ID, periodType, okr.periodStart!, okr.periodEnd!
+        MVP_USER_ID, periodType, okr.periodStart!, okr.periodEnd!, 'in_progress',
       )
       const objResult = await createObjective({
         cycleId: cycle.id,
