@@ -5,6 +5,7 @@
  * 整合 OKRDirectory（左侧目录）+ OKRPanel（右侧详情/编辑）+ 周期抽屉与删除确认。
  * [024] G1 wiring：周期创建抽屉、目标添加到指定周期、删除周期确认、目标状态菜单。
  * [022.01] Task 4：statusFilter 改为 Cycle['status'] | "all"，按 parent cycle
+ * [022.01] Task 5：传入 onCycleApproved/onCycleEnded/onCycleReviewed 回调触发 refresh
  * 状态过滤 objectives（复用 okr-directory 导出的 filterObjectivesByCycleStatus）。
  */
 
@@ -242,6 +243,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
         className="shrink-0 overflow-y-auto min-h-0 lw-scrollbar-thin"
         style={{ width: leftWidth }}
       >
+        {/* [022.01] Task 5：周期状态变更后回调，触发列表刷新 */}
         <OKRDirectory
           cycles={hook.cycles}
           objectives={filteredObjectives}
@@ -255,6 +257,9 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
           onDeleteCycle={(cycleId) => setDeleteCycleTarget(cycleId)}
           onChangeObjectiveStatus={(id, action) => { void handleStatusChange(id, action as "pause" | "resume" | "complete" | "discard" | "archive") }}
           onImport={() => setImportOpen(true)}
+          onCycleApproved={() => { void hook.refresh() }}
+          onCycleEnded={() => { void hook.refresh() }}
+          onCycleReviewed={() => { void hook.refresh() }}
         />
       </div>
 

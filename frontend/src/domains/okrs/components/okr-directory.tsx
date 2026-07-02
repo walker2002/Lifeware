@@ -7,7 +7,7 @@
  *  - 每个 cycle 下挂载 objectives.filter(o => o.cycleId === cycle.id)
  *  - 顶部筛选 tabs：[022.01] Task 4 改为 Cycle 状态（draft/not_started/in_progress/ended/reviewed）；
  *    筛选作用于 parent cycle 状态，voice D8：非匹配 cycle 不渲染（解决 (0) 空卡问题）
- *  - 周期 ⋯：添加目标 / 删除周期（有目标时禁用）
+ *  - 周期 ⋯：[022.01] Task 5 集成 审核通过(draft) / 添加目标 / 结束周期(in_progress) / 复盘(ended) / 删除周期（有目标时禁用）
  *  - 目标 ⋯：按状态显示动作（暂停/完成/废弃/恢复/归档）
  *  - 周期折叠：默认展开「含 active 目标」的周期；其他收起；点击 ChevronDown/Right 切换
  *
@@ -30,6 +30,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import {
+  CycleApproveMenuItem,
+  CycleEndMenuItem,
+  CycleReviewMenuItem,
+} from "./cycle-menu"
 import type { Cycle, Objective } from "@/usom/types/objects"
 import type { ObjectiveStatus } from "@/usom/types/primitives"
 
@@ -49,6 +54,12 @@ interface OKRDirectoryProps {
   onChangeObjectiveStatus?: (id: string, action: string) => void
   onEdit?: (id: string) => void
   onImport?: () => void
+  /** [022.01] Task 5：审核通过周期后回调（刷新 cycle 列表） */
+  onCycleApproved?: () => void
+  /** [022.01] Task 5：结束周期后回调（刷新 cycle 列表） */
+  onCycleEnded?: () => void
+  /** [022.01] Task 5：复盘周期后回调（刷新 cycle 列表） */
+  onCycleReviewed?: () => void
 }
 
 // [022.01] Task 4：顶部筛选 tabs 改为 Cycle 状态。
@@ -126,6 +137,9 @@ export function OKRDirectory({
   onChangeObjectiveStatus,
   onEdit: _onEdit,
   onImport,
+  onCycleApproved,
+  onCycleEnded,
+  onCycleReviewed,
 }: OKRDirectoryProps) {
   const handleCreateCycle = onCreateCycleClick ?? (() => {})
   const handleAddObjective = onAddObjectiveToCycle ?? (() => {})
@@ -219,9 +233,24 @@ export function OKRDirectory({
                     ⋯
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {/* [022.01] Task 5：菜单排序按用户 review 反馈，审核通过作为主要动作置首。
+                        三个菜单项自身带状态守卫（非 draft/in_progress/ended 返回 null），
+                        宿主 DropdownMenu 自然隐藏——不需外层条件渲染。 */}
+                    <CycleApproveMenuItem
+                      cycle={cycle}
+                      onApproved={onCycleApproved}
+                    />
                     <DropdownMenuItem onClick={() => handleAddObjective(cycle.id)}>
                       添加目标
                     </DropdownMenuItem>
+                    <CycleEndMenuItem
+                      cycle={cycle}
+                      onEnded={onCycleEnded}
+                    />
+                    <CycleReviewMenuItem
+                      cycle={cycle}
+                      onReviewed={onCycleReviewed}
+                    />
                     <DropdownMenuItem
                       disabled={hasObjectives}
                       title={hasObjectives ? "请先处理周期内目标" : undefined}
