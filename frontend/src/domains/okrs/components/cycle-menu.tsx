@@ -39,7 +39,7 @@ interface CycleApproveMenuItemProps {
   /** 待审核通过的 Cycle 摘要（仅需 id / status / period.start / period.end） */
   cycle: {
     id: string
-    status: string
+    status: Cycle['status']
     period: { start: string; end: string }
   }
   /** 审核成功后回调（用于刷新列表等） */

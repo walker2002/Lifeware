@@ -237,7 +237,7 @@ describe('[022.01] approveCycle 分派逻辑', () => {
 
     // 不走 orchestrator：避免误改已 in_progress/ended 周期
     expect(r.success).toBe(false)
-    expect(r.error).toBe('仅 draft 状态可审核通过')
+    expect(r.error).toBe('当前周期状态为「in_progress」，仅 draft 状态可审核通过')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
     expect(mockFindById).toHaveBeenCalledTimes(1) // 仅前置读，无回读
   })
@@ -392,7 +392,7 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
     const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(false)
-    expect(r.error).toBe('仅 ended 状态可复盘')
+    expect(r.error).toBe('当前周期状态为「draft」，仅 ended 状态可复盘')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 
@@ -404,7 +404,7 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
     const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(false)
-    expect(r.error).toBe('仅 ended 状态可复盘')
+    expect(r.error).toBe('当前周期状态为「reviewed」，仅 ended 状态可复盘')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 
@@ -503,7 +503,7 @@ describe('[022.01] endCycle 分派逻辑', () => {
     const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(false)
-    expect(r.error).toBe('仅 in_progress 状态可结束')
+    expect(r.error).toBe('当前周期状态为「draft」，仅 in_progress 状态可结束')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 

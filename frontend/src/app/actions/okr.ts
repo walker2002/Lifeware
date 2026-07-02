@@ -383,6 +383,52 @@ export async function deleteDraftKeyResult(
 }
 
 /**
+ * 周期状态转换共享辅助函数（[022.01] Phase 2 neat — 消除 approveCycle/reviewCycle/endCycle 重复）
+ *
+ * 统一 6 步模式：UUID 校验 → findById → 状态前置条件 → executeIntent → 回读 → catch-all。
+ * approveCycle 的特殊分派（now >= periodStart ? startCycle : planCycle）通过 getAction 回调实现。
+ */
+async function transitionCycle(
+  cycleId: string,
+  opts: {
+    /** 允许执行操作的周期状态 */
+    allowedStatus: Cycle['status'],
+    /** 从 cycle 对象派生 SM action 名称（approveCycle 需按 now vs periodStart 分派） */
+    getAction: (cycle: Cycle) => string,
+    /** 状态不匹配时的操作标签（如 "审核通过"、"复盘"、"结束"） */
+    actionLabel: string,
+    /** 回读失败时的错误前缀（如 "审核通过后回读失败"） */
+    reReadError: string,
+    /** catch-all 兜底错误消息 */
+    catchFallback: string,
+  },
+): Promise<OKRActionResult<Cycle>> {
+  try {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+      return { success: false, error: '无效的周期 ID' };
+    }
+    const cycleRepo = new CycleRepository();
+    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!cycle) return { success: false, error: "周期不存在" };
+    if (cycle.status !== opts.allowedStatus) {
+      return { success: false, error: `当前周期状态为「${cycle.status}」，仅 ${opts.allowedStatus} 状态可${opts.actionLabel}` };
+    }
+
+    const action = opts.getAction(cycle);
+    const orchestrator = await createOKROrchestrator();
+    const intent = makeIntent(action, { cycleId });
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+    if (!result.success) return { success: false, error: result.error };
+
+    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!updated) return { success: false, error: opts.reReadError };
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : opts.catchFallback };
+  }
+}
+
+/**
  * 审核通过周期（[022.01] Phase 1: Task 7）
  *
  * 按 server 时刻 now（UTC date-only YYYY-MM-DD）与 periodStart 比较分派：
@@ -396,32 +442,16 @@ export async function deleteDraftKeyResult(
  * @returns 执行结果，成功时返回更新后的 Cycle
  */
 export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
-  try {
-    // 校验 cycleId 格式（UUID），避免无效字符串透传至 DB
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
-      return { success: false, error: '无效的周期 ID' };
-    }
-    const cycleRepo = new CycleRepository();
-    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!cycle) return { success: false, error: "周期不存在" };
-    if (cycle.status !== "draft") {
-      return { success: false, error: "仅 draft 状态可审核通过" };
-    }
-
-    const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC date-only)
-    const action = now >= cycle.period.start ? "startCycle" : "planCycle";
-
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent(action, { cycleId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-
-    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!updated) return { success: false, error: "审核通过后回读失败" };
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "审核通过失败" };
-  }
+  return transitionCycle(cycleId, {
+    allowedStatus: 'draft',
+    getAction: (cycle) => {
+      const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC date-only)
+      return now >= cycle.period.start ? "startCycle" : "planCycle";
+    },
+    actionLabel: '审核通过',
+    reReadError: '审核通过后回读失败',
+    catchFallback: '审核通过失败',
+  });
 }
 
 /**
@@ -433,29 +463,13 @@ export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cyc
  * @returns 执行结果，成功时返回更新后的 Cycle
  */
 export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
-  try {
-    // 校验 cycleId 格式（UUID），避免无效字符串透传至 DB
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
-      return { success: false, error: '无效的周期 ID' };
-    }
-    const cycleRepo = new CycleRepository();
-    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!cycle) return { success: false, error: "周期不存在" };
-    if (cycle.status !== "ended") {
-      return { success: false, error: "仅 ended 状态可复盘" };
-    }
-
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent("reviewCycle", { cycleId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-
-    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!updated) return { success: false, error: "复盘后回读失败" };
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "复盘失败" };
-  }
+  return transitionCycle(cycleId, {
+    allowedStatus: 'ended',
+    getAction: () => 'reviewCycle',
+    actionLabel: '复盘',
+    reReadError: '复盘后回读失败',
+    catchFallback: '复盘失败',
+  });
 }
 
 /**
@@ -468,26 +482,11 @@ export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycl
  * @returns 执行结果
  */
 export async function endCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
-  try {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
-      return { success: false, error: '无效的周期 ID' };
-    }
-    const cycleRepo = new CycleRepository();
-    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!cycle) return { success: false, error: "周期不存在" };
-    if (cycle.status !== "in_progress") {
-      return { success: false, error: "仅 in_progress 状态可结束" };
-    }
-
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent("endCycle", { cycleId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-
-    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
-    if (!updated) return { success: false, error: "结束后回读失败" };
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "结束周期失败" };
-  }
+  return transitionCycle(cycleId, {
+    allowedStatus: 'in_progress',
+    getAction: () => 'endCycle',
+    actionLabel: '结束',
+    reReadError: '结束后回读失败',
+    catchFallback: '结束周期失败',
+  });
 }

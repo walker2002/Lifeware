@@ -40,7 +40,7 @@ vi.mock("@/app/actions/okr", async (importActual) => {
 import { CycleApproveMenuItem, CycleReviewMenuItem, CycleEndMenuItem } from "../cycle-menu"
 
 describe("CycleApproveMenuItem", () => {
-  const draftCycle = {
+  const draftCycle: { id: string; status: "draft"; period: { start: string; end: string } } = {
     id: "cycle-1",
     status: "draft",
     period: { start: "2026-07-01", end: "2026-09-30" },
