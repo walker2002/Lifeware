@@ -134,6 +134,10 @@ export function CycleCreateDrawer({
             {isLoading && <Loader2 className="size-4 animate-spin mr-1" />}
             创建周期
           </Button>
+          {/* [022.01] Phase 1 Task 6：draft 周期需「审核通过」才能激活，期间目标不可见 */}
+          <p className="text-xs text-muted-foreground mt-2">
+            创建后需「审核通过」才能激活周期，目标将在此期间不可见。
+          </p>
         </SheetFooter>
       </SheetContent>
     </Sheet>
