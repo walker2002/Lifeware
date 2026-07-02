@@ -78,7 +78,7 @@ export function CycleApproveMenuItem({ cycle, onApproved }: CycleApproveMenuItem
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded outline-hidden"
+        className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded outline-hidden focus-visible:outline-2 focus-visible:outline-ring"
       >
         审核通过
       </button>

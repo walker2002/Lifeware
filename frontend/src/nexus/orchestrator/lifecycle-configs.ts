@@ -119,9 +119,8 @@ export function buildActionMap(): Record<string, string> {
  */
 export function resolveObjectType(domainId: string, action: string): string {
   try {
-    // [022.01] 修复：原用 require('@/domains/manifest-loader') 在 vitest/ESM
-    // 下无法解析 TS alias → 抛错被 try/catch 吞 → 兜底返回 'okr'（domainId 去 s）
-    // 导致 orchestrator 在 okrs 多键域找不到任何 repo。改用顶部 ESM import。
+    // [022.01] 使用顶部 ESM import (loadDomainManifest)，消除 vitest/ESM 下
+    // require() 对 TS alias 解析失败的兜底误判
     const result = loadDomainManifest(domainId)
     if (!result.success) return domainId.replace(/s$/, '')
 
