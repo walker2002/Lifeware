@@ -10,11 +10,10 @@
  * [022.01] Task 2（eng-review D1）：
  * - wiring.ts 导出 createOKROrchestrator + makeIntent
  * - okr.ts 改为从本文件 import 这两个函数
- * - 为 Task 3（findOrCreateCycle 改走 executeIntent）提供共用入口
  */
 
-import { createOrchestrator } from "../../nexus/orchestrator";
-import { createRuleEngine } from "../../nexus/core/rule-engine";
+import { createOrchestrator } from "@/nexus/orchestrator";
+import { createRuleEngine } from "@/nexus/core/rule-engine";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";

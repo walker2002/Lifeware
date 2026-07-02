@@ -47,12 +47,13 @@ describe('[022.01] adapter.cycle.create', () => {
     })
 
     // adapter.cycle.create 被调用时应不再 throw
-    await expect(
-      repos.cycle.create(
-        { cycleType: 'quarterly', name: '2026 Q3', periodStart: '2026-07-01', periodEnd: '2026-09-30' },
-        MVP_USER_ID,
-      ),
-    ).resolves.toBeDefined()
+    const result = await repos.cycle.create(
+      { cycleType: 'quarterly', name: '2026 Q3', periodStart: '2026-07-01', periodEnd: '2026-09-30' },
+      MVP_USER_ID,
+    )
+    expect(result).toBeDefined()
+    expect(result.status).toBe('draft')
+    expect(result.id).toBeDefined()
   })
 
   it('同自然键已有 in_progress cycle 时，create 不覆写其 status（返回已有行）', async () => {

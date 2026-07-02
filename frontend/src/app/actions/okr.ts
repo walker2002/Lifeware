@@ -386,6 +386,10 @@ export async function deleteDraftKeyResult(
  */
 export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
   try {
+    // 校验 cycleId 格式（UUID），避免无效字符串透传至 DB
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+      return { success: false, error: '无效的周期 ID' };
+    }
     const cycleRepo = new CycleRepository();
     const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
     if (!cycle) return { success: false, error: "周期不存在" };

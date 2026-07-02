@@ -172,7 +172,7 @@ describe('[022.01] createCycle 走 executeIntent', () => {
  */
 describe('[022.01] approveCycle 分派逻辑', () => {
   const draftCycle = {
-    id: 'cycle-approve-001',
+    id: 'c1e00000-0000-0000-0000-000000000001',
     cycleType: 'quarterly' as const,
     name: '2026-Q3',
     period: { start: '2026-07-01', end: '2026-09-30' },
@@ -196,14 +196,14 @@ describe('[022.01] approveCycle 分派逻辑', () => {
       objectType: 'cycle',
     })
 
-    const r = await approveCycle('cycle-approve-001')
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(true)
     expect(mockFindById).toHaveBeenCalledTimes(2) // 前置读 + 回读
     expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
     const [intent] = mockExecuteIntent.mock.calls[0]
     expect(intent.action).toBe('startCycle')
-    expect(intent.fields).toEqual({ cycleId: 'cycle-approve-001' })
+    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
 
     vi.restoreAllMocks()
   })
@@ -218,13 +218,13 @@ describe('[022.01] approveCycle 分派逻辑', () => {
       objectType: 'cycle',
     })
 
-    const r = await approveCycle('cycle-approve-001')
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(true)
     expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
     const [intent] = mockExecuteIntent.mock.calls[0]
     expect(intent.action).toBe('planCycle')
-    expect(intent.fields).toEqual({ cycleId: 'cycle-approve-001' })
+    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
 
     vi.restoreAllMocks()
   })
@@ -233,7 +233,7 @@ describe('[022.01] approveCycle 分派逻辑', () => {
     const inProgressCycle = { ...draftCycle, status: 'in_progress' as const }
     mockFindById.mockResolvedValueOnce(inProgressCycle)
 
-    const r = await approveCycle('cycle-approve-001')
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
 
     // 不走 orchestrator：避免误改已 in_progress/ended 周期
     expect(r.success).toBe(false)

@@ -16,6 +16,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { approveCycle } from "@/app/actions/okr"
 import {
   Dialog,
@@ -62,8 +63,7 @@ export function CycleApproveMenuItem({ cycle, onApproved }: CycleApproveMenuItem
     try {
       const result = await approveCycle(cycle.id)
       if (!result.success) {
-        // server 异常：以弹窗方式提示（保持 UI 体感一致，避免 alert 阻塞）
-        window.alert(result.error ?? "审核失败")
+        toast.error(result.error ?? "审核失败")
         return
       }
       setOpen(false)
