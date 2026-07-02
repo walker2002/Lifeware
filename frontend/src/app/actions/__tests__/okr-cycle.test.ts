@@ -457,3 +457,69 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 })
+
+// ─── endCycle 分派逻辑（[022.01] Phase 2 Task 3.5：in_progress → ended）──
+
+describe('[022.01] endCycle 分派逻辑', () => {
+  const inProgressCycle = {
+    id: 'c1e00000-0000-0000-0000-000000000001',
+    cycleType: 'quarterly' as const,
+    name: '2026-Q3',
+    period: { start: '2026-07-01', end: '2026-09-30' },
+    status: 'in_progress' as const,
+    startedAt: '2026-07-01T00:00:00.000Z' as any,
+    createdAt: '2026-06-01T00:00:00.000Z' as any,
+    updatedAt: '2026-07-01T00:00:00.000Z' as any,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('in_progress cycle → executeIntent("endCycle")', async () => {
+    mockFindById.mockResolvedValue(inProgressCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...inProgressCycle, status: 'ended', endedAt: '2026-09-30T00:00:00.000Z' as any },
+      objectType: 'cycle',
+    })
+
+    const { endCycle } = await import('../okr')
+    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(true)
+    expect(mockFindById).toHaveBeenCalledTimes(2)
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+    const [intent] = mockExecuteIntent.mock.calls[0]
+    expect(intent.action).toBe('endCycle')
+    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
+  })
+
+  it('非 in_progress cycle → error', async () => {
+    const draftCycle = { ...inProgressCycle, status: 'draft' as const }
+    mockFindById.mockResolvedValueOnce(draftCycle)
+
+    const { endCycle } = await import('../okr')
+    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('仅 in_progress 状态可结束')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('illegal UUID → error', async () => {
+    const { endCycle } = await import('../okr')
+    const r = await endCycle('not-a-uuid')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('无效的周期 ID')
+    expect(mockFindById).not.toHaveBeenCalled()
+  })
+
+  it('catch-all 异常 → error', async () => {
+    mockFindById.mockRejectedValueOnce(new Error('网络错误'))
+    const { endCycle } = await import('../okr')
+    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('网络错误')
+  })
+})

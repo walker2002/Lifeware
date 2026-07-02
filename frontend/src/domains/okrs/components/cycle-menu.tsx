@@ -1,15 +1,16 @@
 /**
  * @file cycle-menu
- * @brief [022.01] Phase 1 Task 7 + Phase 2 Task 3: Cycle 操作菜单（审核通过 / 复盘）
+ * @brief [022.01] Phase 1 Task 7 + Phase 2 Task 3 + Task 3.5: Cycle 操作菜单（审核通过 / 结束 / 复盘）
  *
- * 提供两个并列的菜单项组件：
+ * 提供三个并列的菜单项组件：
  * - CycleApproveMenuItem：仅 draft cycle 可见，确认后调用 approveCycle server action
+ * - CycleEndMenuItem：仅 in_progress cycle 可见，确认后调用 endCycle server action
  * - CycleReviewMenuItem：仅 ended cycle 可见，确认后调用 reviewCycle server action
  *
  * 设计要点：
- * - 两个组件保持独立（不抽取共享抽象）——它们的 status 守卫、文案、回调命名、加载文案
- *   各自不同（draft→startCycle/planCycle vs ended→reviewed），强行抽象会引入
- *   仅为统一而存在的条件分支；保持独立更直白、更易读、更易删。
+ * - 三个组件保持独立（不抽取共享抽象）——它们的 status 守卫、文案、回调命名、加载文案
+ *   各自不同（draft→startCycle/planCycle vs in_progress→ended vs ended→reviewed），
+ *   强行抽象会引入仅为统一而存在的条件分支；保持独立更直白、更易读、更易删。
  * - 渲染为单个 dropdown 行（不是 DropdownMenu 容器），便于宿主（okr-directory）的 ⋯
  *   DropdownMenuContent 直接嵌套 children。
  * - 文件头注释遵循 docs/code-commenting-guide.md；规避任何 Tailwind 默认颜色类（仅用 UI token）。
@@ -19,7 +20,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { approveCycle, reviewCycle } from "@/app/actions/okr"
+import { approveCycle, reviewCycle, endCycle } from "@/app/actions/okr"
 import {
   Dialog,
   DialogContent,
@@ -181,6 +182,84 @@ export function CycleReviewMenuItem({ cycle, onReviewed }: CycleReviewMenuItemPr
             </Button>
             <Button onClick={handleReview} disabled={loading}>
               {loading ? "处理中..." : "确认复盘"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+/**
+ * CycleEndMenuItem 入参
+ *
+ * [022.01] Phase 2 Task 3.5：cycle.status 类型收窄为 Cycle['status']
+ * （而非 string），与 CycleReviewMenuItem 对齐。
+ */
+interface CycleEndMenuItemProps {
+  /** 待结束的 Cycle（仅需 id / status） */
+  cycle: {
+    id: string
+    status: Cycle["status"]
+  }
+  /** 结束成功后回调 */
+  onEnded?: () => void
+}
+
+/**
+ * "结束周期" 菜单项——仅 in_progress cycle 可见。
+ *
+ * 点击后弹出二次确认 Dialog；确认即调用 endCycle server action。
+ * 结束后 cycle 转为 ended，下一步可被复盘（reviewCycle）。
+ * 此路径填补了 Phase 2 reviewCycle 的前置：没有它，reviewCycle 在 Phase 2
+ * 不可达（无 way to reach ended state）。
+ */
+export function CycleEndMenuItem({ cycle, onEnded }: CycleEndMenuItemProps) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  // 仅 in_progress 显示；其他状态返回 null（由宿主 DropdownMenu 自然隐藏）
+  if (cycle.status !== "in_progress") return null
+
+  async function handleEnd() {
+    setLoading(true)
+    try {
+      const result = await endCycle(cycle.id)
+      if (!result.success) {
+        toast.error(result.error ?? "结束失败")
+        return
+      }
+      setOpen(false)
+      onEnded?.()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent rounded outline-hidden focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        结束周期
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>结束此周期？</DialogTitle>
+            <DialogDescription>
+              结束后将无法再修改该周期下的目标。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+              取消
+            </Button>
+            <Button onClick={handleEnd} disabled={loading}>
+              {loading ? "处理中..." : "确认结束"}
             </Button>
           </DialogFooter>
         </DialogContent>

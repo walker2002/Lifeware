@@ -22,20 +22,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-// Mock approveCycle / reviewCycle，统一从 server action 模块捕获
+// Mock approveCycle / reviewCycle / endCycle，统一从 server action 模块捕获
 const approveCycleMock = vi.fn()
 const reviewCycleMock = vi.fn()
+const endCycleMock = vi.fn()
 vi.mock("@/app/actions/okr", async (importActual) => {
   const actual = await importActual<typeof import("@/app/actions/okr")>()
   return {
     ...actual,
     approveCycle: (...args: unknown[]) => approveCycleMock(...args),
     reviewCycle: (...args: unknown[]) => reviewCycleMock(...args),
+    endCycle: (...args: unknown[]) => endCycleMock(...args),
   }
 })
 
 // 必须在 import 被测组件前 mock，否则 react-in-jsx-scope 触发先于 mock
-import { CycleApproveMenuItem, CycleReviewMenuItem } from "../cycle-menu"
+import { CycleApproveMenuItem, CycleReviewMenuItem, CycleEndMenuItem } from "../cycle-menu"
 
 describe("CycleApproveMenuItem", () => {
   const draftCycle = {
@@ -174,5 +176,60 @@ describe("CycleReviewMenuItem", () => {
 
     expect(reviewCycleMock).toHaveBeenCalledTimes(1)
     expect(reviewCycleMock).toHaveBeenCalledWith("cycle-2")
+  })
+})
+
+// ─── [022.01] Phase 2 Task 3.5: CycleEndMenuItem ──────────────────────
+
+describe("CycleEndMenuItem", () => {
+  const inProgressCycle = {
+    id: "cycle-3",
+    status: "in_progress" as const,
+    period: { start: "2026-07-01", end: "2026-09-30" },
+  }
+
+  beforeEach(() => {
+    endCycleMock.mockReset()
+    endCycleMock.mockResolvedValue({ success: true, data: { ...inProgressCycle, status: "ended" } })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it("仅 in_progress 状态显示「结束周期」菜单项", () => {
+    const { rerender } = render(<CycleEndMenuItem cycle={inProgressCycle} />)
+    expect(screen.getByRole("button", { name: "结束周期" })).toBeInTheDocument()
+
+    rerender(
+      <CycleEndMenuItem
+        cycle={{ ...inProgressCycle, status: "draft" }}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: "结束周期" })).toBeNull()
+  })
+
+  it("点击后弹出二次确认弹窗", async () => {
+    const user = userEvent.setup()
+    render(<CycleEndMenuItem cycle={inProgressCycle} />)
+
+    expect(screen.queryByText("结束此周期？")).toBeNull()
+    await user.click(screen.getByRole("button", { name: "结束周期" }))
+
+    expect(screen.getByText("结束此周期？")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "确认结束" })).toBeInTheDocument()
+  })
+
+  it("确认结束后调用 endCycle", async () => {
+    const user = userEvent.setup()
+    const onEnded = vi.fn()
+    render(<CycleEndMenuItem cycle={inProgressCycle} onEnded={onEnded} />)
+
+    await user.click(screen.getByRole("button", { name: "结束周期" }))
+    await user.click(screen.getByRole("button", { name: "确认结束" }))
+
+    expect(endCycleMock).toHaveBeenCalledTimes(1)
+    expect(endCycleMock).toHaveBeenCalledWith("cycle-3")
   })
 })

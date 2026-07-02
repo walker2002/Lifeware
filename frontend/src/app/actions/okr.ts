@@ -453,3 +453,37 @@ export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycl
     return { success: false, error: err instanceof Error ? err.message : "复盘失败" };
   }
 }
+
+/**
+ * 结束周期（[022.01] Phase 2 Task 3.5: in_progress → ended）
+ *
+ * 仅允许 in_progress 状态结束；结束后 cycle 可被复盘或直接转终态。
+ * 不接受其他 fromState 的 transition。
+ *
+ * @param cycleId - 周期 ID（USOM UUID 字符串）
+ * @returns 执行结果
+ */
+export async function endCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
+  try {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+      return { success: false, error: '无效的周期 ID' };
+    }
+    const cycleRepo = new CycleRepository();
+    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!cycle) return { success: false, error: "周期不存在" };
+    if (cycle.status !== "in_progress") {
+      return { success: false, error: "仅 in_progress 状态可结束" };
+    }
+
+    const orchestrator = await createOKROrchestrator();
+    const intent = makeIntent("endCycle", { cycleId });
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+    if (!result.success) return { success: false, error: result.error };
+
+    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!updated) return { success: false, error: "结束后回读失败" };
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "结束周期失败" };
+  }
+}
