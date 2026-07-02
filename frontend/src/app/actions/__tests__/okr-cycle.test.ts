@@ -345,3 +345,115 @@ describe('[022.01] createCycle catch-all', () => {
     expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
   })
 })
+
+// ─── reviewCycle 分派逻辑（[022.01] Phase 2）─────────────────────────
+
+describe('[022.01] reviewCycle 分派逻辑', () => {
+  const endedCycle = {
+    id: 'c1e00000-0000-0000-0000-000000000001',
+    cycleType: 'quarterly' as const,
+    name: '2026-Q3',
+    period: { start: '2026-07-01', end: '2026-09-30' },
+    status: 'ended' as const,
+    startedAt: '2026-07-01T00:00:00.000Z' as any,
+    endedAt: '2026-09-30T00:00:00.000Z' as any,
+    createdAt: '2026-06-01T00:00:00.000Z' as any,
+    updatedAt: '2026-10-01T00:00:00.000Z' as any,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('ended cycle → executeIntent("reviewCycle")', async () => {
+    mockFindById.mockResolvedValue(endedCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...endedCycle, status: 'reviewed' },
+      objectType: 'cycle',
+    })
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(true)
+    expect(mockFindById).toHaveBeenCalledTimes(2) // 前置读 + 回读
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+    const [intent] = mockExecuteIntent.mock.calls[0]
+    expect(intent.action).toBe('reviewCycle')
+    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
+  })
+
+  it('非 ended cycle → error（不调 orchestrator）', async () => {
+    const draftCycle = { ...endedCycle, status: 'draft' as const }
+    mockFindById.mockResolvedValueOnce(draftCycle)
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('仅 ended 状态可复盘')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('reviewed cycle → error（终态，不可复盘）', async () => {
+    const reviewedCycle = { ...endedCycle, status: 'reviewed' as const }
+    mockFindById.mockResolvedValueOnce(reviewedCycle)
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('仅 ended 状态可复盘')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('executeIntent 失败 → 透传 error', async () => {
+    mockFindById.mockResolvedValue(endedCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: false,
+      error: 'SM error',
+    })
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('SM error')
+  })
+
+  it('回读失败 → error', async () => {
+    mockFindById.mockResolvedValueOnce(endedCycle) // 前置读
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...endedCycle, status: 'reviewed' },
+      objectType: 'cycle',
+    })
+    mockFindById.mockResolvedValueOnce(null) // 回读 null
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('复盘后回读失败')
+  })
+
+  it('非法 UUID → error', async () => {
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('not-a-uuid')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('无效的周期 ID')
+    expect(mockFindById).not.toHaveBeenCalled()
+  })
+
+  it('catch-all 异常 → error', async () => {
+    mockFindById.mockRejectedValueOnce(new Error('网络错误'))
+
+    const { reviewCycle } = await import('../okr')
+    const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('网络错误')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+})

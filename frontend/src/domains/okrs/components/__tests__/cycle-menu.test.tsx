@@ -1,15 +1,20 @@
 /**
  * @file cycle-menu.test
- * @brief [022.01] Phase 1 Task 7: CycleApproveMenuItem 测试
+ * @brief [022.01] Phase 1 Task 7 + Phase 2 Task 3: CycleApproveMenuItem / CycleReviewMenuItem 测试
  *
- * 覆盖（brief Step 1 / 5）：
+ * 覆盖（Phase 1 brief Step 1 / 5）：
  *  1. 仅 draft 状态显示「审核通过」菜单项
  *  2. 点击后弹出二次确认弹窗（含确认/取消按钮）
  *  3. now >= periodStart 时执行 startCycle action
  *  4. now <  periodStart 时执行 planCycle action
  *
+ * 覆盖（Phase 2 brief Step 5）：
+ *  5. 仅 ended 状态显示「复盘」菜单项
+ *  6. 点击后弹出二次确认弹窗
+ *  7. 确认复盘后调用 reviewCycle
+ *
  * 实现说明：
- * - approveCycle 经 vi.mock 替换，按 vi.setSystemTime 注入不同 now 来验证分派逻辑。
+ * - approveCycle / reviewCycle 经 vi.mock 替换，按 vi.setSystemTime 注入不同 now 来验证分派逻辑。
  * - Dialog 用 portal，断言 body 文本 "审核通过此周期？" 即可定位弹窗出现。
  */
 
@@ -17,18 +22,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-// Mock approveCycle，统一从 server action 模块捕获
+// Mock approveCycle / reviewCycle，统一从 server action 模块捕获
 const approveCycleMock = vi.fn()
+const reviewCycleMock = vi.fn()
 vi.mock("@/app/actions/okr", async (importActual) => {
   const actual = await importActual<typeof import("@/app/actions/okr")>()
   return {
     ...actual,
     approveCycle: (...args: unknown[]) => approveCycleMock(...args),
+    reviewCycle: (...args: unknown[]) => reviewCycleMock(...args),
   }
 })
 
 // 必须在 import 被测组件前 mock，否则 react-in-jsx-scope 触发先于 mock
-import { CycleApproveMenuItem } from "../cycle-menu"
+import { CycleApproveMenuItem, CycleReviewMenuItem } from "../cycle-menu"
 
 describe("CycleApproveMenuItem", () => {
   const draftCycle = {
@@ -112,5 +119,60 @@ describe("CycleApproveMenuItem", () => {
     expect(approveCycleMock).toHaveBeenCalledWith("cycle-1")
 
     vi.restoreAllMocks()
+  })
+})
+
+// ─── [022.01] Phase 2 Task 3: CycleReviewMenuItem ──────────────────────
+
+describe("CycleReviewMenuItem", () => {
+  const endedCycle = {
+    id: "cycle-2",
+    status: "ended" as const,
+    period: { start: "2026-07-01", end: "2026-09-30" },
+  }
+
+  beforeEach(() => {
+    reviewCycleMock.mockReset()
+    reviewCycleMock.mockResolvedValue({ success: true, data: { ...endedCycle, status: "reviewed" } })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it("仅 ended 状态显示「复盘」菜单项", () => {
+    const { rerender } = render(<CycleReviewMenuItem cycle={endedCycle} />)
+    expect(screen.getByRole("button", { name: "复盘" })).toBeInTheDocument()
+
+    rerender(
+      <CycleReviewMenuItem
+        cycle={{ ...endedCycle, status: "in_progress" }}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: "复盘" })).toBeNull()
+  })
+
+  it("点击后弹出二次确认弹窗", async () => {
+    const user = userEvent.setup()
+    render(<CycleReviewMenuItem cycle={endedCycle} />)
+
+    expect(screen.queryByText("复盘此周期？")).toBeNull()
+    await user.click(screen.getByRole("button", { name: "复盘" }))
+
+    expect(screen.getByText("复盘此周期？")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "确认复盘" })).toBeInTheDocument()
+  })
+
+  it("确认复盘后调用 reviewCycle", async () => {
+    const user = userEvent.setup()
+    const onReviewed = vi.fn()
+    render(<CycleReviewMenuItem cycle={endedCycle} onReviewed={onReviewed} />)
+
+    await user.click(screen.getByRole("button", { name: "复盘" }))
+    await user.click(screen.getByRole("button", { name: "确认复盘" }))
+
+    expect(reviewCycleMock).toHaveBeenCalledTimes(1)
+    expect(reviewCycleMock).toHaveBeenCalledWith("cycle-2")
   })
 })

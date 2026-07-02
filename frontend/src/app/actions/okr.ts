@@ -419,3 +419,37 @@ export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cyc
     return { success: false, error: err instanceof Error ? err.message : "审核通过失败" };
   }
 }
+
+/**
+ * 复盘周期（[022.01] Phase 2：ended → reviewed）
+ *
+ * 仅允许 ended 状态复盘；复盘后周期将锁定，目标编辑将在后续版本中限制。
+ *
+ * @param cycleId - 周期 ID（USOM UUID 字符串）
+ * @returns 执行结果，成功时返回更新后的 Cycle
+ */
+export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
+  try {
+    // 校验 cycleId 格式（UUID），避免无效字符串透传至 DB
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+      return { success: false, error: '无效的周期 ID' };
+    }
+    const cycleRepo = new CycleRepository();
+    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!cycle) return { success: false, error: "周期不存在" };
+    if (cycle.status !== "ended") {
+      return { success: false, error: "仅 ended 状态可复盘" };
+    }
+
+    const orchestrator = await createOKROrchestrator();
+    const intent = makeIntent("reviewCycle", { cycleId });
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+    if (!result.success) return { success: false, error: result.error };
+
+    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!updated) return { success: false, error: "复盘后回读失败" };
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "复盘失败" };
+  }
+}
