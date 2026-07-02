@@ -1,17 +1,22 @@
 /**
  * @file okr-cycle.test
- * @brief [022.01] Phase 1: createCycle 改走 executeIntent 集成测试
+ * @brief [022.01] Phase 1: createCycle / approveCycle 集成测试
  *
- * 目的（eng-review D3）：
+ * 目的（eng-review D3 + Task 7 Finding #2）：
  * 1. 验证 createCycle 经 orchestrator.executeIntent 调用，不再走 repo.save 直写
  * 2. 验证 status 入参已被 server-side SM create→draft 强制，
  *    即调用方传入的 fields 不含 status（构造侧验证）
+ * 3. 验证 approveCycle 按 server 时刻 now 与 period.start 比较分派：
+ *    - now >= periodStart → executeIntent('startCycle')
+ *    - now <  periodStart → executeIntent('planCycle')
+ *    - 非 draft cycle → 不调用 orchestrator，直接返回错误
  *
  * 模式（参照现有 frontend/src/app/actions/__tests__/*.test.ts）：
  * - vi.mock 拦截 @/domains/okrs/wiring，注入假 createOKROrchestrator + makeIntent
+ * - vi.mock 拦截 @/domains/okrs/repository/cycle，注入假 CycleRepository.findById
  * - vi.mocked 取出 mock 实例断言调用入参
  *
- * 不需要真实 PG —— 本测试只锁「写入口选择 + 入参形状」两个治理契约。
+ * 不需要真实 PG —— 本测试只锁「写入口选择 + 入参形状 + 分派逻辑」三个治理契约。
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -36,9 +41,18 @@ vi.mock('@/domains/okrs/wiring', () => ({
   })),
 }))
 
-import { createCycle } from '../okr'
+// mock CycleRepository.findById —— 不接 PG；按调用现场注入返回 cycle
+const findByIdMock = vi.fn()
+vi.mock('@/domains/okrs/repository/cycle', () => ({
+  CycleRepository: class MockCycleRepository {
+    findById = findByIdMock
+  },
+}))
+
+import { createCycle, approveCycle } from '../okr'
 
 const mockExecuteIntent = vi.mocked(executeIntentMock)
+const mockFindById = vi.mocked(findByIdMock)
 
 describe('[022.01] createCycle 走 executeIntent', () => {
   beforeEach(() => {
@@ -147,5 +161,84 @@ describe('[022.01] createCycle 走 executeIntent', () => {
 
     expect(r.success).toBe(false)
     expect(r.error).toBe('周期创建成功但未返回对象')
+  })
+})
+
+/**
+ * [022.01] Phase 1 Task 7 Finding #2：
+ * approveCycle 的 server 端分派逻辑（now vs period.start）从未被单测覆盖。
+ * 现有 cycle-menu.test.tsx vi.mock 替掉了整个 approveCycle，UI 只断言调用，
+ * 分派选择本身留空。本 describe 直击 server action 行为。
+ */
+describe('[022.01] approveCycle 分派逻辑', () => {
+  const draftCycle = {
+    id: 'cycle-approve-001',
+    cycleType: 'quarterly' as const,
+    name: '2026-Q3',
+    period: { start: '2026-07-01', end: '2026-09-30' },
+    status: 'draft' as const,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-01T00:00:00.000Z',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('now >= periodStart 时调 executeIntent("startCycle")', async () => {
+    // server 取 now = 2026-07-15，period.start = 2026-07-01 → 立即启动分支
+    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-07-15T12:00:00.000Z')
+    // approveCycle 调两次 findById：前置读 + 成功后回读；统一返回 draft cycle
+    mockFindById.mockResolvedValue(draftCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...draftCycle, status: 'in_progress' },
+      objectType: 'cycle',
+    })
+
+    const r = await approveCycle('cycle-approve-001')
+
+    expect(r.success).toBe(true)
+    expect(mockFindById).toHaveBeenCalledTimes(2) // 前置读 + 回读
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+    const [intent] = mockExecuteIntent.mock.calls[0]
+    expect(intent.action).toBe('startCycle')
+    expect(intent.fields).toEqual({ cycleId: 'cycle-approve-001' })
+
+    vi.restoreAllMocks()
+  })
+
+  it('now < periodStart 时调 executeIntent("planCycle")', async () => {
+    // server 取 now = 2026-06-15，period.start = 2026-07-01 → 未开始分支
+    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-06-15T12:00:00.000Z')
+    mockFindById.mockResolvedValue(draftCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...draftCycle, status: 'not_started' },
+      objectType: 'cycle',
+    })
+
+    const r = await approveCycle('cycle-approve-001')
+
+    expect(r.success).toBe(true)
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+    const [intent] = mockExecuteIntent.mock.calls[0]
+    expect(intent.action).toBe('planCycle')
+    expect(intent.fields).toEqual({ cycleId: 'cycle-approve-001' })
+
+    vi.restoreAllMocks()
+  })
+
+  it('非 draft cycle 直接返回错误，不调用 orchestrator', async () => {
+    const inProgressCycle = { ...draftCycle, status: 'in_progress' as const }
+    mockFindById.mockResolvedValueOnce(inProgressCycle)
+
+    const r = await approveCycle('cycle-approve-001')
+
+    // 不走 orchestrator：避免误改已 in_progress/ended 周期
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('仅 draft 状态可审核通过')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+    expect(mockFindById).toHaveBeenCalledTimes(1) // 仅前置读，无回读
   })
 })

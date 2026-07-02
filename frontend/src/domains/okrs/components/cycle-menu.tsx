@@ -45,7 +45,7 @@ interface CycleApproveMenuItemProps {
  * "审核通过" 菜单项——仅 draft cycle 可见。
  *
  * 点击后弹出二次确认 Dialog；确认即调用 approveCycle server action。
- * 文案根据 now vs periodStart / periodEnd 给出提示（普通/未到开始/已过期）。
+ * 文案根据 now vs periodStart 给出提示（立即启动 / 未开始）。
  */
 export function CycleApproveMenuItem({ cycle, onApproved }: CycleApproveMenuItemProps) {
   const [open, setOpen] = useState(false)
@@ -56,7 +56,6 @@ export function CycleApproveMenuItem({ cycle, onApproved }: CycleApproveMenuItem
 
   const now = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   const willStart = now >= cycle.period.start
-  const isExpired = now > cycle.period.end
 
   async function handleApprove() {
     setLoading(true)
@@ -92,7 +91,6 @@ export function CycleApproveMenuItem({ cycle, onApproved }: CycleApproveMenuItem
               {willStart
                 ? "审核通过后周期将立即启动，目标变为可见。"
                 : "周期尚未到开始日期，审核通过后将进入「未开始」状态。"}
-              {isExpired && " 注意：此周期已过期，审核通过后将自动标记为已结束。"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
