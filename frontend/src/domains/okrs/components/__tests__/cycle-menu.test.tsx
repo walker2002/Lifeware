@@ -54,6 +54,7 @@ describe("CycleApproveMenuItem", () => {
   afterEach(() => {
     cleanup()
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it("仅 draft 状态显示「审核通过」菜单项", () => {
@@ -100,7 +101,6 @@ describe("CycleApproveMenuItem", () => {
     expect(approveCycleMock).toHaveBeenCalledTimes(1)
     expect(approveCycleMock).toHaveBeenCalledWith("cycle-1")
 
-    vi.restoreAllMocks()
   })
 
   it("now < periodStart 时执行 planCycle action", async () => {
@@ -120,7 +120,6 @@ describe("CycleApproveMenuItem", () => {
     // 而服务端的 startCycle/planCycle 分派由 approveCycle 内部按 now 决定
     expect(approveCycleMock).toHaveBeenCalledWith("cycle-1")
 
-    vi.restoreAllMocks()
   })
 })
 

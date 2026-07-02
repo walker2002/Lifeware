@@ -33,6 +33,10 @@ interface OKRActionResult<T = void> {
   error?: string;
 }
 
+/** UUID v4 格式校验（所有 cycle 操作共用，避免内联正则重复） */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUUID(s: string): boolean { return UUID_RE.test(s) }
+
 // ─── 查询 ────────────────────────────────────────────────────────
 
 /**
@@ -157,7 +161,7 @@ export async function createCycle(
 export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void>> {
   try {
     // [022.01] Phase 2 — UUID 校验（对齐 reviewCycle/endCycle 模式）
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+    if (!isUUID(cycleId)) {
       return { success: false, error: '无效的周期 ID' };
     }
     const objRepo = new ObjectiveRepository();
@@ -404,7 +408,7 @@ async function transitionCycle(
   },
 ): Promise<OKRActionResult<Cycle>> {
   try {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+    if (!isUUID(cycleId)) {
       return { success: false, error: '无效的周期 ID' };
     }
     const cycleRepo = new CycleRepository();

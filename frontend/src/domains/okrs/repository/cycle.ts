@@ -1,9 +1,11 @@
 /**
  * @file cycle
- * @brief Cycle 仓储实现（OKR 周期一级对象）
+ * @brief Cycle 仓储：CRUD + 自然键查重 + 状态持久化（updateStatus 独立于 save 的 onConflictDoUpdate）
  *
- * [022] 1A-T4：Cycle 的 CRUD。后续 T6/T7/T11 的依赖基座。
- * 方法均带可选 tx，便于 T13 经 mutation-service 在事务内调用。
+ * [022] 1A-T4 → [022.01] Phase 1/2 演进：
+ * - save 按自然键 (userId, periodStart, periodEnd) upsert，SET 排除 status 防降级
+ * - updateStatus 直写 status + 时间戳（SM 调用，与 save 分离）
+ * - 方法均带可选 tx 参数，支持事务内调用
  */
 
 import { eq, and } from 'drizzle-orm'
