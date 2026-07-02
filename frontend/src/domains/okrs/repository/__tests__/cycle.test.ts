@@ -10,7 +10,9 @@
  * 4. CycleRepository.updateStatus：draft → in_progress
  * 5. CycleRepository.updateStatus：in_progress → ended
  * 6. CycleRepository.updateStatus：ended → reviewed
- * 7. CycleRepository.updateStatus：对象不存在时抛错
+ * 7. CycleRepository.updateStatus：draft → not_started（无时间戳字段变更）
+ * 8. CycleRepository.updateStatus：not_started → in_progress（设置 startedAt=now）
+ * 9. CycleRepository.updateStatus：对象不存在时抛错
  */
 import { describe, it, expect, vi } from 'vitest'
 import { createOkrsGenericRepo } from '../generic-repo-adapter'
@@ -227,6 +229,64 @@ describe('[022.01] CycleRepository.updateStatus', () => {
     expect(tx.updates[0].set.reviewedAt).toBeInstanceOf(Date)
     expect(result.status).toBe('reviewed')
     expect(result.reviewedAt).toBeDefined()
+
+    repo.findById = origFindById
+  })
+
+  it('draft → not_started：设置 status=not_started，无时间戳字段变更', async () => {
+    const repo = new CycleRepository()
+    const origFindById = repo.findById
+    repo.findById = vi.fn().mockResolvedValue({
+      id: 'c-1',
+      status: 'draft',
+      cycleType: 'quarterly',
+      name: '2026 Q3',
+      period: { start: '2026-07-01', end: '2026-09-30' },
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const tx = mockTx()
+    const result = await repo.updateStatus('c-1', 'not_started', MVP_USER_ID, tx as any)
+
+    // UPDATE set 含 status,但无 startedAt/endedAt/reviewedAt 时间戳字段
+    expect(tx.updates.length).toBe(1)
+    expect(tx.updates[0].set.status).toBe('not_started')
+    expect(tx.updates[0].set.startedAt).toBeUndefined()
+    expect(tx.updates[0].set.endedAt).toBeUndefined()
+    expect(tx.updates[0].set.reviewedAt).toBeUndefined()
+
+    // 返回的对象仅含新 status
+    expect(result.status).toBe('not_started')
+
+    repo.findById = origFindById
+  })
+
+  it('not_started → in_progress：设置 status=in_progress + startedAt=now', async () => {
+    const repo = new CycleRepository()
+    const origFindById = repo.findById
+    repo.findById = vi.fn().mockResolvedValue({
+      id: 'c-1',
+      status: 'not_started',
+      cycleType: 'quarterly',
+      name: '2026 Q3',
+      period: { start: '2026-07-01', end: '2026-09-30' },
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const tx = mockTx()
+    const result = await repo.updateStatus('c-1', 'in_progress', MVP_USER_ID, tx as any)
+
+    // UPDATE set 含 status + startedAt,无 endedAt
+    expect(tx.updates.length).toBe(1)
+    expect(tx.updates[0].set.status).toBe('in_progress')
+    expect(tx.updates[0].set.startedAt).toBeInstanceOf(Date)
+    expect(tx.updates[0].set.endedAt).toBeUndefined()
+
+    // 返回的对象含新 status + startedAt
+    expect(result.status).toBe('in_progress')
+    expect(result.startedAt).toBeDefined()
 
     repo.findById = origFindById
   })
