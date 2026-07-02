@@ -251,7 +251,7 @@ export function CycleEndMenuItem({ cycle, onEnded }: CycleEndMenuItemProps) {
           <DialogHeader>
             <DialogTitle>结束此周期？</DialogTitle>
             <DialogDescription>
-              结束后将无法再修改该周期下的目标。
+              结束后目标删除将在后续版本中限制，当前仍可编辑目标内容。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

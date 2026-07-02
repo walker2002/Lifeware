@@ -156,6 +156,10 @@ export async function createCycle(
  */
 export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void>> {
   try {
+    // [022.01] Phase 2 — UUID 校验（对齐 reviewCycle/endCycle 模式）
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cycleId)) {
+      return { success: false, error: '无效的周期 ID' };
+    }
     const objRepo = new ObjectiveRepository();
     const cycleRepo = new CycleRepository();
     // [022.01] Phase 2 — 权限守卫：仅 draft 状态可删除
