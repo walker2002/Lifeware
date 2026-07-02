@@ -131,11 +131,18 @@ PROD_DB_URL=$(grep '^DATABASE_URL=' .env.production | head -1 | sed -E 's/^DATAB
 export DATABASE_URL="$PROD_DB_URL"
 
 # ─── 5. 启动 Next.js ──────────────────────────────────
-info "启动 Next.js 开发服务器（连生产库）..."
+# 与 dev.sh 并行运行：使用不同端口 (3001) + 不同 distDir (.next-prod)
+# 避免 .next/dev/lock 锁文件冲突和端口冲突
+PROD_PORT="${PROD_PORT:-3001}"
+PROD_DIST_DIR="${PROD_DIST_DIR:-.next-prod}"
+export PORT="$PROD_PORT"
+export NEXT_DIST_DIR="$PROD_DIST_DIR"
+
+info "启动 Next.js 开发服务器（连生产库，端口 $PROD_PORT）..."
 echo ""
 echo -e "${GREEN}════════════════════════════════════════${NC}"
 echo -e "${GREEN}  Lifeware 生产环境已就绪${NC}"
-echo -e "${GREEN}  前端: http://localhost:3000${NC}"
+echo -e "${GREEN}  前端: http://localhost:${PROD_PORT}${NC}"
 echo -e "${GREEN}  数据库: postgresql://lifeware:****@localhost:5433/lifeware${NC}"
 echo -e "${GREEN}  用户: mvp@lifeware.app${NC}"
 echo -e "${GREEN}  迁移状态: ${APPLIED_COUNT}/${TOTAL_MIGRATIONS}${NC}"
@@ -145,4 +152,4 @@ fi
 echo -e "${GREEN}════════════════════════════════════════${NC}"
 echo ""
 
-npm run dev
+npx next dev -H 0.0.0.0 -p "$PROD_PORT"
