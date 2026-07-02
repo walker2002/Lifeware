@@ -242,3 +242,106 @@ describe('[022.01] approveCycle 分派逻辑', () => {
     expect(mockFindById).toHaveBeenCalledTimes(1) // 仅前置读，无回读
   })
 })
+
+// ─── approveCycle 负路径 ─────────────────────────────────────────────
+
+describe('[022.01] approveCycle 负路径', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('非法 UUID → error', async () => {
+    const r = await approveCycle('not-a-uuid')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('无效的周期 ID')
+    expect(mockFindById).not.toHaveBeenCalled()
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('cycle 不存在 → error', async () => {
+    mockFindById.mockResolvedValueOnce(null)
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('周期不存在')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('executeIntent 失败 → 透传 error', async () => {
+    const draftCycle = {
+      id: 'c1e00000-0000-0000-0000-000000000001',
+      cycleType: 'quarterly' as const,
+      name: '2026-Q3',
+      period: { start: '2026-07-01', end: '2026-09-30' },
+      status: 'draft' as const,
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    }
+    mockFindById.mockResolvedValueOnce(draftCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: false,
+      error: 'SM error',
+    })
+
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('SM error')
+    expect(mockFindById).toHaveBeenCalledTimes(1) // 仅前置读，无回读
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+  })
+
+  it('回读失败 → error', async () => {
+    const draftCycle = {
+      id: 'c1e00000-0000-0000-0000-000000000001',
+      cycleType: 'quarterly' as const,
+      name: '2026-Q3',
+      period: { start: '2026-07-01', end: '2026-09-30' },
+      status: 'draft' as const,
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    }
+    mockFindById.mockResolvedValueOnce(draftCycle) // 前置读
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      object: { ...draftCycle, status: 'in_progress' },
+      objectType: 'cycle',
+    })
+    mockFindById.mockResolvedValueOnce(null) // 回读返回 null
+
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('审核通过后回读失败')
+    expect(mockFindById).toHaveBeenCalledTimes(2)
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+  })
+
+  it('catch-all 异常 → error', async () => {
+    mockFindById.mockRejectedValueOnce(new Error('网络错误'))
+    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('网络错误')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+})
+
+// ─── createCycle catch-all ──────────────────────────────────────────
+
+describe('[022.01] createCycle catch-all', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('orchestrator.executeIntent 抛出异常 → error', async () => {
+    mockExecuteIntent.mockRejectedValueOnce(new Error('网络错误'))
+
+    const r = await createCycle({
+      cycleType: 'quarterly',
+      name: '2027-Q1',
+      periodStart: '2027-01-01',
+      periodEnd: '2027-03-31',
+    })
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('网络错误')
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+  })
+})
