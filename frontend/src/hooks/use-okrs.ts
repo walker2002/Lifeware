@@ -53,11 +53,13 @@ interface UseOKRsResult {
   /** 周期列表加载中 */
   isLoadingCycles: boolean
   /**
-   * 新建周期（客户端直接调 CycleRepository.save）。
+   * 新建周期（[022.01] Phase 1：走 executeIntent，client 仅传业务字段）
+   *
+   * server 侧构造 id/createdAt/updatedAt，SM 强制 status='draft'。
    * [022] MVP 取舍：创建 cycle 与创建 objective 为两步 server action，
    * objective 失败不会回滚已创建的 cycle（下次可直接选）。
    */
-  createCycle: (cycle: Cycle) => Promise<Cycle>
+  createCycle: (input: { cycleType: string; name: string; periodStart: string; periodEnd: string }) => Promise<Cycle>
   /**
    * [024] G1：删除周期。返回 true=已删，false=拒绝/失败（error 已写入 error 状态）。
    */
@@ -183,14 +185,17 @@ export function useOKRs(): UseOKRsResult {
   }, [refresh])
 
   /**
-   * [022] 新建周期（[022] QA fix：改为 server action）。
+   * [022.01] 新建周期（改走 executeIntent）。
+   *
+   * 客户端只传业务字段（cycleType/name/periodStart/periodEnd），server 侧
+   * 经 SM create→draft，构造 id/createdAt/updatedAt。
    *
    * MVP 取舍：创建 cycle 与创建 objective 是两步 server action，
    * objective 失败不会回滚已创建的 cycle（下次可直接选），
    * 但表单保留已填内容 + errors 区提示「周期已创建，请重试保存目标」。
    */
-  const createCycle = useCallback(async (cycle: Cycle): Promise<Cycle> => {
-    const result = await createCycleAction(cycle)
+  const createCycle = useCallback(async (input: { cycleType: string; name: string; periodStart: string; periodEnd: string }): Promise<Cycle> => {
+    const result = await createCycleAction(input)
     if (!result.success || !result.data) throw new Error(result.error ?? "创建周期失败")
     const saved = result.data
     setCycles(prev => [...prev, saved])

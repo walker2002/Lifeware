@@ -119,10 +119,10 @@ export function buildActionMap(): Record<string, string> {
  */
 export function resolveObjectType(domainId: string, action: string): string {
   try {
-    const { loadDomainManifest } = require('@/domains/manifest-loader')
-    const path = require('node:path')
-    const domainDir = path.resolve(process.cwd(), `src/domains/${domainId}`)
-    const result = loadDomainManifest(domainDir)
+    // [022.01] 修复：原用 require('@/domains/manifest-loader') 在 vitest/ESM
+    // 下无法解析 TS alias → 抛错被 try/catch 吞 → 兜底返回 'okr'（domainId 去 s）
+    // 导致 orchestrator 在 okrs 多键域找不到任何 repo。改用顶部 ESM import。
+    const result = loadDomainManifest(domainId)
     if (!result.success) return domainId.replace(/s$/, '')
 
     const lifecycle = result.manifest.lifecycle ?? {}
@@ -174,10 +174,9 @@ export function getTransitionFromManifest(
   action: string,
 ): { from: string | string[] | null; action: string; to: string; eventType: string } | undefined {
   try {
-    const { loadDomainManifest } = require('@/domains/manifest-loader')
-    const path = require('node:path')
-    const domainDir = path.resolve(process.cwd(), `src/domains/${domainId}`)
-    const result = loadDomainManifest(domainDir)
+    // [022.01] 修复：同 resolveObjectType，改用顶部 ESM import 避免 vitest/ESM
+    // 下 require 解析 TS alias 失败 → 抛错被吞 → 永远返回 undefined
+    const result = loadDomainManifest(domainId)
     if (!result.success) return undefined
 
     const lifecycle = result.manifest.lifecycle?.[objectType]

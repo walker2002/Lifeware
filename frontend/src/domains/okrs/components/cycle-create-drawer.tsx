@@ -21,12 +21,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { Cycle } from "@/usom/types/objects"
-import type { USOM_ID } from "@/usom/types/primitives"
+
+/** [022.01] Phase 1：客户端只传业务字段，id/status/createdAt/updatedAt 由 server 构造 */
+export type CreateCycleInput = {
+  cycleType: string
+  name: string
+  periodStart: string
+  periodEnd: string
+}
 
 interface CycleCreateDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateCycle: (cycle: Cycle) => Promise<Cycle>
+  onCreateCycle: (input: CreateCycleInput) => Promise<Cycle>
   isLoading?: boolean
 }
 
@@ -54,16 +61,13 @@ export function CycleCreateDrawer({
         return d.toISOString().slice(0, 10)
       })()
     try {
-      const cycle: Cycle = {
-        id: crypto.randomUUID() as USOM_ID,
+      // [022.01] Phase 1：客户端只传业务字段，id/status/timestamps 由 server 经 SM 构造
+      await onCreateCycle({
         cycleType,
         name: name || `${s}~${e}`,
-        period: { start: s as any, end: e as any },
-        status: "in_progress",
-        createdAt: now.toISOString() as any,
-        updatedAt: now.toISOString() as any,
-      }
-      await onCreateCycle(cycle)
+        periodStart: s,
+        periodEnd: e,
+      })
       setName("")
       setStart("")
       setEnd("")

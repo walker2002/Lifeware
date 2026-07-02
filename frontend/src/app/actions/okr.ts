@@ -9,17 +9,12 @@
 
 import type { Objective, KeyResult, Cycle } from "@/usom/types/objects";
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
-import type { ObjectiveStatus, KeyResultStatus, Timestamp } from "@/usom/types/primitives";
+import type { ObjectiveStatus } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";
-import { createOkrsGenericRepo } from "@/domains/okrs/repository/generic-repo-adapter";
 import { createOkrsMutationService } from "./okrs/mutation-service";
-import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
-import { TimeboxRepository } from "@/domains/timebox/repository";
-import { createOrchestrator } from "../../nexus/orchestrator";
-import { createRuleEngine } from "../../nexus/core/rule-engine";
-import { createEventBus } from "../../nexus/infrastructure/event-bus";
+import { createOKROrchestrator, makeIntent } from "@/domains/okrs/wiring";
 
 /** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -111,20 +106,32 @@ export async function getActiveCycles(): Promise<OKRActionResult<Cycle[]>> {
 }
 
 /**
- * 创建周期（[022] QA fix 2026-06-26）
+ * 创建周期（[022.01] Phase 1：改走 executeIntent → SM create→draft）
  *
- * 走 repo.save 直写是有意为之的例外（与 write-entry-guard 守卫规则一致）：
- * Cycle 是单行 upsert（自然键 userId+periodStart+periodEnd 唯一约束），
- * 无跨表副作用（无 KR recompute、无 event fan-out），mutation-service
- * 抽象对单行 upsert 反而是过度设计。
+ * 不再接受 status 入参——SM 按 manifest create→draft 强制 draft。
+ * 自然键幂等：同 (userId, periodStart, periodEnd) 只存在一条 cycle。
  *
- * 例外登记：write-entry-guard.test.ts 的 allow 列表
+ * @param input - 周期输入数据
+ * @returns 创建结果
  */
-export async function createCycle(cycle: Cycle): Promise<OKRActionResult<Cycle>> {
+export async function createCycle(
+  input: { cycleType: string; name: string; periodStart: string; periodEnd: string },
+): Promise<OKRActionResult<Cycle>> {
   try {
-    const repo = new CycleRepository();
-    const data = await repo.save(cycle, MVP_USER_ID);
-    return { success: true, data };
+    const orchestrator = await createOKROrchestrator();
+    const intent = makeIntent("createCycle", {
+      cycleType: input.cycleType,
+      name: input.name,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+    });
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+    if (!result.success) return { success: false, error: result.error };
+
+    // 从 SM 执行结果取返回对象（adapter.create → save 回查返回持久化行）
+    const cycle = result.object as Cycle | undefined;
+    if (!cycle) return { success: false, error: "周期创建成功但未返回对象" };
+    return { success: true, data: cycle };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "创建周期失败" };
   }
@@ -164,68 +171,6 @@ export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void
 }
 
 // ─── 操作 ────────────────────────────────────────────────────────
-
-/**
- * 创建 OKR 编排器实例
- * @returns OKR 编排器
- */
-async function createOKROrchestrator() {
-  const objectiveRepo = new ObjectiveRepository();
-  const keyResultRepo = new KeyResultRepository();
-  const eventRepo = new SystemEventRepository();
-  const timeboxRepo = new TimeboxRepository();
-  const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
-
-  const okrsRepos = createOkrsGenericRepo({
-    objectiveRepo: objectiveRepo as any,
-    keyResultRepo: keyResultRepo as any,
-    cycleRepo: new CycleRepository() as any,
-  });
-
-  return createOrchestrator({
-    eventRepo,
-    intentEngine: { parse: async () => { throw new Error("not used") } },
-    ruleEngine: {
-      evaluate: async (intentEval, snapshot) => {
-        const result = await ruleEngine.evaluate(intentEval, snapshot);
-        return {
-          result: result.severity,
-          warnings: result.warnings,
-          confirmations: result.confirmations,
-        };
-      },
-    },
-    getRepo: (domainId: string, objectType: string) => {
-      if (domainId === 'okrs') {
-        const repo = okrsRepos[objectType]
-        if (!repo) throw new Error(`未找到 OKR repo: ${objectType}`)
-        return repo
-      }
-      throw new Error(`getRepo: 不支持的域 ${domainId}`)
-    },
-  });
-}
-
-/**
- * 构建意图对象
- * 
- * @param action - 动作名称
- * @param fields - 动作字段
- * @returns 意图对象
- */
-function makeIntent(action: string, fields: Record<string, unknown>) {
-  const now = new Date().toISOString() as Timestamp;
-  return {
-    id: crypto.randomUUID() as import("@/usom/types/primitives").USOM_ID,
-    intentionId: crypto.randomUUID() as import("@/usom/types/primitives").USOM_ID,
-    targetDomain: "okrs" as const,
-    action,
-    fields,
-    confidence: 1.0,
-    resolvedBy: "template_form" as const,
-    createdAt: now,
-  };
-}
 
 /**
  * 创建目标
