@@ -15,6 +15,7 @@ import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";
 import { createOkrsMutationService } from "./okrs/mutation-service";
 import { createOKROrchestrator, makeIntent } from "@/domains/okrs/wiring";
+import type { USOM_ID } from "@/usom/types/primitives";
 
 /** MVP 用户 ID（临时使用） */
 const MVP_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -367,5 +368,43 @@ export async function deleteDraftKeyResult(
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "删除失败" };
+  }
+}
+
+/**
+ * 审核通过周期（[022.01] Phase 1: Task 7）
+ *
+ * 按 server 时刻 now（UTC date-only YYYY-MM-DD）与 periodStart 比较分派：
+ * - now >= periodStart → executeIntent('startCycle')（draft → in_progress）
+ * - now <  periodStart → executeIntent('planCycle')  （draft → not_started）
+ *
+ * 仅允许从 draft 状态审核通过；非 draft 返回错误，避免误改已 in_progress/ended 周期。
+ * 不接受其他 fromState 的 transition；分派由 server 决定，避免客户端造假。
+ *
+ * @param cycleId - 周期 ID（USOM UUID 字符串）
+ * @returns 执行结果，成功时返回更新后的 Cycle
+ */
+export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
+  try {
+    const cycleRepo = new CycleRepository();
+    const cycle = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!cycle) return { success: false, error: "周期不存在" };
+    if (cycle.status !== "draft") {
+      return { success: false, error: "仅 draft 状态可审核通过" };
+    }
+
+    const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC date-only)
+    const action = now >= cycle.period.start ? "startCycle" : "planCycle";
+
+    const orchestrator = await createOKROrchestrator();
+    const intent = makeIntent(action, { cycleId });
+    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
+    if (!result.success) return { success: false, error: result.error };
+
+    const updated = await cycleRepo.findById(cycleId as USOM_ID, MVP_USER_ID);
+    if (!updated) return { success: false, error: "审核通过后回读失败" };
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "审核通过失败" };
   }
 }
