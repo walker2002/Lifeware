@@ -32,6 +32,7 @@ describe('[024] G1 deleteCycle server action', () => {
     nonEmptyCycleId = crypto.randomUUID()
 
     // 1) 空周期（用于「可删」用例）
+    // [022.01] Phase 2: assertEditable 守卫仅允许 draft 状态删除；fix status 为 'draft'
     await db.insert(s.cycles).values({
       id: emptyCycleId,
       userId: MVP_USER_ID,
@@ -39,7 +40,7 @@ describe('[024] G1 deleteCycle server action', () => {
       name: 'test-del-024-empty-2027Q1',
       periodStart: '2027-01-01',
       periodEnd: '2027-03-31',
-      status: 'in_progress',
+      status: 'draft',
       createdAt: now,
       updatedAt: now,
     })
@@ -52,7 +53,7 @@ describe('[024] G1 deleteCycle server action', () => {
       name: 'test-del-024-nonempty-2027Q2',
       periodStart: '2027-04-01',
       periodEnd: '2027-06-30',
-      status: 'in_progress',
+      status: 'draft',
       createdAt: now,
       updatedAt: now,
     })
