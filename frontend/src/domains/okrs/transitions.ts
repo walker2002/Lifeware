@@ -1,15 +1,14 @@
 /**
  * @file transitions
- * @brief OKRs 状态转换表
- * 
- * Objective: (null) → draft → active ⇄ paused
- *            draft/active/paused → discarded → archived
- *            active → completed → archived
- * KeyResult: 联动 Objective 状态变更时 KR 同步转换
- *            独立 updateProgress 不改变状态
+ * @brief OKRs 状态转换工具（Cycle SM 仍在使用）
+ *
+ * [022.01] Phase 3：Objective/KR 不再有独立状态机。
+ *  - objectiveTransitions / keyResultTransitions 已删除
+ *  - Cycle 状态机由 manifest.yaml lifecycle.cycle 驱动，本文件保留通用
+ *    Transition<T> 与 findTransition 辅助函数。
+ * Objective 字段写：通过 mutation-service 直写；KR 完成判定：由 progressRate 触发。
  */
 
-import type { ObjectiveStatus, KeyResultStatus } from '@/usom/types/primitives'
 import type { SystemEventType } from '@/usom/types/process'
 
 /**
@@ -26,35 +25,9 @@ export interface Transition<T extends string = string> {
   eventType: SystemEventType
 }
 
-export const objectiveTransitions: Transition<ObjectiveStatus>[] = [
-  { from: null,       to: 'draft',     action: 'create',   eventType: 'ObjectiveCreated' },
-  { from: 'draft',    to: 'active',    action: 'activate',  eventType: 'ObjectiveActivated' },
-  { from: 'draft',    to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
-  { from: 'active',   to: 'paused',    action: 'pause',     eventType: 'ObjectivePaused' },
-  { from: 'active',   to: 'completed', action: 'complete',  eventType: 'ObjectiveCompleted' },
-  { from: 'active',   to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
-  { from: 'paused',   to: 'active',    action: 'resume',    eventType: 'ObjectiveResumed' },
-  { from: 'paused',   to: 'discarded', action: 'discard',   eventType: 'ObjectiveDiscarded' },
-  { from: 'completed',to: 'archived',  action: 'archive',   eventType: 'ObjectiveArchived' },
-  { from: 'discarded',to: 'archived',  action: 'archive',   eventType: 'ObjectiveArchived' },
-]
-
-export const keyResultTransitions: Transition<KeyResultStatus>[] = [
-  { from: null,       to: 'draft',     action: 'create',   eventType: 'KeyResultUpdated' },
-  { from: 'draft',    to: 'active',   action: 'activate',  eventType: 'KeyResultUpdated' },
-  { from: 'draft',    to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
-  { from: 'active',   to: 'paused',   action: 'pause',     eventType: 'KeyResultUpdated' },
-  { from: 'active',   to: 'completed', action: 'complete',  eventType: 'KeyResultCompleted' },
-  { from: 'active',   to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
-  { from: 'paused',   to: 'active',   action: 'resume',    eventType: 'KeyResultUpdated' },
-  { from: 'paused',   to: 'discarded', action: 'discard',   eventType: 'KeyResultUpdated' },
-  { from: 'completed',to: 'archived',  action: 'archive',   eventType: 'KeyResultUpdated' },
-  { from: 'discarded',to: 'archived',  action: 'archive',   eventType: 'KeyResultUpdated' },
-]
-
 /**
  * 查找状态转换
- * 
+ *
  * @param transitions - 转换列表
  * @param from - 源状态
  * @param action - 动作名称

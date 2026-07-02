@@ -185,27 +185,8 @@ export type Tag = string // lowercase, max 20 chars
 export type Notes = string | null
 
 // ─── Status Enums ──────────────────────────────────────────────
-/**
- * 目标状态
- * - draft: 草稿
- * - active: 活跃中
- * - paused: 已暂停
- * - completed: 已完成
- * - discarded: 已废弃
- * - archived: 已归档
- */
-export type ObjectiveStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded' | 'archived'
-
-/**
- * 关键结果状态
- * - draft: 草稿
- * - active: 活跃中
- * - paused: 已暂停
- * - completed: 已完成
- * - discarded: 已废弃
- * - archived: 已归档
- */
-export type KeyResultStatus = 'draft' | 'active' | 'paused' | 'completed' | 'discarded' | 'archived'
+// [022.01] Phase 3：移除 ObjectiveStatus / KeyResultStatus。
+// Objective/KR 不再有独立状态机——状态权威完全迁移至 Cycle.status。
 
 /**
  * 任务状态

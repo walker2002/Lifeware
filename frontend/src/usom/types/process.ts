@@ -4,7 +4,7 @@
 import type {
   USOM_ID, Timestamp, DateOnly, Tag, Notes,
   EnergyState, EnergyCurve, TimeOfDay, PeriodType,
-  IntentionStatus, ObjectiveStatus, KeyResultStatus,
+  IntentionStatus,
   TaskStatus, HabitStatus, TimeboxStatus,
   DomainId, ActionCategory, ActionType, USOMObjectType, ExternalSourceType,
 } from './primitives'
@@ -196,8 +196,10 @@ export type SystemEventType =
   | 'HabitCreated' | 'HabitActivated' | 'HabitSuspended' | 'HabitArchived' | 'HabitDeleted'
   | 'HabitLogged' | 'HabitSkipped' | 'HabitStreakMilestone'
   | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged'
-  | 'ObjectiveCreated' | 'ObjectiveActivated' | 'ObjectivePaused' | 'ObjectiveResumed'
-  | 'ObjectiveCompleted' | 'ObjectiveDiscarded' | 'ObjectiveArchived'
+  // [022.01] Phase 3: Objective 6 个状态事件移除（ObjectiveActivated/Paused/Resumed/Completed/Discarded/Archived）。
+  // Obj/KR 不再有独立状态机，状态权威迁移至 Cycle.status。
+  // CycleCreated/Planned/Started/Ended/Reviewed 保留。
+  | 'ObjectiveCreated'
   | 'KeyResultUpdated' | 'KeyResultCompleted' | 'KeyResultProgressUpdated'
   | 'ReviewCreated' | 'ReviewCompleted'
   | 'IntentionCaptured' | 'IntentionDissolved'

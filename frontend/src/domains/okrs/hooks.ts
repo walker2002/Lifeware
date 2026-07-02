@@ -128,6 +128,9 @@ export function createOkrsHooks(
     const { fields } = intent
     const action = intent.action
 
+    // [022.01] Phase 3：移除 activateObjective 校验块。
+    // Objective 无独立状态机，无需激活前置（KR 草稿由 cycle.status 统一管控）。
+
     if (action === 'createObjective' || action === 'updateObjective') {
       const title = fields['title']
       if (action === 'createObjective' && (!title || (typeof title === 'string' && title.trim() === ''))) {
@@ -140,30 +143,6 @@ export function createOkrsHooks(
       const okrType = fields['okrType']
       if (okrType !== undefined && !validOkrTypes.has(okrType as string)) {
         errors.push(`okrType 必须是 ${[...validOkrTypes].join(' 或 ')}`)
-      }
-    }
-
-    if (action === 'activateObjective') {
-      const objectiveId = fields['objectiveId']
-      if (!objectiveId || typeof objectiveId !== 'string') {
-        errors.push('objectiveId 必填')
-      }
-      // 激活前置校验：需要 >= 1 个 draft KR + 周期日期
-      if (repos?.keyResultRepo && repos?.objectiveRepo && objectiveId) {
-        const userId = fields['userId'] as string
-        if (userId) {
-          const objective = await repos.objectiveRepo.findById(objectiveId, userId)
-          if (objective) {
-            if (!objective.period?.start || !objective.period?.end) {
-              errors.push('激活失败: 必须设置周期起止日期')
-            }
-            const krs = await repos.keyResultRepo.findByObjective(objectiveId, userId)
-            const draftKRs = krs.filter((kr: any) => kr.status === 'draft')
-            if (draftKRs.length === 0) {
-              errors.push('激活失败: 至少需要 1 个草稿关键结果')
-            }
-          }
-        }
       }
     }
 
@@ -233,51 +212,9 @@ export function createOkrsHooks(
           }],
         }
 
-      case 'ObjectiveActivated':
-        return {
-          metrics: [],
-          suggestions: [{
-            actionType: 'review_okr',
-            label: `目标已激活: ${title}`,
-            weight: 70,
-          }],
-        }
-
-      case 'ObjectiveCompleted':
-        return {
-          metrics: [{
-            metricKey: 'objective_completed',
-            value: 1,
-          }],
-          suggestions: [{
-            actionType: 'review_okr',
-            label: `目标已完成: ${title}`,
-            weight: 80,
-          }],
-        }
-
-      case 'ObjectiveDiscarded':
-        return {
-          metrics: [],
-          suggestions: [{
-            actionType: 'review_okr',
-            label: `目标已废弃: ${title}`,
-            weight: 40,
-          }],
-        }
-
-      case 'KeyResultCompleted':
-        return {
-          metrics: [{
-            metricKey: 'key_result_completed',
-            value: 1,
-          }],
-          suggestions: [{
-            actionType: 'review_okr',
-            label: `关键结果已完成: ${(event.payload['krTitle'] as string) || ''}`,
-            weight: 75,
-          }],
-        }
+      // [022.01] Phase 3：移除 Objective 状态事件（Activated/Paused/Resumed/
+      // Completed/Discarded/Archived）以及 KeyResultCompleted，这些事件不再产生。
+      // Obj/KR 完成语义迁移至 progressRate 判定。
 
       case 'KeyResultProgressUpdated': {
         const progressRate = (event.payload['progressRate'] as number) || 0

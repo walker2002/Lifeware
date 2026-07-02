@@ -8,7 +8,7 @@ import type {
   USOM_ID, Timestamp, DateOnly, DurationMinutes, Notes, Tag,
   Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
   Chronotype, EnergyCurvePoint, EnergySensitivity,
-  ObjectiveStatus, KeyResultStatus, TaskStatus, HabitStatus,
+  TaskStatus, HabitStatus,
   CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
   ThreadStatus, AISessionStatus,
   ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
@@ -163,7 +163,6 @@ export interface Cycle {
 /**
  * 目标接口（OKR 目标）
  * @property id - 目标唯一标识
- * @property status - 目标状态
  * @property title - 目标标题
  * @property description - 目标描述
  * @property cycleId - 权威周期归属，指向 Cycle（见 §3.5a）
@@ -179,10 +178,13 @@ export interface Cycle {
  * @property discardedAt - 废弃时间
  * @property completedAt - 完成时间
  * @property archivedAt - 归档时间
+ *
+ * [022.01] Phase 3：移除 status 字段。状态权威迁移至 Cycle.status（§3.5a）。
+ * Objective 不再有独立状态机——可编辑性由 {@link assertEditable}（guard.ts）
+ * 通过归属 Cycle 的 status 统一判定。
  */
 export interface Objective {
   id: USOM_ID
-  status: ObjectiveStatus
   title: string
   description?: string
   /** 权威周期归属，指向 Cycle */
@@ -217,13 +219,15 @@ export interface Objective {
  * @property currentValue - 当前值
  * @property unit - 单位
  * @property progressRate - 进度比率（0-1）
- * @property status - 关键结果状态
  * @property dueDate - 截止日期
  * @property discardedAt - 废弃时间
  * @property completedAt - 完成时间
  * @property archivedAt - 归档时间
  * @property createdAt - 创建时间
  * @property updatedAt - 更新时间
+ *
+ * [022.01] Phase 3：移除 status 字段。完成语义由 progressRate 承载
+ * （progressRate >= 1.0 即视为完成）。
  */
 export interface KeyResult {
   id: USOM_ID
@@ -236,12 +240,11 @@ export interface KeyResult {
   progressRate: number
   // [024] 达成信心度（0-100 百分比），默认 50
   confidence: number
-  status: KeyResultStatus
   dueDate?: DateOnly
   discardedAt?: Timestamp
   // [022] 2026-06-26 review deferred：补齐 KR 生命周期时间戳字段。
   // 此前 mapper 不映射，导致 archive() 写后 read 丢失 archivedAt，
-  // status='completed' 派生后丢失 completedAt。
+  // completedAt 写入路径丢失。
   completedAt?: Timestamp
   archivedAt?: Timestamp
   createdAt: Timestamp

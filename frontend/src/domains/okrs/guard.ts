@@ -1,12 +1,11 @@
 /**
  * @file guard
- * @brief [022.01] Phase 2: Cycle 状态权限守卫
+ * @brief [022.01] Phase 3: OKR 域全面权限守卫
  *
  * 统一 Cycle/Obj/KR 的编辑与删除权限检查，以 Cycle.status 为唯一权威源。
  * 权限矩阵见设计 spec §C。
  *
- * Phase 2 集成范围：deleteCycle + reviewCycle（cycle 级操作）。
- * Obj/KR 写路径接入 defer 到 Phase 3（届时 Obj/KR 自身 status 被移除）。
+ * Phase 3 全面守卫：所有 Cycle/Obj/KR 写路径均经 assertEditable 检查。
  */
 
 import type { Cycle } from '@/usom/types/objects'

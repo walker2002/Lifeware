@@ -22,117 +22,24 @@ intent_triggers:
     response_type: page
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
+# [022.01] Phase 3：objective / key_result 无独立状态机。
+# 仅保留 null→draft 的 create 转换（最小外壳），以维持 orchestrator 管线：
+#   - orchestrator/index.ts:951 getLifecycle 在 undefined 时抛错
+#   - resolveObjectType(L120) / buildActionMap(L59) 也依赖 lifecycle keys
+# draft 即初态也是终态——创建后无任何 SM 转换，字段写走 mutation-service。
 lifecycle:
   objective:
-    states: [draft, active, paused, completed, discarded, archived]
+    states: [draft]
     initial_state: draft
     transitions:
-      - from: null
-        to: draft
-        trigger: intent
-        action: create
-        event_type: ObjectiveCreated
-      - from: draft
-        to: active
-        trigger: intent
-        action: activate
-        event_type: ObjectiveActivated
-      - from: draft
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: ObjectiveDiscarded
-      - from: active
-        to: paused
-        trigger: intent
-        action: pause
-        event_type: ObjectivePaused
-      - from: active
-        to: completed
-        trigger: intent
-        action: complete
-        event_type: ObjectiveCompleted
-      - from: active
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: ObjectiveDiscarded
-      - from: paused
-        to: active
-        trigger: intent
-        action: resume
-        event_type: ObjectiveResumed
-      - from: paused
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: ObjectiveDiscarded
-      - from: completed
-        to: archived
-        trigger: intent
-        action: archive
-        event_type: ObjectiveArchived
-      - from: discarded
-        to: archived
-        trigger: intent
-        action: archive
-        event_type: ObjectiveArchived
-    terminal_states: [archived]
+      - { from: null, to: draft, trigger: intent, action: create, event_type: ObjectiveCreated }
+    terminal_states: [draft]
   key_result:
-    states: [draft, active, paused, completed, discarded, archived]
+    states: [draft]
     initial_state: draft
     transitions:
-      - from: null
-        to: draft
-        trigger: intent
-        action: create
-        event_type: KeyResultUpdated
-      - from: draft
-        to: active
-        trigger: intent
-        action: activate
-        event_type: KeyResultUpdated
-      - from: draft
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: KeyResultUpdated
-      - from: active
-        to: paused
-        trigger: intent
-        action: pause
-        event_type: KeyResultUpdated
-      - from: active
-        to: completed
-        trigger: intent
-        action: complete
-        event_type: KeyResultCompleted
-      - from: active
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: KeyResultUpdated
-      - from: paused
-        to: active
-        trigger: intent
-        action: resume
-        event_type: KeyResultUpdated
-      - from: paused
-        to: discarded
-        trigger: intent
-        action: discard
-        event_type: KeyResultUpdated
-      - from: completed
-        to: archived
-        trigger: intent
-        action: archive
-        event_type: KeyResultUpdated
-      - from: discarded
-        to: archived
-        trigger: intent
-        action: archive
-        event_type: KeyResultUpdated
-    terminal_states: [archived]
+      - { from: null, to: draft, trigger: intent, action: create, event_type: KeyResultUpdated }
+    terminal_states: [draft]
   cycle:
     states: [draft, not_started, in_progress, ended, reviewed]
     initial_state: draft
@@ -146,6 +53,7 @@ lifecycle:
     terminal_states: [reviewed]
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
+# [022.01] Phase 3：移除 status 字段元数据（Objective/KR 不再含 status）。
 field_metadata:
   title: { type: string, mutation_mode: ContentField }
   description: { type: string, mutation_mode: ContentField }
@@ -153,7 +61,6 @@ field_metadata:
   priority: { type: enum, mutation_mode: ContentField, options: [P0, P1, P2] }
   tags: { type: json, mutation_mode: ContentField }
   cycleId: { type: string, mutation_mode: FactField }
-  status: { type: enum, mutation_mode: FactField, options: [draft, active, paused, completed, discarded, archived] }
   targetValue: { type: number, mutation_mode: FactField }
   currentValue: { type: number, mutation_mode: FactField }
   unit: { type: string, mutation_mode: ContentField }
@@ -161,13 +68,9 @@ field_metadata:
   confidence: { type: number, mutation_mode: FactField }
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
-list_actions:
-  - action: discard
-    label: 废弃
-    confirm_required: true
-  - action: archive
-    label: 归档
-    confirm_required: true
+# [022.01] Phase 3：移除 discard/archive list actions（Objective/KR 无独立状态机，
+# 字段写通过 mutation-service 直走，无 list action 入口）。保留空数组以满足 schema。
+list_actions: []
 
 # ─── 区块 E: required_fields + templates ─────────────────────────
 required_fields:
@@ -194,14 +97,9 @@ required_fields:
       placeholder: 例如：%
 
 # ─── 区块 F: subscribed_events ───────────────────────────────────
+# [022.01] Phase 3：移除 Objective 状态事件（6 个），Cycle 状态事件保留。
 subscribed_events:
   - ObjectiveCreated
-  - ObjectiveActivated
-  - ObjectivePaused
-  - ObjectiveResumed
-  - ObjectiveCompleted
-  - ObjectiveDiscarded
-  - ObjectiveArchived
   - KeyResultUpdated
   - KeyResultCompleted
   - KeyResultProgressUpdated
@@ -230,34 +128,7 @@ view_routes:
     params:
       mode: create
 
-# ─── 区块 H: cascade_rules ─────────────────────────────────────────
-cascade_rules:
-  - type: parent_child_status
-    parent_object: objective
-    child_object: key_result
-    child_query: findByParent
-    rules:
-      - parent_action: activate
-        child_filter: "status == 'draft'"
-        child_to_status: active
-        event_type: KeyResultActivated
-      - parent_action: pause
-        child_filter: "status == 'active'"
-        child_to_status: paused
-        event_type: KeyResultPaused
-      - parent_action: resume
-        child_filter: "status == 'paused'"
-        child_to_status: active
-        event_type: KeyResultResumed
-      - parent_action: complete
-        child_filter: "status in ['active','paused']"
-        child_to_status: completed
-        event_type: KeyResultCompleted
-      - parent_action: discard
-        child_filter: "status not in ['discarded','archived']"
-        child_to_status: discarded
-        event_type: KeyResultDiscarded
-      - parent_action: archive
-        child_filter: "status != 'archived'"
-        child_to_status: archived
-        event_type: KeyResultArchived
+# [022.01] Phase 3：移除 cascade_rules.parent_child_status 块（6 条）。
+# SM 侧已有 null-safety：
+#   - orchestrator/index.ts:955 getCascadeRules 在空数组时返回 undefined
+#   - state-machine/index.ts:336 deps.getCascadeRules 为 undefined 时跳过 cascade 处理
