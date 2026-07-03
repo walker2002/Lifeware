@@ -44,27 +44,56 @@ export const FieldCompletenessRule: Rule = {
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
     if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
 
-    const missing: string[] = []
-
-    for (const field of REQUIRED_FIELDS) {
-      const value = getField(intent, field)
-      // title 需要非空字符串；startTime/endTime 需要存在且非空
-      if (!isNonEmptyString(value)) {
-        missing.push(field)
-      } else if (value === undefined || value === null || value === '') {
-        missing.push(field)
-      }
+    // [026] P0-2 修复（issue #2 误判 itinerary 缺 endTime → NeedConfirm）：
+    //   itinerary 域用 durationMin 而非 endTime（行程时长由 durationMin 决定，
+    //   客户端不折 endTime 上送），timebox 域用 endTime。按 action/objectType
+    //   分派：itinerary 类（action 名含 "Itinerary"）必含 title/startTime/durationMin；
+    //   timebox 类保持原 title/startTime/endTime 三必含。
+    if (isItineraryIntent(intent)) {
+      return evaluateCompleteness(intent, ['title', 'startTime', 'durationMin'])
     }
-
-    if (missing.length === 0) {
-      return { severity: 'pass' }
-    }
-
-    return {
-      severity: 'warning',
-      message: `缺少必需字段: ${missing.join(', ')}`,
-    }
+    return evaluateCompleteness(intent, REQUIRED_FIELDS)
   },
+}
+
+/**
+ * 判断 intent 是否属于 itinerary 域。
+ *
+ * 当前约定：submitDynamicIntent('timebox', 'createItinerary'/'editItinerary'/...) 路由后
+ * intent.targetDomain === 'timebox'，但 action 名含 "Itinerary" 是 itinerary 域的
+ * 标志（与 resolveObjectType 同款分派逻辑，参 app/actions/timebox.ts:354 / 392 / 409）。
+ * 若未来 objectType 字段下推到 intent 层，可改为读 intent.objectType。
+ */
+function isItineraryIntent(intent: StructuredIntent): boolean {
+  return typeof intent.action === 'string' && intent.action.includes('Itinerary')
+}
+
+/**
+ * 字段必含检查（共享实现）。
+ *
+ * 接受非空字符串（title/startTime/endTime）或有效 number（durationMin 等数值字段）。
+ * 跨类型：timebox 域全字符串字段，itinerary 域 durationMin 是 number —— 兼容。
+ *
+ * @param intent 结构化意图
+ * @param requiredFields 必须存在的字段名集合（任意字段为空 → warning）
+ */
+function evaluateCompleteness(
+  intent: StructuredIntent,
+  requiredFields: string[],
+): RuleResult {
+  const missing: string[] = []
+  for (const field of requiredFields) {
+    const value = getField(intent, field)
+    const present = isNonEmptyString(value) || isValidNumber(value)
+    if (!present) missing.push(field)
+  }
+  if (missing.length === 0) {
+    return { severity: 'pass' }
+  }
+  return {
+    severity: 'warning',
+    message: `缺少必需字段: ${missing.join(', ')}`,
+  }
 }
 
 // ─── 2. EndTimeAfterStartRule ─────────────────────────────────
