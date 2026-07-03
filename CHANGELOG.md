@@ -195,6 +195,8 @@
 ## Itinerary 域（[026]）
 
 > 2026_07_03 — A3 ship（14 commits：4 action + 5 态存储 + lazy reconcile + /schedule 锁定合并 + I-1 修复 + Tier 2 docs）。**[026] 全闭环 ship-ready**：`Itinerary` 作 timebox 域内二级对象，5 态存储 lifecycle，零 cron，AI 锁。
+>
+> 2026_07_03 — **T23 (P3, codex #1 follow-up) ship**：field_metadata per-objectType 嵌套重构。消除 timebox itinerary 与其它域同名字段潜在冲突（timebox.timebox.* + timebox.itinerary.* 各自独立 namespace）。4 commits `dc29a6c` / `935a547` / `908f25a` / docs commit：(1) 5 域 manifest 全嵌套化 + schema 升级 `z.record(z.record(...))`；(2) 3 生产消费者（factory.getFieldMetadata / orchestrator field 判定 / okrs.hooks validOkrTypes）+ 9 测试 mock 改读嵌套；(3) validator 区块 C 启发式（C-flat-field-metadata 拒绝平铺）+ 5 新测试；(4) docs/usom-design + domain-development-guide + CHANGELOG 同步。4 域 baseline 持平（validate-manifest 0 errors / 2 warns / 2 info）。
 
 ### 设计决策（关键）
 
@@ -238,7 +240,7 @@
 
 ### 已知 follow-up（保留给 [027] / P2 / P3）
 
-- [P3] **codex #1** `field_metadata` per-objectType 嵌套（timebox/itinerary 同名字段需不同校验场景）— T23
+- ~~[P3] **codex #1** `field_metadata` per-objectType 嵌套（timebox/itinerary 同名字段需不同校验场景）— T23~~ ✅ T23 已 ship（见 [026] section 顶部）
 - [P3] **codex #3** `reconcileAndAdvanceItineraries` 走单 `mutationService.execute()`（绕开完整 intent 流水线）— T22
 - [P2] **codex #5** `localDayKey` 跨 TZ 单元测试（依赖容器 `TZ=Asia/Shanghai`）+ 部署文档 env 必填 — T20
 - [P2] **codex #6** GrowthMenu 单测覆盖 4 itinerary action 自动归"timebox"组 — T19

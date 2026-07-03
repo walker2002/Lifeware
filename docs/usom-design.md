@@ -1224,8 +1224,10 @@ type ValidationResult =
 
 #### 字段写入三分类（mutation_mode）
 
-业务事实写入口按 manifest `field_metadata.*.mutation_mode` 把字段写入分流
-（见宪章 §III 业务事实写入口）：
+业务事实写入口按 manifest `field_metadata.<objectType>.<field>.mutation_mode` 把字段写入分流
+（[026] T23：field_metadata 已重构为 per-objectType 嵌套结构，一级 key 为 objectType，
+二级 key 为字段名；消除跨域字段名潜在冲突，如 timebox itinerary 与其它域同名字段）；
+见宪章 §III 业务事实写入口：
 
 | 分类 | 写入路径 |
 |---|---|

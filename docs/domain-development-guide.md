@@ -58,7 +58,7 @@
 
 ### 2.1 ⚠️ 跨字段红线（硬约束）+ `mutation_mode` 字段分类
 
-每个字段在 manifest `field_metadata.<field>.mutation_mode` 声明其写入分类（运行时已落地，见 `nexus/domain-mutation-service/index.ts` `update()` 路由 `resolveMutationMode`）。`mutationService.update`/`execute` 的字段路径**都不走全量 onValidate**（[018] TENSION-4→4A）。
+每个字段在 manifest `field_metadata.<objectType>.<field>.mutation_mode` 声明其写入分类（[026] T23：field_metadata 已嵌套化；运行时已落地，见 `nexus/domain-mutation-service/index.ts` `update()` 路由 `resolveMutationMode`，读 `manifest.field_metadata[objectType]`）。`mutationService.update`/`execute` 的字段路径**都不走全量 onValidate**（[018] TENSION-4→4A）。
 
 | `mutation_mode` | 写入路径（`mutationService.update`） | 校验 | 业务事件 |
 |---|---|---|---|
@@ -414,24 +414,29 @@ lifecycle:
 # 告诉前端：每个字段是否可编辑、输入类型、是否需要确认
 # 注意：这里只声明业务语义，不声明视觉样式
 
+# [026] T23: field_metadata 改为 per-objectType 嵌套结构，一级 key 为 objectType（如 task / habit），
+# 二级 key 为字段名。多 objectType 域（如 timebox {timebox, itinerary} / okrs {objective, key_result}）
+# 各自独立 namespace，消跨域字段名冲突（timebox itinerary 与其它域同名字段）。
+
 field_metadata:
-  # 每字段须声明 mutation_mode（见 Part I §2.1）：
-  #   FactField（缺省）= 走字段执行器轻校验，可经 mutationService.update 原子写
-  #   ContentField     = 直走 Repository.updateFields（无校验、无事件）
-  #   PresentationField= 本地态，不落库
-  # 带跨字段/跨对象约束的字段【不得】标 FactField/ContentField，其写入经 executeIntent。
-  title:
-    type: string                  # string / time / date / number / textarea /
-                                  # select / boolean / json / enum / lifecycle_timestamp
-    label: 标题
-    required: true
-    mutation_mode: ContentField
-  priority:
-    type: enum
-    label: 优先级
-    options: [critical, high, medium, low]
-    mutation_mode: FactField      # 独立单字段、无跨字段约束 → 可 inline 原子写
-  some_date_field:
+  task:  # objectType key（单域单 objectType 时与域 ID 同）
+    # 每字段须声明 mutation_mode（见 Part I §2.1）：
+    #   FactField（缺省）= 走字段执行器轻校验，可经 mutationService.update 原子写
+    #   ContentField     = 直走 Repository.updateFields（无校验、无事件）
+    #   PresentationField= 本地态，不落库
+    # 带跨字段/跨对象约束的字段【不得】标 FactField/ContentField，其写入经 executeIntent。
+    title:
+      type: string                  # string / time / date / number / textarea /
+                                    # select / boolean / json / enum / lifecycle_timestamp
+      label: 标题
+      required: true
+      mutation_mode: ContentField
+    priority:
+      type: enum
+      label: 优先级
+      options: [critical, high, medium, low]
+      mutation_mode: FactField      # 独立单字段、无跨字段约束 → 可 inline 原子写
+    some_date_field:
     type: time
     label: 时间
     required: false
