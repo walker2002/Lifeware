@@ -25,8 +25,6 @@ interface TimeboxListProps {
   compact?: boolean;
   /** 状态转换操作回调（仅对 timebox 生效，itinerary 走 CNUI） */
   onAction?: (timeboxId: string, action: string) => void;
-  /** [023] A2 C1：卡片标题点击进入编辑 Drawer（仅 timebox） */
-  onEdit?: (tb: import("@/usom/types/summaries").TimeboxSummary) => void;
 }
 
 /**
@@ -35,7 +33,7 @@ interface TimeboxListProps {
  * [026] A3.2 IRON RULE：纯 timebox-only 输入（含空 itinerary）时，
  * 渲染输出与 T13 改动前字节级一致——T15 回归测试会守护。
  */
-export function TimeboxList({ events, compact = false, onAction, onEdit }: TimeboxListProps) {
+export function TimeboxList({ events, compact = false, onAction }: TimeboxListProps) {
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-hairline bg-surface-card p-12">
@@ -49,7 +47,7 @@ export function TimeboxList({ events, compact = false, onAction, onEdit }: Timeb
       <div className="flex flex-col gap-2">
         {events.map((e) =>
           e.kind === "timebox" ? (
-            <TimeboxCard key={e.id} timebox={e.source} compact onAction={onAction} onEdit={onEdit} />
+            <TimeboxCard key={e.id} timebox={e.source} compact onAction={onAction} />
           ) : (
             <ItineraryLockedCard key={e.id} itinerary={e.source} compact />
           ),
@@ -62,7 +60,7 @@ export function TimeboxList({ events, compact = false, onAction, onEdit }: Timeb
     <div className="grid gap-4 sm:grid-cols-2">
       {events.map((e) =>
         e.kind === "timebox" ? (
-          <TimeboxCard key={e.id} timebox={e.source} onAction={onAction} onEdit={onEdit} />
+          <TimeboxCard key={e.id} timebox={e.source} onAction={onAction} />
         ) : (
           <ItineraryLockedCard key={e.id} itinerary={e.source} />
         ),

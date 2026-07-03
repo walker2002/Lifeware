@@ -76,11 +76,9 @@ interface TimeboxCardProps {
   timebox: TimeboxSummary;
   compact?: boolean;
   onAction?: (timeboxId: string, action: string) => void;
-  /** [023] A2 C1：标题点击进入编辑 Drawer */
-  onEdit?: (tb: TimeboxSummary) => void;
 }
 
-export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: TimeboxCardProps) {
+export function TimeboxCard({ timebox, compact = false, onAction }: TimeboxCardProps) {
   const statusStyle = STATUS_STYLES[timebox.status] ?? STATUS_STYLES.planned;
   const borderColor = getCardBorderColor(timebox.executionRecord);
   const completionIcon = getCompletionIcon(timebox.executionRecord);
@@ -123,18 +121,11 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           <span className="text-xs text-body whitespace-nowrap">
             {formatTime(timebox.startTime)}-{formatTime(timebox.endTime)}
           </span>
-          <button
-            type="button"
-            onClick={() => onEdit?.(timebox)}
-            className={`flex-1 truncate text-left text-sm font-medium bg-transparent p-0 cursor-pointer hover:underline ${
-              timebox.status === "cancelled" ? "text-body line-through" : "text-ink"
-            }`}
-          >
+          <span className={`flex-1 truncate text-sm font-medium ${
+            timebox.status === "cancelled" ? "text-body line-through" : "text-ink"
+          }`}>
             {timebox.title}
-          </button>
-          {timebox.archetypeName && (
-            <span className="text-xs text-muted whitespace-nowrap">· {timebox.archetypeName}</span>
-          )}
+          </span>
           {timebox.status === "running" && (
             <span className="text-xs font-mono text-success whitespace-nowrap">
               {formatElapsed(elapsed)}
@@ -208,19 +199,8 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
         <h3 className={`flex-1 truncate font-display text-base font-medium ${
           timebox.status === "cancelled" ? "text-body line-through" : "text-ink"
         }`}>
-          <button
-            type="button"
-            onClick={() => onEdit?.(timebox)}
-            className={`bg-transparent p-0 m-0 border-0 text-inherit font-inherit cursor-pointer hover:underline ${
-              timebox.status === "cancelled" ? "text-body line-through" : "text-ink"
-            }`}
-          >
-            {timebox.title}
-          </button>
+          {timebox.title}
         </h3>
-        {timebox.archetypeName && (
-          <span className="text-xs text-muted whitespace-nowrap">· {timebox.archetypeName}</span>
-        )}
         <Badge variant={statusStyle.variant} className="shrink-0">{statusStyle.label}</Badge>
         {/* 操作按钮 */}
         <div className="flex items-center gap-1 shrink-0">

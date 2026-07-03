@@ -19,14 +19,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { DayView } from './day-view'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
-import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
+import { transitionTimebox } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
 import { mergeEvents, type ScheduleEvent } from './schedule-event'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { Plus, CalendarOff } from 'lucide-react'
 import type { Timebox } from '@/usom/types/objects'
-import type { TimeboxSummary } from '@/usom/types/summaries'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -70,12 +69,6 @@ export function ScheduleWorkspace() {
     // needs_confirm 由 T4 Drawer/弹窗处理（此处简化：reload）
   }, [date, loadDay])
 
-  // 编辑：列表只有 summary（无 activityArchetypeId/notes），按 id 取完整 Timebox 再开 Drawer
-  const handleEdit = useCallback(async (summary: TimeboxSummary) => {
-    const tb = await getTimeboxById(summary.id)
-    if (tb) setDrawer({ mode: 'edit', editTarget: tb })
-  }, [])
-
   return (
     <div className="flex h-full">
       {/* 左栏：当日时间盒列表 */}
@@ -103,7 +96,6 @@ export function ScheduleWorkspace() {
               events={events}
               currentDate={date}
               onAction={(id, action) => handleAction(id, action as any)}
-              onEdit={handleEdit}
             />
           )}
         </div>
