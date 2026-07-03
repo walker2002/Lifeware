@@ -319,6 +319,9 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
       try {
         return await transaction(async (tx) => {
           let lastObject: unknown
+          let lastObjectType: string | undefined
+          let lastTargetId: USOM_ID | undefined
+          let hasFieldSteps = false
           const objects: Record<string, unknown> = {}
           for (const step of steps) {
             const stepObjectType = step.objectType ?? intent.objectType
@@ -350,6 +353,9 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
               if (result.kind === 'Rejected') {
                 throw new FieldMutationError((result as any).errors?.join('; ') ?? '字段写入失败')
               }
+              hasFieldSteps = true
+              lastObjectType = stepObjectType
+              lastTargetId = stepTargetId
               continue
             }
 
@@ -372,7 +378,20 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
               throw new StateMutationError(res.error ?? '状态转换失败')
             }
             lastObject = res.object
+            lastObjectType = stepObjectType
+            lastTargetId = stepTargetId
             if (step.tag) objects[step.tag] = res.object
+          }
+
+          // [026] P0-3 修复（issue #3 partial-write 半失败）：
+          //   纯 field steps 时 lastObject 始终 undefined（仅 state 步骤设置），
+          //   调用方拿不到更新后的对象 → 抛错 → partial-write 半失败状态。
+          //   兜底：在事务内用同事务 tx 调 repo.findById(targetId, userId, tx) 读回，
+          //   填入 lastObject 供调用方直接使用。
+          if (lastObject === undefined && hasFieldSteps && lastTargetId) {
+            const readbackRepo = getRepository(intent.objectType, domainId)
+            const found = await readbackRepo.findById(lastTargetId, userId, tx)
+            if (found) lastObject = found
           }
 
           return { success: true, object: lastObject, objects }
