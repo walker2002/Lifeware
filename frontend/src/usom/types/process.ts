@@ -200,7 +200,7 @@ export type SystemEventType =
   // Obj/KR 不再有独立状态机，状态权威迁移至 Cycle.status。
   // CycleCreated/Planned/Started/Ended/Reviewed 保留。
   | 'ObjectiveCreated'
-  | 'KeyResultUpdated' | 'KeyResultCompleted' | 'KeyResultProgressUpdated'
+  | 'KeyResultUpdated' | 'KeyResultProgressUpdated'
   | 'ReviewCreated' | 'ReviewCompleted'
   | 'IntentionCaptured' | 'IntentionDissolved'
   | 'ProjectCreated' | 'ProjectActivated' | 'ProjectPaused' | 'ProjectResumed'

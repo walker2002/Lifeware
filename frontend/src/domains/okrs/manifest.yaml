@@ -101,7 +101,6 @@ required_fields:
 subscribed_events:
   - ObjectiveCreated
   - KeyResultUpdated
-  - KeyResultCompleted
   - KeyResultProgressUpdated
   - TaskCompleted
   - HabitLogged
