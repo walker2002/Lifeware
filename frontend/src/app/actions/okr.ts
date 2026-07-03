@@ -9,7 +9,6 @@
 
 import type { Objective, KeyResult, Cycle } from "@/usom/types/objects";
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository";
-import type { ObjectiveStatus } from "@/usom/types/primitives";
 import { ObjectiveRepository } from "@/domains/okrs/repository/objective";
 import { KeyResultRepository } from "@/domains/okrs/repository/key-result";
 import { CycleRepository } from "@/domains/okrs/repository/cycle";
@@ -41,18 +40,17 @@ function isUUID(s: string): boolean { return UUID_RE.test(s) }
 
 /**
  * 获取目标列表
- * 
- * @param status - 目标状态（可选）
+ *
+ * [022.01] Phase 3：删除 status 参数——obj 不再有独立状态字段。
+ * 返回当前用户所有未软删除 objectives；Cycle 状态筛选由
+ * 客户端通过 filterObjectivesByCycleStatus 派生。
+ *
  * @returns 目标列表
  */
-export async function getObjectives(
-  status?: ObjectiveStatus,
-): Promise<OKRActionResult<Objective[]>> {
+export async function getObjectives(): Promise<OKRActionResult<Objective[]>> {
   try {
     const repo = new ObjectiveRepository();
-    const objectives = status
-      ? await repo.findByStatus(status, MVP_USER_ID)
-      : await repo.findAll(MVP_USER_ID);
+    const objectives = await repo.findAll(MVP_USER_ID);
     return { success: true, data: objectives };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "获取目标列表失败" };
@@ -190,7 +188,11 @@ export async function deleteCycle(cycleId: string): Promise<OKRActionResult<void
 
 /**
  * 创建目标
- * 
+ *
+ * [022.01] Phase 3：先经 assertEditable(cycle, 'edit_objective') 守卫，
+ * 再走 SM executeIntent；返回 result.object 直接取新创建的 Objective。
+ * （旧实现 findByStatus("draft") 已删：obj 无 status 字段。）
+ *
  * @param input - 目标输入数据
  * @returns 创建结果
  */
@@ -198,15 +200,19 @@ export async function createObjective(
   input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" },
 ): Promise<OKRActionResult<Objective>> {
   try {
+    // Phase 3：检查 cycle 是否允许 edit_objective
+    const cycleRepo = new CycleRepository();
+    const cycle = await cycleRepo.findById(input.cycleId as USOM_ID, MVP_USER_ID);
+    if (cycle) assertEditable(cycle, 'edit_objective');
+
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("createObjective", { ...input, priority: input.priority ?? 'P1' });
     const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
-    const repo = new ObjectiveRepository();
-    const objectives = await repo.findByStatus("draft", MVP_USER_ID);
-    const created = objectives.sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )[0];
+    // [022.01] Phase 3：findByStatus 已删除（obj 无 status 字段）。
+    // SM executeIntent 返回 result.object 含新创建的 Objective，直接取用。
+    const created = result.object as Objective | undefined;
+    if (!created) return { success: false, error: "目标创建成功但未返回对象" };
     return { success: true, data: created };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "创建目标失败" };
@@ -222,6 +228,8 @@ export async function createObjective(
  * 已知架构债（FM-5，本 Task 不处理）：orchestrator（自带 SM）与 mutation-service（factory 自带 SM）
  * 并存——Phase 1 仅修真正的 repo 直写违宪（updateObjective），不强行统一两套写入口（须宪法讨论）。
  *
+ * [022.01] Phase 3：先经 assertEditable(cycle, 'edit_objective') 守卫。
+ *
  * @param objectiveId - 目标 ID
  * @param fields - 更新字段
  * @returns 更新结果
@@ -231,6 +239,14 @@ export async function updateObjective(
   fields: Record<string, unknown>,
 ): Promise<OKRActionResult<Objective>> {
   try {
+    // Phase 3：检查所属 cycle 是否允许 edit_objective
+    const objRepo = new ObjectiveRepository();
+    const obj = await objRepo.findById(objectiveId, MVP_USER_ID);
+    if (obj) {
+      const cycleRepo = new CycleRepository();
+      const cycle = await cycleRepo.findById(obj.cycleId, MVP_USER_ID);
+      if (cycle) assertEditable(cycle, 'edit_objective');
+    }
     const svc = createOkrsMutationService()
     // 过滤派生/不可写字段（period 现为派生；调用方不应再发，但防御性剔除）
     const writable = { ...fields }
@@ -249,57 +265,10 @@ export async function updateObjective(
 }
 
 /**
- * 激活目标
- * 
- * @param objectiveId - 目标 ID
- * @returns 操作结果
- */
-export async function activateObjective(
-  objectiveId: string,
-): Promise<OKRActionResult> {
-  try {
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent("activateObjective", { objectiveId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "激活失败" };
-  }
-}
-
-/**
- * 更改目标状态
- * 
- * @param objectiveId - 目标 ID
- * @param action - 状态动作（pause/resume/complete/discard/archive）
- * @returns 操作结果
- */
-export async function changeObjectiveStatus(
-  objectiveId: string,
-  action: "pause" | "resume" | "complete" | "discard" | "archive",
-): Promise<OKRActionResult> {
-  try {
-    const actionMap: Record<string, string> = {
-      pause: "pauseObjective",
-      resume: "resumeObjective",
-      complete: "completeObjective",
-      discard: "discardObjective",
-      archive: "archiveObjective",
-    };
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent(actionMap[action], { objectiveId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "状态更新失败" };
-  }
-}
-
-/**
  * 创建关键结果
- * 
+ *
+ * [022.01] Phase 3：先经 assertEditable(cycle, 'edit_kr') 守卫。
+ *
  * @param objectiveId - 目标 ID
  * @param input - 关键结果输入数据
  * @returns 创建结果
@@ -309,6 +278,14 @@ export async function createKeyResult(
   input: { title: string; description?: string; targetValue: number; unit: string },
 ): Promise<OKRActionResult<KeyResult>> {
   try {
+    // Phase 3：检查所属 Objective 的 cycle 是否允许 edit_kr
+    const objRepo = new ObjectiveRepository();
+    const obj = await objRepo.findById(objectiveId as USOM_ID, MVP_USER_ID);
+    if (obj) {
+      const cycleRepo = new CycleRepository();
+      const cycle = await cycleRepo.findById(obj.cycleId, MVP_USER_ID);
+      if (cycle) assertEditable(cycle, 'edit_kr');
+    }
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("createKeyResult", { objectiveId, ...input });
     const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
@@ -326,7 +303,9 @@ export async function createKeyResult(
 
 /**
  * 更新关键结果
- * 
+ *
+ * [022.01] Phase 3：先经 assertEditable(cycle, 'edit_kr') 守卫。
+ *
  * @param keyResultId - 关键结果 ID
  * @param fields - 更新字段
  * @returns 更新结果
@@ -336,11 +315,22 @@ export async function updateKeyResult(
   fields: Record<string, unknown>,
 ): Promise<OKRActionResult<KeyResult>> {
   try {
+    // Phase 3：检查所属 cycle 是否允许 edit_kr
+    const krRepo = new KeyResultRepository();
+    const kr0 = await krRepo.findById(keyResultId as USOM_ID, MVP_USER_ID);
+    if (kr0) {
+      const objRepo = new ObjectiveRepository();
+      const obj = await objRepo.findById(kr0.objectiveId, MVP_USER_ID);
+      if (obj) {
+        const cycleRepo = new CycleRepository();
+        const cycle = await cycleRepo.findById(obj.cycleId, MVP_USER_ID);
+        if (cycle) assertEditable(cycle, 'edit_kr');
+      }
+    }
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("updateKeyResult", { keyResultId, ...fields });
     const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
-    const krRepo = new KeyResultRepository();
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
     return { success: true, data: kr! };
   } catch (err) {
@@ -350,7 +340,9 @@ export async function updateKeyResult(
 
 /**
  * 更新关键结果进度
- * 
+ *
+ * [022.01] Phase 3：先经 assertEditable(cycle, 'edit_kr') 守卫。
+ *
  * @param keyResultId - 关键结果 ID
  * @param currentValue - 当前值
  * @returns 更新结果
@@ -360,29 +352,26 @@ export async function updateKeyResultProgress(
   currentValue: number,
 ): Promise<OKRActionResult<KeyResult>> {
   try {
+    // Phase 3：检查所属 cycle 是否允许 edit_kr
+    const krRepo = new KeyResultRepository();
+    const kr0 = await krRepo.findById(keyResultId as USOM_ID, MVP_USER_ID);
+    if (kr0) {
+      const objRepo = new ObjectiveRepository();
+      const obj = await objRepo.findById(kr0.objectiveId, MVP_USER_ID);
+      if (obj) {
+        const cycleRepo = new CycleRepository();
+        const cycle = await cycleRepo.findById(obj.cycleId, MVP_USER_ID);
+        if (cycle) assertEditable(cycle, 'edit_kr');
+      }
+    }
     const orchestrator = await createOKROrchestrator();
     const intent = makeIntent("updateKeyResultProgress", { keyResultId, currentValue });
     const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
     if (!result.success) return { success: false, error: result.error };
-    const krRepo = new KeyResultRepository();
     const kr = await krRepo.findById(keyResultId, MVP_USER_ID);
     return { success: true, data: kr! };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "更新进度失败" };
-  }
-}
-
-export async function deleteDraftKeyResult(
-  keyResultId: string,
-): Promise<OKRActionResult> {
-  try {
-    const orchestrator = await createOKROrchestrator();
-    const intent = makeIntent("deleteKeyResult", { keyResultId });
-    const result = await orchestrator.executeIntent(intent, MVP_USER_ID);
-    if (!result.success) return { success: false, error: result.error };
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "删除失败" };
   }
 }
 

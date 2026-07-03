@@ -2,30 +2,28 @@
  * @file use-okrs
  * @brief OKR 管理 Hook
  *
- * 提供 OKR 的增删改查等操作
+ * 提供 OKR 的增删改查等操作。
  *
- * [022.01] Task 4：refresh 保留 ObjectiveStatus 签名以兼容 okr-list.tsx 等
- * 独立的 OKR 列表页面；Cycle 状态筛选在 client 端（okr-workspace 调用方）
- * 通过 filterObjectivesByCycleStatus 派生，不依赖 server 端 cycle 过滤。
+ * [022.01] Task 4：删除 ObjectiveStatus 相关接口与方法。
+ * obj 不再有独立状态字段——refresh 不再接受 status 参数；
+ * activate / changeStatus / deleteKR 三组方法整组移除。
+ * Cycle 状态筛选在 client 端（okr-workspace 调用方）通过
+ * filterObjectivesByCycleStatus 派生，不依赖 server 端 cycle 过滤。
  */
 
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
 import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
-import type { ObjectiveStatus } from "@/usom/types/primitives"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
 import {
   getObjectives,
   getObjectiveById,
   createObjective,
   updateObjective,
-  activateObjective,
-  changeObjectiveStatus,
   createKeyResult,
   updateKeyResult,
   updateKeyResultProgress,
-  deleteDraftKeyResult,
   getActiveCycles,
   createCycle as createCycleAction,
   deleteCycle as deleteCycleAction,
@@ -42,24 +40,18 @@ interface UseOKRsResult {
   isLoading: boolean
   error: string | null
   /**
-   * [022.01] Task 4：保留原签名（status?: ObjectiveStatus）以兼容
-   * okr-list.tsx 等独立 OKR 列表页面。Phase 2 的 Cycle 状态筛选
-   * 在 okr-workspace / okr-directory 端用纯函数 filterObjectivesByCycleStatus
-   * 做 client-side 过滤，未变更 server 端行为。
-   * 保留循环论点的 type-narrowing：参数名 cycleStatus 更准确，但接收
-   * ObjectiveStatus（保留向后兼容；okr-list 仍以 ObjectiveStatus 过滤）。
+   * [022.01] Task 4：refresh 不再接受 status 参数（obj 已无独立状态字段）。
+   * Cycle 状态筛选在 okr-workspace / okr-directory 端用纯函数
+   * filterObjectivesByCycleStatus 做 client-side 过滤，未变更 server 端行为。
    */
-  refresh: (cycleStatus?: ObjectiveStatus) => Promise<void>
+  refresh: () => Promise<void>
   updateLocal: (id: string, updated: Objective) => void
   loadDetail: (id: string) => Promise<ObjectiveWithKR | null>
   create: (input: { cycleId: string; title: string; description?: string; okrType?: "visionary" | "committed"; priority?: "P0" | "P1" | "P2" }) => Promise<Objective | null>
   update: (id: string, fields: Record<string, unknown>) => Promise<Objective | null>
-  activate: (id: string) => Promise<boolean>
-  changeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<boolean>
   addKR: (objectiveId: string, input: { title: string; description?: string; targetValue: number; unit: string }) => Promise<KeyResult | null>
   updateKR: (id: string, fields: Record<string, unknown>) => Promise<KeyResult | null>
   updateKRProgress: (id: string, currentValue: number) => Promise<KeyResult | null>
-  deleteKR: (id: string) => Promise<boolean>
   /** [022] 可选周期列表（用于 cycle picker） */
   cycles: Cycle[]
   /** 周期列表加载中 */
@@ -87,15 +79,14 @@ export function useOKRs(): UseOKRsResult {
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [isLoadingCycles, setIsLoadingCycles] = useState(true)
 
-  const refresh = useCallback(async (cycleStatus?: ObjectiveStatus) => {
+  const refresh = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
-      // [022.01] Task 4：cycleStatus 沿用 ObjectiveStatus 透传给 server，
-      // 保留向后兼容（okr-list.tsx 等独立 OKR 列表页面的调用路径）。
+      // [022.01] Task 4：getObjectives 不再接受 status 参数。
       // okr-workspace 的 Cycle 状态筛选由 client 端 filterObjectivesByCycleStatus
       // 在 hook 返回后做派生，不依赖 server-side cycle 状态过滤。
-      const result = await getObjectives(cycleStatus)
+      const result = await getObjectives()
       if (result.success && result.data) {
         setObjectives(result.data)
       } else {
@@ -146,26 +137,6 @@ export function useOKRs(): UseOKRsResult {
     return null
   }, [updateLocal])
 
-  const activate_ = useCallback(async (id: string): Promise<boolean> => {
-    const result = await activateObjective(id)
-    if (result.success) {
-      await refresh()
-      return true
-    }
-    setError(result.error ?? "激活失败")
-    return false
-  }, [refresh])
-
-  const changeStatus_ = useCallback(async (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive"): Promise<boolean> => {
-    const result = await changeObjectiveStatus(id, action)
-    if (result.success) {
-      await refresh()
-      return true
-    }
-    setError(result.error ?? "状态更新失败")
-    return false
-  }, [refresh])
-
   const addKR = useCallback(async (objectiveId: string, input: { title: string; description?: string; targetValue: number; unit: string }): Promise<KeyResult | null> => {
     const result = await createKeyResult(objectiveId, input)
     if (result.success) {
@@ -189,16 +160,6 @@ export function useOKRs(): UseOKRsResult {
     setError(result.error ?? "更新进度失败")
     return null
   }, [])
-
-  const deleteKR_ = useCallback(async (id: string): Promise<boolean> => {
-    const result = await deleteDraftKeyResult(id)
-    if (result.success) {
-      await refresh()
-      return true
-    }
-    setError(result.error ?? "删除失败")
-    return false
-  }, [refresh])
 
   /**
    * [022.01] 新建周期（改走 executeIntent）。
@@ -241,12 +202,9 @@ export function useOKRs(): UseOKRsResult {
     loadDetail,
     create: create as any,
     update,
-    activate: activate_,
-    changeStatus: changeStatus_,
     addKR,
     updateKR: updateKR_,
     updateKRProgress: updateKRProgress_,
-    deleteKR: deleteKR_,
     cycles,
     isLoadingCycles,
     createCycle: createCycle as any,
