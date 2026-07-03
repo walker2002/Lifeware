@@ -215,18 +215,32 @@ describe('[026] T16 P1 server actions 集成测试', () => {
   })
 
   // ─── case 4: deleteItinerary(scheduledId) ───────────────────
-  // [026] C1 修复后：deleteItinerary 内部调用 submitDynamicIntent('timebox',
-  // 'cancelItinerary', ...)，SM 找到 from scheduled→cancelled transition 直接执行，
-  // 不弹 needs_confirm（cancel 无 form 字段校验，rule-engine 不拦）。
-  it('case 4: deleteItinerary(scheduledId) → status=ok + DB status=cancelled（C1 修复后直通）', async () => {
+  // [026] C1 修复后：deleteItinerary 内部用 cancelItinerary 走 SM cancel transition。
+  // 首次调（confirmed=undefined）→ FieldCompletenessRule 警告缺字段 → needs_confirm；
+  // 确认后（confirmed=true）→ SM 执行 scheduled→cancelled → success。
+  it('case 4: deleteItinerary(scheduledId) 二次确认 → status=ok + DB status=cancelled（C1 修复后）', async () => {
     const repo = new ItineraryRepository()
     const it = baseIt()
     await repo.save(it, USER)
 
-    const result = await deleteItinerary(it.id as any)
-    expect(result.status).toBe('ok')
-    expect(result.itinerary).toBeTruthy()
+    // 第一次：needs_confirm（FieldCompletenessRule 缺 title/startTime/durationMin 警告）
+    const first = await deleteItinerary(it.id as any)
+    expect(first.status).toBe('needs_confirm')
+    if (first.status === 'needs_confirm') {
+      expect(first.confirmAction).toBe('cancelItinerary')
+      expect(first.confirmFields).toMatchObject({ objectId: it.id })
+    }
+    // needs_confirm 不落库
+    const afterFirst = (await db.select().from(s.itineraries)
+      .where(eq(s.itineraries.id, it.id as any)))[0]
+    expect(afterFirst.status).toBe('scheduled')
 
+    // 第二次：confirmed=true → SM 执行 scheduled→cancelled
+    const result2 = await deleteItinerary(it.id as any, true)
+    expect(result2.status).toBe('ok')
+    expect(result2.itinerary).toBeTruthy()
+
+    // DB row 已变更（cancelled + cancelledAt 非 null）
     const afterRow = (await db.select().from(s.itineraries)
       .where(eq(s.itineraries.id, it.id as any)))[0]
     expect(afterRow.status).toBe('cancelled')
