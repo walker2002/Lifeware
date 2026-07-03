@@ -385,7 +385,35 @@ export const timeboxes = pgTable('timeboxes', {
   index('idx_timeboxes_user_end').on(table.userId, table.endTime),
 ])
 
-// ─── 4.7 reviews ──────────────────────────────────────────────
+// ─── 4.7 itineraries（[026] 行程，D2 reversal: 5 态存储 + 4 transition 时间戳）──
+export const itineraries = pgTable('itineraries', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  title:        text('title').notNull(),
+  detail:       text('detail'),
+  startTime:    timestamp('start_time', { withTimezone: true }).notNull(),
+  durationMin:  integer('duration_min').notNull(),
+  people:       jsonb('people').notNull().$type<string[]>().default([]),
+  // [026] D2 reversal: 5 态全部存储（Cancelled 终态，expired/completed 终态）
+  status:       text('status', { enum: ['scheduled', 'in_progress', 'expired', 'cancelled', 'completed'] }).notNull().default('scheduled'),
+  // SM transition 时间戳（推进时盖）
+  inProgressAt: timestamp('in_progress_at', { withTimezone: true }),
+  expiredAt:    timestamp('expired_at', { withTimezone: true }),
+  completedAt:  timestamp('completed_at', { withTimezone: true }),
+  cancelledAt:  timestamp('cancelled_at', { withTimezone: true }),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  // reconcile 高频查询：未终态 + 起始日 ≤ 今天
+  index('idx_itineraries_user_status_start').on(table.userId, table.status, table.startTime),
+  // Page 列表：未取消 + 按 startTime 排序
+  index('idx_itineraries_user_status').on(table.userId, table.status),
+])
+// 不存 endTime 列（endTime = startTime + durationMin 派生）
+// 不加 FK 到 timeboxes（D2=C 读时合并，行程不物化为 timebox 行）
+
+// ─── 4.8 reviews ──────────────────────────────────────────────
 export const reviews = pgTable('reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

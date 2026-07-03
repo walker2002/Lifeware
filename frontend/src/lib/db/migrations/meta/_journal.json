@@ -218,6 +218,13 @@
       "when": 1783300000000,
       "tag": "0030_p3_drop_obj_kr_status",
       "breakpoints": false
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1783400000000,
+      "tag": "0031_itineraries",
+      "breakpoints": false
     }
   ]
 }
