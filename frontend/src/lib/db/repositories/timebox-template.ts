@@ -1,9 +1,9 @@
 /**
  * @file timebox-template.repository
- * @brief 时间盒模板仓储实现（[023] A2，配置类不走 Nexus）
+ * @brief 时间盒模板仓储实现（[023-02] 行列表 + 模板级星期，配置类不走 Nexus）
  *
  * 每次 create/update/delete 操作自动写入 user_audit_log（OQ-7）。
- * A3 owner-check：写入前校验 subscribed_habits/tasks/threads 中每个 id 归属当前 userId。
+ * A3 owner-check：rows 中 source∈{habit,task,thread} 的 sourceId 全部归属当前 userId。
  *
  * @see docs/usom-design.md §3.12
  * @see docs/database-design.md §7.8
@@ -13,13 +13,8 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import type { DbClient } from '@/lib/db'
 import * as s from '@/lib/db/schema'
+import type { TemplateRow } from '@/lib/db/schema'
 import type { USOM_ID } from '@/usom/types/primitives'
-
-/** 单段生存时间锚点 */
-export interface SurvivalSegment {
-  start: string
-  end: string
-}
 
 /** TimeboxTemplate（USOM 形状，DB 行 → 业务对象的映射目标） */
 export interface TimeboxTemplate {
@@ -27,22 +22,18 @@ export interface TimeboxTemplate {
   userId: USOM_ID
   schemaVersion: number
   name: string
-  survivalSegments: Record<string, SurvivalSegment>
-  subscribedHabits: string[]
-  subscribedTasks: string[]
-  subscribedThreads: string[]
+  daysOfWeek: number[]
+  rows: TemplateRow[]
   createdAt: string
   updatedAt: string
 }
 
-/** Create/Update 输入（除 id/userId 外字段全部可选） */
+/** Create/Update 输入（除 id 外字段必填） */
 export interface TimeboxTemplateInput {
   id?: string
   name: string
-  survivalSegments: Record<string, SurvivalSegment>
-  subscribedHabits?: string[]
-  subscribedTasks?: string[]
-  subscribedThreads?: string[]
+  daysOfWeek: number[]
+  rows: TemplateRow[]
 }
 
 /** DB 行 → USOM TimeboxTemplate */
@@ -52,10 +43,8 @@ function rowToTemplate(row: typeof s.timeboxTemplates.$inferSelect): TimeboxTemp
     userId: row.userId,
     schemaVersion: row.schemaVersion,
     name: row.name,
-    survivalSegments: row.survivalSegments,
-    subscribedHabits: row.subscribedHabits ?? [],
-    subscribedTasks: row.subscribedTasks ?? [],
-    subscribedThreads: row.subscribedThreads ?? [],
+    daysOfWeek: row.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6],
+    rows: row.rows ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -83,7 +72,6 @@ export class TimeboxTemplateRepository {
 
   async create(input: TimeboxTemplateInput, userId: USOM_ID, tx?: DbClient): Promise<TimeboxTemplate> {
     const exec = async (client: DbClient) => {
-      // A3 owner-check：每个订阅 id 必须归属当前 user
       await this.assertSubscriptionsOwned(input, userId, client)
 
       const [row] = await client
@@ -91,10 +79,8 @@ export class TimeboxTemplateRepository {
         .values({
           userId,
           name: input.name,
-          survivalSegments: input.survivalSegments,
-          subscribedHabits: input.subscribedHabits ?? [],
-          subscribedTasks: input.subscribedTasks ?? [],
-          subscribedThreads: input.subscribedThreads ?? [],
+          daysOfWeek: input.daysOfWeek,
+          rows: input.rows,
         })
         .returning()
 
@@ -115,22 +101,10 @@ export class TimeboxTemplateRepository {
       const old = await this.findById(id, userId, client)
       if (!old) throw new Error(`TimeboxTemplate ${id} not found`)
 
-      // A3 owner-check：若订阅字段被改，则重新校验
-      const subscriptionsChanged =
-        input.subscribedHabits !== undefined ||
-        input.subscribedTasks !== undefined ||
-        input.subscribedThreads !== undefined
-      if (subscriptionsChanged) {
-        await this.assertSubscriptionsOwned(
-          {
-            ...input,
-            subscribedHabits: input.subscribedHabits ?? old.subscribedHabits,
-            subscribedTasks: input.subscribedTasks ?? old.subscribedTasks,
-            subscribedThreads: input.subscribedThreads ?? old.subscribedThreads,
-          },
-          userId,
-          client,
-        )
+      // A.2：rows 引用相等时跳过 owner-check（编辑器 setState 总是给新数组，
+      // 所以引用相等 = rows 结构未变 = 不需校验 habits/tasks/threads 归属）
+      if (old.rows !== input.rows) {
+        await this.assertSubscriptionsOwned(input, userId, client)
       }
 
       const changedFields: string[] = []
@@ -140,21 +114,13 @@ export class TimeboxTemplateRepository {
         setData.name = input.name
         changedFields.push('name')
       }
-      if (input.survivalSegments !== undefined) {
-        setData.survivalSegments = input.survivalSegments
-        changedFields.push('survivalSegments')
+      if (input.daysOfWeek !== undefined) {
+        setData.daysOfWeek = input.daysOfWeek
+        changedFields.push('daysOfWeek')
       }
-      if (input.subscribedHabits !== undefined) {
-        setData.subscribedHabits = input.subscribedHabits
-        changedFields.push('subscribedHabits')
-      }
-      if (input.subscribedTasks !== undefined) {
-        setData.subscribedTasks = input.subscribedTasks
-        changedFields.push('subscribedTasks')
-      }
-      if (input.subscribedThreads !== undefined) {
-        setData.subscribedThreads = input.subscribedThreads
-        changedFields.push('subscribedThreads')
+      if (input.rows !== undefined) {
+        setData.rows = input.rows
+        changedFields.push('rows')
       }
 
       const [updated] = await client
@@ -199,28 +165,27 @@ export class TimeboxTemplateRepository {
   }
 
   /**
-   * A3 owner-check：批量校验 subscribed_habits/tasks/threads 归属当前 userId。
-   * 任一 id 不归属或不存在则抛错。
+   * A3 owner-check：遍历 input.rows 收集 source∈{habit,task,thread} 的 sourceId，
+   * 按来源分组去重后校验归属。任一 id 不归属或不存在则抛错。
+   *
+   * 仅在 rows 结构变化时由 update()/create() 调用——rows 未变时跳过可避免
+   * 3 张表的全表 inArray（[023-02] 决议 A.2）。
    *
    * 注：使用静态导入避免循环依赖（HabitRepository / TaskRepository / ThreadRepository）。
-   * 若引入 dynamic import 则失去并行优势且类型不安全。
    */
   private async assertSubscriptionsOwned(
     input: TimeboxTemplateInput,
     userId: USOM_ID,
     client: DbClient,
   ): Promise<void> {
-    // 懒加载：仅在有订阅时才引入各 Repo（避免无谓依赖）
+    const habitIds = uniq(input.rows.filter((r) => r.source === 'habit' && r.sourceId).map((r) => r.sourceId!))
+    const taskIds = uniq(input.rows.filter((r) => r.source === 'task' && r.sourceId).map((r) => r.sourceId!))
+    const threadIds = uniq(input.rows.filter((r) => r.source === 'thread' && r.sourceId).map((r) => r.sourceId!))
+
     const tasks = await Promise.all([
-      input.subscribedHabits && input.subscribedHabits.length > 0
-        ? this._checkHabits(input.subscribedHabits, userId, client)
-        : Promise.resolve(),
-      input.subscribedTasks && input.subscribedTasks.length > 0
-        ? this._checkTasks(input.subscribedTasks, userId, client)
-        : Promise.resolve(),
-      input.subscribedThreads && input.subscribedThreads.length > 0
-        ? this._checkThreads(input.subscribedThreads, userId, client)
-        : Promise.resolve(),
+      habitIds.length > 0 ? this._checkHabits(habitIds, userId, client) : Promise.resolve(),
+      taskIds.length > 0 ? this._checkTasks(taskIds, userId, client) : Promise.resolve(),
+      threadIds.length > 0 ? this._checkThreads(threadIds, userId, client) : Promise.resolve(),
     ])
     void tasks
   }
@@ -296,4 +261,9 @@ export class TimeboxTemplateRepository {
     }
     return result
   }
+}
+
+/** 数组去重（保序）；owner-check 前置收窄 inArray */
+function uniq<T>(arr: T[]): T[] {
+  return [...new Set(arr)]
 }
