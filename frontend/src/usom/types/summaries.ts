@@ -4,7 +4,7 @@
 import type {
   USOM_ID, DateOnly, Timestamp,
   Priority, EnergyLevel, PeriodType,
-  ObjectiveStatus, KeyResultStatus, TaskStatus,
+  TaskStatus,
   HabitStatus, TimeboxStatus, IntentionStatus,
   ClarityLevel, DecompositionLevel,
 } from './primitives'
@@ -53,7 +53,6 @@ export interface TimeboxSummary {
 export interface ObjectiveSummary {
   id: USOM_ID
   title: string
-  status: ObjectiveStatus
   /** 权威周期归属，指向 Cycle */
   cycleId: USOM_ID
   /** 派生只读：由 Cycle 填充 */
@@ -66,7 +65,6 @@ export interface KeyResultSummary {
   objectiveId: USOM_ID
   title: string
   progressRate: number
-  status: KeyResultStatus
   dueDate?: DateOnly
 }
 

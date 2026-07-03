@@ -1,6 +1,10 @@
 /**
  * @file generic-repo-adapter.test
  * @brief OKRs 域 GenericRepo 适配器单元测试
+ *
+ * [022.01] Phase 3：移除 objective/key_result 的 updateStatus / deleteDraft 测试，
+ * 移除 create 时硬编码 status 的断言（manifest 已去 status 列）。
+ * 保留 findById / save / create / updateFields / findByParent + cycle.updateStatus 的覆盖。
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -22,7 +26,6 @@ function makeMockKeyResultRepo() {
     findById: vi.fn(),
     save: vi.fn(),
     findByObjective: vi.fn(),
-    deleteDraft: vi.fn(),
     updateProgress: vi.fn(),
     updateFields: vi.fn(),
   }
@@ -62,7 +65,7 @@ describe('createOkrsGenericRepo', () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
-      const expected = { id: 'o-1', status: 'draft', title: 'Q3 目标' }
+      const expected = { id: 'o-1', title: 'Q3 目标' }
       objectiveRepo.findById.mockResolvedValue(expected)
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
@@ -76,7 +79,7 @@ describe('createOkrsGenericRepo', () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
-      const obj = { id: 'o-1', status: 'draft', title: '测试目标' }
+      const obj = { id: 'o-1', title: '测试目标' }
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
       await repos.objective.save(obj, userId)
@@ -84,7 +87,7 @@ describe('createOkrsGenericRepo', () => {
       expect(objectiveRepo.save).toHaveBeenCalledWith(obj, userId, undefined)
     })
 
-    it('create 构造完整对象并持久化', async () => {
+    it('create 构造完整对象并持久化（[022.01] Phase 3：不再含 status 字段）', async () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
@@ -92,62 +95,17 @@ describe('createOkrsGenericRepo', () => {
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
       const result = await repos.objective.create(
-        { title: '新目标', status: 'draft', priority: 'P0' },
+        { title: '新目标', priority: 'P0' },
         userId,
       )
 
       expect(result.id).toBeTruthy()
       expect(result.title).toBe('新目标')
-      expect(result.status).toBe('draft')
       expect(result.priority).toBe('P0')
       expect(result.createdAt).toBeTruthy()
+      // Phase 3：status 字段已从 Objective USOM 类型移除
+      expect((result as any).status).toBeUndefined()
       expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ title: '新目标' }), userId, undefined)
-    })
-
-    it('create 使用 SM 注入的 status', async () => {
-      const objectiveRepo = makeMockObjectiveRepo()
-      const keyResultRepo = makeMockKeyResultRepo()
-      const cycleRepo = makeMockCycleRepo()
-      objectiveRepo.save.mockResolvedValue(undefined)
-
-      const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
-      const result = await repos.objective.create(
-        { title: '新目标', status: 'active' },
-        userId,
-      )
-
-      expect(result.status).toBe('active')
-    })
-
-    it('updateStatus 加载现有对象、合并状态、持久化并返回', async () => {
-      const objectiveRepo = makeMockObjectiveRepo()
-      const keyResultRepo = makeMockKeyResultRepo()
-      const cycleRepo = makeMockCycleRepo()
-      const existing = {
-        id: 'o-1', status: 'draft', title: '目标', createdAt: '2026-01-01', updatedAt: '2026-01-01',
-      }
-      objectiveRepo.findById.mockResolvedValue(existing)
-      objectiveRepo.save.mockResolvedValue(undefined)
-
-      const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
-      const result = await repos.objective.updateStatus('o-1' as USOM_ID, 'active', userId)
-
-      expect(result.status).toBe('active')
-      expect(result.updatedAt).toBeTruthy()
-      expect(objectiveRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'active' }), userId, undefined)
-    })
-
-    it('updateStatus 对 discarded 状态添加 discardedAt', async () => {
-      const objectiveRepo = makeMockObjectiveRepo()
-      const keyResultRepo = makeMockKeyResultRepo()
-      const cycleRepo = makeMockCycleRepo()
-      objectiveRepo.findById.mockResolvedValue({ id: 'o-1', status: 'draft', title: '目标' })
-      objectiveRepo.save.mockResolvedValue(undefined)
-
-      const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
-      const result = await repos.objective.updateStatus('o-1' as USOM_ID, 'discarded', userId)
-
-      expect(result.discardedAt).toBeTruthy()
     })
   })
 
@@ -158,7 +116,7 @@ describe('createOkrsGenericRepo', () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
-      const expected = { id: 'kr-1', status: 'draft', title: 'KR1' }
+      const expected = { id: 'kr-1', title: 'KR1' }
       keyResultRepo.findById.mockResolvedValue(expected)
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
@@ -168,7 +126,7 @@ describe('createOkrsGenericRepo', () => {
       expect(result).toEqual(expected)
     })
 
-    it('create 构造完整 KR 对象并持久化', async () => {
+    it('create 构造完整 KR 对象并持久化（Phase 3：不再含 status 字段）', async () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
@@ -176,7 +134,7 @@ describe('createOkrsGenericRepo', () => {
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
       const result = await repos.key_result.create(
-        { objectiveId: 'o-1', title: '新 KR', targetValue: 100, unit: '个', status: 'draft' },
+        { objectiveId: 'o-1', title: '新 KR', targetValue: 100, unit: '个' },
         userId,
       )
 
@@ -184,8 +142,8 @@ describe('createOkrsGenericRepo', () => {
       expect(result.objectiveId).toBe('o-1')
       expect(result.title).toBe('新 KR')
       expect(result.targetValue).toBe(100)
-      expect(result.status).toBe('draft')
       expect(result.currentValue).toBe(0)
+      expect((result as any).status).toBeUndefined()
       expect(keyResultRepo.save).toHaveBeenCalled()
     })
 
@@ -202,30 +160,22 @@ describe('createOkrsGenericRepo', () => {
       expect(keyResultRepo.findByObjective).toHaveBeenCalledWith('o-1', userId, undefined)
       expect(result).toEqual(krs)
     })
+  })
 
-    it('deleteDraft 委托到 keyResultRepo.deleteDraft', async () => {
+  // ─── Cycle adapter（仍保留 status 转换）──────────────────────
+
+  describe('cycle adapter', () => {
+    it('updateStatus 委托到 cycleRepo.updateStatus', async () => {
       const objectiveRepo = makeMockObjectiveRepo()
       const keyResultRepo = makeMockKeyResultRepo()
       const cycleRepo = makeMockCycleRepo()
-      keyResultRepo.deleteDraft.mockResolvedValue(undefined)
+      cycleRepo.updateStatus.mockResolvedValue({ id: 'c-1', status: 'in_progress' })
 
       const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
-      await repos.key_result.deleteDraft!('kr-1' as USOM_ID, userId)
+      const result = await repos.cycle.updateStatus!('c-1' as USOM_ID, 'in_progress', userId)
 
-      expect(keyResultRepo.deleteDraft).toHaveBeenCalledWith('kr-1', userId, undefined)
-    })
-
-    it('updateStatus 对 archived 状态添加 archivedAt', async () => {
-      const objectiveRepo = makeMockObjectiveRepo()
-      const keyResultRepo = makeMockKeyResultRepo()
-      const cycleRepo = makeMockCycleRepo()
-      keyResultRepo.findById.mockResolvedValue({ id: 'kr-1', status: 'completed' })
-      keyResultRepo.save.mockResolvedValue(undefined)
-
-      const repos = createOkrsGenericRepo({ objectiveRepo, keyResultRepo, cycleRepo })
-      const result = await repos.key_result.updateStatus('kr-1' as USOM_ID, 'archived', userId)
-
-      expect(result.archivedAt).toBeTruthy()
+      expect(cycleRepo.updateStatus).toHaveBeenCalledWith('c-1', 'in_progress', userId, undefined)
+      expect(result).toEqual({ id: 'c-1', status: 'in_progress' })
     })
   })
 })

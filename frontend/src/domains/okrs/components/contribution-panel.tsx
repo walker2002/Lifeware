@@ -62,6 +62,15 @@ export function filterCandidates(
 }
 
 /**
+ * 计算当前 cycle 状态下 ContributionPanel 是否可编辑（[022.01] Phase 3）。
+ *
+ * 导出为纯函数便于单测；仅 reviewed 状态只读，其余均可编辑。
+ */
+export function isContributionEditable(cycleStatus: string): boolean {
+  return cycleStatus !== 'reviewed'
+}
+
+/**
  * KR 贡献管理面板
  */
 export function ContributionPanel({ krId, cycleStatus, onChange }: ContributionPanelProps) {
@@ -71,7 +80,7 @@ export function ContributionPanel({ krId, cycleStatus, onChange }: ContributionP
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   // [022.01] Phase 3：编辑权限由 cycle.status 决定——仅 reviewed 只读。
-  const isEditable = cycleStatus !== "reviewed"
+  const isEditable = isContributionEditable(cycleStatus)
 
   // 加载已有贡献 + 候选（一次性，搜索在客户端进行）
   useEffect(() => {

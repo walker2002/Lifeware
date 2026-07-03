@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest"
-import { filterCandidates } from "../components/contribution-panel"
+import { filterCandidates, isContributionEditable } from "../components/contribution-panel"
 
 interface TestCandidate {
   id: string
@@ -88,5 +88,19 @@ describe("ContributionPanel — 关联/解除关联状态", () => {
       existing.map((c) => `${c.contributorType}:${c.contributorId}`),
     )
     expect(linkedIds.has("task:t1")).toBe(false)
+  })
+})
+
+// [022.01] Phase 3：cycleStatus 决定 ContributionPanel 编辑权限
+describe("ContributionPanel — isEditable（[022.01] Phase 3 cycleStatus 守卫）", () => {
+  it('cycleStatus !== "reviewed" → 可编辑', () => {
+    expect(isContributionEditable("draft")).toBe(true)
+    expect(isContributionEditable("not_started")).toBe(true)
+    expect(isContributionEditable("in_progress")).toBe(true)
+    expect(isContributionEditable("ended")).toBe(true)
+  })
+
+  it('cycleStatus === "reviewed" → 不可编辑', () => {
+    expect(isContributionEditable("reviewed")).toBe(false)
   })
 })

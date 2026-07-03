@@ -62,4 +62,6 @@ export const okrsPlugin: DomainPlugin = result.success
   : null!
 
 export { createOkrsHooks } from './hooks'
-export { objectiveTransitions, keyResultTransitions, findTransition } from './transitions'
+// [022.01] Phase 3：objectiveTransitions / keyResultTransitions 已删除（Obj/KR 不再有独立状态机）。
+// findTransition 仍可用（Cycle SM 与外部域消费者使用）。
+export { findTransition } from './transitions'

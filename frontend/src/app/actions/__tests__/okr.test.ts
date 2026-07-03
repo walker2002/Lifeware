@@ -63,7 +63,6 @@ describe('[024] G1 deleteCycle server action', () => {
       cycleId: nonEmptyCycleId,
       title: 'test-del-024-guard-obj',
       description: '挂在 nonEmptyCycleId 上用于阻断 deleteCycle',
-      status: 'draft',
       objectiveNumber: '27Q2-O1',
       priority: 'P1',
       okrType: 'committed',

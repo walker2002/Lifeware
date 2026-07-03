@@ -73,14 +73,15 @@ export interface GenericRepo {
   create(fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
 
   /**
-   * 更新对象状态
+   * 更新对象状态（[022.01] Phase 3：可选 —— Objective/KeyResult 无 status 字段，
+   * 仅保留 Cycle/Task/Habit/Thread 等仍持有 status 的对象实现此方法）。
    * @param id - 对象 ID
    * @param toStatus - 目标状态
    * @param userId - 用户 ID
    * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 更新后的完整对象
    */
-  updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+  updateStatus?(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
 
   /**
    * 局部字段更新（FactField 字段写的统一通道）。
@@ -268,8 +269,14 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
       const repo = getRepository(objectType)
 
       if (existingObject) {
-        // 状态转换：使用 updateStatus（透传 tx）
-        object = await repo.updateStatus(objectId!, transition.to as string, userId, tx)
+        // 状态转换：使用 updateStatus（透传 tx）。[022.01] Phase 3：Objective/KeyResult
+        // 无 status 字段，GenericRepo.updateStatus 为可选；缺失则降级为 save() 全量回写。
+        if (typeof repo.updateStatus === 'function') {
+          object = await repo.updateStatus(objectId!, transition.to as string, userId, tx)
+        } else {
+          object = { ...existingObject, status: transition.to, updatedAt: now }
+          await repo.save(object, userId, tx)
+        }
 
         // 自动设置 lifecycle_timestamp 字段
         const actionTimestampMap = buildActionTimestampMap(lifecycle, fieldMeta)

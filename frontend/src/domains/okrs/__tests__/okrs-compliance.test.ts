@@ -3,7 +3,6 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { okrsPlugin } from '../index'
 import { createOkrsHooks } from '../hooks'
-import { objectiveTransitions, keyResultTransitions } from '../transitions'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
 
@@ -38,13 +37,22 @@ describe('T011: OKRs manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toContain('subscribed_events:')
   })
 
-  it('lifecycle 应包含 objective 和 key_result 两个对象的状态定义', () => {
-    expect(manifestContent).toMatch(/objective:/)
-    expect(manifestContent).toMatch(/key_result:/)
+  // [022.01] Phase 3：移除 objective/key_result 的独立状态机 transitions；
+  // 仅保留 null→draft 最小 lifecycle 条目（orchestrator L951 要求）。
+  // 状态权威收敛到 Cycle，Objective/KR 不再有 activate/pause/resume/complete 等状态转换。
+  it('lifecycle objective/key_result 仅保留 null→draft 最小转换（Phase 3 收敛）', () => {
+    expect(manifestContent).toMatch(/cycle:/)
+    // 不应再有 activate/pause/resume/complete 等状态转换 action
+    expect(manifestContent).not.toMatch(/action:\s*activate/)
+    expect(manifestContent).not.toMatch(/action:\s*pause/)
+    expect(manifestContent).not.toMatch(/action:\s*resume/)
+    expect(manifestContent).not.toMatch(/action:\s*complete/)
+    // objective/key_result terminal_states 应仅含 draft（无可达终态）
+    expect(manifestContent).toMatch(/objective:[\s\S]*?terminal_states:\s*\[draft\]/)
+    expect(manifestContent).toMatch(/key_result:[\s\S]*?terminal_states:\s*\[draft\]/)
   })
 
   it('intent_triggers 应仅包含 okrs（[022-A4] Phase 3 清理后）', () => {
-    // [022-A4] 移除 lifecycle action triggers；仅保留 okrs 导航类意图
     expect(manifestContent).toMatch(/action:\s*okrs/)
     expect(manifestContent).not.toMatch(/action:\s*createObjective/)
     expect(manifestContent).not.toMatch(/action:\s*activateObjective/)
@@ -62,9 +70,7 @@ describe('T011: OKRs manifest.yaml 六区块完整性', () => {
 describe('T012: OKRs hooks.ts 纯函数验证', () => {
   it('hooks.ts 不应包含数据库相关导入（[022-A4] 允许 IContributionRepository 类型导入）', async () => {
     const hooksContent = readFileSync(resolve(__dirname, '../hooks.ts'), 'utf-8')
-    // 禁止直接 import DB / repository 实体（constitution §VI 无副作用原则）
     expect(hooksContent).not.toMatch(/from.*['"]@?\.?\.?\/?(lib\/db|drizzle)/)
-    // 允许接口类型导入（IContributionRepository），但禁止具体实现类
     expect(hooksContent).not.toMatch(/import\s+(?!type).*[Rr]epository/)
   })
 
@@ -85,7 +91,8 @@ describe('T012: OKRs hooks.ts 纯函数验证', () => {
       },
       list_actions: [],
       required_fields: {},
-      subscribed_events: ['ObjectiveCreated', 'ObjectiveActivated', 'ObjectivePaused', 'ObjectiveResumed', 'ObjectiveCompleted', 'ObjectiveDiscarded', 'ObjectiveArchived', 'KeyResultUpdated', 'KeyResultCompleted', 'KeyResultProgressUpdated', 'TaskCompleted', 'HabitLogged'],
+      // [022.01] Phase 3：subscribed_events 移除 7 个 ObjectiveCompleted/ObjectiveActivated/ObjectivePaused/ObjectiveResumed/ObjectiveDiscarded/ObjectiveArchived/KeyResultCompleted 等 Objective/KR 独立状态事件
+      subscribed_events: ['ObjectiveCreated', 'KeyResultUpdated', 'KeyResultProgressUpdated', 'TaskCompleted', 'HabitLogged'],
     }
     const hooks = createOkrsHooks(mockManifest as any)
     expect(typeof hooks.onValidate).toBe('function')
@@ -94,48 +101,8 @@ describe('T012: OKRs hooks.ts 纯函数验证', () => {
   })
 })
 
-describe('T013: OKRs transitions 一致性', () => {
-  it('transitions.ts 应导出 objectiveTransitions (10 条)', () => {
-    expect(Array.isArray(objectiveTransitions)).toBe(true)
-    expect(objectiveTransitions.length).toBe(10)
-  })
-
-  it('transitions.ts 应导出 keyResultTransitions (10 条)', () => {
-    expect(Array.isArray(keyResultTransitions)).toBe(true)
-    expect(keyResultTransitions.length).toBe(10)
-  })
-
-  it('objectiveTransitions 应包含 create 转换 (null → draft)', () => {
-    const create = objectiveTransitions.find(t => t.action === 'create')
-    expect(create).toBeDefined()
-    expect(create!.from).toBeNull()
-    expect(create!.to).toBe('draft')
-    expect(create!.eventType).toBe('ObjectiveCreated')
-  })
-
-  it('objectiveTransitions 应包含 activate 转换 (draft → active)', () => {
-    const activate = objectiveTransitions.find(t => t.action === 'activate' && t.from === 'draft')
-    expect(activate).toBeDefined()
-    expect(activate!.to).toBe('active')
-    expect(activate!.eventType).toBe('ObjectiveActivated')
-  })
-
-  it('keyResultTransitions 应包含 create 转换 (null → draft)', () => {
-    const create = keyResultTransitions.find(t => t.action === 'create')
-    expect(create).toBeDefined()
-    expect(create!.from).toBeNull()
-    expect(create!.to).toBe('draft')
-    expect(create!.eventType).toBe('KeyResultUpdated')
-  })
-
-  it('keyResultTransitions 应包含 complete 转换 (active → completed)', () => {
-    const complete = keyResultTransitions.find(t => t.action === 'complete')
-    expect(complete).toBeDefined()
-    expect(complete!.from).toBe('active')
-    expect(complete!.to).toBe('completed')
-    expect(complete!.eventType).toBe('KeyResultCompleted')
-  })
-})
+// [022.01] Phase 3：删除 T013 objectiveTransitions/keyResultTransitions 测试 —
+// Obj/KR 独立状态机已移除（状态权威收敛至 Cycle.status），不再有 transitions。
 
 describe('T014: OKRs index.ts 插件入口', () => {
   it('okrsPlugin 应正确导出', () => {

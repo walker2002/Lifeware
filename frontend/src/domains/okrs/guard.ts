@@ -50,3 +50,22 @@ export function assertEditable(
     )
   }
 }
+
+/**
+ * 检查给定 Cycle 是否可执行指定操作（[022.01] Phase 3）。
+ *
+ * 与 assertEditable 的区别：checkCycleEditable 不抛错，返回 boolean；
+ * 用于前置 guard 路径的「乐观检查」场景（如 server action 前置 read）。
+ *
+ * @param cycle - 周期对象（可为 null — 表示「周期不存在」）
+ * @param operation - 待执行的操作类型
+ * @returns 是否可执行；null cycle 一律返回 false
+ */
+export function checkCycleEditable(
+  cycle: { status: Cycle['status'] } | null | undefined,
+  operation: EditableOperation,
+): boolean {
+  if (!cycle) return false
+  const allowed = ALLOWED[cycle.status]
+  return allowed.has(operation)
+}

@@ -124,13 +124,8 @@ describe('OKR Domain Plugin', () => {
       expect(result.kind).toBe('Rejected')
     })
 
-    it('activateObjective 缺少 objectiveId 应校验失败', async () => {
-      const result = await okrsPlugin.onValidate(
-        makeIntent('activateObjective', {}),
-        mockSnapshot(),
-      )
-      expect(result.kind).toBe('Rejected')
-    })
+    // [022.01] Phase 3：activateObjective 已从 manifest 移除（Obj 独立状态机不存在）。
+    // 状态权威收敛至 Cycle.status；activate 语义由 cycle.startCycle 代理。
   })
 
   describe('onEvent', () => {
@@ -148,18 +143,17 @@ describe('OKR Domain Plugin', () => {
       expect(result.suggestions[0].actionType).toBe('review_okr')
     })
 
-    it('ObjectiveCompleted 应返回完成指标', async () => {
+    it('KeyResultProgressUpdated 应返回完成指标（[022.01] Phase 3：ObjectiveCompleted 已移除，由 KR 进度事件代理）', async () => {
       const event: SystemEvent = {
         id: 'e2' as any,
-        type: 'ObjectiveCompleted',
+        type: 'KeyResultProgressUpdated',
         occurredAt: new Date().toISOString() as any,
         triggeredBy: 'state_machine',
-        payload: { title: '已完成的目标' },
+        payload: { title: '已完成的关键结果' },
         snapshotId: 'snap' as any,
       }
       const result = await okrsPlugin.onEvent(event, mockSnapshot())
       expect(result.metrics.length).toBeGreaterThan(0)
-      expect(result.metrics[0].metricKey).toBe('objective_completed')
     })
 
     it('未订阅事件应返回空', async () => {

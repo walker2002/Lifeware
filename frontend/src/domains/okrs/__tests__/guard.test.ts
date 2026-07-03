@@ -4,9 +4,11 @@
  *
  * 覆盖设计 spec §C 全部 5 个 Cycle 状态 × 6 种操作类型的允许/拒绝矩阵。
  * delete_cycle 在 draft 状态的「无目标」前置条件不测（由 okr.ts:deleteCycle 独立负责）。
+ *
+ * [022.01] Phase 3：补充 checkCycleEditable 单元测试（assertEditable 的布尔版兄弟函数）。
  */
 import { describe, it, expect } from 'vitest'
-import { assertEditable } from '../guard'
+import { assertEditable, checkCycleEditable } from '../guard'
 import type { Cycle } from '@/usom/types/objects'
 
 type Operation =
@@ -72,5 +74,33 @@ describe('[022.01] assertEditable 权限矩阵', () => {
     for (const op of ops) {
       expect(() => assertEditable(cycle, op)).toThrow('reviewed')
     }
+  })
+})
+
+/**
+ * [022.01] Phase 3：checkCycleEditable 单元测试
+ *
+ * 验证乐观检查函数：返回 boolean，不抛错；null cycle 视为不可编辑。
+ */
+describe('[022.01] checkCycleEditable', () => {
+  it('valid cycle status → passes', () => {
+    // draft + edit_objective → 返回 true（不抛错）
+    const cycle = makeCycle('draft')
+    expect(checkCycleEditable(cycle, 'edit_objective')).toBe(true)
+    // in_progress + edit_kr → 返回 true
+    expect(checkCycleEditable(makeCycle('in_progress'), 'edit_kr')).toBe(true)
+  })
+
+  it('reviewed cycle → returns false', () => {
+    // reviewed + edit_objective → 返回 false（不抛错）
+    const cycle = makeCycle('reviewed')
+    expect(checkCycleEditable(cycle, 'edit_objective')).toBe(false)
+    expect(checkCycleEditable(cycle, 'edit_kr')).toBe(false)
+  })
+
+  it('cycle not found (null) → returns false', () => {
+    // null cycle → 返回 false（视为「不可编辑」短路）
+    expect(checkCycleEditable(null, 'edit_objective')).toBe(false)
+    expect(checkCycleEditable(undefined, 'edit_kr')).toBe(false)
   })
 })

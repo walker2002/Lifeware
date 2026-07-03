@@ -4,6 +4,7 @@
  *
  * [022] 2B-T8：验证 updateProgress 经 ContributionRepository.recomputeProgress 重算，
  * 含孤儿贡献清理（源已删除的 task/habit 引用）。
+ * [022.01] Phase 3：移除 KR.status 字段派生；改为自动管理 completedAt。
  * 依赖真实 PostgreSQL（容器 lifeware-postgres-1）。
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
@@ -58,7 +59,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
       })
     }
 
-    // 2. Objective
+    // 2. Objective — [022.01] Phase 3：移除 status 字段
     const existingObj = await db.select().from(s.objectives)
       .where(and(
         eq(s.objectives.userId, USER_ID),
@@ -74,7 +75,6 @@ describe('KeyResultRepository.updateProgress 集成', () => {
         userId: USER_ID,
         title: 'T8 测试目标',
         cycleId,
-        status: 'active',
         okrType: 'committed',
         objectiveNumber: 'O-T8',
         priority: 'P1',
@@ -84,7 +84,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
       })
     }
 
-    // 3. KeyResult
+    // 3. KeyResult — [022.01] Phase 3：移除 status 字段
     const existingKR = await db.select().from(s.keyResults)
       .where(and(
         eq(s.keyResults.userId, USER_ID),
@@ -105,7 +105,6 @@ describe('KeyResultRepository.updateProgress 集成', () => {
         currentValue: '0',
         unit: '任务数',
         progressRate: '0',
-        status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -160,7 +159,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
   it('updateProgress 经 ContributionRepository 重算 currentValue（任务数单位）', async () => {
     // 准备 KR
     await db.update(s.keyResults)
-      .set({ unit: '任务数', targetValue: '10', currentValue: '0', status: 'active' })
+      .set({ unit: '任务数', targetValue: '10', currentValue: '0' })
       .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
     await cleanContributions(krId)
 
@@ -209,10 +208,12 @@ describe('KeyResultRepository.updateProgress 集成', () => {
     }
   })
 
-  it('updateProgress status 派生 — currentValue 达 targetValue 时自动 completed', async () => {
+  // [022.01] Phase 3：移除 status 派生，改为 completedAt 自动管理。
+  // 新语义：progressRate >= 1.0 时自动设置 completedAt。
+  it('updateProgress 派生 completedAt — progressRate >= 1.0 自动设置', async () => {
     // 准备 KR：targetValue=2
     await db.update(s.keyResults)
-      .set({ unit: '任务数', targetValue: '2', currentValue: '0', status: 'active' })
+      .set({ unit: '任务数', targetValue: '2', currentValue: '0', completedAt: null })
       .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
     await cleanContributions(krId)
 
@@ -240,9 +241,10 @@ describe('KeyResultRepository.updateProgress 集成', () => {
 
     const updated = await krRepo.updateProgress(krId, 0, USER_ID)
 
-    // 断言：currentValue=2 >= targetValue=2 → status='completed'
+    // 断言：currentValue=2 >= targetValue=2 → completedAt 自动设置
     expect(Number(updated.currentValue)).toBe(2)
-    expect(updated.status).toBe('completed')
+    expect(updated.completedAt).toBeDefined()
+    expect(updated.completedAt).not.toBeNull()
 
     // 清理
     await cleanContributions(krId)
@@ -256,7 +258,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
   it('updateProgress 孤儿清理 — 已删除 task 的 contribution 被自动移除', async () => {
     // 准备 KR
     await db.update(s.keyResults)
-      .set({ unit: '任务数', targetValue: '10', currentValue: '0', status: 'active' })
+      .set({ unit: '任务数', targetValue: '10', currentValue: '0' })
       .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
     await cleanContributions(krId)
 
@@ -294,7 +296,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
   it('updateProgress 孤儿清理 — 已删除 habit 的 contribution 被自动移除', async () => {
     // 准备 KR
     await db.update(s.keyResults)
-      .set({ unit: '任务数', targetValue: '10', currentValue: '0', status: 'active' })
+      .set({ unit: '任务数', targetValue: '10', currentValue: '0' })
       .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
     await cleanContributions(krId)
 
@@ -336,7 +338,8 @@ describe('KeyResultRepository.updateProgress 集成', () => {
   })
 
   // ─── [022] 2026-06-26 review deferred TEST gaps ───────────
-  // 补 KeyResultRepository.updateFields / save / archive 三个未覆盖方法的回归测试
+  // 补 KeyResultRepository.updateFields / save 两个未覆盖方法的回归测试
+  // [022.01] Phase 3：移除 archive 方法测试（status 字段已删除，archive 不再是测试目标）
 
   it('updateFields 局部字段更新（仅改 title，其余字段保持）', async () => {
     const updated = await krRepo.updateFields(
@@ -360,7 +363,7 @@ describe('KeyResultRepository.updateProgress 集成', () => {
   })
 
   it('save (upsert) 按 id 冲突更新：第二次 save 覆盖第一次的字段', async () => {
-    // 准备：构造 KR 对象，第一次 save
+    // 准备：构造 KR 对象，第一次 save — [022.01] Phase 3：移除 status 字段
     const krA = {
       id: krId,
       userId: USER_ID as any,
@@ -371,7 +374,6 @@ describe('KeyResultRepository.updateProgress 集成', () => {
       currentValue: 0,
       unit: '任务数' as const,
       progressRate: 0,
-      status: 'active' as const,
       priority: 'P1' as const,
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
@@ -397,15 +399,78 @@ describe('KeyResultRepository.updateProgress 集成', () => {
     await krRepo.updateFields(krId, { title: 'T8 KR-更新进度' }, USER_ID)
   })
 
-  it('archive 标记 KR 为 archived 并写 archivedAt', async () => {
-    // 先确认 KR 当前 status 不是 archived
-    const before = await krRepo.findById(krId, USER_ID)
-    expect(before?.status).not.toBe('archived')
+  // ─── [022.01] Phase 3: updateProgress completedAt 自动管理 ───
 
-    await krRepo.archive(krId, USER_ID)
-    const after = await krRepo.findById(krId, USER_ID)
-    expect(after?.status).toBe('archived')
-    expect(after?.archivedAt).toBeDefined()
-    expect(after?.archivedAt).not.toBeNull()
+  /**
+   * 矩阵：
+   *  - progressRate >= 1.0 + completedAt NULL → 设置 completedAt
+   *  - progressRate >= 1.0 + completedAt 存在 → 保持不变
+   *  - progressRate < 1.0  + completedAt 存在 → 清空 completedAt
+   *  - progressRate < 1.0  + completedAt NULL → 不变
+   */
+  describe('updateProgress completedAt auto-management', () => {
+    /** 工具：直接更新 KR 行（绕过 updateProgress）以预设 completedAt 状态 */
+    async function presetKR(opts: { target: number; current: number; completedAt: Date | null }) {
+      await db.update(s.keyResults)
+        .set({
+          targetValue: String(opts.target),
+          currentValue: String(opts.current),
+          progressRate: '0',
+          unit: '任务数',
+          completedAt: opts.completedAt,
+        })
+        .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
+      await cleanContributions(krId)
+    }
+
+    /** 工具：注册一个 0 贡献让 updateProgress 重算 progressRate = 0 */
+    async function addContribution(id: string) {
+      await contributionRepo.add(
+        { keyResultId: krId, contributorType: 'task', contributorId: id },
+        USER_ID,
+      )
+    }
+
+    it('progressRate < 1.0 且 completedAt 为 NULL → 不变', async () => {
+      // 初始 completedAt NULL
+      await presetKR({ target: 10, current: 0, completedAt: null })
+
+      const updated = await krRepo.updateProgress(krId, 0, USER_ID)
+
+      expect(Number(updated.progressRate)).toBe(0)
+      expect(updated.completedAt).toBeNull()
+    })
+
+    it('progressRate >= 1.0 且 completedAt 已存在 → 保持不变（不重置）', async () => {
+      // 预设 completedAt = 一个已知的过去时间戳
+      const pastDate = new Date('2025-06-01T00:00:00.000Z')
+      // 重置为 currentValue=10 >= target=5 → progressRate >= 1.0（手动 UPDATE 字段绕过 updateProgress）
+      await db.update(s.keyResults)
+        .set({
+          targetValue: '5',
+          currentValue: '10',
+          progressRate: '0',
+          unit: '任务数',
+          completedAt: pastDate,
+        })
+        .where(and(eq(s.keyResults.id, krId), eq(s.keyResults.userId, USER_ID)))
+      await cleanContributions(krId)
+
+      const updated = await krRepo.updateProgress(krId, 0, USER_ID)
+
+      // completedAt 应保持原值（不被覆盖为 now）
+      expect(updated.completedAt).toEqual(pastDate)
+    })
+
+    it('progressRate < 1.0 且 completedAt 已存在 → 清空 completedAt', async () => {
+      // 预设 completedAt 存在，但当前 progressRate 会被重算为 0
+      const pastDate = new Date('2025-06-01T00:00:00.000Z')
+      await presetKR({ target: 10, current: 0, completedAt: pastDate })
+
+      const updated = await krRepo.updateProgress(krId, 0, USER_ID)
+
+      expect(Number(updated.progressRate)).toBe(0)
+      expect(updated.completedAt).toBeNull()
+    })
   })
 })

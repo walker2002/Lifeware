@@ -75,7 +75,6 @@ describe('ContributionRepository', () => {
         userId: USER_ID,
         title: 'T6 测试目标',
         cycleId: cycleId,
-        status: 'active',
         okrType: 'committed',
         objectiveNumber: 'O-T6',
         priority: 'P1',
@@ -108,7 +107,6 @@ describe('ContributionRepository', () => {
           currentValue: '0',
           unit: '任务数',
           progressRate: '0',
-          status: 'active',
           createdAt: new Date(),
           updatedAt: new Date(),
         })

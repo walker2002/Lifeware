@@ -7,7 +7,7 @@
  * T-03: Nexus 组件不直接处理 userId
  */
 
-import type { USOM_ID, Timestamp, DateOnly, ObjectiveStatus, KeyResultStatus, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, SchedulingConstraint, TrackingMode, Notes } from '../types/primitives'
+import type { USOM_ID, Timestamp, DateOnly, Priority, EnergyLevel, ThreadStatus, AISessionStatus, ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode, SchedulingConstraint, TrackingMode, Notes } from '../types/primitives'
 import type {
   User, UserCalibration, Intention, StructuredIntent,
   Objective, KeyResult, Task, Thread, Habit, HabitLog, Timebox, Review,
@@ -707,14 +707,6 @@ export interface IObjectiveRepository {
   findActive(userId: USOM_ID): Promise<Objective[]>
 
   /**
-   * 根据状态查找目标
-   * @param status - 目标状态
-   * @param userId - 用户 ID
-   * @returns 目标列表
-   */
-  findByStatus(status: ObjectiveStatus, userId: USOM_ID): Promise<Objective[]>
-
-  /**
    * 根据周期查找目标
    * @param start - 开始日期
    * @param end - 结束日期
@@ -722,16 +714,6 @@ export interface IObjectiveRepository {
    * @returns 目标列表
    */
   findByPeriod(start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]>
-
-  /**
-   * 根据状态和周期查找目标
-   * @param status - 目标状态列表
-   * @param start - 开始日期
-   * @param end - 结束日期
-   * @param userId - 用户 ID
-   * @returns 目标列表
-   */
-  findByStatusInPeriod(status: ObjectiveStatus[], start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]>
 
   /**
    * 查找包含关键结果的目标
@@ -746,14 +728,15 @@ export interface IObjectiveRepository {
    * @param objective - 目标对象
    * @param userId - 用户 ID
    */
-  save(objective: Objective, userId: USOM_ID): Promise<void>
+  save(objective: Objective, userId: USOM_ID, tx?: DbClient): Promise<void>
 
   /**
-   * 归档目标
+   * 局部字段更新（FactField 字段写的统一通道）。
    * @param id - 目标 ID
+   * @param fields - 待更新字段
    * @param userId - 用户 ID
    */
-  archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+  updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Objective>
 }
 
 // ─── KeyResult ─────────────────────────────────────────────────
@@ -788,34 +771,19 @@ export interface IKeyResultRepository {
   updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID): Promise<KeyResult>
 
   /**
-   * 批量更新状态
-   * @param objectiveId - 目标 ID
-   * @param fromStatus - 原状态
-   * @param toStatus - 新状态
-   * @param userId - 用户 ID
-   */
-  batchUpdateStatus(objectiveId: USOM_ID, fromStatus: KeyResultStatus, toStatus: KeyResultStatus, userId: USOM_ID): Promise<void>
-
-  /**
-   * 删除草稿
+   * 局部字段更新
    * @param id - 关键结果 ID
+   * @param fields - 待更新字段
    * @param userId - 用户 ID
    */
-  deleteDraft(id: USOM_ID, userId: USOM_ID): Promise<void>
+  updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<KeyResult>
 
   /**
    * 保存关键结果
    * @param keyResult - 关键结果对象
    * @param userId - 用户 ID
    */
-  save(keyResult: KeyResult, userId: USOM_ID): Promise<void>
-
-  /**
-   * 归档关键结果
-   * @param id - 关键结果 ID
-   * @param userId - 用户 ID
-   */
-  archive(id: USOM_ID, userId: USOM_ID): Promise<void>
+  save(keyResult: KeyResult, userId: USOM_ID, tx?: DbClient): Promise<void>
 }
 
 // ─── Contribution ───────────────────────────────────────────────

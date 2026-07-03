@@ -97,6 +97,7 @@
 
 ## OKR Domain
 
+- 2026_07_03 — [022.01] Phase 3：移除 Objective/KeyResult 独立 status 字段与状态机。编辑/删除权限收敛至 Cycle.status 经 assertEditable 守卫。DB 迁移 0030（DROP objectives.status + key_results.status 列）。
 - 2026_06_26 — [022] 收尾：QA/Review/Defer 修复（use server boundary / updateProgress 原子性 / KR owner-check / OnEventDispatchFailed 持久化 等）
 - 2026_06_26 — [022] Phase 3：/okrs 工作台 + OKRForm ModeSwitcher + TemplateSelector + ContributionPanel + 事件驱动 recompute
 - 2026_06_26 — [022] Phase 2：contributions junction + KeyResult.currentValue 派生 + CompletedTasksProvider + habits.key_result_id 迁移

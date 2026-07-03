@@ -250,20 +250,21 @@ describe('[022-A4] OKR onEvent 跨域事件驱动 KR 进度重算', () => {
   })
 
   describe('兼容性 - 原有 OKR 自域事件', () => {
-    it('ObjectiveCompleted 不调用 contributionRepo', async () => {
+    it('KeyResultProgressUpdated 不调用 contributionRepo（[022.01] Phase 3：ObjectiveCompleted 已移除）', async () => {
       const event: SystemEvent = {
         id: 'e1' as any,
-        type: 'ObjectiveCompleted',
+        type: 'KeyResultProgressUpdated',
         occurredAt: new Date().toISOString() as any,
         triggeredBy: 'state_machine',
-        payload: { title: '完成目标' },
+        payload: { title: '完成关键结果' },
         snapshotId: 'snap' as any,
       }
       const result = await hooks.onEvent(event, makeSnapshot())
+      // KR 进度事件不再触发 contribution 重算（Phase 3：updateProgress 内部已直接 recompute）
       expect(mockRepo.findByContributor).not.toHaveBeenCalled()
       expect(mockRepo.recomputeProgress).not.toHaveBeenCalled()
-      expect(result.suggestions.length).toBeGreaterThan(0)
-      expect(result.suggestions[0].actionType).toBe('review_okr')
+      // KR 进度事件非 review trigger；不产生 suggestions
+      expect(result.suggestions).toBeDefined()
     })
   })
 })

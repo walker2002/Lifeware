@@ -133,7 +133,11 @@ export async function executeCascade(params: CascadeParams): Promise<CascadeResu
 
     const objectIds: USOM_ID[] = []
     for (const child of toUpdate) {
-      await childRepo.updateStatus(child.id as USOM_ID, matchRule.child_to_status, userId)
+      // [022.01] Phase 3：updateStatus 为可选（Obj/KR 无 status 字段）。
+      // cascade 规则对 Obj/KR 已被 manifest 移除，故此路径在生产中不会触达 Obj/KR。
+      if (typeof childRepo.updateStatus === 'function') {
+        await childRepo.updateStatus(child.id as USOM_ID, matchRule.child_to_status, userId)
+      }
       objectIds.push(child.id as USOM_ID)
     }
 
