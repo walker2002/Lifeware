@@ -87,6 +87,42 @@ intent_triggers:
       - 重新安排剩余时间
       - 调整今天下午的安排
     keywords: [调整, 重排, adjust]
+  # [026] A1.5: 行程管理 4 action（create/edit/delete/viewItineraries）
+  # 注：markInProgress / markExpired 不在 intent_triggers——它们由 reconcile
+  # 走 submitDynamicIntent 调 SM，无需 intent_trigger。
+  - action: createItinerary
+    shortcut: /createItinerary
+    description: 增加一个未来行程
+    response_type: cnui
+    cnui_surface: create-itinerary
+    examples:
+      - 7月15日下午2点看牙医
+      - 下周三19:00 和张三吃饭
+    keywords: [行程, 安排, 约会, 日历]
+  - action: editItinerary
+    shortcut: /editItinerary
+    description: 修改一个计划或执行中的行程
+    response_type: cnui
+    cnui_surface: edit-itinerary
+    examples:
+      - 把看牙医改到下午3点
+    keywords: [修改行程, 改行程]
+  - action: deleteItinerary
+    shortcut: /deleteItinerary
+    description: 删除计划或执行中的行程（可多选）
+    response_type: cnui
+    cnui_surface: delete-itinerary
+    examples:
+      - 删掉下周的行程
+    keywords: [删除行程]
+  - action: viewItineraries
+    shortcut: /itineraries
+    description: 行程管理
+    response_type: page
+    view_route: /itineraries
+    examples:
+      - 看看我的行程
+    keywords: [行程, 日历]
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -130,6 +166,55 @@ lifecycle:
         action: log
         event_type: TimeboxLogged
     terminal_states: [cancelled, logged]
+  # [026] A1.5: D2 reversal — 行程=独立对象读时算状态（按日历日，零 cron）。
+  # 5 态全部存储，SM 驱动全部 transition。
+  itinerary:
+    # [026] D2 reversal: 5 态全部存储，SM 驱动全部 transition
+    states: [scheduled, in_progress, expired, cancelled, completed]
+    initial_state: scheduled
+    transitions:
+      - from: null
+        to: scheduled
+        trigger: intent
+        action: create
+        event_type: ItineraryCreated
+      # 时间驱动：lazy reconcile 在 startTime 日历日=今日 触发（仅 from scheduled）
+      - from: scheduled
+        to: in_progress
+        trigger: intent
+        action: markInProgress
+        event_type: ItineraryMarkedInProgress
+      # 时间驱动：lazy reconcile 在今日日历日>startTime 日历日 触发（from {scheduled, in_progress}）
+      - from: scheduled
+        to: expired
+        trigger: intent
+        action: markExpired
+        event_type: ItineraryMarkedExpired
+      - from: in_progress
+        to: expired
+        trigger: intent
+        action: markExpired
+        event_type: ItineraryMarkedExpired
+      # 用户取消：spec + 用户 "计划/执行状态可以任意修改、删除"（cancel from {scheduled, in_progress}）
+      # 终态 expired/cancelled/completed 不可删（SM 拒绝；spec "已过期/已完成不能删除"）
+      - from: scheduled
+        to: cancelled
+        trigger: intent
+        action: cancel
+        event_type: ItineraryCancelled
+      - from: in_progress
+        to: cancelled
+        trigger: intent
+        action: cancel
+        event_type: ItineraryCancelled
+      # [027] 后补：completed（timebox 打卡后）
+      # - from: scheduled,   to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
+      # - from: in_progress, to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
+      # - from: expired,     to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
+    terminal_states: [expired, cancelled, completed]
+    # 注：markInProgress / markExpired 的 trigger 在 manifest 里写 `intent`，
+    # 实际调用方是 reconcileItineraryStatuses()（在页面 server component 加载时跑，
+    # 逐条 submitDynamicIntent）。无 cron、无后台 job。
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 field_metadata:
@@ -173,6 +258,24 @@ field_metadata:
     type: json
     label: 执行记录
     required: false
+  # [026] A1.5: 行程字段元数据（仅追加 3 个；title/startTime 沿用 timebox 字段）
+  # status/inProgressAt/expiredAt/completedAt/cancelledAt 不入 field_metadata
+  # （SM-driven，不经 mutationService.update，避跨字段红线）
+  durationMin:
+    type: number
+    label: 时长(分钟)
+    required: true
+    mutation_mode: FactField
+  detail:
+    type: string
+    label: 详情
+    required: false
+    mutation_mode: ContentField
+  people:
+    type: json
+    label: 关系人
+    required: false
+    mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:
@@ -245,6 +348,10 @@ view_routes:
   config_activity_archetypes:
     component: app/config/activity-archetypes/page
     url: /config/activity-archetypes
+  # [026] A1.5: 行程管理页
+  viewItineraries:
+    component: app/itineraries/page
+    url: /itineraries
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
@@ -311,5 +418,15 @@ cnui_surfaces:
     handler: ./cnui/handlers
   log-timebox:
     description: 批量打卡（三态：完成/未完成/跳过 + 备注，逐条走 logTimebox）
+    handler: ./cnui/handlers
+  # [026] A1.5: 行程管理 3 surface（K-block 错误待 A2 = T10 创建后清零）
+  create-itinerary:
+    description: 增加行程（默认编辑表单/可切列表）
+    handler: ./cnui/handlers
+  edit-itinerary:
+    description: 修改行程（默认列表/选中切表单）
+    handler: ./cnui/handlers
+  delete-itinerary:
+    description: 删除行程（多选）
     handler: ./cnui/handlers
 
