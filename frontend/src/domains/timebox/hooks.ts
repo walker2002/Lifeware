@@ -19,7 +19,8 @@ import type { StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, ActionCategory } from '@/usom/types/primitives'
 import type { DomainManifest } from '@/domains/manifest-loader/schema'
 import { evaluateDomainRules } from '@/nexus/rules'
-import { timeboxRuleRegistry } from './rules-registry'
+import { resolveObjectType } from '@/nexus/orchestrator/lifecycle-configs'
+import { itineraryRuleRegistry, timeboxRuleRegistry } from './rules-registry'
 
 /** 即将开始阈值（毫秒） */
 const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000
@@ -34,38 +35,48 @@ export function createTimeboxHooks(manifest: DomainManifest) {
 
   /**
    * 验证意图（[018-G3] R2 + codex E5：改调 evaluateDomainRules，规则声明式化）
-   * 规则逻辑全部迁入 timeboxRuleRegistry（见 ./rules-registry）；本处仅薄壳委托。
+   * 规则逻辑全部迁入 timeboxRuleRegistry / itineraryRuleRegistry（见 ./rules-registry）；
+   * 本处仅薄壳委托 + 按 objectType 分派 registry。
    *
    * **R11** — 唯一生产调用方 `nexus/orchestrator/index.ts:742` 已用 `await`，
    * async 签名安全。无其他生产 caller。tests `timebox-domain.test.ts`
    * 兼容（`await timeboxPlugin.onValidate`）。
    *
    * **R15** — 本 onValidate **有意省略** `normalizeFieldValues` 预处理：
-   * timebox 字段简单无 enum（title 字符串 + startTime ISO + duration number），
-   * 不存在中文→枚举映射或日期格式整理需求。A1 若给 timebox 加 enum 字段
+   * timebox/itinerary 字段简单无 enum（title 字符串 + startTime ISO + duration/number），
+   * 不存在中文→枚举映射或日期格式整理需求。A1 若给 timebox/itinerary 加 enum 字段
    * （如 activityArchetypeId L1/L2 校验），需补 normalize 预处理。
    *
    * **F5 [023] A0 post-review** — `repos: {}` 是 MVP 有意选择，非 bug：
-   * 当前 timebox 规则全字段（title / startTime / duration）无关 repo/IO，
+   * 当前 timebox/itinerary 规则全字段（title / startTime / duration）无关 repo/IO，
    * 走纯 schema 校验即可。Future-proof 标记：A2 timebox 重写时若加
    * 「该时间槽与已有 timebox 不重叠」或「user WIP 上限」类规则，需在
    * 此处注入 `timeboxRepo`/`taskRepo`/`userCalibrationRepo`，并加
    * 对应 Repository 层依赖追踪（[018] R0/R1 模式）。当前 doc-only 警告。
+   *
+   * **[026] A1.6 D2 reversal — objectType 分派**：
+   * `resolveObjectType('timebox', intent.action)` 按 manifest.lifecycle 键
+   * 动态返回 'timebox' | 'itinerary'（[022.01] ESM import + manifest 驱动）。
+   * itinerary action 走 `itineraryRuleRegistry`（3 realtime + 1 submit），
+   * timebox action 走 `timeboxRuleRegistry`（既有的 3 realtime + 1 submit）。
+   * registry 即 SSOT（[020] 范式），hooks 仅做分派。
    */
   async function onValidate(
     intent: StructuredIntent,
     snapshot: USOMSnapshot,
   ): Promise<ValidationResult> {
     // R11 + R15：唯一生产 caller `orchestrator/index.ts:742` 已 `await`，async 安全。
-    // R15 省略 normalizeFieldValues（timebox 字段简单无 enum；A1 加 enum 字段时需补）。
-    // `now` 在 snapshot.currentTime 缺失时回落 0——MVP timebox rules 全字段无关 now，
-    // 未来若加依赖 now 的 rule，需确保 snapshot.currentTime 始终存在（A2 评估）。
-    // F5：repos 空对象是有意 MVP 简化（见 JSDoc），A2 加 repo-依赖规则时需扩 deps。
+    // R15 省略 normalizeFieldValues（timebox/itinerary 字段简单无 enum；A1 加 enum 字段时需补）。
+    // `now` 在 snapshot.currentTime 缺失时回落 0——MVP timebox/itinerary rules 全字段
+    // 在 startTimeInFuture 等规则中确实读 now，需确保 snapshot.currentTime 始终存在
+    // （A2 评估）。F5：repos 空对象是有意 MVP 简化（见 JSDoc），A2 加 repo-依赖规则时需扩 deps。
+    const objectType = resolveObjectType('timebox', intent.action)
+    const registry = objectType === 'itinerary' ? itineraryRuleRegistry : timeboxRuleRegistry
     return evaluateDomainRules('timebox', intent, {
       repos: {},
       userId: snapshot.userId,
       now: snapshot.currentTime ? Date.parse(snapshot.currentTime) : 0,
-    }, timeboxRuleRegistry)
+    }, registry)
   }
 
   /**
