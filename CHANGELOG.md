@@ -21,6 +21,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_03 — [026] Itinerary A3 ship：4 action（create/edit/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile + /schedule 锁定合并；ItineraryWorkspace inline Sheet drawer 触发 createItinerary（替换 T12 hash 死链 → T14 I-1 修复）；GrowthMenu 4 intent_trigger 自动归"timebox"组（registry 自动分组，零代码改动）；§3.13 / §4.X 已完整覆盖
 - 2026_07_03 — [026] Itinerary 对象（D2 reversal）：5 态存储 + lazy reconcile + 4 transition 时间戳（A1 进行中）
 - 2026_06_19 — [018-G3] 判定模型补全：ValidationResult 3→5 变体；ruleResultToValidation 接线 warning→PassedWithWarning
 - 2026_06_19 — [018-G2] 公共 `createDomainMutationServiceFactory` 抽象；SystemEventType +HabitFieldUpdated
@@ -36,6 +37,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_03 — [026] A3 ship：§4.X itineraries 表 DDL 完整落地 + 迁移 0031 + ItineraryRepository.findActive/findNeedingReconcile + 4 transition（cancel/markInProgress/markExpired）；5 态 storage 全部由 SM transition 推进（lazy reconcile，零 cron）
 - 2026_07_03 — [026] §4.X itineraries 表契约：5 态 status enum + 4 transition 时间戳 + 2 索引（DDL 在 T2 迁移 0031 落地）
 - 2026_06_30 — [024] key_results +confidence（CHECK 0-100）；[023] +activity_archetypes / user_audit_log；A3.3 DROP habit_templates / template_habits（迁移 0027）
 - 2026_06_10 — tasks/habits status CHECK 补 deleted 状态（对齐 USOM）
@@ -187,6 +189,60 @@
 - **fix(lib)** 新增 `suggestShortcut(action, shortcuts)` 纯函数：唯一前缀匹配返回该 shortcut（createTime→/createTimebox），多义/无匹配返回 undefined。+7 单测。
 - **fix(hook)** `handleConversationSend` slash 分支加守卫：`!shortcut && !resolvedDomainId` → 拦截，给「未识别的命令 /xxx。你是否想输入 /yyy？」提示，不进任何域管道。（产品决策：未注册命令一律提示，不自动补全。）`intentTriggers` 入 deps 防闭包 stale。
 - **fix(refresh)** `handleCnuiConfirm` 成功后广播 `window` 事件 `lifeware:data-changed`（detail `{domainId, action}`）。`ActionView` 经 `mainViewState.type==='action'` **内联挂载** `HabitListPage`/`TaskTreePage` 于 page.tsx（非独立路由），CNUI 提交时仍 mounted → 之前 stale。现各加 `useEffect` 监听器按 `domainId` 自行 reload（habits→loadHabits / tasks→handleDataChanged）。timebox 仍走 `deps.loadTimeboxes`。OKR 无 create 快捷方式 + 刷新入口深埋 → defer。
+
+## Itinerary 域（[026]）
+
+> 2026_07_03 — A3 ship（14 commits：4 action + 5 态存储 + lazy reconcile + /schedule 锁定合并 + I-1 修复 + Tier 2 docs）。**[026] 全闭环 ship-ready**：`Itinerary` 作 timebox 域内二级对象，5 态存储 lifecycle，零 cron，AI 锁。
+
+### 设计决策（关键）
+
+- **D2 reversal（Cycle 模式）**：原 spec D2=C "读时算 status"被用户推翻。改用 Cycle 模式：状态全部存 DB（`status` enum + 4 transition 时间戳列），SM 驱动 transition；`reconcileItineraryStatuses()` 在页面 server component 加载时 lazy 触发（零 cron 守护进程）。**收益**：可直接 SQL 查询 `WHERE status = 'expired'` 做"未实施的计划"统计（spec §7.4 OQ-7）；集成 codex D5 + D6 修复（双重 reconcile / `ReconcileAction.kind` 判别名陷阱）后稳定。
+- **决议 A（拆双 mutation service）**：plan-eng-review 决议。A1.4 落地为 `createTimeboxMutationService` vs `createItineraryMutationService`，事件类型分离（`TimeboxFieldUpdated` vs `ItineraryFieldUpdated`），避免字段语义串扰。
+- **D4 决议 A（共享表单组件）**：抽 `<ItineraryFormFields>` 公共组件（D4 决议 A），3 surface（CreateItinerary / EditItinerary / DeleteItinerary）共用，避免 3 处重复字段定义 + 多端修正。T10 落地。
+
+### 架构按 §IX 7 层覆盖
+
+- L1 数据模型：`Itinerary` USOM 接口 + `ItineraryStatus` 5 态枚举（T1）
+- L2 仓储 + 写入口：`ItineraryRepository` 5 方法（findById/save/updateFields/findByDateRange/findNeedingReconcile）+ 双 mutation service（T4 + 决议 A）
+- L3 规则/校验：`timebox/rules-registry.ts` 加 `itinerary` 字段规则（T6）
+- L4 Surface 渲染：`CreateItinerary` / `EditItinerary` / `DeleteItinerary` 3 surface（`response_type: cnui`）+ `<ItineraryFormFields>` 公共组件（T10）
+- L5 页面路由：`/itineraries` 独立 Next.js page route，server component 加载时调 reconcileAndAdvanceItineraries（T12）
+- L6 CNUI 处理：`timebox/cnui/handlers.ts` 3 branch + `surfaceHandlers` 注册（T11）
+- L7 schema 守门员：manifest 4 intent_triggers（createItinerary/editItinerary/deleteItinerary/viewItineraries）+ lifecycle 5 态 + 6 transitions；`validate-manifest.ts` 跑通 0 errors（T5）
+
+### 写入口 + 跨字段红线
+
+- 5 server action 走完整 Nexus（`submitDynamicIntent` → Orchestrator → `resolveObjectType` 路由 → `createTasksGenericRepo({timeboxRepo, itineraryRepo})` → SM transition）：`createItinerary` / `updateItinerary` / `deleteItinerary` / `markInProgressItinerary` / `markExpiredItinerary`（T7 落地，T1.7 字段白名单 `ITINERARY_UPDATE_ALLOWED` 防绕过状态机写 status/时间戳列 — 对应 [project-server-action-field-write-needs-allowlist]）。
+- 关系人（people）保留 `string[]` 纯文本（D1=A），`jsonb` 存，`@` 前缀 + 中文逗号分隔输入 — 与 CycleCreateDrawer 同模式。
+- `/schedule` 跨域合并：A3.2 引入 `ScheduleEvent` 联合类型（`kind: 'timebox' | 'itinerary'`），`ScheduleWorkspace.loadDay` 用 `Promise.all` 并行拉 timebox + itinerary 后 `mergeEvents` 合并；Status 来自 DB（不做读时算）— D2 reversal 一致性兑现。`/schedule` 显陈旧状态可接受 MVP（codex #8 follow-up → SWR 缓存 defer [023.4]）。
+
+### GrowthMenu 自动归组（registry SSOT 兑现）
+
+- manifest 4 intent_trigger（`createItinerary` / `editItinerary` / `deleteItinerary` / `viewItineraries`）`domainId: timebox`
+- `getAllDomainActions()` 按 `plugin.manifest.domainId` 自动分组（registry.ts:87-93）
+- GrowthMenu（`components/layout/growth-menu.tsx`）纯展示组件，从 `domainActions` prop 拿到分组后按 `DOMAIN_META['timebox'] = {icon: Clock, label: '时间盒'}` 映射
+- **4 个 itinerary action 自动归"时间盒"组**，零代码改动。TDD：既有 `growth-menu.test.tsx` 8 case 已验证按 domainName 分组（D4 同期既有）。
+- T11 修复后 manifest validator 4 domain 0 errors / 2 warns（既有 tasks）+ 2 INFO（既有 habits/timebox redundant cnui_surface）
+
+### T14 I-1 修复（与 GrowthMenu 集成）
+
+- T12 hash trigger (`window.location.hash = 'createItinerary'`) 是死链：ItineraryWorkspace 是 standalone page 不在 chat 流；`useIntentHandler` hook 需 Chat 流 deps（setTimeboxes/addChatMessage/saveCurrentConversation/ensureConversationView 等），不能直挂；surface 必须 ConversationView 挂载才能渲染
+- T14 修复为内联 Sheet-based Drawer（同 TimeboxDrawer 范式）：复用 `<ItineraryFormFields>` 公共组件 + `createItinerary` server action（走完整 Nexus + SM create transition）+ AlertDialog 二次确认（needs_confirm）；Cmd/Ctrl+Enter 快捷提交；删除成功 `router.refresh()` 让 server component 重跑（reconcile + 列表 fresh read，取代本地 setItems filter 防 stale）
+- 文件：`domains/timebox/components/itinerary-workspace.tsx`（commit `c4c4332`）
+
+### IRON RULE 守护
+
+- T15 必做：A3.2 ScheduleEvent 联合把 DayView/TimeboxList/TimeboxTimeline/MiniCalendar 改为按 `kind` 分支渲染 — 若 timebox 分支回归损坏既有 /schedule 时间盒渲染会 0 报警。3 个共享组件须补"渲染 TimeboxSummary-only 输入"字节级 snapshot 回归测试（baseline = git main 实现渲染一次保存）。**不退化**是 [026] A3.2 IRON RULE — 必须先做。
+
+### 已知 follow-up（保留给 [027] / P2 / P3）
+
+- [P3] **codex #1** `field_metadata` per-objectType 嵌套（timebox/itinerary 同名字段需不同校验场景）— T23
+- [P3] **codex #3** `reconcileAndAdvanceItineraries` 走单 `mutationService.execute()`（绕开完整 intent 流水线）— T22
+- [P2] **codex #5** `localDayKey` 跨 TZ 单元测试（依赖容器 `TZ=Asia/Shanghai`）+ 部署文档 env 必填 — T20
+- [P2] **codex #6** GrowthMenu 单测覆盖 4 itinerary action 自动归"timebox"组 — T19
+- [P3] **codex #7** `domain-development-guide §4.1` 移除 timebox L3 豁免（[023] A0 已建 rules-registry，理由不成立）— T21
+- [P3] **codex #8** ItineraryWorkspace 客户端 state 落后 — 加 SWR / router refresh（仿 [023.4] H4）— T14 阶段已用 `router.refresh()` 临时覆盖完整 SWR
+- **[027]** `markCompleted` transition + 智能编排归集行程（timebox 打卡 → itinerary.completed + scheduler 读 itinerary）；/itineraries 月视图（MonthView 复用 A3.2 ScheduleEvent 联合）；ContextSnapshot 加 `ItinerarySummary[]`
 
 ## Timebox / Activity Archetype（[023]）
 

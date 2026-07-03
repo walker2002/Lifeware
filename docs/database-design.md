@@ -853,6 +853,8 @@ CREATE INDEX idx_itineraries_user_start  ON itineraries(user_id, start_time);
 - 状态枚举与 USOM `ItineraryStatus` 5 态严格对齐；CHECK 约束由迁移 SQL 加。
 - `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
 
+**[026] A3 SHIP（2026_07_03）**：表 DDL 已通过 T2 迁移 0031 手写落地（dev DB lifeware_dev@localhost:5432，journal idx=31）。`ItineraryRepository` 5 方法（findById/save/updateFields/findByDateRange/findNeedingReconcile）+ 双 mutation service（timebox/itinerary 事件类型分离，D2 reversal 决议 A）+ lazy reconcile（`reconcileAndAdvanceItineraries` 页面 server component 加载时跑）。GrowthMenu 集成 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。详情见 CHANGELOG.md `## Itinerary 域（[026]）`。
+
 ---
 
 ### 4.8 reviews（复盘表）

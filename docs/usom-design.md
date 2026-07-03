@@ -1001,6 +1001,8 @@ type ItineraryStatus =
 
 **DB 落点**：`itineraries` 表（见 `docs/database-design.md` §4.X，DDL 在 T2 迁移手写落地）。
 
+**[026] A3 SHIP（2026_07_03）**：4 action（createItinerary/editItinerary/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile（零 cron）+ `<ItineraryFormFields>` 公共组件（D4 决议 A）+ 字段白名单（防绕过状态机直写 status/时间戳）+ ItineraryWorkspace 内联 Sheet drawer（T14 I-1 修复，取代 T12 hash 死链）。GrowthMenu 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。剩余 follow-up T15-T23，详见 CHANGELOG.md `## Itinerary 域（[026]）`。
+
 ---
 
 ## 四、系统流通对象（Process Objects）
