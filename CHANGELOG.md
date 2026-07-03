@@ -21,6 +21,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_04 — [023-02] §3.12 TimeboxTemplate 改写：`survivalSegments`(7键) + `subscribedHabits/Tasks/Threads` 三数组 → `daysOfWeek`(模板级星期数组) + `rows`(有序行列表，`source ∈ {habit, task, thread, custom}`)。A3 owner-check 改为遍历 rows 收集 sourceId。
 - 2026_07_03 — [026] Itinerary A3 ship：4 action（create/edit/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile + /schedule 锁定合并；ItineraryWorkspace inline Sheet drawer 触发 createItinerary（替换 T12 hash 死链 → T14 I-1 修复）；GrowthMenu 4 intent_trigger 自动归"timebox"组（registry 自动分组，零代码改动）；§3.13 / §4.X 已完整覆盖
 - 2026_07_03 — [026] Itinerary 对象（D2 reversal）：5 态存储 + lazy reconcile + 4 transition 时间戳（A1 进行中）
 - 2026_06_19 — [018-G3] 判定模型补全：ValidationResult 3→5 变体；ruleResultToValidation 接线 warning→PassedWithWarning
@@ -37,6 +38,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_04 — [023-02] §7.8 timebox_templates 改写：`survival_segments` + 3 个 `subscribed_*` 列 → `rows` (jsonb 有序行列表) + `days_of_week` (模板级星期)。迁移 0032 包含 7 段→7 custom 行回填（仅当 `rows='[]'`）+ DROP 4 列。
 - 2026_07_03 — [026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod TZ 一致，codex #5 落地）
 - 2026_07_03 — [026] A3 ship：§4.X itineraries 表 DDL 完整落地 + 迁移 0031 + ItineraryRepository.findActive/findNeedingReconcile + 4 transition（cancel/markInProgress/markExpired）；5 态 storage 全部由 SM transition 推进（lazy reconcile，零 cron）
 - 2026_07_03 — [026] §4.X itineraries 表契约：5 态 status enum + 4 transition 时间戳 + 2 索引（DDL 在 T2 迁移 0031 落地）
