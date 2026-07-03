@@ -494,6 +494,198 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+// ─── 行程解析系统提示词 ─────────────────────────────────────────
+
+/**
+ * [026] A2.1 行程意图解析系统提示词。
+ *
+ * 输出结构（JSON）：
+ * {
+ *   "drafts": [
+ *     {
+ *       "title": "string",
+ *       "startTime": "ISO 8601（含时区，如 2026-07-15T14:00:00+08:00）",
+ *       "durationMin": number（分钟）,
+ *       "people": "string[]（@ 提取的关系人）",
+ *       "confidence": 0-1
+ *     }
+ *   ]
+ * }
+ *
+ * 关键约束：
+ * - 多记录分隔符：全角"；" / 半角";"（与 MULTI_TASK_PROMPT 保持一致）
+ * - 关系人提取：@ 前导（"@张三" → people=["张三"]）
+ * - 不确定时长时使用 60 分钟作为默认（与行程常用时长对齐）
+ */
+const ITINERARY_PARSE_PROMPT = (now: Date) => `
+你是 Lifeware 行程意图解析器。将用户的自然语言输入解析为结构化的行程列表。
+
+当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
+时区：Asia/Shanghai (UTC+8)
+
+支持的动作：仅解析行程相关输入。其他意图返回空 drafts 数组 + confidence < 0.5。
+
+输出 JSON 格式：
+{
+  "drafts": [
+    {
+      "title": "string",
+      "startTime": "ISO 8601（含时区，如 2026-07-15T14:00:00+08:00）",
+      "durationMin": number（分钟）,
+      "people": "string[]（@ 提取的关系人，可空数组）",
+      "confidence": 0-1
+    }
+  ]
+}
+
+解析规则：
+
+1. 多记录分隔符
+   - 全角分号"；"和半角分号";"都作为行程分隔符
+   - 优先级：全角"；" > 半角";" > 换行
+   - 没有分隔符 → 单条 draft
+
+2. 关系人提取（[026] D1=A 关系人纯文本）
+   - "@" 前导的名称进入 people 数组
+   - 示例："下周三19:00 @张三 吃饭" → people=["张三"]
+   - 多个 @："@张三 @李四 开会" → people=["张三", "李四"]
+   - 没有 @ → people=[]
+
+3. 时间解析
+   - "今天" → ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}
+   - "明天" → 日期 +1
+   - "下周三" → 下个周三（Asia/Shanghai 时区）
+   - "下午2点" → 14:00
+   - "上午9点" → 09:00
+   - "晚上7点" → 19:00
+   - "7月15日下午2点" → 2026-07-15T14:00:00+08:00
+   - 无具体时间时使用上午 9:00 作为默认 startTime
+
+4. 时长推断
+   - "1小时" → 60
+   - "半小时" → 30
+   - "2小时" → 120
+   - "看牙医" → 60（典型时长）
+   - "吃饭" → 90
+   - "开会" → 60
+   - 缺省 → 60
+
+5. 标题规则
+   - 移除 @ 关系人部分再取标题
+   - "下周三19:00 @张三 吃饭" → title="吃饭"
+   - "7月15日下午2点看牙医" → title="看牙医"
+   - 含空格不拆分（"OKR 季度评审"是单个 title）
+
+6. confidence
+   - 信息完整：>= 0.85
+   - 缺时间或缺时长：0.6-0.8
+   - 无关输入：< 0.5
+
+示例：
+输入："7月15日下午2点看牙医"
+输出：{"drafts":[{"title":"看牙医","startTime":"2026-07-15T14:00:00+08:00","durationMin":60,"people":[],"confidence":0.9}]}
+
+输入："下周三19:00 @张三 吃饭；下周五15:00 @李四 开会"
+输出：{"drafts":[
+  {"title":"吃饭","startTime":"<下周三>T19:00:00+08:00","durationMin":90,"people":["张三"],"confidence":0.92},
+  {"title":"开会","startTime":"<下周五>T15:00:00+08:00","durationMin":60,"people":["李四"],"confidence":0.9}
+]}
+
+输入："和家人吃晚饭"
+输出：{"drafts":[{"title":"吃晚饭","startTime":"<今天>T19:00:00+08:00","durationMin":90,"people":["家人"],"confidence":0.7}]}
+说明："和家人"作为关系人提取——但 @ 前缀更明确，没有 @ 时不强制提取。
+本例应返回 people=[]。
+`
+
+// ─── 行程解析函数 ──────────────────────────────────────────────
+
+/**
+ * [026] A2.1 使用 AI 解析自然语言输入为行程 drafts。
+ *
+ * 与 parseMultiTask 行为相似但输出结构不同：
+ *  - parseMultiTask 返回 StructuredIntent 数组（timebox 域）
+ *  - parseItineraryWithAI 返回 { drafts, success, error? }（行程域，
+ *    供 parseItineraryIntentOnly 转成最终对外契约）
+ *
+ * 解析容错：缺字段的 draft 会被过滤，最终为空数组时返回 success=false。
+ */
+export interface ItineraryDraft {
+  title: string
+  startTime: string
+  durationMin: number
+  people: string[]
+}
+
+export interface ItineraryParseResult {
+  success: boolean
+  drafts: ItineraryDraft[]
+  error?: string
+}
+
+interface LLMItineraryResponse {
+  drafts: Array<{
+    title: string
+    startTime: string
+    durationMin: number
+    people?: string[]
+    confidence: number
+  }>
+}
+
+export async function parseItineraryWithAI(
+  rawInput: string,
+  aiRuntime: AIRuntime,
+): Promise<ItineraryParseResult> {
+  try {
+    const response = await aiRuntime.generate({
+      domainId: 'timebox',
+      action: 'parseItineraryIntent',
+      systemPrompt: ITINERARY_PARSE_PROMPT(new Date()),
+      messages: [{ role: 'user', content: rawInput }],
+      taskType: 'field_extraction',
+      temperature: 0.3,
+    })
+
+    const content = response.content
+    if (!content) {
+      return { success: false, drafts: [], error: 'LLM 返回内容为空' }
+    }
+
+    const jsonStr = typeof content === 'string' ? extractJSON(content) : JSON.stringify(content)
+    let parsed: LLMItineraryResponse
+    try {
+      parsed = JSON.parse(jsonStr) as LLMItineraryResponse
+    } catch {
+      return { success: false, drafts: [], error: '无法解析行程 JSON 响应' }
+    }
+
+    if (!Array.isArray(parsed.drafts) || parsed.drafts.length === 0) {
+      return { success: false, drafts: [], error: '未识别到有效的行程' }
+    }
+
+    const drafts: ItineraryDraft[] = []
+    for (const d of parsed.drafts) {
+      if (!d.title || !d.startTime) continue
+      if (typeof d.durationMin !== 'number' || d.durationMin <= 0) continue
+      drafts.push({
+        title: d.title,
+        startTime: d.startTime,
+        durationMin: d.durationMin,
+        people: Array.isArray(d.people) ? d.people : [],
+      })
+    }
+
+    if (drafts.length === 0) {
+      return { success: false, drafts: [], error: '所有行程信息不完整，请补充时间/时长' }
+    }
+
+    return { success: true, drafts }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '未知错误'
+    return { success: false, drafts: [], error: `行程解析失败：${message}` }
+  }
+}
+
 // ─── 习惯意图解析 ──────────────────────────────────────────────
 
 /**

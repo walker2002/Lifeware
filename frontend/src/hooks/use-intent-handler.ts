@@ -24,6 +24,7 @@ import {
   fetchDomainActions,
   parseHabitIntentOnly,
   parseTimeboxBatchIntentOnly,  // [023-01+] chat 路径 dry-run 入口
+  parseItineraryIntentOnly,     // [026] A2.1 行程 dry-run 入口
   openCnuiSurface,
   submitCnuiSurface,
   isCnuiSurface,
@@ -552,6 +553,43 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
                 timestamp: new Date().toISOString(),
               }
               deps.addChatMessage(errMsg)
+              setIsLoading(false)
+              return
+            }
+
+            // [026] A2.1 行程创建/编辑/删除意图 → 走行程 dry-run 解析（";" 多记录 + "@" 关系人）
+            //   路由条件：slash 解析出 action ∈ {createItinerary, editItinerary, deleteItinerary}
+            //   之前：chat 路径只调 parseHabitIntentOnly + parseTimeboxBatchIntentOnly，
+            //         行程 slash 落空走 submitIntent → parseWithAI 弱 systemPrompt → 解析失败
+            //   现在：直接调 parseItineraryIntentOnly → ITINERARY_PARSE_PROMPT（多记录+@people）
+            if (
+              (resolvedDomainId === "timebox" || slashResult.domainId === "timebox") &&
+              (slashResult.action === "createItinerary" ||
+                slashResult.action === "editItinerary" ||
+                slashResult.action === "deleteItinerary")
+            ) {
+              const itinParse = await parseItineraryIntentOnly(content)
+              if (itinParse.success && itinParse.drafts && itinParse.drafts.length > 0) {
+                const cnuiResult = await openCnuiSurface("timebox", slashResult.action, { drafts: itinParse.drafts })
+                const cnuiMsg: ChatMessage = {
+                  role: "assistant",
+                  content: `已识别 ${itinParse.drafts.length} 个行程，请确认：`,
+                  timestamp: new Date().toISOString(),
+                  cnuiSurface: cnuiResult.surface,
+                }
+                deps.addChatMessage(cnuiMsg)
+                setIsLoading(false)
+                return
+              }
+              // [026] A2.1 解析失败 → 仍打开空 CNUI 表单让用户手填（与 timebox 一致语义）
+              const cnuiResult = await openCnuiSurface("timebox", slashResult.action)
+              const cnuiMsg: ChatMessage = {
+                role: "assistant",
+                content: "请填写行程信息：",
+                timestamp: new Date().toISOString(),
+                cnuiSurface: cnuiResult.surface,
+              }
+              deps.addChatMessage(cnuiMsg)
               setIsLoading(false)
               return
             }

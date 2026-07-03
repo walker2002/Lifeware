@@ -23,7 +23,7 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-repo-adapter";
 import { createHabitsGenericRepo } from "@/domains/habits/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
-import { parseHabitWithAI, parseMultiTask } from "../../nexus/core/intent-engine/ai-parser";
+import { parseHabitWithAI, parseMultiTask, parseItineraryWithAI } from "../../nexus/core/intent-engine/ai-parser";
 import type { AIParserResult } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
@@ -1235,6 +1235,49 @@ export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<Tim
     })
 
     return { success: true, drafts }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '解析失败'
+    return { success: false, error: message }
+  }
+}
+
+// ─── Itinerary 意图仅解析（[026] A2.1 dry-run Server Action）─────
+
+/**
+ * [026] A2.1 仅解析行程意图（不提交），返回 drafts 给 CNUI surface 预填。
+ *
+ * 与 parseTimeboxBatchIntentOnly / parseHabitIntentOnly 模式一致：
+ * dry-run，仅返回 drafts 让用户在 CNUI 表单里编辑确认后再提交。
+ *
+ * 路由来源：use-intent-handler.ts:createItinerary/editItinerary/deleteItinerary
+ * 三条路由分支检测 `slashResult.action` 命中后调本函数，
+ * 避免 chat 路径走 submitIntent → parseWithAI（弱 systemPrompt）。
+ *
+ * 多租户 T-02：MVP_USER_ID 透传（与 parseHabitIntentOnly / parseTimeboxBatchIntentOnly 一致）。
+ *
+ * 契约：
+ * - 输入：用户自然语言（如 "7月15日下午2点看牙医；下周三19:00 @张三 吃饭"）
+ * - 输出：{success, drafts: [{title, startTime, durationMin, people}], error?}
+ *
+ * @param rawInput - 用户原始自然语言输入
+ * @returns 解析结果（drafts 给 CNUI 预填）
+ */
+export interface ItineraryParseIntentResult {
+  success: boolean
+  drafts?: Array<{ title: string; startTime: string; durationMin: number; people: string[] }>
+  error?: string
+}
+
+export async function parseItineraryIntentOnly(rawInput: string): Promise<ItineraryParseIntentResult> {
+  try {
+    const aiRuntime = createAIRuntime()
+    const parseResult = await parseItineraryWithAI(rawInput, aiRuntime)
+
+    if (!parseResult.success) {
+      return { success: false, error: parseResult.error ?? '未识别到有效的行程' }
+    }
+
+    return { success: true, drafts: parseResult.drafts }
   } catch (err) {
     const message = err instanceof Error ? err.message : '解析失败'
     return { success: false, error: message }
