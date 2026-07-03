@@ -66,13 +66,24 @@ export function createDomainMutationServiceFactory(
     return repo
   }
 
-  /** 从本域 manifest 读取 field_metadata（domainId 在闭包固定，忽略入参）。 */
+  /**
+   * 从本域 manifest 读取指定 objectType 的 field_metadata（[026] T23 per-objectType 嵌套）。
+   * 一级 key 为 objectType（如 task / itinerary），二级 key 为字段名。
+   * 缺省回退 {}（field-executor 接到空表 → 拒绝未声明字段，行为与平铺版一致）。
+   *
+   * @param _domainId - 域 ID（闭包固定，忽略入参）
+   * @param objectType - 对象类型（task / habit / itinerary / objective / key_result 等）
+   */
   function getFieldMetadata(
     _domainId: string,
-    _objectType: string,
+    objectType: string,
   ): Record<string, FieldMetadata> {
     const manifest = getFullManifest(domainId)
-    return (manifest?.field_metadata as Record<string, FieldMetadata> | undefined) ?? {}
+    // [026] T23: 嵌套读取 manifest.field_metadata[objectType]
+    const nested = manifest?.field_metadata as
+      | Record<string, Record<string, FieldMetadata>>
+      | undefined
+    return nested?.[objectType] ?? {}
   }
 
   /** 构建 tx 版 SM.execute 闭包（按 proposal.targetObject.type 取 repo/lifecycle）。 */

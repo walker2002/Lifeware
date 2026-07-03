@@ -25,7 +25,10 @@ const mockManifest = {
   intent_triggers: [],
   lifecycle: {},
   field_metadata: {
-    okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+    // [026] T23 per-objectType 嵌套：okrType 在 objective 块下
+    objective: {
+      okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+    },
   },
   list_actions: [],
   required_fields: {},

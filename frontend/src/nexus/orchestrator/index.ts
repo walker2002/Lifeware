@@ -908,7 +908,8 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         // 路由键约定：objectId / {camelCase objectType}Id（如 taskId/threadId），
         // 这些是定位用、非业务字段写，必须排除。cascade_ 子任务 intent 仅传 taskId
         // （见下方拆分块，已去掉 title），故递归路径必走 else 分支，不会被误接管。
-        const manifestFieldMeta = manifest?.field_metadata as Record<string, unknown> | undefined
+        // [026] T23: 嵌套读取 manifest.field_metadata[smObjectType]（per-objectType 嵌套结构）
+        const manifestFieldMeta = (manifest?.field_metadata as Record<string, Record<string, unknown>> | undefined)?.[smObjectType]
         const routingKeys = new Set(['objectId', `${smObjectType.replace(/_([a-z])/g, (_, c) => c.toUpperCase())}Id`])
         const targetId = resolveObjectId(intent.fields, smObjectType)
         const fieldSteps = Object.entries(intent.fields)

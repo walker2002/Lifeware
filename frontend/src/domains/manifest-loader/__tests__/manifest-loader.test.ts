@@ -24,7 +24,10 @@ const validManifest = {
     },
   },
   field_metadata: {
-    title: { type: 'string', label: '标题', required: true },
+    // [026] T23 per-objectType 嵌套
+    timebox: {
+      title: { type: 'string', label: '标题', required: true },
+    },
   },
   list_actions: [
     { action: 'start', label: '开始', confirm_required: false },
@@ -117,12 +120,15 @@ describe('ManifestSchema', () => {
     const data = {
       ...validManifest,
       field_metadata: {
-        ...validManifest.field_metadata,
-        startedAt: { type: 'lifecycle_timestamp', label: '开始时间', required: false },
+        // [026] T23 per-objectType 嵌套
+        timebox: {
+          ...validManifest.field_metadata.timebox,
+          startedAt: { type: 'lifecycle_timestamp', label: '开始时间', required: false },
+        },
       },
     }
     const result = ManifestSchema.parse(data)
-    expect(result.field_metadata.startedAt.type).toBe('lifecycle_timestamp')
+    expect(result.field_metadata.timebox.startedAt.type).toBe('lifecycle_timestamp')
   })
 })
 

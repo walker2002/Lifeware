@@ -112,7 +112,8 @@ describe('T011: habits field_metadata 写入口治理完整性', () => {
   beforeAll(() => {
     const result = loadDomainManifest('habits')
     expect(result.success).toBe(true)
-    fieldMetadata = (result.success ? result.manifest.field_metadata : {}) as Record<string, FieldMetadata>
+    // [026] T23 per-objectType 嵌套：取 habit 块
+    fieldMetadata = (result.success ? (result.manifest.field_metadata?.habit ?? {}) : {}) as Record<string, FieldMetadata>
   })
 
   it('manifest 应成功加载且 field_metadata 非空', () => {
@@ -169,7 +170,10 @@ describe('T008: Habits hooks.ts 纯函数验证', () => {
       intent_triggers: [],
       lifecycle: {},
       field_metadata: {
-        frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+        // [026] T23 per-objectType 嵌套
+        habit: {
+          frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+        },
       },
       list_actions: [],
       required_fields: {},

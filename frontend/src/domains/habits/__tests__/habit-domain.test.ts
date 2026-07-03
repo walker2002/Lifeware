@@ -18,7 +18,10 @@ vi.mock('@/domains/manifest-loader', () => ({
       intent_triggers: [],
       lifecycle: {},
       field_metadata: {
-        frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+        // [026] T23 per-objectType 嵌套
+        habit: {
+          frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] },
+        },
       },
       list_actions: [],
       required_fields: { createHabit: [

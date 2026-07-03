@@ -110,8 +110,9 @@ export function createOkrsHooks(
   repos?: OkrsHookRepos,
 ) {
   const subscribedEvents = new Set(manifest.subscribed_events)
+  // [026] T23: 嵌套读取 manifest.field_metadata.objective.okrType.options
   const validOkrTypes = new Set(
-    manifest.field_metadata.okrType?.options ?? ['visionary', 'committed']
+    manifest.field_metadata.objective?.okrType?.options ?? ['visionary', 'committed']
   )
 
   /**

@@ -11,12 +11,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 
-// ─── Mock registry（返回受控 manifest：priority=FactField / title=ContentField）──
+// ─── Mock registry（返回受控 manifest：priority=FactField / title=ContentField）
+// [026] T23 per-objectType 嵌套：field_metadata.task.{priority,title}
 vi.mock('@/domains/registry', () => ({
   getFullManifest: () => ({
     field_metadata: {
-      priority: { type: 'enum', label: '优先级', required: false, options: ['high', 'low'], mutation_mode: 'FactField' },
-      title: { type: 'string', label: '标题', required: true, mutation_mode: 'ContentField' },
+      task: {
+        priority: { type: 'enum', label: '优先级', required: false, options: ['high', 'low'], mutation_mode: 'FactField' },
+        title: { type: 'string', label: '标题', required: true, mutation_mode: 'ContentField' },
+      },
     },
     lifecycle: { task: { initial: 'todo', states: {} } },
   }),

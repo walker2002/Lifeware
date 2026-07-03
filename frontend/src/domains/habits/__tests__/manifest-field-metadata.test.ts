@@ -18,9 +18,10 @@ import type { FieldMetadata } from '@/usom/types/domain-types'
 
 // 直接通过 manifest-loader 解析（habitsPlugin.manifest 为 ProcessManifest，
 // 不含 field_metadata；需取完整 DomainManifest 才能校验区块 C）
+// [026] T23 per-objectType 嵌套：field_metadata.habit.* 才是字段元数据
 const result = loadDomainManifest('habits')
 const fieldMetadata = result.success
-  ? result.manifest.field_metadata
+  ? (result.manifest.field_metadata?.habit ?? {})
   : {}
 
 /** CreateHabitInput 的全部字段名（权威字段集，14 个） */

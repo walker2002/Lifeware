@@ -9,7 +9,8 @@ import { describe, it, expect } from 'vitest'
 import { loadDomainManifest } from '@/domains/manifest-loader'
 
 const result = loadDomainManifest('tasks')
-const fieldMetadata = result.success ? result.manifest.field_metadata : {}
+// [026] T23 per-objectType 嵌套：activityArchetypeId 在 task 块下
+const fieldMetadata = result.success ? result.manifest.field_metadata?.task ?? {} : {}
 
 describe('[023] A3.2 tasks manifest archetype 接入', () => {
   it('manifest 应成功加载', () => { expect(result.success).toBe(true) })

@@ -12,7 +12,10 @@ vi.mock('@/domains/manifest-loader', () => ({
       intent_triggers: [],
       lifecycle: {},
       field_metadata: {
-        okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+        // [026] T23 per-objectType 嵌套
+        objective: {
+          okrType: { type: 'enum', label: 'OKR类型', required: false, options: ['visionary', 'committed'] },
+        },
       },
       list_actions: [],
       required_fields: { createObjective: [

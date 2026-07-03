@@ -131,17 +131,18 @@ lifecycle:
         event_type: Created
     terminal_states: []
 field_metadata:
-  priority:
-    type: enum
-    label: 优先级
-    required: false
-    options: [high, medium, low]
-    mutation_mode: FactField
-  title:
-    type: string
-    label: 标题
-    required: true
-    mutation_mode: ContentField
+  obj:  # [026] T23 per-objectType 嵌套
+    priority:
+      type: enum
+      label: 优先级
+      required: false
+      options: [high, medium, low]
+      mutation_mode: FactField
+    title:
+      type: string
+      label: 标题
+      required: true
+      mutation_mode: ContentField
 list_actions: []
 required_fields: {}
 subscribed_events: []
@@ -149,8 +150,8 @@ subscribed_events: []
     const result = loadDomainManifest(tmpDir)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.manifest.field_metadata['priority'].mutation_mode).toBe('FactField')
-      expect(result.manifest.field_metadata['title'].mutation_mode).toBe('ContentField')
+      expect(result.manifest.field_metadata['obj']?.['priority'].mutation_mode).toBe('FactField')
+      expect(result.manifest.field_metadata['obj']?.['title'].mutation_mode).toBe('ContentField')
     }
   })
 
@@ -173,10 +174,11 @@ lifecycle:
         event_type: Created
     terminal_states: []
 field_metadata:
-  title:
-    type: string
-    label: 标题
-    required: true
+  obj:  # [026] T23 per-objectType 嵌套
+    title:
+      type: string
+      label: 标题
+      required: true
 list_actions: []
 required_fields: {}
 subscribed_events: []
@@ -184,7 +186,7 @@ subscribed_events: []
     const result = loadDomainManifest(tmpDir)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.manifest.field_metadata['title'].mutation_mode).toBeUndefined()
+      expect(result.manifest.field_metadata['obj']?.['title'].mutation_mode).toBeUndefined()
     }
   })
 
@@ -193,8 +195,9 @@ subscribed_events: []
     const loaded = loadDomainManifest(realDir)
     expect(loaded.success).toBe(true)
     // zod 非 strict strip：旧域 field_metadata 中 label/required/default_value/description 被剥离
+    // [026] T23: title 在 objective 块下
     if (loaded.success) {
-      const titleMeta = loaded.manifest.field_metadata?.title as Record<string, unknown> | undefined
+      const titleMeta = loaded.manifest.field_metadata?.objective?.title as Record<string, unknown> | undefined
       expect(titleMeta).toBeDefined()
       expect(titleMeta).not.toHaveProperty('label')
       expect(titleMeta).not.toHaveProperty('required')

@@ -17,7 +17,7 @@ vi.mock('@/domains/manifest-loader', () => ({
     manifest: {
       id: 'habits', version: '1.0.0', name: '习惯管理', description: 'd',
       intent_triggers: [], lifecycle: {},
-      field_metadata: { frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] } },
+      field_metadata: { habit: { frequencyType: { type: 'enum', label: '频率类型', required: true, options: ['daily', 'weekly', 'custom'] } } },
       list_actions: [],
       required_fields: {},
       subscribed_events: [],
