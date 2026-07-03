@@ -215,37 +215,18 @@ describe('[026] T16 P1 server actions 集成测试', () => {
   })
 
   // ─── case 4: deleteItinerary(scheduledId) ───────────────────
-  // [P0-1 修复后真路径] deleteItinerary server action 内部最终走 SM 的 cancel transition
-  // （action 名 deleteItinerary 是 source 命名约定，SM transition action 名 = cancel，
-  //  参 manifest.yaml: itinerary transitions: from: scheduled, to: cancelled, action: cancel）。
-  // 第一次：rule-engine 判 NeedConfirm（已存 source 设计：用户必二次确认）。
-  // 第二次调 confirm 降级版（用 'cancelItinerary' action 走 SM 真路径）→ 落库 cancelled。
-  it('case 4: deleteItinerary(scheduledId) 二次确认 → status=ok + DB status=cancelled', async () => {
+  // [026] C1 修复后：deleteItinerary 内部调用 submitDynamicIntent('timebox',
+  // 'cancelItinerary', ...)，SM 找到 from scheduled→cancelled transition 直接执行，
+  // 不弹 needs_confirm（cancel 无 form 字段校验，rule-engine 不拦）。
+  it('case 4: deleteItinerary(scheduledId) → status=ok + DB status=cancelled（C1 修复后直通）', async () => {
     const repo = new ItineraryRepository()
     const it = baseIt()
     await repo.save(it, USER)
 
-    // 第一次：source 走 needs_confirm（rule-engine 提示）
-    const first = await deleteItinerary(it.id as any)
-    expect(first.status).toBe('needs_confirm')
-    if (first.status === 'needs_confirm') {
-      expect(first.confirmAction).toBe('deleteItinerary')
-      expect(first.confirmFields).toMatchObject({ objectId: it.id })
-    }
-    // 第一次确认后 DB 仍 scheduled（needs_confirm 不落库）
-    const afterFirst = (await db.select().from(s.itineraries)
-      .where(eq(s.itineraries.id, it.id as any)))[0]
-    expect(afterFirst.status).toBe('scheduled')
+    const result = await deleteItinerary(it.id as any)
+    expect(result.status).toBe('ok')
+    expect(result.itinerary).toBeTruthy()
 
-    // 第二次调确认版（confirmed=true 跳过 NeedsConfirm；用 cancelItinerary action 走 SM 真 cancel 路径）
-    const { submitDynamicIntent } = await import('@/app/actions/intent')
-    const result2 = await submitDynamicIntent(
-      'timebox', 'cancelItinerary', { objectId: it.id }, true,
-    )
-    expect(result2.success).toBe(true)
-    expect(result2.object).toBeTruthy()
-
-    // DB row 已变更（cancelled 状态落库 + cancelledAt 非 null）
     const afterRow = (await db.select().from(s.itineraries)
       .where(eq(s.itineraries.id, it.id as any)))[0]
     expect(afterRow.status).toBe('cancelled')
@@ -253,23 +234,14 @@ describe('[026] T16 P1 server actions 集成测试', () => {
   })
 
   // ─── case 5: deleteItinerary(expiredId) → 写入约束 IRON RULE ──
-  // [P0-1 修复后真路径] SM 拒 expired→cancelled（terminal state）。
-  it('case 5: deleteItinerary(expiredId) → SM 拒终态（确认后拒）+ DB row 不变（IRON RULE）', async () => {
+  // [026] C1 修复后：deleteItinerary 直调 cancelItinerary→SM 拒终态，
+  // 不弹 needs_confirm（SM 拒绝非 confirm 路径），直接 throw。
+  it('case 5: deleteItinerary(expiredId) → SM 拒终态 throw + DB row 不变（IRON RULE）', async () => {
     const id = await seedWithStatus('expired')
     const beforeRow = (await db.select().from(s.itineraries)
       .where(eq(s.itineraries.id, id as any)))[0]
 
-    // 第一次走 needs_confirm
-    const first = await deleteItinerary(id as any)
-    expect(first.status).toBe('needs_confirm')
-
-    // 第二次调确认版（confirmed=true 跳过 NeedsConfirm）→ SM 真拒终态
-    const { submitDynamicIntent } = await import('@/app/actions/intent')
-    const result2 = await submitDynamicIntent(
-      'timebox', 'cancelItinerary', { objectId: id }, true,
-    )
-    expect(result2.success).toBe(false)
-    expect(result2.error).toMatch(/终态|非法转换|非法状态/)
+    await expect(deleteItinerary(id as any)).rejects.toThrow()
 
     // 写入约束 IRON RULE：DB row 不得改变
     const afterRow = (await db.select().from(s.itineraries)
@@ -281,23 +253,13 @@ describe('[026] T16 P1 server actions 集成测试', () => {
   })
 
   // ─── case 6: deleteItinerary(completedId) → 抛错 + DB 不变 ──
-  // [P0-1 修复后] SM 拒 completed→cancelled（terminal state）。
-  it('case 6: deleteItinerary(completedId) → SM 拒终态（确认后拒）+ DB row 不变', async () => {
+  // [026] C1 修复后：同上，completed 同属 terminal state，SM 直接拒。
+  it('case 6: deleteItinerary(completedId) → SM 拒终态 throw + DB row 不变', async () => {
     const id = await seedWithStatus('completed')
     const beforeRow = (await db.select().from(s.itineraries)
       .where(eq(s.itineraries.id, id as any)))[0]
 
-    // 第一次走 needs_confirm
-    const first = await deleteItinerary(id as any)
-    expect(first.status).toBe('needs_confirm')
-
-    // 第二次调确认版 → SM 真拒终态
-    const { submitDynamicIntent } = await import('@/app/actions/intent')
-    const result2 = await submitDynamicIntent(
-      'timebox', 'cancelItinerary', { objectId: id }, true,
-    )
-    expect(result2.success).toBe(false)
-    expect(result2.error).toMatch(/终态|非法转换|非法状态/)
+    await expect(deleteItinerary(id as any)).rejects.toThrow()
 
     const afterRow = (await db.select().from(s.itineraries)
       .where(eq(s.itineraries.id, id as any)))[0]
