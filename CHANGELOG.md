@@ -37,6 +37,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_03 — [026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod TZ 一致，codex #5 落地）
 - 2026_07_03 — [026] A3 ship：§4.X itineraries 表 DDL 完整落地 + 迁移 0031 + ItineraryRepository.findActive/findNeedingReconcile + 4 transition（cancel/markInProgress/markExpired）；5 态 storage 全部由 SM transition 推进（lazy reconcile，零 cron）
 - 2026_07_03 — [026] §4.X itineraries 表契约：5 态 status enum + 4 transition 时间戳 + 2 索引（DDL 在 T2 迁移 0031 落地）
 - 2026_06_30 — [024] key_results +confidence（CHECK 0-100）；[023] +activity_archetypes / user_audit_log；A3.3 DROP habit_templates / template_habits（迁移 0027）

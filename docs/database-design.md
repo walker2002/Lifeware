@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_07_03 (refactor)**：[026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod 一致或扩展 UTC 归一化，codex #5 落地）
 - **2026_07_02 (refactor)**：[022.01] Phase 3 — 移除 Objective/KR 独立状态 — `objectives` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_objectives_user_status` 索引；`key_results` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_key_results_user_status` 索引。状态权威迁移至 `cycles.status`（§4.0）。迁移：idx=30（待 Task 6 落地）。`findAll` 过滤逻辑变更：`ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`。`paused` 语义永久丢失（迁移有损可接受）
 - **2026_06_30 (refactor)**：[023] A3.2 UI 层接入 — `tasks.activity_archetype_id` / `habits.activity_archetype_id` 列说明补「UI 层已接入（CNUI 表单 + 详情只读）；FK ON DELETE SET NULL → 详情行整块不渲染（M3）」
 - **2026_06_26 (refactor)**：OKR Domain 重组 [022] Tier-2 文档先行 — 新增 §4.0 `cycles` 表（OKR 周期一级对象，cycle_type/status/period_start/period_end/三时间戳，健康度读时聚合不落库）；`objectives` 表删除 `period_type`/`period_start`/`period_end` 三列 + `check_objectives_period_end_after_start` 约束 + `idx_objectives_period` 索引，新增 `cycle_id uuid NOT NULL REFERENCES cycles(id) ON DELETE RESTRICT` + `idx_objectives_cycle` 索引；周期信息上移至 cycles 表，Objective 经 cycle_id 归属；§11.2 映射表补 `Objective.cycleId` 与 `Objective.period`（派生）说明
@@ -1611,6 +1612,22 @@ interface DerivedSignalsRepository {
 索引：
 - `uniq_user_settings_user` UNIQUE ON (user_id)
 
+#### 部署 TZ 约束（[026] T20 codex #5 落地）
+
+`user_settings.timezone` 列存的是**用户级**偏好（默认 `'Asia/Shanghai'`），用于前端展示与个性化。但 **reconcile 调度（`reconcile-itinerary.ts` / `reconcile-itineraries.ts` 的 `localDayKey`）依赖宿主进程本地时区**，即 Next.js server runtime 的系统 TZ，而不是 user_settings.timezone。
+
+这意味着：
+- **dev / staging / prod 三套环境的宿主 TZ 必须一致**（如都设为 `Asia/Shanghai` 或都设为 UTC），否则同一行程在不同环境的"今日 / 昨日"判定不一致。
+- **跨 TZ 部署**（如北京 dev + 弗吉尼亚 prod）会引入「同一日历日歧义」——同一时刻在两地分属不同 localDayKey，reconcile 推进节奏会偏移。
+- 单元测试已覆盖 TZ 边界（`reconcile-itinerary-tz.test.ts`），但运行时仍以 Node 进程 TZ 为准。
+
+**当前 [026] 决策**：保持 dev/prod TZ 一致即可，不做 user_settings.timezone → reconcile TZ 的扩展（保留后续 [027] 行程与智能编排合并时再演进）。若需多 TZ 部署，须把 `localDayKey` 扩展为接收显式 IANA TZ 参数或 UTC 归一化（见 [026] OQ-6，defer 至 [027]）。
+
+**操作要点**：
+- Docker 部署：在 `docker-compose.yml` / `Dockerfile` 设 `TZ=Asia/Shanghai` 或 `ENV TZ=Asia/Shanghai` + 挂载 `/etc/localtime`。
+- 本地开发：CI 跑 `validate:structure` + `vitest` 已覆盖 TZ 边界场景；开发者本地无需特设。
+- 生产环境：明确设置 `TZ` 环境变量，并在变更记录中标注（参考本文档第 §「变更记录」）。
+
 ### `memory_episodes`
 
 Session 归档时自动生成的摘要记录，用于跨会话记忆。
@@ -1642,5 +1659,5 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_06_30*
+*文档版本：2026_07_03*
 *关联上游文档：docs/usom-design.md*
