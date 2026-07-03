@@ -495,7 +495,8 @@ export const WRITE_ENTRY_EXEMPTIONS = [
 /** rules-registry 豁免（缺 L3 + [020] C/L 旧范式，带 sunset） */
 export const RULES_REGISTRY_EXEMPTIONS = [
   { domain: 'okrs', reason: '无 rules-registry + C 区 field_metadata 仍带旧范式（[020] 未迁，registry 即 SSOT 的例外）', sunset: 'okrs 全量 onboarding' },
-  { domain: 'timebox', reason: '写域缺 L3 规则三层 + C 区 field_metadata 仍带旧范式（[020] 未迁）', sunset: 'timebox L3 补齐 + 全量 onboarding' },
+  // [026] T21 — timebox 域 L3 已落地（[026] T6 timebox/rules-registry.ts 含 timeboxRuleRegistry
+  // + itineraryRuleRegistry，hooks.ts 调 evaluateDomainRules），从豁免清单移除。
 ] as const
 
 const WRITE_ENTRY_EXEMPTION_SET = new Set(WRITE_ENTRY_EXEMPTIONS.map(e => e.file))

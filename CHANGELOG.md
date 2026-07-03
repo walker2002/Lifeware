@@ -86,6 +86,7 @@
 
 ## Domain 开发权威指南（docs/domain-development-guide.md）
 
+- 2026_07_03 — [026] T21 — §4.1 Sunset 豁免清单移除 timebox 一行（[026] T6 已落地 timebox/rules-registry.ts + itineraryRuleRegistry 双 registry，hooks.ts 调 evaluateDomainRules）；§7 四域现状对照表 timebox L3 状态从 ❌ → ✅ registry+evaluate。validate:structure 仍 0 errors。
 - 2026_06_22 — [019.1] CnuiFormAdapter 退役：habits 手写化 + 删 FormRegistry/Adapter/register-form + validator L4-1/L7-2 落地
 - 2026_06_21 — Part II 注册步骤对齐 tasks 参考实现（manifest 模板 / hooks / schema / repository / Step 5.5 / Step 13）
 - 2026_06_21 — [019] 原 mydocs 注册指南移入 docs/ 并与 Domain 范式整合为单一权威文件

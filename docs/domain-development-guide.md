@@ -5,6 +5,7 @@
 > **宪法关系**：Part I 是 constitution §III/VI/VIII + §CN-UI（第 4 条已 supersede）+ **§IX Domain Development Paradigm**（v2.0.0，2026-06-22 生效）的操作展开；§IX 修订记录见 `.specify/amendments/proposed-IX-domain-paradigm.md`（含对 §CN-UI 第 4 条的显式 supersede，✅ 已生效）。
 
 **变更记录**：
+- **2026_07_03（[026] T21）**：§4.1 Sunset 豁免清单移除 timebox 一行（[026] T6 已落地 timebox/rules-registry.ts 含 timeboxRuleRegistry + itineraryRuleRegistry，hooks.ts 调 evaluateDomainRules；validate:structure 仍 0 errors）。§7 四域现状对照表 timebox L3 状态从 ❌ → ✅ registry+evaluate。
 - **2026_06_24（[020] registry 即 SSOT）**：规则三层范式收敛 —— manifest 不再声明 `rules:` 区块（删除 C 区 label/required + L 区 rules）；registry 即 SSOT（每条规则自带 `{check, fields, message}` meta）；evaluateDomainRules/useManifestRules/realtime 改读 registry 参数（删 get-realtime-rules 中转）；validator 删 integrity.ts + validate-manifest 区块 G + 补 L3-realtime-singlefield CI check；constitution v2.1.0 MINOR（§IX/§VIII/§III 修正）。Step 2 manifest 模板 区块 L 注释化。Part I 治理表 L3-2 更新。
 - **2026_06_21（Part II 对齐）**：注册步骤全面对齐 tasks 参考实现——Step 2 manifest 模板补 `rules:` 区块 / `field_metadata.mutation_mode` / `cnui_surfaces` 改 map / 根字段 `domain_id`→`id`；Step 3 hooks 改工厂函数 + onValidate 委托 `evaluateDomainRules`；Step 4 schema 位置改 `src/lib/db/schema.ts` 集中；Step 5 repository 改目录；**新增 Step 5.5 组装 mutation-service**；Step 13 cnui 注册签名对齐 tasks；概念统一 `requires_full_validate`→`mutation_mode`（FactField/ContentField/PresentationField）；编号对齐总览（页面 Step 6 / 注册 Step 7 / Markdown Step 8）。
 - **2026_06_21**：[019] 整合——原 `mydocs/core/LW_domain_注册指南` 移入 `docs/`（归属转第二层）并与 `docs/domain-paradigm.md` 合并为本权威文件；新增 **Part I 范式与治理**（写入口两合法路径适用场景/跨字段红线 `mutation_mode` 字段分类/治理 must-should+sunset 豁免/CI validator/C-DC 检查清单 [CI]/[HUMAN]/四域现状对照）；Part II Step 3/5.5/13 加 paradigm 对齐说明。经 /plan-eng-review 2026-06-21 通过。
@@ -104,9 +105,8 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | 域 | 豁免规则 | sunset | 理由 |
 |---|---|---|---|
 | okrs | rules-registry 缺失 + updateObjective 绕过写入口 | okrs 全量 onboarding | 前范式遗产；正确修复需 mutation-service = onboarding 一部分（字段更新非状态转换）；缠 [025] 跨域事务 |
-| timebox | rules-registry 缺失（写域无规则三层） | timebox onboarding | timebox 有写路径（`startTimebox`/`endTimebox` 经 executeIntent + GenericRepo adapter），缺规则三层 → 写域 MUST 违例，托管至 onboarding |
 
-> timebox **不是**「无写路径 N/A」——它有 `startTimebox`/`endTimebox` 写动作（manifest 触发器 + `createTimeboxGenericRepo` + intent.ts executeIntent 路径），只是缺 L3 规则三层，故入豁免。
+> timebox **不是**「无写路径 N/A」——它有 `startTimebox`/`endTimebox` 写动作（manifest 触发器 + `createTimeboxGenericRepo` + intent.ts executeIntent 路径）。**[026] T21**：timebox L3 已落地（`timebox/rules-registry.ts` 含 `timeboxRuleRegistry` + `itineraryRuleRegistry`，hooks.ts 调 `evaluateDomainRules`），从本豁免清单移除。
 
 ## 5. CI Validator 设计（真治理 = 强制）
 
@@ -160,7 +160,7 @@ validator 保持 MUST 严格 + 枚举式豁免清单（每条带 sunset，定期
 | **tasks** | ✅ | ✅ mutation-service | ✅ registry+evaluate | ✅ 手写 surface | ✅ 只读页 | 🟡 契约断 | 参考实现；L6 随 [019.0] 修 |
 | **habits** | ✅ | ✅ | ✅ | ✅ 手写 | 🟡 HabitForm | ✅ | [019.1] adapter 已退役、回填已接 |
 | **okrs** | ✅ | ❌（扁平 okr.ts） | ❌ ad-hoc | ❌ | ❌ | — | §4.1 豁免，全量 onboarding 缠 [025] |
-| **timebox** | ✅ | ✅(走 executeIntent) | ❌ | 🟡 stub | ❌ | — | §4.1 豁免（写域缺 L3） |
+| **timebox** | ✅ | ✅(走 executeIntent) | ✅ registry+evaluate（[026] T6 + T21 移除 §4.1 豁免） | 🟡 stub | ❌ | — | L3 已落地；itinerary 引入 rule registry 双 registry 分派 |
 
 ---
 
