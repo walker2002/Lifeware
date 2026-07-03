@@ -59,6 +59,15 @@ intent_triggers:
       - 今天有什么安排
     keywords: [日程, schedule, 安排, 今天]
     view_route: /schedule
+  - action: configTimeboxTemplates
+    shortcut: /timeboxTemplates
+    description: 时间盒模板管理
+    response_type: page
+    examples:
+      - 时间盒模板
+      - 配置时间盒模板
+    keywords: [模板, 时间盒模板, 模板管理]
+    view_route: /timebox-templates
   - action: createSmartSchedule
     shortcut: /smartSchedule
     description: AI 智能编排日程
@@ -227,6 +236,9 @@ view_routes:
   viewSchedule:
     component: app/schedule/page
     url: /schedule
+  configTimeboxTemplates:
+    component: domains/timebox/pages/TimeboxTemplatesPage
+    url: /timebox-templates
   config_timebox_templates:
     component: app/timebox-templates/page
     url: /timebox-templates

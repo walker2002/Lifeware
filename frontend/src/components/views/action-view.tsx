@@ -4,6 +4,7 @@ import { HabitListPage } from "@/domains/habits/pages/HabitListPage"
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
 import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
 import { OkrWorkspacePage } from "@/domains/okrs/pages/OkrWorkspacePage"
+import { TimeboxTemplatesPage } from "@/domains/timebox/pages/TimeboxTemplatesPage"
 import { ScheduleView } from "@/components/views/schedule-view"
 
 const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
@@ -23,6 +24,9 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
   },
   okrs: {
     okrs: OkrWorkspacePage,
+  },
+  timebox: {
+    configTimeboxTemplates: TimeboxTemplatesPage,
   },
 }
 

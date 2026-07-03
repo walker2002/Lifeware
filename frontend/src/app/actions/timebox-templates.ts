@@ -59,6 +59,17 @@ export async function deleteTimeboxTemplate(
   }
 }
 
+/** 拉取当前用户全部时间盒模板（供 GrowthMenu 入口的内联渲染首次加载用） */
+export async function fetchTimeboxTemplates(): Promise<TimeboxTemplateActionResult<TimeboxTemplate[]>> {
+  try {
+    const repo = new TimeboxTemplateRepository()
+    const data = await repo.findByUser(MVP_USER_ID)
+    return { success: true, data }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : '拉取时间盒模板失败' }
+  }
+}
+
 // ─── 订阅源 ──────────────────────────────────────────────────────
 
 /**
