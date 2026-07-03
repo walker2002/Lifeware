@@ -68,7 +68,7 @@ export function DeleteItinerary({ dataModel, onConfirm, onCancel, isLoading, isD
           className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay">取消</button>}
         <button type="button" onClick={() => onConfirm({ ...dataModel, selectedIds: [...selected] })}
           disabled={isLoading || selected.size === 0}
-          className="rounded-md bg-error px-4 py-1.5 text-xs font-medium text-error-foreground disabled:opacity-50">
+          className="rounded-md bg-destructive px-4 py-1.5 text-xs font-medium text-destructive-foreground disabled:opacity-50">
           删除选中（{selected.size}）
         </button>
       </div>
