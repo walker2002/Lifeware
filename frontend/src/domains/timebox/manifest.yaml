@@ -354,9 +354,6 @@ view_routes:
   configTimeboxTemplates:
     component: domains/timebox/pages/TimeboxTemplatesPage
     url: /timebox-templates
-  config_timebox_templates:
-    component: app/timebox-templates/page
-    url: /timebox-templates
   config_activity_archetypes:
     component: app/config/activity-archetypes/page
     url: /config/activity-archetypes
