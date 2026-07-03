@@ -46,17 +46,19 @@ export interface TimeboxSummary {
   endedAt?: Timestamp
   loggedAt?: Timestamp
   executionRecord?: import('./objects').ExecutionRecord
-  /** [023] A2 OV#4 死字段最小消费方：活动原型名（来自 ActivityArchetype.l2Name） */
-  archetypeName?: string
 }
 
-/** 行程摘要（≤5 字段，供 /schedule 合并展示与 ContextSnapshot 用） */
+/** 行程摘要（≤7 字段，供 /schedule 合并展示 + ContextSnapshot + 编辑入口用） */
 export interface ItinerarySummary {
   id:        USOM_ID
   title:     string
   startTime: Timestamp
   durationMin: number
   status:    ItineraryStatus            // 直接来自 DB
+  // [026] 编辑入口需要：UI 双击/编辑按钮开 EditItineraryDrawer，复用 <ItineraryFormFields> 5 字段。
+  // 原 summary 仅 4 字段，编辑前需再 fetch；扩 2 字段 → 客户端编辑零延迟、零额外往返。
+  detail?:   string | null
+  people?:   string[]
 }
 
 export interface ObjectiveSummary {

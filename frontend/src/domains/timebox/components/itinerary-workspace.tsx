@@ -24,8 +24,7 @@
  */
 'use client'
 
-import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import {
@@ -45,9 +44,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, CalendarOff, Trash2, Loader2 } from 'lucide-react'
+import { Plus, CalendarOff, Trash2, Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { deleteItinerary, createItinerary, type CreateItineraryInput } from '@/app/actions/timebox'
+import {
+  deleteItinerary,
+  createItinerary,
+  updateItinerary,
+  type CreateItineraryInput,
+} from '@/app/actions/timebox'
+import { getItinerariesByRange } from '@/app/actions/intent'
 import { ItineraryFormFields, type ItineraryDraftFields } from '@/domains/timebox/cnui/surfaces/ItineraryFormFields'
 import type { ItinerarySummary } from '@/usom/types/summaries'
 
@@ -67,10 +72,16 @@ function defaultDraft(): ItineraryDraftFields {
 }
 
 export function ItineraryWorkspace({ initialItems }: { initialItems: ItinerarySummary[] }) {
-  const router = useRouter()
   const [items, setItems] = useState<ItinerarySummary[]>(initialItems)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [createOpen, setCreateOpen] = useState(false)
+  // [026] 编辑入口：editingTarget = 正在被编辑的行程 summary；null = Drawer 关闭。
+  // 不放在 selected set 中——多选删除语义 ≠ 编辑触发，避免与 toggle 选中冲突。
+  const [editingTarget, setEditingTarget] = useState<ItinerarySummary | null>(null)
+  // [BUG 修复] 列表创建/删除后不刷新：useState(initialItems) 在 mount 后不会因
+  //   router.refresh() / RSC payload 变化而 reset（React 行为：useState 初值仅 mount 取一次）。
+  //   改用显式 reload() 客户端重拉，覆盖两种入口（独立 page + GrowthMenu ActionView）。
+  const [, startReload] = useTransition()
 
   // 列表筛 {scheduled, in_progress}（D2 reversal: server 已 filter，client 也再 filter 保险）
   const active = items.filter(i => i.status === 'scheduled' || i.status === 'in_progress')
@@ -87,6 +98,23 @@ export function ItineraryWorkspace({ initialItems }: { initialItems: ItinerarySu
       return n
     })
 
+  // 重新拉取窗口内行程（与 /itineraries/page.tsx 同步：-7d / +90d）
+  const reload = useCallback(() => {
+    startReload(async () => {
+      const start = new Date()
+      start.setDate(start.getDate() - 7)
+      const end = new Date()
+      end.setDate(end.getDate() + 90)
+      try {
+        const list = await getItinerariesByRange(start, end)
+        setItems(list)
+      } catch (e) {
+        console.error('[ItineraryWorkspace] reload failed', e)
+        toast.error('行程列表刷新失败')
+      }
+    })
+  }, [])
+
   const handleDelete = async () => {
     // 快照 selected 防止 await 期间 setSelected 状态变更
     const ids = Array.from(selected)
@@ -100,10 +128,15 @@ export function ItineraryWorkspace({ initialItems }: { initialItems: ItinerarySu
       }
     }
     setSelected(new Set())
-    // [026] T14 I-1：多选删除后用 router.refresh() 触发 server component 重跑，
-    // 让 reconcileAndAdvanceItineraries + getItinerariesByRange 重读 DB（dedup stale）。
-    // 比 setItems 本地 filter 更可靠（涵盖其他客户端/server 端变更）。
-    router.refresh()
+    // [026] 统一走 client reload —— 涵盖其他客户端并发变更；
+    //   独立 page 路径 mount 时已触发 reconcile，删除无需再触发。
+    reload()
+  }
+
+  // [026] 编辑入口：从列表项触发 → 设 editingTarget（不切 selected，避免与多选态打架）。
+  const openEditor = (it: ItinerarySummary) => {
+    setSelected(new Set())
+    setEditingTarget(it)
   }
 
   return (
@@ -143,25 +176,50 @@ export function ItineraryWorkspace({ initialItems }: { initialItems: ItinerarySu
             <div className="space-y-2">
               {sorted.map(it => {
                 const checked = selected.has(it.id)
+                // 终止态不可编辑（避免越权改，已设计如此——ItineraryRepository 端也禁）
+                const editable = it.status === 'scheduled' || it.status === 'in_progress'
                 return (
-                  <button
+                  <div
                     key={it.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`行程：${it.title}`}
                     onClick={() => toggle(it.id)}
-                    className={`w-full text-left rounded-md border p-3 ${
+                    onDoubleClick={() => editable && openEditor(it)}
+                    onKeyDown={e => {
+                      if (editable && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault()
+                        openEditor(it)
+                      }
+                    }}
+                    className={`w-full text-left rounded-md border p-3 cursor-pointer ${
                       checked ? 'border-primary bg-primary/5' : 'border-hairline bg-canvas'
                     } hover:bg-hover-overlay`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-ink truncate">{it.title}</span>
-                      <span className="text-xs text-body/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-ink truncate flex-1">{it.title}</span>
+                      <span className="text-xs text-body/70 shrink-0">
                         {it.status === 'in_progress' ? '执行中' : '计划'}
                       </span>
+                      {editable && (
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={`编辑行程：${it.title}`}
+                          onClick={e => {
+                            e.stopPropagation() // 不触发父 div 的选中 toggle
+                            openEditor(it)
+                          }}
+                          className="text-body/70 hover:text-ink"
+                        >
+                          <Pencil />
+                        </Button>
+                      )}
                     </div>
                     <div className="text-xs text-body/70">
                       {new Date(it.startTime).toLocaleString('zh-CN')} · {it.durationMin}分钟
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -171,9 +229,139 @@ export function ItineraryWorkspace({ initialItems }: { initialItems: ItinerarySu
 
       {/* [026] T14 I-1 修复：内联 Drawer（standalone page 不在 chat 流，必须独立 mount。
           与 TimeboxDrawer 同款 Sheet 模式：复用 <ItineraryFormFields> 公共组件，
-          提交走 createItinerary server action → 完整 Nexus → SM create transition。 */}
-      {createOpen && <CreateItineraryDrawer onClose={() => setCreateOpen(false)} onSaved={() => { setCreateOpen(false); router.refresh() }} />}
+          提交走 createItinerary server action → 完整 Nexus → SM create transition。
+
+          [BUG 修复] 保存后用 reload() 重拉（不用 router.refresh()，原因见组件顶部注释）。 */}
+      {createOpen && (
+        <CreateItineraryDrawer
+          onClose={() => setCreateOpen(false)}
+          onSaved={() => {
+            setCreateOpen(false)
+            reload()
+          }}
+        />
+      )}
+
+      {/* [026] 编辑入口：列表项「编辑按钮 / 双击 / 键盘 Enter」都会设 editingTarget，
+          命中后挂 EditItineraryDrawer。形态与 CreateItineraryDrawer 同款 Sheet，
+          提交走 updateItinerary（不走 submitDynamicIntent——updateItinerary 已封装
+          mutation service + SM 状态守护；field_steps 模式天然支持单字段局部写）。 */}
+      {editingTarget && (
+        <EditItineraryDrawer
+          target={editingTarget}
+          onClose={() => setEditingTarget(null)}
+          onSaved={() => {
+            setEditingTarget(null)
+            reload()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * 编辑行程 Drawer（[026] 编辑入口）
+ * - Sheet（与 CreateItineraryDrawer 同款 520px）
+ * - <ItineraryFormFields> 公共组件 —— 与新建完全一致字段集合（标题/时间/时长/关系人/详情）
+ * - 提交走 updateItinerary server action（直调 mutation service，5 字段可写）。
+ *   字段白名单由 updateItinerary 内部强制（ITINERARY_UPDATE_ALLOWED），安全。
+ * - needs_confirm 不适用：updateItinerary 不返回 needs_confirm（无 rule warning 路径）。
+ *   若 server 抛错（SM 拒终态 / validation 失败），用 toast.error 兜底。
+ */
+function EditItineraryDrawer({
+  target,
+  onClose,
+  onSaved,
+}: {
+  target: ItinerarySummary
+  onClose: () => void
+  onSaved: () => void
+}) {
+  // 初始 draft = 当前行程快照；detail/people 在 ItinerarySummary 已扩字段（schema 维度）。
+  // 编辑期间若其他客户端改了同一行程，本地 draft 与 DB 可能短暂发散——用户保存时直接覆盖
+  // （符合个人工具假设，不引入乐观锁；多客户端同写场景罕见）。
+  const [draft, setDraft] = useState<ItineraryDraftFields>(() => ({
+    id: target.id,
+    title: target.title,
+    startTime: target.startTime as unknown as string,
+    durationMin: target.durationMin,
+    detail: target.detail ?? null,
+    people: target.people ?? [],
+  }))
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = useCallback(async () => {
+    const title = draft.title.trim()
+    if (!title || submitting) return
+    if (!draft.startTime || draft.durationMin <= 0) return
+    setSubmitting(true)
+    try {
+      const r = await updateItinerary(target.id as any, {
+        title,
+        startTime: new Date(draft.startTime).toISOString(),
+        durationMin: draft.durationMin,
+        detail: draft.detail?.trim() ? draft.detail.trim() : null,
+        people: draft.people,
+      })
+      if (r.status === 'ok') {
+        toast.success('行程已更新')
+        onSaved()
+      } else {
+        // needs_confirm 不来自 updateItinerary（server action 直路径），防御性兜底
+        toast.error(r.message ?? '更新失败')
+      }
+    } catch (e) {
+      console.error('[EditItineraryDrawer] 提交失败', e)
+      toast.error(e instanceof Error ? e.message : '更新失败，请重试')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [draft, submitting, target.id, onSaved])
+
+  return (
+    <Sheet open onOpenChange={o => { if (!o) onClose() }}>
+      <SheetContent
+        side="right"
+        className="w-[520px] sm:max-w-[520px] gap-0 p-0"
+        aria-label={`编辑行程：${target.title}`}
+        onKeyDown={e => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit()
+        }}
+      >
+        <SheetHeader className="flex flex-row items-center justify-between shrink-0 space-y-0 px-5 py-3 border-b border-hairline-soft">
+          <SheetTitle className="text-sm font-semibold text-ink">编辑行程</SheetTitle>
+        </SheetHeader>
+        <SheetDescription className="sr-only">编辑行程</SheetDescription>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          <ItineraryFormFields
+            draft={draft}
+            onChange={patch => setDraft(prev => ({ ...prev, ...patch }))}
+            disabled={submitting}
+          />
+        </div>
+
+        <div className="shrink-0 border-t border-hairline px-5 py-3 flex items-center justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            取消
+          </Button>
+          <Button
+            onClick={() => handleSubmit()}
+            disabled={!draft.title.trim() || draft.durationMin <= 0 || submitting}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-1 size-3 animate-spin" />
+                保存中
+              </>
+            ) : (
+              '保存修改'
+            )}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 

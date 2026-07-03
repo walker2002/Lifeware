@@ -847,6 +847,9 @@ export async function getItinerariesByRange(
     startTime: it.startTime as Timestamp,
     durationMin: it.durationMin,
     status: it.status, // [026] D2 reversal: 直接来自 DB
+    // [026] 编辑入口：扩 detail/people，客户端编辑零额外往返
+    detail: it.detail ?? null,
+    people: it.people ?? [],
   }));
 }
 
