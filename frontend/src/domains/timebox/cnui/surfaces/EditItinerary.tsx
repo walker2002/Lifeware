@@ -1,0 +1,87 @@
+/**
+ * @file EditItinerary
+ * @brief 修改行程 CNUI surface（[026] D2 reversal）
+ *
+ * 默认 {scheduled, in_progress} 列表（用户可改计划/执行），选中切编辑表单。
+ * 4 字段复用 <ItineraryFormFields>（D4 决议 A）。
+ * 终态 expired/cancelled/completed 不在列表（不可改，UI 自然隐藏）。
+ */
+
+'use client'
+
+import { useState } from 'react'
+import { ItineraryFormFields, type ItineraryDraftFields } from './ItineraryFormFields'
+
+interface EditItineraryProps {
+  surfaceType: string
+  dataModel: Record<string, unknown>
+  onDataChange: (d: Record<string, unknown>) => void
+  onConfirm: (d: Record<string, unknown>) => void
+  onCancel?: () => void
+  isLoading?: boolean
+  isDone?: boolean
+  serverErrors?: string[]
+}
+
+export function EditItinerary({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: EditItineraryProps) {
+  const items = (dataModel.items as (ItineraryDraftFields & { status: string })[]) ?? []
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<(ItineraryDraftFields & { status: string }) | null>(null)
+
+  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 行程已更新</p>
+
+  const selected = items.find(i => i.id === selectedId)
+
+  if (selected && draft) {
+    const update = (patch: Partial<ItineraryDraftFields>) => setDraft(d => d ? { ...d, ...patch } : d)
+    const back = () => { setSelectedId(null); setDraft(null) }
+    const submit = () => {
+      onDataChange({ ...dataModel, selected: draft })
+      onConfirm({ ...dataModel, selected: draft })
+    }
+    const titleFilled = typeof draft.title === 'string' && draft.title.trim().length > 0
+    return (
+      <>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-medium text-ink">编辑行程（{selected.status === 'in_progress' ? '执行中' : '计划'}）</span>
+          <button type="button" onClick={back} className="text-xs text-body/70 underline">返回列表</button>
+        </div>
+        <ItineraryFormFields draft={draft} onChange={update} />
+        <div className="flex items-center justify-end gap-2 pt-2">
+          {onCancel && <button type="button" onClick={onCancel}
+            className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay">取消</button>}
+          <button type="button" onClick={submit} disabled={isLoading || !titleFilled}
+            title={!titleFilled ? '请填写事件名称' : undefined}
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
+            保存
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要修改的行程（仅计划/执行中）</span></div>
+      {items.length === 0
+        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的行程</p>
+        : <div className="space-y-1 max-h-72 overflow-y-auto">
+            {items.map(it => (
+              <button key={it.id} type="button"
+                onClick={() => { setSelectedId(it.id); setDraft(it) }}
+                className="w-full text-left rounded-md border border-hairline bg-canvas p-2 hover:bg-hover-overlay">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-ink truncate">{it.title}</span>
+                  <span className="text-xs text-body/70">{it.status === 'in_progress' ? '执行中' : '计划'}</span>
+                </div>
+                <div className="text-xs text-body/70">{new Date(it.startTime).toLocaleString('zh-CN')} · {it.durationMin}分</div>
+              </button>
+            ))}
+          </div>}
+      {onCancel && <div className="flex justify-end pt-2">
+        <button type="button" onClick={onCancel}
+          className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay">取消</button>
+      </div>}
+    </>
+  )
+}
