@@ -220,6 +220,22 @@ function validateDomain(domainId: string): void {
   const generationActions = (manifest.generation_actions ?? {}) as Record<string, Record<string, unknown>>
   const queryActions = (manifest.query_actions ?? {}) as Record<string, Record<string, unknown>>
 
+  // ── 区块 C: field_metadata 嵌套结构校验（[026] T23 per-objectType）───
+  // 检测顶层 field_metadata 是否包含「平铺」字段（值是 FieldMetadata 而不是
+  // Record<string, FieldMetadata>）。平铺格式已被 Zod schema 拒绝，但本工具独立
+  // 校验 YAML 原始结构，给出友好诊断。
+  //
+  // 启发式：v 自身含 'type' 字段 → 视为 FieldMetadata 平铺；否则视为嵌套表。
+  const fieldMetadata = (manifest.field_metadata ?? {}) as Record<string, unknown>
+  for (const [k, v] of Object.entries(fieldMetadata)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      if ('type' in (v as Record<string, unknown>)) {
+        addError(domainId, 'C-flat-field-metadata',
+          `field_metadata.${k} 是 FieldMetadata 平铺（type=${(v as Record<string, unknown>).type}），应改为 per-objectType 嵌套结构: field_metadata.{${k}}: { ... }`)
+      }
+    }
+  }
+
   // ── 区块 A: intent_triggers 校验 ─────────────────────────────
 
   const actionNames = new Set<string>()
