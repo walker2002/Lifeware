@@ -1,10 +1,17 @@
 /**
  * @file schedule-workspace
- * @brief 时间盒工作台（[023] A2）— standalone 模式
+ * @brief 时间盒工作台（[023] A2 / [026] A3.2）
  *
  * 左栏：日期导航 + 当日时间盒列表（DayView 复用），支持创建/编辑/删除/lifecycle。
  * 右栏：Timebox Drawer 挂载点（Variant C v2，T4 实现）。
  * 配色用 CSS 变量令牌（bg-canvas/text-ink/border-hairline）。
+ *
+ * [026] A3.2：loadDay 改用 Promise.all 并行拉 timebox + itinerary，
+ * 合并为 ScheduleEvent[] 后塞给 DayView。
+ *
+ * [026] codex D5 修复：loadDay **不**调 reconcileAndAdvanceItineraries
+ * （避免 /schedule 翻日历页重推 N 次 SM）。reconcile 仅在 /itineraries
+ * 触发。Trade-off：/schedule 可能显陈旧状态。可接受 MVP。
  */
 
 'use client'
@@ -13,7 +20,8 @@ import { useState, useCallback, useEffect } from 'react'
 import { DayView } from './day-view'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
-import { getTimeboxesByRange } from '@/app/actions/intent'
+import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
+import { mergeEvents, type ScheduleEvent } from './schedule-event'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import { Plus, CalendarOff } from 'lucide-react'
@@ -30,7 +38,7 @@ interface DrawerState {
 
 export function ScheduleWorkspace() {
   const [date, setDate] = useState(() => new Date())
-  const [timeboxes, setTimeboxes] = useState<TimeboxSummary[]>([])
+  const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [drawer, setDrawer] = useState<DrawerState | null>(null)
 
@@ -39,9 +47,14 @@ export function ScheduleWorkspace() {
     try {
       const start = new Date(d); start.setHours(0, 0, 0, 0)
       const end = new Date(d); end.setHours(23, 59, 59, 999)
-      // 走 server action（客户端禁止直 import db repo / drizzle）；返回 TimeboxSummary[]
-      const list = await getTimeboxesByRange(start, end)
-      setTimeboxes(list)
+      // [026] A3.2：并行拉 timebox + itinerary（codex D5 修复：getItinerariesByRange
+      // 是纯读；reconcile 仅在 /itineraries 触发，避免 /schedule 翻日历页重推 N 次 SM）。
+      // Trade-off：/schedule 可能显陈旧状态（若用户未访问过 /itineraries）。可接受 MVP。
+      const [timeboxList, itineraryList] = await Promise.all([
+        getTimeboxesByRange(start, end),
+        getItinerariesByRange(start, end),
+      ])
+      setEvents(mergeEvents(timeboxList, itineraryList))
     } catch (e) {
       console.error('[ScheduleWorkspace] 加载失败', e)
     } finally {
@@ -78,7 +91,7 @@ export function ScheduleWorkspace() {
             <div className="space-y-2">
               {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
             </div>
-          ) : timeboxes.length === 0 ? (
+          ) : events.length === 0 ? (
             <EmptyState
               icon={CalendarOff}
               title="今天还没有时间盒"
@@ -87,7 +100,7 @@ export function ScheduleWorkspace() {
             />
           ) : (
             <DayView
-              timeboxes={timeboxes}
+              events={events}
               currentDate={date}
               onAction={(id, action) => handleAction(id, action as any)}
               onEdit={handleEdit}

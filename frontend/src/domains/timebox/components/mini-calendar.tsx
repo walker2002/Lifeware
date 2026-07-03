@@ -1,3 +1,15 @@
+/**
+ * @file mini-calendar
+ * @brief 月历缩略图（[026] A3.2 适配 kind 分支）
+ *
+ * 显示当月日历网格，标记有事件的日期。
+ *
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
+ * - 有任意 kind 的事件（timebox/itinerary）都标点
+ * - 纯 timebox-only 输入（含空 itinerary）时与 T13 改动前字节级一致（IRON RULE 守护）
+ *
+ * 拆分规则：调用方传 ScheduleEvent[]，本组件按 e.kind 派生态不分支（仅判断有无）。
+ */
 "use client"
 
 import {
@@ -12,25 +24,26 @@ import {
   endOfWeek,
 } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import type { TimeboxSummary } from "@/usom/types/summaries"
+import type { ScheduleEvent } from "./schedule-event"
 
 interface MiniCalendarProps {
   currentDate: Date
   selectedDate?: Date
-  timeboxes: TimeboxSummary[]
+  events: ScheduleEvent[]
   onDateSelect?: (date: Date) => void
 }
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
-function hasTimeboxOnDate(date: Date, timeboxes: TimeboxSummary[]): boolean {
-  return timeboxes.some((tb) => {
-    const start = new Date(tb.startTime)
+/** 判断指定日期是否有任意事件（timebox 或 itinerary） */
+function hasEventOnDate(date: Date, events: ScheduleEvent[]): boolean {
+  return events.some((e) => {
+    const start = new Date(e.start)
     return isSameDay(start, date)
   })
 }
 
-export function MiniCalendar({ currentDate, selectedDate, timeboxes, onDateSelect }: MiniCalendarProps) {
+export function MiniCalendar({ currentDate, selectedDate, events, onDateSelect }: MiniCalendarProps) {
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 })
@@ -61,7 +74,7 @@ export function MiniCalendar({ currentDate, selectedDate, timeboxes, onDateSelec
           const isCurrentMonth = isSameMonth(day, currentDate)
           const isToday = isSameDay(day, today)
           const isSelected = selectedDate ? isSameDay(day, selectedDate) : isSameDay(day, currentDate)
-          const hasEvent = hasTimeboxOnDate(day, timeboxes)
+          const hasEvent = hasEventOnDate(day, events)
 
           return (
             <button

@@ -129,7 +129,7 @@ export function HabitStatisticsPage() {
             <MiniCalendar
               currentDate={currentDate}
               selectedDate={currentDate}
-              timeboxes={[]}
+              events={[]}
               onDateSelect={(d) => setCurrentDate(d)}
             />
           </div>
