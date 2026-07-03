@@ -17,6 +17,10 @@ import { TimeboxList } from './cnui/surfaces/TimeboxList'
 import { CreateTimebox } from './cnui/surfaces/CreateTimebox'
 import { AdjustSchedule } from './cnui/surfaces/AdjustSchedule'
 import { LogTimebox } from './cnui/surfaces/LogTimebox'
+// [026] A2.5 — 行程 3 surface 注册（handler 共用 timebox 模块，按 action 分支）
+import { CreateItinerary } from './cnui/surfaces/CreateItinerary'
+import { EditItinerary } from './cnui/surfaces/EditItinerary'
+import { DeleteItinerary } from './cnui/surfaces/DeleteItinerary'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
@@ -40,6 +44,22 @@ cnuiRegistry.register('timebox', 'adjust-schedule', {
 // [023] A2.7 — logTimebox CNUI surface（批量打卡三态 + 备注）
 cnuiRegistry.register('timebox', 'log-timebox', {
   component: LogTimebox,
+  handlerModulePath,
+})
+
+// [026] A2.5 — 行程 3 surface（K-block manifest 已声明，handler 共用 timebox 模块）
+cnuiRegistry.register('timebox', 'create-itinerary', {
+  component: CreateItinerary,
+  handlerModulePath,
+})
+
+cnuiRegistry.register('timebox', 'edit-itinerary', {
+  component: EditItinerary,
+  handlerModulePath,
+})
+
+cnuiRegistry.register('timebox', 'delete-itinerary', {
+  component: DeleteItinerary,
   handlerModulePath,
 })
 

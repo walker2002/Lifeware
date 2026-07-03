@@ -6,7 +6,7 @@
  */
 
 import type { CnuiSurfaceHandler, CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
-import { TimeboxRepository } from '@/domains/timebox/repository'
+import { TimeboxRepository, ItineraryRepository } from '@/domains/timebox/repository'
 import { TaskRepository } from '@/domains/tasks/repository'
 import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
@@ -197,6 +197,50 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    // [026] A2.5 — 行程 3 surface open 分支（D2 reversal：列表筛 {scheduled, in_progress}）
+    if (action === 'createItinerary') {
+      let drafts = (intentFields?.drafts as any[]) ?? []
+      // 无 drafts → 初始化单条空白 draft（默认明日 9:00 + 1h）。用户填表直接走。
+      if (drafts.length === 0) {
+        const now = new Date()
+        const nextRound = new Date(now)
+        nextRound.setDate(now.getDate() + 1)
+        nextRound.setHours(9, 0, 0, 0)
+        const startIso = nextRound.toISOString()
+        drafts = [{ id: crypto.randomUUID(), title: '', startTime: startIso, durationMin: 60, people: [], detail: null }]
+      }
+      // D2 reversal：列表筛 {scheduled, in_progress}（用 findActive，已 T4 实现）
+      const all = await new ItineraryRepository().findActive(MVP_USER_ID as USOM_ID)
+      return {
+        content: drafts.every(d => d.title === '') ? '请填写行程信息' : '请确认要创建的行程',
+        dataSnapshot: {
+          items: drafts,
+          existing: all.map(i => ({ id: i.id, title: i.title, startTime: i.startTime, status: i.status })),
+        },
+      }
+    }
+
+    if (action === 'editItinerary') {
+      // D2 reversal：列表筛 {scheduled, in_progress}，终态自然不在列表
+      const all = await new ItineraryRepository().findActive(MVP_USER_ID as USOM_ID)
+      return {
+        content: '请选择要修改的计划/执行中行程',
+        dataSnapshot: { items: all.map(i => ({
+          id: i.id, title: i.title, startTime: i.startTime,
+          durationMin: i.durationMin, detail: i.detail, people: i.people, status: i.status,
+        })) },
+      }
+    }
+
+    if (action === 'deleteItinerary') {
+      // D2 reversal：列表筛 {scheduled, in_progress}，终态自然不在列表
+      const all = await new ItineraryRepository().findActive(MVP_USER_ID as USOM_ID)
+      return {
+        content: '请选择要删除的计划/执行中行程（可多选）',
+        dataSnapshot: { items: all.map(i => ({ id: i.id, title: i.title, startTime: i.startTime, status: i.status })) },
+      }
+    }
+
     return { content: '请填写信息', dataSnapshot: {} }
   },
 
@@ -285,6 +329,73 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       return { success: true, data: { count: logged.length } }
     }
 
+    // [026] A2.5 — 行程 3 surface submit 分支
+    // 写入口：createItinerary 经 submitDynamicIntent（intention 流水线），
+    //         editItinerary / deleteItinerary 经 T7 server actions（mutationService / SM）。
+    // SM 自动拒终态（terminal_states: expired/cancelled/completed），handler 不预校验。
+
+    if (action === 'createItinerary') {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      const items = (fields.items as any[]) ?? []
+      const succeeded: string[] = []
+      const failed: { title: string; error: string }[] = []
+      for (const it of items) {
+        try {
+          const r = await submitDynamicIntent('timebox', 'createItinerary', {
+            title: it.title, startTime: it.startTime, durationMin: it.durationMin,
+            ...(it.detail ? { detail: it.detail } : {}),
+            ...(it.people?.length ? { people: it.people } : {}),
+          })
+          if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
+          else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+        } catch (e) {
+          failed.push({ title: it.title ?? '未命名', error: e instanceof Error ? e.message : '创建失败' })
+        }
+      }
+      return {
+        success: failed.length === 0,
+        error: failed.length
+          ? `${failed.length} 条失败：${failed.map(f => `${f.title || '未命名'}（${f.error}）`).join('；')}`
+          : undefined,
+        data: { count: succeeded.length, succeeded, failed },
+      }
+    }
+
+    if (action === 'editItinerary') {
+      // surface onConfirm 透传 { ..., selected: ItineraryDraftFields & { status } }，取 selected 提交
+      const sel = fields.selected as {
+        id: string; title: string; startTime: string; durationMin: number
+        detail?: string | null; people: string[]; status?: string
+      }
+      if (!sel?.id) return { success: false, error: '未选择行程' }
+      const { updateItinerary } = await import('@/app/actions/timebox')
+      try {
+        await updateItinerary(sel.id as any, {
+          title: sel.title, startTime: sel.startTime, durationMin: sel.durationMin,
+          detail: sel.detail ?? null, people: sel.people,
+        })
+        return { success: true, data: { id: sel.id } }
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : '更新失败' }
+      }
+    }
+
+    if (action === 'deleteItinerary') {
+      // SM 自动拒终态（expired/cancelled/completed），由 catch 兜底（handler 不预校验）
+      const ids = (fields.selectedIds as string[]) ?? []
+      const { deleteItinerary } = await import('@/app/actions/timebox')
+      const failed: string[] = []
+      for (const id of ids) {
+        try { await deleteItinerary(id as any) }
+        catch (e) { failed.push(`${id}（${e instanceof Error ? e.message : '删除失败'}）`) }
+      }
+      return {
+        success: failed.length === 0,
+        error: failed.length ? `${failed.length} 条删除失败：${failed.join('；')}` : undefined,
+        data: { count: ids.length - failed.length },
+      }
+    }
+
     return { success: false, error: `Unknown CN-UI action: timebox/${action}` }
   },
 }
@@ -302,4 +413,8 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'create-timebox': timeboxCnuiHandler,
   'log-timebox': timeboxCnuiHandler,
   'adjust-schedule': timeboxCnuiHandler,
+  // [026] A2.5 — 行程 3 surface 共用 timeboxCnuiHandler（按 action 分支）
+  'create-itinerary': timeboxCnuiHandler,
+  'edit-itinerary': timeboxCnuiHandler,
+  'delete-itinerary': timeboxCnuiHandler,
 }
