@@ -1967,3 +1967,230 @@ psql "postgres://lifeware_dev@localhost:5432/lifeware_dev" \
 - ✅ 类型一致：`TemplateRow` 在 schema.ts 定义，repository re-import；`WEEKDAY_LABELS.value` 0-6；`MAX_VISIBLE_ROWS=4` 在 Task 7 单测与组件使用。
 - ✅ 0 占位：每个代码块都给到完整代码；每个命令都给到 expected。
 - ✅ 文件路径全部绝对。
+
+---
+
+## Review Decisions Applied（2026-07-04 plan-eng-review）
+
+本节是 `/plan-eng-review` 走完 4 节（架构 3 / 代码 4 / 测试 4 / 性能 2 = 13 决议）+ Codex outside voice（4 决议）后的 **17 项实施级 delta**。实施时按原 11 任务顺序执行，把每条 delta 折入对应任务；不改原任务结构，但补/改 step 即可。
+
+### A. 架构（3 决议）
+
+**A.1 迁移加 down.sql + 迁移前 dump（决议 1.1）**
+- **影响任务**：Task 2
+- **新增文件**：
+  - `src/lib/db/migrations/0032_023_02_timebox_template_redesign.down.sql`：反向 `ADD COLUMN survival_segments jsonb NOT NULL DEFAULT '{}'::jsonb` + 3 个 `subscribed_*` 数组空列 + 重建 `idx_timebox_templates_user`。**不回填旧数据**（已丢，回滚只能防止 schema 漂移）。
+- **新增步骤**（在 Task 2 之前）：
+  - `pg_dump -t timebox_templates lifeware_dev > /tmp/timebox_templates-pre-0032.sql` 备份一行现状
+  - 提交 `/tmp/*.sql` 暂不入库（仅本地）
+- **Commit 变更**：把 down.sql 一起加进 Task 2.4 commit。
+
+**A.2 `update()` 在 rows 未变时跳过 owner-check（决议 1.2）**
+- **影响任务**：Task 4
+- **改动点**：Task 4.4 `update()` 方法，**先** `findById` 拿 `old`，比较 `old.rows === input.rows`（引用相等——editor 总是用新数组 setState，可靠 sentinel），相等则跳过 `assertSubscriptionsOwned`。
+- **新增测试**：在 Task 5.3 之后补一个 `update` describe，3 个用例：happy / rows 变化触发 owner-check / rows 不变跳过 owner-check。
+- **注释补强**：在 `assertSubscriptionsOwned` 上方加 `// 仅在 rows 结构变化时由 update()/create() 调用——rows 未变时跳过可避免 3 张表的全表 inArray。`
+
+**A.3 补紧凑编辑流程 ASCII 图（决议 1.3）**
+- **影响任务**：Task 9 开头
+- **新增内容**（紧跟 Task 9 文件清单之后，描述块之前）：
+  ```
+  TemplateEditForm 数据流：
+  PageBanner
+    └─► TemplateCard 网格（width 自适应，1/2/3 列）
+          └─► 点击「编辑」onEdit() 触发：
+                ├─► ensureSources() [fire-and-forget, 1 min cache]
+                │     └─► fetchSubscriptionSources (server action)
+                │           └─► setSources({habits, tasks, threads})
+                └─► setEditing(template) → Sheet.open = true
+                      └─► TemplateEditForm (独立组件)
+                            ├─► onChange={(t) => setEditing(t)} → setState 全模板引用替换
+                            ├─► 行内 onChange → updateRow(id, patch) → setState 新 rows 数组
+                            ├─► 来源下拉 changeRowSource(id, source, sourceId?) → resolve from sources
+                            └─► onSave → saveTimeboxTemplate → repo.create/update → 乐观 setTemplates → setEditing(null)
+  ```
+
+### B. 代码质量（4 决议）
+
+**B.1 行 `<select>` 在 sources 未就绪时禁用（决议 2.1）**
+- **影响任务**：Task 9
+- **改动点**：`TemplateEditForm` 中所有「来源」`<select>` 元素加 `disabled={sources === null}`，并在其右侧加 `{sources === null ? '加载订阅源…' : ''}` 小字。
+- **理由**：防止 fire-and-forget 竞态导致用户切到 habit 看到空下拉。
+
+**B.2 TemplateEditForm 不再排序行展示（决议 2.2）**
+- **影响任务**：Task 9
+- **改动点**：删除 `TemplateEditForm` 内的 `const sortedRows = useMemo(() => sortRowsByStart(template.rows), [template.rows])`，改用 `template.rows` 直接渲染（保持用户编辑顺序）。
+- **保留**：`TemplateCard` 仍调 `sortRowsByStart` 用于展示。
+
+**B.3 DEFAULT_SEGMENT_SEED 单点维护 + SQL KEEP IN SYNC（决议 2.3）**
+- **影响任务**：Task 6 + Task 2
+- **改动点**：
+  - 在 `template-row-helpers.ts` 新增 `export const DEFAULT_SEGMENT_SEED: ReadonlyArray<{ activityName: string; start: string; end: string }> = [...]`（7 段硬编码）
+  - `seedTemplateRows` 改为 `DEFAULT_SEGMENT_SEED.map(s => ({ id, source: 'custom', ...s }))`
+  - 0032 SQL 的 `v_default jsonb_build_array(...)` 块上方加注释：`-- KEEP IN SYNC WITH frontend/src/domains/timebox/lib/template-row-helpers.ts:DEFAULT_SEGMENT_SEED`
+  - `template-row-helpers.test.ts` 补一个用例：遍历 `DEFAULT_SEGMENT_SEED` 与 SQL 注释指针的 link 一致（实际只测长度 7 + 第 0 项是「起床/07:00/07:30」即可保证同步不被无声改动）。
+
+**B.4 `addMinutesToHHMM` 抽出到 helpers + 4 单测（决议 2.4 + 3.4）**
+- **影响任务**：Task 6 + Task 8
+- **改动点**：
+  - 在 `template-row-helpers.ts` 新增 `export function addMinutesToHHMM(hhmm: string, minutes: number): string`
+  - `app/actions/timebox-templates.ts` 删除内联 `addMinutesToHHMM`，改 `import { addMinutesToHHMM } from '@/domains/timebox/lib/template-row-helpers'`
+  - `template-row-helpers.test.ts` 补 4 个用例：
+    - 正常：`addMinutesToHHMM('06:00', 60) === '07:00'`
+    - 跨午夜：`addMinutesToHHMM('23:00', 120) === '01:00'`
+    - 24h×N 归一：`addMinutesToHHMM('06:00', 1440) === '06:00'`
+    - 0 加成：`addMinutesToHHMM('06:00', 0) === '06:00'`
+  - **同时改决议 1.1（Codex 之外 + cross-2）**：`blankTemplateRow` 重命名为 `newEmptyRow`（消除与编辑器内 `blankTemplate()` 整模板的命名混淆）。所有引用点同步改：`template-row-helpers.ts` 导出 + `timebox-template-editor.tsx` import + 测试。
+
+### C. 测试（4 决议）
+
+**C.1 补 3 个 `update()` 测试（决议 3.1 + A.2 一并）**
+- **影响任务**：Task 5
+- **新增内容**（在 Task 5.3 之后）：
+  ```ts
+  describe('update', () => {
+    it('应能在 rows 未变时只改 name 且不触发 owner-check', async () => {
+      // mocks: findById returning FAKE_TEMPLATE_ROW
+      // assert: txSelect.calledTimes(0)  // owner-check SKIPPED
+      // assert: txUpdate called once
+    })
+    it('应能在 rows 变化时触发 owner-check', async () => {
+      // mocks: findById, then owner-check habits select, then update
+      // assert: txSelect called for habits
+    })
+    it('A3 owner-check：rows 中 habit 跨用户应抛出', async () => {
+      // similar to create cross-user test but on update path
+    })
+  })
+  ```
+
+**C.2 TemplateCard popover 内容点击测试（决议 3.2）**
+- **影响任务**：Task 7
+- **新增用例**：
+  ```ts
+  it('点击「还有 N 条」应展开 Popover 并显示完整行列表', async () => {
+    // 6 rows setup
+    // click on the trigger
+    // assert: rows[4] and rows[5] (originally hidden) are now in document
+  })
+  ```
+
+**C.3 TemplateEditForm 抽为独立组件 + 独立单测（决议 3.3）**
+- **影响任务**：Task 9
+- **改动点**：
+  - 新文件 `src/domains/timebox/components/template-edit-form.tsx`：把 Task 9.2 的 `TemplateEditForm` 函数体搬过来，props 维持 `{ template, sources, onChange, onSave, onCancel, saving }`。
+  - `timebox-template-editor.tsx` 删除 `TemplateEditForm` 函数，import 抽出版本。
+  - 新文件 `src/domains/timebox/components/__tests__/template-edit-form.test.tsx`：覆盖：
+    - 渲染：name 框 + 7 个 weekday chips + 行列表
+    - 来源下拉：在 `sources === null` 时所有来源 select `disabled`
+    - 切来源 → 输入 resolver：mock sources，changeRowSource('habit', 'h-1') 后该行 activityName 变 h.title、start/end 变 h.start/h.end
+    - 删行：点 trash icon → rows 少 1
+    - 新增行：点 + → rows 多 1（newEmptyRow 默认）
+
+**C.4 addMinutesToHHMM 4 用例（决议 3.4）**
+- 已在 B.4 内列。
+
+### D. 性能（2 决议）
+
+**D.1 React.memo + 稳定行 key（决议 4.1）**
+- **影响任务**：Task 9
+- **改动点**：
+  - `TemplateEditForm` 内联行元素抽为 `RowEditor` 子组件，包裹 `React.memo`。
+  - props 仅 `{ row, sources, onUpdate, onDelete, onSourceChange }`（不含整个 `template`），父组件 name 输入时不会触发子组件 re-render。
+  - `template-row-helpers.ts:genRowId` 已在用 `crypto.randomUUID()`，保证行 id 跨 setState 稳定。
+
+**D.2 1 分钟 in-memory cache（决议 4.2）**
+- **影响任务**：Task 8
+- **改动点**：在 `app/actions/timebox-templates.ts` 文件顶部加 `let _sourcesCache: { at: number; data: SubscriptionSources } | null = null`，`fetchSubscriptionSources` 入口处：`if (_sourcesCache && Date.now() - _sourcesCache.at < 60_000) return { success: true, data: _sourcesCache.data }`。这能让编辑器二次打开走 in-memory 0 DB 命中。
+- **注释**：`MVP in-memory;后续接 SWR 替代`。
+
+### E. Outside Voice 跨模型（4 决议）
+
+**E.1 blankTemplateRow → newEmptyRow 重命名（决议 Cross-1）**
+- 已在 B.4 内列。
+
+**E.2 SQL 迁移用 `md5(segment_key)` 稳定 row id（决议 Cross-2）**
+- **影响任务**：Task 2
+- **改动点**：0032 SQL 的 `v_default jsonb_build_array(...)` 块改为
+  ```sql
+  v_default jsonb := jsonb_build_array(
+    jsonb_build_object('id', md5('seg-wake')::text,    'activityName', '起床',    'start', '07:00', 'end', '07:30', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-morning')::text,  'activityName', '晨间',    'start', '07:30', 'end', '09:00', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-workAm')::text,   'activityName', '上午上班','start', '09:00', 'end', '12:00', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-noon')::text,     'activityName', '午间',    'start', '12:00', 'end', '13:30', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-workPm')::text,   'activityName', '下午上班','start', '13:30', 'end', '18:00', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-evening')::text,  'activityName', '晚间',    'start', '18:00', 'end', '23:00', 'source', 'custom'),
+    jsonb_build_object('id', md5('seg-sleep')::text,    'activityName', '睡眠',    'start', '23:00', 'end', '07:00', 'source', 'custom')
+  );
+  ```
+- **理由**：迁移重跑 / 同 dev DB 多次执行，row id 永远稳定，未来若做 row 级引用（如模板行继承）可锁住。
+
+**E.3 Source 重命名陈旧名 = MVP 接受（决议 Cross-3）**
+- **影响任务**：无（仅文档）
+- **改动点**：在 §0 spec 已有「activityName 是创建/编辑时快照」声明下，再在本文「NOT in scope」节补一行：
+  > 习惯/任务/主线重命名后，模板行 `activityName` 不会自动同步——MVP 接受。修复路径是用户编辑模板后重新选择来源对象（changeRowSource 会重新 resolve）。
+
+**E.4 Task 0: baseline 验证（决议 Cross-4）**
+- **影响任务**：新增 Task 0，置于 Task 1 之前
+- **内容**：
+  ```
+  ### Task 0: 验证 baseline 测试数
+  
+  **Files:** 无。
+  
+  - [ ] **Step 0.1: 跑 baseline 测试**
+  
+  ```bash
+  cd frontend
+  npm test 2>&1 | tee /tmp/baseline-test.log
+  ```
+  
+  **Expected**：记录 PASS 数 N_baseline（当前 plan 推断 17）。后续 Task 11 验证 zero new failure = N_baseline。
+  
+  - [ ] **Step 0.2: 记录 baseline + 确认 Plan 数**
+  
+  把 `N_baseline` 写到本文「Self-Review」节的「vitest baseline」行；若 N_baseline 偏离 17 超过 ±2，把 diff 写进 PR description。
+  ```
+
+### F. 决议落地总览（17 决议 → 11 任务）
+
+| 决议 | 类型 | 影响任务 | 工作量 |
+|---|---|---|---|
+| A.1 down.sql + dump | 架构 | Task 2 | ~5min |
+| A.2 update() 跳过 owner-check | 架构 | Task 4 + 5 | ~10min |
+| A.3 ASCII 编辑流程图 | 架构 | Task 9 | ~3min |
+| B.1 sources 未就绪禁用 | 代码 | Task 9 | ~5min |
+| B.2 编辑器不排序 | 代码 | Task 9 | ~2min |
+| B.3 DEFAULT_SEGMENT_SEED + KEEP IN SYNC | 代码 | Task 6 + 2 | ~5min |
+| B.4 + E.1 addMinutesToHHMM 抽 + 4 测试 + 重命名 | 代码 | Task 6 + 8 | ~10min |
+| C.1 3 个 update() 测试 | 测试 | Task 5 | ~10min |
+| C.2 popover 内容点击测试 | 测试 | Task 7 | ~5min |
+| C.3 TemplateEditForm 抽 + 单测 | 测试 | Task 9 | ~15min |
+| C.4 addMinutes 4 用例 | 测试 | Task 6 | ~5min |
+| D.1 React.memo + 稳定 key | 性能 | Task 9 | ~8min |
+| D.2 1min in-memory cache | 性能 | Task 8 | ~5min |
+| E.2 md5 稳定 row id | 跨模型 | Task 2 | ~3min |
+| E.3 stale name 文档化 | 跨模型 | NOT in scope | ~1min |
+| E.4 Task 0 baseline | 跨模型 | 新增 Task 0 | ~2min |
+| T.scoping 总开销 | — | — | ~93min（增量） |
+
+实施时按 11 任务 + Task 0 顺序执行，每条决议在对应 task 落地；本节作为"实施补丁"。
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run (pure refactor, no scope change) |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_absorbed | 10 findings; 6 meta-aligned with review decisions, 4 unique: naming collision (→E.1), stable IDs (→E.2), stale names (→E.3), baseline verification (→E.4) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEARED | 13 issues + 4 outside-voice = 17 decisions, all folded into "Review Decisions Applied" section above |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not run (this review covers UI; plan-eng-review already covered design tokens, Sheet, popover, width-adaptive) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run (no new dev infra introduced) |
+
+- **CODEX:** absorbed — 6 findings were already in 13-issue review (down.sql / update skip / tests / DEFAULT_SEGMENT_SEED / KEEP IN SYNC / addMinutes tests); 4 unique findings (naming, stable IDs, stale names, baseline) added as E.1–E.4.
+- **CROSS-MODEL:** Claude + Codex agree on: (a) migration rollback needed, (b) update() needs tests including rows-unchanged skip, (c) cross-midnight is a real edge, (d) baseline must be measured. No disagreement on a single architectural call.
+- **VERDICT:** CEO + ENG CLEARED — ready to implement. (no CEO run needed for pure refactor scope)
+
+**UNRESOLVED DECISIONS:**
+- *(none)* — all 17 decisions accepted by user, all folded into the "Review Decisions Applied" section above. The "Failure modes" section flagged code-DB desync as a real silent-empty-state risk; this is accepted as MVP scope (atomic prod migrations, dev-only concern).
