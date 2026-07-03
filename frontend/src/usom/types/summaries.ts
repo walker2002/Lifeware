@@ -41,6 +41,8 @@ export interface TimeboxSummary {
   endTime: Timestamp
   taskIds: USOM_ID[]
   habitIds: USOM_ID[]
+  /** [023] A2 OV#4：活动原型名（ActivityArchetype.l2Name），timeboxToSummary 解析后填充；最小消费方=TimeboxCard 标题行 */
+  archetypeName?: string
   startedAt?: Timestamp
   overtimeAt?: Timestamp
   endedAt?: Timestamp

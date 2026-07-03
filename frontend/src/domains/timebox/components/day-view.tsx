@@ -17,18 +17,20 @@ import { TimeboxList } from "./timebox-list"
 import { TimeboxTimeline } from "./timebox-timeline"
 import { MiniCalendar } from "./mini-calendar"
 import type { ScheduleEvent } from "./schedule-event"
+import type { TimeboxSummary } from "@/usom/types/summaries"
 
 interface DayViewProps {
   events: ScheduleEvent[]
   currentDate: Date
   onDateSelect?: (date: Date) => void
   onAction?: (timeboxId: string, action: string) => void
+  onEdit?: (tb: TimeboxSummary) => void   // [023] A2 C1：卡片标题点击进入编辑
 }
 
-export function DayView({ events, currentDate, onDateSelect, onAction }: DayViewProps) {
+export function DayView({ events, currentDate, onDateSelect, onAction, onEdit }: DayViewProps) {
   return (
     <div className="grid w-full gap-4 md:[grid-template-columns:30%_40%_30%] max-md:grid-cols-1">
-      <TimeboxList events={events} compact onAction={onAction} />
+      <TimeboxList events={events} compact onAction={onAction} onEdit={onEdit} />
       <TimeboxTimeline events={events} />
       <div className="hidden md:block">
         <MiniCalendar
