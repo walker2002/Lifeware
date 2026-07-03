@@ -206,6 +206,15 @@ const itineraryFieldsValid: SubmitCheck = async (
   intent: StructuredIntent,
   ctx,
 ) => {
+  // [026] P0-1 修复（issue #1 阻断 reconcile / mark / delete 路径）：
+  //   submit 规则对所有 action 都校验字段会把 mark* / delete* 阻断（这些 action 只传
+  //   {objectId, at}，缺 title/startTime/durationMin → reject）。故仅在 createItinerary
+  //   / editItinerary 时校验字段；其他 action（markInProgressItinerary /
+  //   markExpiredItinerary / deleteItinerary）立即通过，由 SM 独立把关终态/转移检查。
+  if (intent.action !== 'createItinerary' && intent.action !== 'editItinerary') {
+    return validationPassed()
+  }
+
   const errors: string[] = []
   const { fields } = intent
 
