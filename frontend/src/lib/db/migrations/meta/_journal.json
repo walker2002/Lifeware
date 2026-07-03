@@ -225,6 +225,13 @@
       "when": 1783400000000,
       "tag": "0031_itineraries",
       "breakpoints": false
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1783122305000,
+      "tag": "0032_023_02_timebox_template_redesign",
+      "breakpoints": false
     }
   ]
 }
