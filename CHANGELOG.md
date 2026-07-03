@@ -21,6 +21,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_03 — [026] Itinerary 对象（D2 reversal）：5 态存储 + lazy reconcile + 4 transition 时间戳（A1 进行中）
 - 2026_06_19 — [018-G3] 判定模型补全：ValidationResult 3→5 变体；ruleResultToValidation 接线 warning→PassedWithWarning
 - 2026_06_19 — [018-G2] 公共 `createDomainMutationServiceFactory` 抽象；SystemEventType +HabitFieldUpdated
 - 2026_06_19 — [018-G1] habits 写入口切片：字段三分类落地 + `createHabitsMutationService`
@@ -35,6 +36,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_03 — [026] §4.X itineraries 表契约：5 态 status enum + 4 transition 时间戳 + 2 索引（DDL 在 T2 迁移 0031 落地）
 - 2026_06_30 — [024] key_results +confidence（CHECK 0-100）；[023] +activity_archetypes / user_audit_log；A3.3 DROP habit_templates / template_habits（迁移 0027）
 - 2026_06_10 — tasks/habits status CHECK 补 deleted 状态（对齐 USOM）
 - 2026_06_06 — tasks 状态枚举回退对齐代码（todo/planned/in_progress/completed/archived）；移除废弃列；v_active_tasks 视图修复

@@ -9,7 +9,7 @@ import type {
   Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   TaskStatus, HabitStatus,
-  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus,
+  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus, ItineraryStatus,
   ThreadStatus, AISessionStatus,
   ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
   SchedulingConstraint, TrackingMode,
@@ -620,6 +620,35 @@ export interface Timebox {
   loggedAt?: Timestamp
   executionRecord?: ExecutionRecord
   notes?: Notes
+}
+
+/**
+ * 行程（Itinerary）—— 未来日历上一次性的事件安排（[026]，Cycle 模式）
+ *
+ * 与 Timebox 区别：Timebox 是今日可被 AI 重排的执行格；Itinerary 是用户对未来
+ * 钉死的承诺，到日子读时合并进当日日程作"锁定时间格"，AI 编排器不可移动。
+ *
+ * 状态全部存储（不读时算）：scheduled/in_progress/expired 由 SM transition 推进；
+ * 终态 cancelled/completed 持久化用于"未实施的计划"统计。
+ * 时间驱动的 transition（→in_progress, →expired）由 reconcileItineraryStatuses()
+ * 在页面 server component 加载时触发（零 cron）。
+ */
+export interface Itinerary {
+  id:             USOM_ID
+  status:         ItineraryStatus         // 存储：5 态枚举
+  title:          string                  // 活动事件名称
+  detail:         string | null           // 活动事件详情
+  startTime:      Timestamp               // 开始时间（UTC 存，展示层本地化）
+  durationMin:    number                  // 时长（分钟）；endTime = startTime + durationMin 派生
+  people:         string[]                // 关系人（纯文本，D1=A）
+  userId:         USOM_ID
+  createdAt:      Timestamp
+  updatedAt:      Timestamp
+  inProgressAt:   Timestamp | null         // SM transition scheduled→in_progress 时盖
+  expiredAt:      Timestamp | null         // SM transition →expired 时盖
+  completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
+  cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
+  schemaVersion:  number
 }
 
 // ─── 3.11 Review ──────────────────────────────────────────────

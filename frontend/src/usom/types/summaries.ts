@@ -5,7 +5,7 @@ import type {
   USOM_ID, DateOnly, Timestamp,
   Priority, EnergyLevel, PeriodType,
   TaskStatus,
-  HabitStatus, TimeboxStatus, IntentionStatus,
+  HabitStatus, TimeboxStatus, ItineraryStatus, IntentionStatus,
   ClarityLevel, DecompositionLevel,
 } from './primitives'
 
@@ -48,6 +48,15 @@ export interface TimeboxSummary {
   executionRecord?: import('./objects').ExecutionRecord
   /** [023] A2 OV#4 死字段最小消费方：活动原型名（来自 ActivityArchetype.l2Name） */
   archetypeName?: string
+}
+
+/** 行程摘要（≤5 字段，供 /schedule 合并展示与 ContextSnapshot 用） */
+export interface ItinerarySummary {
+  id:        USOM_ID
+  title:     string
+  startTime: Timestamp
+  durationMin: number
+  status:    ItineraryStatus            // 直接来自 DB
 }
 
 export interface ObjectiveSummary {

@@ -212,6 +212,7 @@ export type SystemEventType =
   | 'HabitFieldUpdated'
   | 'OkrFieldUpdated'
   | 'TimeboxFieldUpdated'
+  | 'ItineraryCreated' | 'ItineraryMarkedInProgress' | 'ItineraryMarkedExpired' | 'ItineraryCancelled' | 'ItineraryFieldUpdated' | 'ItineraryCompleted'
   | 'CycleCreated' | 'CyclePlanned' | 'CycleStarted' | 'CycleEnded' | 'CycleReviewed'
   | 'OnEventDispatchFailed'
 
@@ -398,3 +399,9 @@ const _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'HabitF
 void _HABIT_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
 const _OKR_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'OkrFieldUpdated'
 void _OKR_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
+const _ITINERARY_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'ItineraryFieldUpdated'
+void _ITINERARY_FIELD_UPDATED_IS_VALID_SYSTEM_EVENT_TYPE
+const _ITINERARY_MARKED_IN_PROGRESS_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'ItineraryMarkedInProgress'
+void _ITINERARY_MARKED_IN_PROGRESS_IS_VALID_SYSTEM_EVENT_TYPE
+const _ITINERARY_MARKED_EXPIRED_IS_VALID_SYSTEM_EVENT_TYPE: SystemEventType = 'ItineraryMarkedExpired'
+void _ITINERARY_MARKED_EXPIRED_IS_VALID_SYSTEM_EVENT_TYPE

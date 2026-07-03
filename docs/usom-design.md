@@ -945,6 +945,62 @@ type SegmentKey =
 
 **DB 落点**：`timebox_templates` 表（见 `docs/database-design.md` §7.8）。
 
+### 3.13 Itinerary（行程，[026]）
+
+**对象意图**：用户对未来日历上一次性的事件安排——读书会、约饭、牙医、家长会等"钉死"承诺。与 Timebox 区别：Timebox 是今日可被 AI 重排的执行格；Itinerary 是对未来钉死的承诺，到日子由读时合并器纳入当日日程作"锁定时间格"，AI 编排器不可移动。
+
+**D2 reversal（Cycle 模式）**：状态全部存储（**不读时算**），`scheduled` / `in_progress` / `expired` 由状态机 transition 推进；终态 `cancelled` / `completed` 持久化（用于"未实施的计划"统计，spec §7.4 OQ-7）。时间驱动的 transition（`scheduled→in_progress` 当日到日触发；`scheduled/in_progress→expired` 过日触发）由 `reconcileItineraryStatuses()` 在页面 server component 加载时触发（**零 cron**）。
+
+```typescript
+interface Itinerary {
+  id:             USOM_ID
+  status:         ItineraryStatus         // 存储：5 态枚举（C 方案：D2 reversal 后改为 Cycle 模式）
+  title:          string                  // 活动事件名称
+  detail:         string | null           // 活动事件详情
+  startTime:      Timestamp               // 开始时间（UTC 存，展示层本地化）
+  durationMin:    number                  // 时长（分钟）；endTime = startTime + durationMin 派生
+  people:         string[]                // 关系人（纯文本，D1=A）
+  userId:         USOM_ID
+  createdAt:      Timestamp
+  updatedAt:      Timestamp
+  inProgressAt:   Timestamp | null         // SM transition scheduled→in_progress 时盖
+  expiredAt:      Timestamp | null         // SM transition →expired 时盖
+  completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
+  cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
+  schemaVersion:  number
+}
+
+type ItineraryStatus =
+  | 'scheduled'   // initial state（SM null→scheduled）
+  | 'in_progress' // 执行中（SM scheduled→in_progress，lazy reconcile 当日到日触发）
+  | 'expired'     // 已过期（SM scheduled/in_progress→expired，lazy reconcile 过日触发；终态）
+  | 'cancelled'   // 用户取消（SM {scheduled,in_progress}→cancelled；终态；spec "已过期/已完成不能删除"）
+  | 'completed'   // 已完成（[027] SM →completed，timebox 打卡后；终态）
+```
+
+**状态机**（读时 reconcile + 用户操作触发）：
+
+```
+                     ┌──────────── cancelled ────────────┐
+                     │                                   │
+                     ▼                                   │
+   null ──▶ scheduled ──▶ in_progress ──▶ [027]completed
+              │              │
+              │              │
+              └──▶ expired ◀─┘  (终态)
+                            ▲
+                            └── cancelled (终态)
+```
+
+- `scheduled → in_progress`：lazy reconcile，Itinerary.startTime 当日到日触发
+- `scheduled / in_progress → expired`：lazy reconcile，startTime + durationMin 跨日触发
+- `scheduled / in_progress → cancelled`：用户主动取消（spec §7.4：expired/completed 不可取消）
+- `[027] in_progress → completed`：timebox 打卡完成后由编排器联动触发（不在 [026] 范围）
+
+**与 Timebox 的边界**：Itinerary 不参与 AI 自动编排（OQ-4：AI 锁），scheduling-handler 只查 timeboxes。Itinerary 只在当日读时合并进 `/schedule`，作为锁定时间格插入。
+
+**DB 落点**：`itineraries` 表（见 `docs/database-design.md` §4.X，DDL 在 T2 迁移手写落地）。
+
 ---
 
 ## 四、系统流通对象（Process Objects）

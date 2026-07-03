@@ -137,6 +137,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── habits                 ← 习惯
 ├── habit_logs             ← 习惯打卡记录（独立表）
 ├── timeboxes              ← 时间盒
+├── itineraries            ← 行程（[026]，Cycle 模式 5 态存储 + 4 transition 时间戳）
 ├── task_execution_logs    ← 任务执行记录（新增 2026-05-28）
 ├── reviews                ← 复盘
 └── activity_archetypes    ← 活动原型（[023] A1：7 L1 + 30 L2，配置类不走 SM）
@@ -804,6 +805,53 @@ CREATE INDEX idx_task_exec_logs_user_task ON task_execution_logs(user_id, task_i
 CREATE INDEX idx_task_exec_logs_timebox ON task_execution_logs(timebox_id);
 CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logged_at desc);
 ```
+
+---
+
+### 4.X itineraries（行程表，[026]）
+
+对应 USOM `Itinerary`。
+
+> **D2 reversal（Cycle 模式）**：状态全部存储，**不读时算**。`scheduled`/`in_progress`/`expired` 由 SM transition 推进（lazy reconcile，零 cron）；终态 `cancelled`/`completed` 持久化用于"未实施的计划"统计。详细 USOM 接口见 `docs/usom-design.md` §3.13。
+>
+> **DDL 实现在 T2 迁移（手写 SQL + psql + 登记 journal，idx=31）落地**；本节先登记列/索引契约供 Repository 与 server actions 引用。
+
+```sql
+-- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化）
+CREATE TABLE itineraries (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references users(id) on delete cascade,
+  schema_version  integer not null default 1,
+
+  -- 核心业务字段
+  status          text not null check (status in ('scheduled', 'in_progress', 'expired', 'cancelled', 'completed')),
+  title           text not null,
+  detail          text,                    -- 活动详情，可空
+  start_time      timestamptz not null,    -- 开始时间（UTC 存）
+  duration_min    integer not null,        -- 时长（分钟）；end_time = start_time + duration_min 派生
+  people          text[] not null default '{}',  -- 关系人（纯文本，D1=A）
+
+  -- 4 个 transition 时间戳（lazy reconcile + 用户操作触发盖戳）
+  in_progress_at  timestamptz,             -- scheduled→in_progress 时盖
+  expired_at      timestamptz,             -- scheduled/in_progress→expired 时盖
+  completed_at    timestamptz,             -- [027] →completed 时盖
+  cancelled_at    timestamptz,             -- →cancelled 时盖
+
+  -- 审计字段
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- 索引
+CREATE INDEX idx_itineraries_user_status ON itineraries(user_id, status);
+CREATE INDEX idx_itineraries_user_start  ON itineraries(user_id, start_time);
+```
+
+**设计要点**：
+- `end_time` 不存列：派生 = `start_time + duration_min * interval '1 minute'`，与 USOM 注释一致；调度查询用 `tstzrange` 表达式。
+- 4 时间戳 nullable：只在 transition 触发时盖；初始创建后仅 `created_at`/`updated_at` 有值。
+- 状态枚举与 USOM `ItineraryStatus` 5 态严格对齐；CHECK 约束由迁移 SQL 加。
+- `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
 
 ---
 
