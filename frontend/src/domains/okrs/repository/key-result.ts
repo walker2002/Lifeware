@@ -12,7 +12,7 @@ import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IKeyResultRepository } from '../../../usom/interfaces/irepository'
 import type { KeyResult } from '../../../usom/types/objects'
-import type { USOM_ID, KeyResultStatus } from '../../../usom/types/primitives'
+import type { USOM_ID } from '../../../usom/types/primitives'
 import { keyResultRowToUSOM, keyResultUSOMToRow } from '../../../lib/db/repositories/mappers'
 import { ContributionRepository } from './contribution'
 
@@ -37,7 +37,9 @@ export class KeyResultRepository implements IKeyResultRepository {
    *
    * [022] 2B-T8：不再信任传入的 _currentValue，改为从 junction 表重算。
    * 重算前会清理孤儿贡献（源 task/habit 已删除的引用）。
-   * 保留 status 派生（currentValue >= targetValue → completed）和下钳（Math.max(0, …)）。
+   * [022.01] Phase 3：移除 status 派生逻辑，改为自动管理 completedAt
+   * （progressRate >= 1.0 → 设值；< 1.0 → 清空以支持"未完成"回退）。
+   * 保留下钳（Math.max(0, …)）。
    *
    * [Review fix 2026-06-26] 接受 tx 参数并透传给所有 db.* 调用，使调用方
    * （mutation-service、跨域事件分发）能在同一事务中完成「孤儿清理 + 重算 +
@@ -94,54 +96,35 @@ export class KeyResultRepository implements IKeyResultRepository {
     // ── 1. 经 junction 表重算进度 ──
     const { currentValue, progressRate } = await contributionRepo.recomputeProgress(id, userId, tx)
 
-    // ── 2. 获取 KR 元数据用于 status 派生 ──
+    // ── 2. 获取 KR 元数据用于 completedAt 自动管理 ──
     const existing = await this.findById(id, userId, tx)
     if (!existing) throw new Error(`KeyResult ${id} not found`)
 
     // ── 3. 下钳保底（recomputeProgress 已内部钳制，此处再保底一次）──
     const clampedValue = Math.max(0, currentValue)
 
-    // ── 4. Status 派生：currentValue >= targetValue → completed ──
-    const newStatus: KeyResultStatus = clampedValue >= existing.targetValue ? 'completed' : existing.status
+    // ── 4. [022.01] Phase 3: 完成时间戳自动管理（替代 status 派生）──
+    // progressRate >= 1.0 且 completedAt 未设 → 设 completedAt = now()
+    // progressRate < 1.0 且 completedAt 已设 → 清空 completedAt（允许"未完成"回退）
+    const setValues: Record<string, unknown> = {
+      currentValue: String(clampedValue),
+      progressRate: String(progressRate),
+      updatedAt: new Date(),
+    }
+    if (progressRate >= 1.0 && !existing.completedAt) {
+      setValues.completedAt = new Date()
+    } else if (progressRate < 1.0 && existing.completedAt) {
+      setValues.completedAt = null
+    }
 
     // ── 5. 持久化（threading tx 保证整个 recompute 链路原子化）──
     await tx.update(s.keyResults)
-      .set({
-        currentValue: String(clampedValue),
-        progressRate: String(progressRate),
-        status: newStatus,
-        updatedAt: new Date(),
-      })
+      .set(setValues)
       .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
 
     const updated = await this.findById(id, userId, tx)
     if (!updated) throw new Error(`KeyResult ${id} not found after updateProgress`)
     return updated
-  }
-
-  async batchUpdateStatus(
-    objectiveId: USOM_ID,
-    fromStatus: KeyResultStatus,
-    toStatus: KeyResultStatus,
-    userId: USOM_ID,
-    tx: DbClient = db,
-  ): Promise<void> {
-    await tx.update(s.keyResults)
-      .set({ status: toStatus, updatedAt: new Date() })
-      .where(and(
-        eq(s.keyResults.objectiveId, objectiveId),
-        eq(s.keyResults.userId, userId),
-        eq(s.keyResults.status, fromStatus),
-      ))
-  }
-
-  async deleteDraft(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<void> {
-    await tx.delete(s.keyResults)
-      .where(and(
-        eq(s.keyResults.id, id),
-        eq(s.keyResults.userId, userId),
-        eq(s.keyResults.status, 'draft'),
-      ))
   }
 
   /**
@@ -171,11 +154,5 @@ export class KeyResultRepository implements IKeyResultRepository {
       target: s.keyResults.id,
       set: row,
     })
-  }
-
-  async archive(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<void> {
-    await tx.update(s.keyResults)
-      .set({ status: 'archived', archivedAt: new Date() })
-      .where(and(eq(s.keyResults.id, id), eq(s.keyResults.userId, userId)))
   }
 }

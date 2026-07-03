@@ -4,7 +4,10 @@
  *
  * 将 IObjectiveRepository / IKeyResultRepository 适配为通用 GenericRepo 接口，
  * 使 OKRs 域可使用通用状态机（GenericStateMachine）处理所有 CRUD 和状态转换。
- * KeyResult adapter 额外支持 findByParent（cascade）和 deleteDraft。
+ * KeyResult adapter 额外支持 findByParent（cascade）。
+ *
+ * [022.01] Phase 3: 移除 objective/key_result 的 updateStatus / deleteDraft,
+ * 移除 create 时硬编码的 status 字段（manifest 已去 status 列）。
  */
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -27,7 +30,6 @@ interface OkrsRepoPair {
     findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
     save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
     findByObjective(objectiveId: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>[]>
-    deleteDraft(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
     updateProgress(id: USOM_ID, currentValue: number, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
@@ -58,9 +60,9 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
+        // [022.01] Phase 3: 不再硬编码 status（manifest 已去 status 列）。fields 中不含 status。
         const objective = {
           id,
-          status: fields.status ?? 'draft',
           title: fields.title ?? '',
           description: fields.description,
           okrType: fields.okrType ?? 'committed',
@@ -74,21 +76,6 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
         }
         await repos.objectiveRepo.save(objective, userId, tx)
         return objective
-      },
-      async updateStatus(id, toStatus, userId, tx) {
-        const existing = await repos.objectiveRepo.findById(id, userId, tx)
-        if (!existing) throw new Error(`Objective ${id} not found`)
-        const now = new Date().toISOString()
-        const updated = {
-          ...existing,
-          status: toStatus,
-          updatedAt: now,
-          ...(toStatus === 'discarded' ? { discardedAt: now } : {}),
-          ...(toStatus === 'completed' ? { completedAt: now } : {}),
-          ...(toStatus === 'archived' ? { archivedAt: now } : {}),
-        }
-        await repos.objectiveRepo.save(updated, userId, tx)
-        return updated
       },
       async updateFields(id, fields, userId, tx) {
         return repos.objectiveRepo.updateFields(id, fields, userId, tx)
@@ -105,6 +92,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
+        // [022.01] Phase 3: 不再硬编码 status（manifest 已去 status 列）。fields 中不含 status。
         const kr = {
           id,
           objectiveId: fields.objectiveId,
@@ -114,36 +102,17 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           currentValue: 0,
           unit: fields.unit ?? '',
           progressRate: 0,
-          status: fields.status ?? 'draft',
           createdAt: now,
           updatedAt: now,
         }
         await repos.keyResultRepo.save(kr, userId, tx)
         return kr
       },
-      async updateStatus(id, toStatus, userId, tx) {
-        const existing = await repos.keyResultRepo.findById(id, userId, tx)
-        if (!existing) throw new Error(`KeyResult ${id} not found`)
-        const now = new Date().toISOString()
-        const updated = {
-          ...existing,
-          status: toStatus,
-          updatedAt: now,
-          ...(toStatus === 'discarded' ? { discardedAt: now } : {}),
-          ...(toStatus === 'completed' ? { completedAt: now } : {}),
-          ...(toStatus === 'archived' ? { archivedAt: now } : {}),
-        }
-        await repos.keyResultRepo.save(updated, userId, tx)
-        return updated
-      },
       async updateFields(id, fields, userId, tx) {
         return repos.keyResultRepo.updateFields(id, fields, userId, tx)
       },
       async findByParent(parentId, userId, tx) {
         return repos.keyResultRepo.findByObjective(parentId, userId, tx)
-      },
-      async deleteDraft(id, userId, tx) {
-        await repos.keyResultRepo.deleteDraft(id, userId, tx)
       },
     },
     cycle: {

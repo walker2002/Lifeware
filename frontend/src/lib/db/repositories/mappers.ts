@@ -406,7 +406,7 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
 // cycles 提供。cycleId 直接透传 row.cycleId。
 type ObjectiveRow = {
   id: string; userId: string; schemaVersion: number;
-  status: string; title: string; description: string | null;
+  title: string; description: string | null;
   cycleId: string | null;
   cycleType: string | null;            // join cycles.cycle_type（过渡期 cycle_id 可 NULL）
   cyclePeriodStart: string | null;     // join cycles.period_start
@@ -420,7 +420,6 @@ type ObjectiveRow = {
 export function objectiveRowToUSOM(row: ObjectiveRow, keyResultIds: USOM_ID[] = []): Objective {
   return {
     id: row.id,
-    status: row.status as Objective['status'],
     title: row.title,
     description: row.description ?? undefined,
     // [022-T5] cycleId 来自 row（替换 [022-T3] 占位）
@@ -451,7 +450,6 @@ export function objectiveUSOMToRow(objective: Objective, userId: USOM_ID) {
   return {
     id: objective.id,
     userId: userId,
-    status: objective.status,
     title: objective.title,
     description: objective.description ?? null,
     cycleId: objective.cycleId,
@@ -469,7 +467,7 @@ export function objectiveUSOMToRow(objective: Objective, userId: USOM_ID) {
 // --- KeyResult ---------------------------------------------------
 type KeyResultRow = {
   id: string; userId: string; schemaVersion: number;
-  status: string; objectiveId: string;
+  objectiveId: string;
   title: string; description: string | null;
   targetValue: string; currentValue: string;
   unit: string; progressRate: string;
@@ -492,7 +490,6 @@ export function keyResultRowToUSOM(row: KeyResultRow): KeyResult {
     progressRate: Number(row.progressRate),
     // [024] G2 confidence：缺省回退 50，对齐 DB DEFAULT
     confidence: (row as any).confidence ?? 50,
-    status: row.status as KeyResult['status'],
     dueDate: (row.dueDate as DateOnly) ?? undefined,
     discardedAt: toISO(row.discardedAt),
     // [022] 2026-06-26 review deferred：补齐 mapper 漏掉的 archivedAt/completedAt。
@@ -508,7 +505,6 @@ export function keyResultUSOMToRow(kr: KeyResult, userId: USOM_ID) {
   return {
     id: kr.id,
     userId: userId,
-    status: kr.status,
     objectiveId: kr.objectiveId,
     title: kr.title,
     description: kr.description ?? null,

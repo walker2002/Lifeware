@@ -9,12 +9,12 @@
  * 派生编号前缀。KR 查询统一改 inArray 批查，消除 N+1。
  */
 
-import { eq, and, between, inArray, ne, like, type SQL } from 'drizzle-orm'
+import { eq, and, between, inArray, like, isNull, type SQL } from 'drizzle-orm'
 import { db, type DbClient } from '../../../lib/db/index'
 import * as s from '../../../lib/db/schema'
 import type { IObjectiveRepository, ObjectiveWithKR } from '../../../usom/interfaces/irepository'
 import type { Objective } from '../../../usom/types/objects'
-import type { USOM_ID, ObjectiveStatus, DateOnly } from '../../../usom/types/primitives'
+import type { USOM_ID, DateOnly } from '../../../usom/types/primitives'
 import { objectiveRowToUSOM, objectiveUSOMToRow, keyResultRowToUSOM } from '../../../lib/db/repositories/mappers'
 import { CycleRepository } from './cycle'
 
@@ -30,7 +30,6 @@ export class ObjectiveRepository implements IObjectiveRepository {
   private async findObjRows(where: SQL | undefined, tx: DbClient = db) {
     return tx.select({
       id: s.objectives.id,
-      status: s.objectives.status,
       title: s.objectives.title,
       description: s.objectives.description,
       parentId: s.objectives.parentId,
@@ -80,24 +79,27 @@ export class ObjectiveRepository implements IObjectiveRepository {
   }
 
   async findAll(userId: USOM_ID): Promise<Objective[]> {
+    // [022.01] Phase 3: status 列已删除，用时间戳过滤软删除
     const rows = await this.findObjRows(
-      and(eq(s.objectives.userId, userId), ne(s.objectives.status, 'archived')),
+      and(
+        eq(s.objectives.userId, userId),
+        isNull(s.objectives.discardedAt),
+        isNull(s.objectives.archivedAt),
+      ),
     )
     const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
     return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
   async findActive(userId: USOM_ID): Promise<Objective[]> {
+    // [022.01] Phase 3: status 列已删除，改为按 cycle.status='in_progress' 过滤
     const rows = await this.findObjRows(
-      and(eq(s.objectives.userId, userId), eq(s.objectives.status, 'active')),
-    )
-    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
-    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
-  }
-
-  async findByStatus(status: ObjectiveStatus, userId: USOM_ID): Promise<Objective[]> {
-    const rows = await this.findObjRows(
-      and(eq(s.objectives.userId, userId), eq(s.objectives.status, status)),
+      and(
+        eq(s.objectives.userId, userId),
+        isNull(s.objectives.discardedAt),
+        isNull(s.objectives.archivedAt),
+        eq(s.cycles.status, 'in_progress'),
+      ),
     )
     const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
     return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
@@ -130,24 +132,10 @@ export class ObjectiveRepository implements IObjectiveRepository {
     return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
   }
 
-  async findByStatusInPeriod(status: ObjectiveStatus[], start: DateOnly, end: DateOnly, userId: USOM_ID): Promise<Objective[]> {
-    // [022-T6] status 仍属 objectives，period 过滤改用 cycles
-    const rows = await this.findObjRows(
-      and(
-        eq(s.cycles.userId, userId),
-        inArray(s.objectives.status, status),
-        between(s.cycles.periodStart, start, end),
-      ),
-    )
-    const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))
-    return rows.map((r) => objectiveRowToUSOM(r as any, krByObj.get(r.id) ?? []))
-  }
-
   async findWithKeyResults(id: USOM_ID, userId: USOM_ID): Promise<ObjectiveWithKR | null> {
     // 独立 join：返回 ObjectiveWithKR 含完整 KR 对象，不复用 findObjRows
     const rows = await db.select({
       id: s.objectives.id,
-      status: s.objectives.status,
       title: s.objectives.title,
       description: s.objectives.description,
       parentId: s.objectives.parentId,
@@ -240,11 +228,5 @@ export class ObjectiveRepository implements IObjectiveRepository {
         like(s.objectives.objectiveNumber, `${prefix}-O%`),
       ))
     return rows.length
-  }
-
-  async archive(id: USOM_ID, userId: USOM_ID): Promise<void> {
-    await db.update(s.objectives)
-      .set({ status: 'archived', archivedAt: new Date() })
-      .where(and(eq(s.objectives.id, id), eq(s.objectives.userId, userId)))
   }
 }
