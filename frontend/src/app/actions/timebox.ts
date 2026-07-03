@@ -338,28 +338,34 @@ export async function updateItinerary(
   throw new Error('更新行程失败：mutation service 未返回对象（字段执行器配置需排查）')
 }
 
-/**
- * 删除行程（[026] A1.7，soft-cancel）
- *
- * 走 Nexus：submitDynamicIntent('timebox', 'deleteItinerary')。
- * resolveObjectType('timebox', 'deleteItinerary') 因 action 含 "Itinerary"
- * 字符串匹配，分派到 'itinerary' → SM cancel transition。
- *
- * SM 自动拒绝：from ∈ {expired, cancelled, completed}（terminal state）
- * 或 from = scheduled/in_progress 但 cancel transition 不存在的非法转换。
- * manifest terminal_states = [expired, cancelled, completed]，所以
- * 已过期/已取消/已完成的行程删除会被 SM 拒（success: false），错误透传 throw。
- *
- * 由客户端弹错误信息给用户（参 CascadeConfirmDialog 范式）。
- */
-export async function deleteItinerary(itineraryId: USOM_ID): Promise<ItineraryActionResult> {
-  const result = await submitDynamicIntent('timebox', 'deleteItinerary', { objectId: itineraryId })
+	/**
+	 * 删除行程（[026] A1.7，soft-cancel）
+	 *
+	 * [026] C1 修复：走 Nexus submitDynamicIntent('timebox', 'cancelItinerary', ...)。
+	 * resolveObjectType('timebox', 'cancelItinerary') 因 action 含 "Itinerary"
+	 * 字符串匹配，分派到 'itinerary' → SM cancel transition（lifecycle 登记）。
+	 *
+	 * 原用 'deleteItinerary' 经 buildActionMap intent_triggers 分支映射为短 action
+	 * 'delete'，但 manifest lifecycle 只登记了 action: cancel（cancelItinerary→cancel），
+	 * 导致 SM 找不到对应 transition。改用 'cancelItinerary' 复用 lifecycle 映射。
+	 *
+	 * SM 自动拒绝：from ∈ {expired, cancelled, completed}（terminal state）。
+	 * 已过期/已取消/已完成的行程删除会被 SM 拒（success: false），错误透传 throw。
+	 */
+export async function deleteItinerary(
+  itineraryId: USOM_ID,
+  confirmed?: boolean,
+): Promise<ItineraryActionResult> {
+  // [026] C1 修复：用 'cancelItinerary' 而非 'deleteItinerary'
+  // buildActionMap 从 lifecycle transitions（action: cancel）生成 cancelItinerary→cancel；
+  // 原 'deleteItinerary' 仅从 intent_triggers 生成 deleteItinerary→delete，无对应 SM transition。
+  const result = await submitDynamicIntent('timebox', 'cancelItinerary', { objectId: itineraryId }, confirmed)
   if (!result.success) {
     if (result.needsConfirmation) {
       return {
         status: 'needs_confirm',
         message: result.confirmationMessage ?? '需确认',
-        confirmAction: 'deleteItinerary',
+        confirmAction: 'cancelItinerary',
         confirmFields: { objectId: itineraryId },
       }
     }
