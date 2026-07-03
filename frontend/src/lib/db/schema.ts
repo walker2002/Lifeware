@@ -94,7 +94,6 @@ export const objectives = pgTable('objectives', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'discarded', 'archived'] }).notNull(),
   title: text('title').notNull(),
   description: text('description'),
 
@@ -113,7 +112,6 @@ export const objectives = pgTable('objectives', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (table) => [
-  index('idx_objectives_user_status').on(table.userId, table.status),
   index('idx_objectives_cycle').on(table.userId, table.cycleId),
   index('idx_objectives_parent').on(table.parentId),
 ])
@@ -124,7 +122,6 @@ export const keyResults = pgTable('key_results', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['draft', 'active', 'paused', 'completed', 'discarded', 'archived'] }).notNull(),
   objectiveId: uuid('objective_id').notNull().references(() => objectives.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
@@ -148,7 +145,6 @@ export const keyResults = pgTable('key_results', {
   check('check_key_results_target_positive', sql`${table.targetValue} > 0`),
   check('check_key_results_current_within_target', sql`${table.currentValue} >= 0 AND ${table.currentValue} <= ${table.targetValue}`),
   check('check_key_results_confidence_range', sql`${table.confidence} BETWEEN 0 AND 100`),
-  index('idx_key_results_user_status').on(table.userId, table.status),
   index('idx_key_results_objective').on(table.objectiveId),
   index('idx_key_results_due_date').on(table.userId, table.dueDate),
 ])
