@@ -172,7 +172,7 @@ export function OKRDetail({
               <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable onProgressUpdate={onUpdateKRProgress} />
               <ContributionPanel
                 krId={kr.id}
-                cycleStatus={cycleStatus ?? "draft"}
+                cycleStatus={cycleStatus ?? "reviewed"}
                 onChange={load}
               />
               <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>

@@ -41,6 +41,12 @@ export function OKRList() {
   if (hook.error) return <div className="p-4 text-center text-destructive">{hook.error}</div>
 
   if (detailId) {
+    // [022.01] C1 修复：从 hook.objectives + hook.cycles 查找当前 Objective 所属 cycle 状态，
+    // 透传至 OKRDetail（最终驱动 ContributionPanel 编辑权限）。
+    const detailObj = hook.objectives.find(o => o.id === detailId)
+    const detailCycle = detailObj
+      ? hook.cycles.find(c => c.id === detailObj.cycleId)
+      : undefined
     return (
       <OKRDetail
         objectiveId={detailId}
@@ -50,6 +56,7 @@ export function OKRList() {
         onUpdateKRProgress={hook.updateKRProgress}
         onDeleteKR={async (krId) => { await hook.updateKR(krId, { discardedAt: new Date().toISOString() }); return true }}
         onBack={() => { setDetailId(null); hook.refresh() }}
+        cycleStatus={detailCycle?.status}
       />
     )
   }

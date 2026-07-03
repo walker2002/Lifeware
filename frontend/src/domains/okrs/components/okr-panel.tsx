@@ -35,9 +35,14 @@ interface OKRPanelProps {
   presetCycleId?: string
   /** [022] 3A-T2：触发外部 OKRImportDialog（由 OKRWorkspace 注入） */
   onImportTrigger?: () => void
-  /** [022.01] Task 5：当前 Objective 所属 cycle 的状态（透传至下游 KRProgress / ContributionPanel） */
-  cycleStatus?: string
 }
+
+/**
+ * [022.01] C1 修复：原 cycleStatus prop 已在 Phase 3 移除——
+ *   OKRPanel 不渲染 ContributionPanel（主路径 OKRWorkspace → OKRPanel → KRProgress）；
+ *   KR 进度编辑权限由 KRProgress.editable 控制，本组件不消费 cycleStatus。
+ *   ContributionPanel 由 OKRDetail 渲染，cycleStatus 在 OKRList → OKRDetail 路径上透传。
+ */
 
 const PRIORITY_LABELS: Record<string, { label: string; variant: "destructive" | "default" | "secondary" | "outline" }> = {
   P0: { label: "P0 必须", variant: "destructive" },
@@ -50,7 +55,6 @@ export function OKRPanel({
   onAddKR, onUpdateKRProgress, onConfidenceUpdate, onDeleteKR, onReload,
   presetCycleId,
   onImportTrigger,
-  cycleStatus,
 }: OKRPanelProps) {
   const [isAddingKR, setIsAddingKR] = useState(false)
   const [newKR, setNewKR] = useState({ title: "", targetValue: 100, unit: "%" })

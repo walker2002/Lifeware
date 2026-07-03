@@ -8,7 +8,9 @@
  * 状态过滤 objectives（复用 okr-directory 导出的 filterObjectivesByCycleStatus）。
  * [022.01] Task 5：传入 onCycleApproved/onCycleEnded/onCycleReviewed 回调触发 refresh。
  * Phase 3 进一步清理：删除 onChangeObjectiveStatus/handleStatusChange/handleActivate 回调；
- * handleDelete 改为直接设 discardedAt；OKRPanel 新增 cycleStatus 透传。
+ * handleDelete 改为直接设 discardedAt。
+ * [022.01] C1 修复：移除 OKRPanel 的 cycleStatus 透传（dead code）—
+ *   本路径 OKRWorkspace → OKRPanel → KRProgress 不渲染 ContributionPanel。
  */
 
 "use client"
@@ -284,8 +286,6 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
             /** [024] G1 presetCycleId：仅在 create 模式透传 selectedCycleId */
             presetCycleId={mode === "create" ? selectedCycleId ?? undefined : undefined}
             onImportTrigger={() => setImportOpen(true)}
-            /** [022.01] Task 5：透传当前 Objective 所属 cycle 的状态供下游使用 */
-            cycleStatus={detailData?.cycleId ? hook.cycles.find(c => c.id === detailData.cycleId)?.status : undefined}
           />
         )}
       </div>
