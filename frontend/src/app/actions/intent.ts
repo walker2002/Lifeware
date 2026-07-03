@@ -8,7 +8,7 @@
 
 "use server";
 
-import type { TimeboxSummary } from "@/usom/types/summaries";
+import type { TimeboxSummary, ItinerarySummary } from "@/usom/types/summaries";
 import type { Timebox } from "@/usom/types/objects";
 import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
@@ -807,6 +807,47 @@ export async function getTimeboxesByRange(
   end: Date,
 ): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummariesByRange(start, end);
+}
+
+// ─── Itinerary Read Action（A1.7，codex D5 修复：纯读）─────────────
+
+/**
+ * 按 [start, end] 范围读取行程摘要列表（[026] A1.7）。
+ *
+ * [026] codex D5 修复：纯读函数，**不**内联 reconcileItineraryStatuses。
+ * 原因：避免 /itineraries 双调 + /schedule 翻日历页重推 N 次。
+ *
+ * 调用方契约（必须遵守）：
+ * - A3.1 /itineraries server component：在调本函数前先调
+ *   reconcileAndAdvanceItineraries()（T8 helper）。
+ * - A3.2 /schedule loadDay：在读日历日行程前先对当天用户行程调
+ *   reconcileAndAdvanceItineraries()（T8 helper）。
+ * 不直接调本函数会读到陈旧 status（未 reconcile 的 scheduled/in_progress）。
+ *
+ * 多租户 T-02：透传 MVP_USER_ID。
+ *
+ * @param start - 起始时间（含）
+ * @param end - 结束时间（含）
+ * @returns 行程摘要列表（5 态 status 直接来自 DB）
+ */
+export async function getItinerariesByRange(
+  start: Date,
+  end: Date,
+): Promise<ItinerarySummary[]> {
+  const repo = new ItineraryRepository();
+  // [026] A1.7 / codex D5：纯读，不内联 reconcile
+  const list = await repo.findByDateRange(
+    start.toISOString() as Timestamp,
+    end.toISOString() as Timestamp,
+    MVP_USER_ID as USOM_ID,
+  );
+  return list.map(it => ({
+    id: it.id,
+    title: it.title,
+    startTime: it.startTime as Timestamp,
+    durationMin: it.durationMin,
+    status: it.status, // [026] D2 reversal: 直接来自 DB
+  }));
 }
 
 // ─── Habit Server Actions ─────────────────────────────────────────
