@@ -1914,7 +1914,7 @@ npm run validate:manifest
 
 **Expected**：
 - tsc base=head 零新增错误
-- vitest base=head 零新增失败（基线 17；新测约 +5 = 22）
+- vitest base=head 零新增失败（基线：1468 PASS / 32 pre-existing FAIL；新测约 +7 — 关注 32→32 不新增）
 - lint 0 error
 - validate:manifest 0 errors
 
@@ -2145,7 +2145,7 @@ psql "postgres://lifeware_dev@localhost:5432/lifeware_dev" \
   npm test 2>&1 | tee /tmp/baseline-test.log
   ```
   
-  **Expected**：记录 PASS 数 N_baseline（当前 plan 推断 17）。后续 Task 11 验证 zero new failure = N_baseline。
+  **Expected**：记录 PASS 数 N_baseline 与 pre-existing FAIL 集合（实测：**1468 PASS / 32 pre-existing FAIL / 20 skipped / 5 todo** — 1525 总测试）。后续 Task 11 验证 "base=head 零新增 FAIL" 以本次 32 个 pre-existing FAIL 集合为参照；任何新增 FAIL 都是回归，禁止用 plan 推断值 17 作为 barrier（plan 推断显著低估基线）。
   
   - [ ] **Step 0.2: 记录 baseline + 确认 Plan 数**
   
