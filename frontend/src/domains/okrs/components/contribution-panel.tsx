@@ -2,10 +2,11 @@
  * @file contribution-panel
  * @brief KR 详情页贡献管理面板
  *
- * [022] Phase 3 Task 4 核心组件：
+ * [022] Phase 3 Task 4 核心组件 + [022.01] Phase 3 cycleStatus 迁移：
  * - 列出 KR 下已关联的 task/habit contribution（Badge 列表）
  * - 提供客户端 title 搜索 + 一键关联 / 解除关联
- * - 编辑权限 = objective.status ∈ {draft, active}
+ * - [022.01] Phase 3：编辑权限 = cycle.status ≠ "reviewed"
+ *   （Objective.status 已删除，权限语义由 Cycle 承载）
  *
  * 架构要点（来自 /plan-eng-review outside voice #1 的修正）：
  * - 客户端组件不直接 new ContributionRepository()（违反 R-01）
@@ -33,8 +34,8 @@ import {
 interface ContributionPanelProps {
   /** 目标 KR ID */
   krId: string
-  /** Objective 状态（draft/active 时允许编辑关联） */
-  objectiveStatus: string
+  /** [022.01] Phase 3：所属 cycle 状态（≠ "reviewed" 时允许编辑关联） */
+  cycleStatus: string
   /** 变更回调（刷新父组件数据） */
   onChange: () => void
 }
@@ -63,13 +64,14 @@ export function filterCandidates(
 /**
  * KR 贡献管理面板
  */
-export function ContributionPanel({ krId, objectiveStatus, onChange }: ContributionPanelProps) {
+export function ContributionPanel({ krId, cycleStatus, onChange }: ContributionPanelProps) {
   const [existingContribs, setExistingContribs] = useState<Contribution[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const isEditable = objectiveStatus === "draft" || objectiveStatus === "active"
+  // [022.01] Phase 3：编辑权限由 cycle.status 决定——仅 reviewed 只读。
+  const isEditable = cycleStatus !== "reviewed"
 
   // 加载已有贡献 + 候选（一次性，搜索在客户端进行）
   useEffect(() => {

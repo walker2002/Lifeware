@@ -2,14 +2,15 @@
  * @file okr-directory
  * @brief OKR 工作台左侧目录（周期-目标二级树 + ⋯ 菜单 + 折叠/展开）
  *
- * 重构要点（[024] G1 + [024.1] T1 + [022.01] T4）：
+ * 重构要点（[024] G1 + [024.1] T1 + [022.01] T4 + [022.01] T5）：
  *  - 顶层节点由 Cycle 驱动（不再是按 objective.period 派生的字符串分组）
  *  - 每个 cycle 下挂载 objectives.filter(o => o.cycleId === cycle.id)
  *  - 顶部筛选 tabs：[022.01] Task 4 改为 Cycle 状态（draft/not_started/in_progress/ended/reviewed）；
  *    筛选作用于 parent cycle 状态，voice D8：非匹配 cycle 不渲染（解决 (0) 空卡问题）
  *  - 周期 ⋯：[022.01] Task 5 集成 审核通过(draft) / 添加目标 / 结束周期(in_progress) / 复盘(ended) / 删除周期（有目标时禁用）
- *  - 目标 ⋯：按状态显示动作（暂停/完成/废弃/恢复/归档）
- *  - 周期折叠：默认展开「含 active 目标」的周期；其他收起；点击 ChevronDown/Right 切换
+ *  - 目标 ⋯：[022.01] Phase 3 简化为仅「删除目标」（设置 discardedAt）；
+ *    pause/resume/complete/archive 语义由 cycle 级操作承载
+ *  - 周期折叠：[022.01] Phase 3 改为「cycle.status === 'in_progress'」展开，其余收起（不再依赖 objective.status）
  *
  * @remarks
  *  - 移除了 getPeriodGroupKey（旧实现用 objective.period 派生分组键；现在以 cycle 为权威）
@@ -36,7 +37,6 @@ import {
   CycleReviewMenuItem,
 } from "./cycle-menu"
 import type { Cycle, Objective } from "@/usom/types/objects"
-import type { ObjectiveStatus } from "@/usom/types/primitives"
 
 type CycleStatus = Cycle["status"]
 type CycleFilter = CycleStatus | "all"
@@ -51,7 +51,7 @@ interface OKRDirectoryProps {
   onCreateCycleClick?: () => void
   onAddObjectiveToCycle?: (cycleId: string) => void
   onDeleteCycle?: (cycleId: string) => void
-  onChangeObjectiveStatus?: (id: string, action: string) => void
+  onDeleteObjective?: (id: string) => void
   onEdit?: (id: string) => void
   onImport?: () => void
   /** [022.01] Task 5：审核通过周期后回调（刷新 cycle 列表） */
@@ -94,36 +94,6 @@ export function filterObjectivesByCycleStatus(
   return objectives.filter((o) => matchedCycleIds.has(o.cycleId))
 }
 
-type ObjectiveAction = "pause" | "complete" | "discard" | "resume" | "archive"
-
-interface ObjectiveMenuItem {
-  action: ObjectiveAction
-  label: string
-}
-
-function objectiveMenuItems(status: ObjectiveStatus): ObjectiveMenuItem[] {
-  switch (status) {
-    case "draft":
-      return [{ action: "discard", label: "废弃" }]
-    case "active":
-      return [
-        { action: "pause", label: "暂停" },
-        { action: "complete", label: "完成" },
-        { action: "discard", label: "废弃" },
-      ]
-    case "paused":
-      return [
-        { action: "resume", label: "恢复" },
-        { action: "discard", label: "废弃" },
-      ]
-    case "completed":
-    case "discarded":
-      return [{ action: "archive", label: "归档" }]
-    default:
-      return []
-  }
-}
-
 export function OKRDirectory({
   cycles,
   objectives,
@@ -134,7 +104,7 @@ export function OKRDirectory({
   onCreateCycleClick,
   onAddObjectiveToCycle,
   onDeleteCycle,
-  onChangeObjectiveStatus,
+  onDeleteObjective,
   onEdit: _onEdit,
   onImport,
   onCycleApproved,
@@ -144,15 +114,14 @@ export function OKRDirectory({
   const handleCreateCycle = onCreateCycleClick ?? (() => {})
   const handleAddObjective = onAddObjectiveToCycle ?? (() => {})
   const handleDeleteCycle = onDeleteCycle ?? (() => {})
-  const handleChangeStatus = onChangeObjectiveStatus ?? (() => {})
+  const handleDeleteObjective = onDeleteObjective ?? (() => {})
 
-  // [024.1] T1：周期折叠。默认展开「含 active 目标」的周期；其他收起。
+  // [022.01] Task 5：周期折叠。
+  // MVP：进行中的周期默认展开，其余收起（不在依赖 objective.status）
   const [collapsedCycleIds, setCollapsedCycleIds] = useState<Set<string>>(() => {
     const collapsed = new Set<string>()
     for (const cycle of cycles) {
-      const hasActive = objectives.some(
-        (o) => o.cycleId === cycle.id && o.status === "active",
-      )
+      const hasActive = cycle.status === "in_progress"
       if (!hasActive) collapsed.add(cycle.id)
     }
     return collapsed
@@ -267,49 +236,43 @@ export function OKRDirectory({
 
               {!isCollapsed && hasObjectives && (
                 <div className="space-y-0.5 mt-1">
-                  {cycleObjectives.map(obj => {
-                    const items = objectiveMenuItems(obj.status)
-                    return (
-                      <div
-                        key={obj.id}
-                        className={`group flex items-center gap-1.5 px-2 py-1.5 rounded text-sm hover:bg-muted/80 transition-colors ${
-                          selectedId === obj.id ? "bg-muted font-medium" : ""
-                        }`}
+                  {cycleObjectives.map(obj => (
+                    <div
+                      key={obj.id}
+                      className={`group flex items-center gap-1.5 px-2 py-1.5 rounded text-sm hover:bg-muted/80 transition-colors ${
+                        selectedId === obj.id ? "bg-muted font-medium" : ""
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onSelect(obj.id)}
+                        title={obj.title}
+                        className="flex items-center gap-1.5 min-w-0 flex-1 text-left"
                       >
-                        <button
-                          type="button"
-                          onClick={() => onSelect(obj.id)}
-                          title={obj.title}
-                          className="flex items-center gap-1.5 min-w-0 flex-1 text-left"
-                        >
-                          {obj.objectiveNumber && (
-                            <span className="font-mono text-xs text-muted-foreground shrink-0">{obj.objectiveNumber}</span>
-                          )}
-                          <span className="truncate min-w-0">{obj.title}</span>
-                        </button>
-                        {items.length > 0 && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              aria-label="目标操作"
-                              className="px-1 py-0.5 text-sm text-muted-foreground hover:text-ink rounded hover:bg-muted/80 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 outline-hidden"
-                            >
-                              ⋯
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {items.map(item => (
-                                <DropdownMenuItem
-                                  key={item.action}
-                                  onClick={() => handleChangeStatus(obj.id, item.action)}
-                                >
-                                  {item.label}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        {obj.objectiveNumber && (
+                          <span className="font-mono text-xs text-muted-foreground shrink-0">{obj.objectiveNumber}</span>
                         )}
-                      </div>
-                    )
-                  })}
+                        <span className="truncate min-w-0">{obj.title}</span>
+                      </button>
+                      {/* [022.01] Task 5：MVP 目标菜单简化为仅「删除」（设置 discardedAt）。
+                          pause/resume/complete/archive 语义由 cycle 级操作承载。 */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label="目标操作"
+                          className="px-1 py-0.5 text-sm text-muted-foreground hover:text-ink rounded hover:bg-muted/80 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 outline-hidden"
+                        >
+                          ⋯
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteObjective(obj.id)}
+                          >
+                            删除目标
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

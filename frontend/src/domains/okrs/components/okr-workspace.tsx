@@ -5,8 +5,10 @@
  * 整合 OKRDirectory（左侧目录）+ OKRPanel（右侧详情/编辑）+ 周期抽屉与删除确认。
  * [024] G1 wiring：周期创建抽屉、目标添加到指定周期、删除周期确认、目标状态菜单。
  * [022.01] Task 4：statusFilter 改为 Cycle['status'] | "all"，按 parent cycle
- * [022.01] Task 5：传入 onCycleApproved/onCycleEnded/onCycleReviewed 回调触发 refresh
  * 状态过滤 objectives（复用 okr-directory 导出的 filterObjectivesByCycleStatus）。
+ * [022.01] Task 5：传入 onCycleApproved/onCycleEnded/onCycleReviewed 回调触发 refresh。
+ * Phase 3 进一步清理：删除 onChangeObjectiveStatus/handleStatusChange/handleActivate 回调；
+ * handleDelete 改为直接设 discardedAt；OKRPanel 新增 cycleStatus 透传。
  */
 
 "use client"
@@ -63,10 +65,10 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null)
   const [deleteCycleTarget, setDeleteCycleTarget] = useState<string | null>(null)
 
-  // [022.01] Task 4：按 parent cycle 状态筛选（语义与 okr-directory 一致）。
-  // archived objective 一律不展示；其余按 cycle.status 过滤。
+  // [022.01] Task 4 + Phase 3：按 parent cycle 状态筛选（语义与 okr-directory 一致）。
+  // 软删除（archivedAt/discardedAt）一律不展示；其余按 cycle.status 过滤。
   const filteredObjectives: Objective[] = filterObjectivesByCycleStatus(
-    hook.objectives.filter((o) => o.status !== "archived"),
+    hook.objectives.filter((o) => !o.archivedAt && !o.discardedAt),
     hook.cycles,
     statusFilter,
   )
@@ -146,27 +148,12 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   }, [])
 
   const handleDelete = useCallback(async (id: string) => {
-    await hook.changeStatus(id, "discard")
+    // [022.01] Phase 3：直接设 discardedAt（不依赖 Objective.status 状态机）
+    await hook.update(id, { discardedAt: new Date().toISOString() })
     if (selectedId === id) {
       setSelectedId(null)
       setDetailData(null)
       setMode("empty")
-    }
-  }, [selectedId, hook])
-
-  const handleStatusChange = useCallback(async (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => {
-    await hook.changeStatus(id, action)
-    if (selectedId === id) {
-      const data = await hook.loadDetail(id)
-      setDetailData(data)
-    }
-  }, [selectedId, hook])
-
-  const handleActivate = useCallback(async (id: string) => {
-    await hook.activate(id)
-    if (selectedId === id) {
-      const data = await hook.loadDetail(id)
-      setDetailData(data)
     }
   }, [selectedId, hook])
 
@@ -255,7 +242,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
           onCreateCycleClick={() => setCycleDrawerOpen(true)}
           onAddObjectiveToCycle={handleAddObjectiveToCycle}
           onDeleteCycle={(cycleId) => setDeleteCycleTarget(cycleId)}
-          onChangeObjectiveStatus={(id, action) => { void handleStatusChange(id, action as "pause" | "resume" | "complete" | "discard" | "archive") }}
+          onDeleteObjective={handleDelete}
           onImport={() => setImportOpen(true)}
           onCycleApproved={() => { void hook.refresh() }}
           onCycleEnded={() => { void hook.refresh() }}
@@ -288,17 +275,17 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
             onEdit={handleEdit}
             onSaveCreate={handleSaveCreate}
             onSaveEdit={handleSaveEdit}
-            onActivate={handleActivate}
-            onChangeStatus={handleStatusChange}
             onAddKR={selectedId ? (input) => hook.addKR(selectedId, input) : undefined}
             onUpdateKRProgress={hook.updateKRProgress}
-            onDeleteKR={hook.deleteKR}
+            onDeleteKR={async (krId) => { await hook.updateKR(krId, { discardedAt: new Date().toISOString() }); return true }}
             /** [024] G2 信心度更新：仅在选中 OKR 时启用回调 */
             onConfidenceUpdate={selectedId ? (krId, v) => hook.updateKR(krId, { confidence: v }) : undefined}
             onReload={selectedId ? async () => { const data = await hook.loadDetail(selectedId); setDetailData(data) } : undefined}
             /** [024] G1 presetCycleId：仅在 create 模式透传 selectedCycleId */
             presetCycleId={mode === "create" ? selectedCycleId ?? undefined : undefined}
             onImportTrigger={() => setImportOpen(true)}
+            /** [022.01] Task 5：透传当前 Objective 所属 cycle 的状态供下游使用 */
+            cycleStatus={detailData?.cycleId ? hook.cycles.find(c => c.id === detailData.cycleId)?.status : undefined}
           />
         )}
       </div>

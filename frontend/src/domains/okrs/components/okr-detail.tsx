@@ -1,8 +1,12 @@
 /**
  * @file okr-detail
  * @brief OKR 详情组件
- * 
- * 展示 OKR 详情，支持编辑、状态变更和 KR 管理
+ *
+ * 展示 OKR 详情，支持编辑、KR 管理。
+ * [022.01] Phase 3：移除 Objective.status 字段——状态语义由 Cycle 承载。
+ *  - 删除 STATUS_LABELS / statusActions / activate 分支 / 状态 Badge
+ *  - 激活权限与编辑权限统一由 cycleStatus 决定（从父组件透传）
+ *  - KR 列表不再按 kr.status 过滤（软删已由 repository 层处理）
  */
 
 "use client"
@@ -33,10 +37,6 @@ interface OKRDetailProps {
   onLoad: (id: string) => Promise<ObjectiveWithKR | null>
   /** 更新回调 */
   onUpdate: (id: string, fields: Record<string, unknown>) => Promise<Objective | null>
-  /** 激活回调 */
-  onActivate: (id: string) => Promise<boolean>
-  /** 状态变更回调 */
-  onChangeStatus: (id: string, action: "pause" | "resume" | "complete" | "discard" | "archive") => Promise<boolean>
   /** 添加 KR 回调 */
   onAddKR: (objectiveId: string, input: { title: string; description?: string; targetValue: number; unit: string }) => Promise<KeyResult | null>
   /** 更新 KR 进度回调 */
@@ -45,29 +45,20 @@ interface OKRDetailProps {
   onDeleteKR: (id: string) => Promise<boolean>
   /** 返回回调 */
   onBack: () => void
-}
-
-/** 状态标签映射 */
-const STATUS_LABELS: Record<string, string> = {
-  draft: "草稿",
-  active: "进行中",
-  paused: "已暂停",
-  completed: "已完成",
-  discarded: "已废弃",
-  archived: "已归档",
+  /** [022.01] Task 5：父组件透传的 cycle 状态，供下游 KRProgress / ContributionPanel 使用 */
+  cycleStatus?: string
 }
 
 export function OKRDetail({
-  objectiveId, onLoad, onUpdate, onActivate, onChangeStatus,
+  objectiveId, onLoad, onUpdate,
   onAddKR, onUpdateKRProgress, onDeleteKR, onBack,
+  cycleStatus,
 }: OKRDetailProps) {
   const [data, setData] = useState<ObjectiveWithKR | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [isAddingKR, setIsAddingKR] = useState(false)
   const [newKR, setNewKR] = useState({ title: "", targetValue: 100, unit: "%" })
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<{ action: string; label: string; message: string } | null>(null)
   const [krDeleteId, setKrDeleteId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -93,45 +84,6 @@ export function OKRDetail({
 
   const obj = data
   const krs = data.keyResults ?? []
-
-  const statusActions: { action: "pause" | "resume" | "complete" | "discard" | "archive"; label: string }[] = []
-  if (obj.status === "draft") {
-    statusActions.push({ action: "discard", label: "废弃" })
-  } else if (obj.status === "active") {
-    statusActions.push({ action: "pause", label: "暂停" })
-    statusActions.push({ action: "complete", label: "完成" })
-    statusActions.push({ action: "discard", label: "废弃" })
-  } else if (obj.status === "paused") {
-    statusActions.push({ action: "resume", label: "恢复" })
-    statusActions.push({ action: "discard", label: "废弃" })
-  } else if (obj.status === "completed" || obj.status === "discarded") {
-    statusActions.push({ action: "archive", label: "归档" })
-  }
-
-  const CONFIRM_MESSAGES: Record<string, { label: string; message: string }> = {
-    discard: { label: "废弃", message: "确定要废弃此 OKR 吗？所有 Key Result 也将被标记为已废弃。" },
-    archive: { label: "归档", message: "确定要归档此 OKR 吗？归档后将从默认视图中隐藏，此操作不可撤销。" },
-  }
-
-  const handleStatusAction = async (action: "pause" | "resume" | "complete" | "discard" | "archive" | "activate") => {
-    if (CONFIRM_MESSAGES[action]) {
-      setConfirmAction({ action, ...CONFIRM_MESSAGES[action] })
-      return
-    }
-    await executeAction(action)
-  }
-
-  const executeAction = async (action: string) => {
-    setConfirmAction(null)
-    setActionLoading(action)
-    if (action === "activate") {
-      await onActivate(objectiveId)
-    } else {
-      await onChangeStatus(objectiveId, action as any)
-    }
-    setActionLoading(null)
-    await load()
-  }
 
   const handleSaveEdit = async (fields: OKRFormFields) => {
     const updateFields: Record<string, unknown> = {
@@ -177,8 +129,8 @@ export function OKRDetail({
     )
   }
 
-  const activeKRs = krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived")
-  const allKRCompleted = activeKRs.length > 0 && activeKRs.every(kr => kr.status === "completed")
+  // [022.01] Phase 3：KR 列表不再按 kr.status 过滤（findAll 已返回非软删行）。
+  const activeKRs = krs
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
@@ -194,9 +146,6 @@ export function OKRDetail({
               {obj.description && <p className="text-sm text-muted-foreground">{obj.description}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={obj.status === "active" ? "default" : "secondary"}>
-                {STATUS_LABELS[obj.status] ?? obj.status}
-              </Badge>
               <Badge variant="outline">{obj.okrType === "visionary" ? "愿景型" : "承诺型"}</Badge>
             </div>
           </div>
@@ -205,63 +154,30 @@ export function OKRDetail({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {activeKRs.length === 0 && obj.status === "active" && (
-            <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">
-              当前没有 Key Result，建议添加后继续追踪
-            </div>
-          )}
-
-          {allKRCompleted && obj.status === "active" && (
-            <div className="rounded-md bg-success-soft p-3 text-sm text-success">
-              所有 KR 已完成，建议将 Objective 标记为
-              <Button variant="link" className="h-auto p-0 text-success underline" onClick={() => handleStatusAction("complete")}>完成</Button>
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2">
-            {obj.status === "draft" && (
-              <Button onClick={() => handleStatusAction("activate")} disabled={actionLoading !== null}>
-                {actionLoading === "activate" ? "激活中..." : "激活"}
-              </Button>
-            )}
-            {statusActions.map(sa => (
-              <Button key={sa.action} variant={sa.action === "discard" || sa.action === "archive" ? "destructive" : "default"}
-                onClick={() => handleStatusAction(sa.action)} disabled={actionLoading !== null}>
-                {actionLoading === sa.action ? "处理中..." : sa.label}
-              </Button>
-            ))}
-            {(obj.status === "draft" || obj.status === "active") && (
-              <Button variant="outline" onClick={() => setIsEditing(true)}>编辑</Button>
-            )}
-            {obj.status === "archived" && (
-              <span className="text-sm text-muted-foreground p-2">该 OKR 已归档，不可操作</span>
-            )}
+            <Button variant="outline" onClick={() => setIsEditing(true)}>编辑</Button>
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-medium">关键结果 ({krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").length})</h3>
-          {(obj.status === "draft" || obj.status === "active") && (
-            <Button variant="outline" size="sm" onClick={() => setIsAddingKR(true)}>+ 添加 KR</Button>
-          )}
+          <h3 className="font-medium">关键结果 ({activeKRs.length})</h3>
+          <Button variant="outline" size="sm" onClick={() => setIsAddingKR(true)}>+ 添加 KR</Button>
         </div>
 
-        {krs.filter(kr => kr.status !== "discarded" && kr.status !== "archived").map((kr, index) => (
+        {activeKRs.map((kr, index) => (
           <Card key={kr.id}>
             <CardContent className="pt-4 space-y-2">
-              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable={obj.status === "active"} onProgressUpdate={onUpdateKRProgress} />
+              <KRProgress kr={kr} krNumber={obj.objectiveNumber ? `${obj.objectiveNumber}-K${index + 1}` : undefined} editable onProgressUpdate={onUpdateKRProgress} />
               <ContributionPanel
                 krId={kr.id}
-                objectiveStatus={obj.status}
+                cycleStatus={cycleStatus ?? "draft"}
                 onChange={load}
               />
-              {kr.status === "draft" && (
-                <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
-                  删除
-                </Button>
-              )}
+              <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => setKrDeleteId(kr.id)}>
+                删除
+              </Button>
             </CardContent>
           </Card>
         ))}
@@ -280,22 +196,6 @@ export function OKRDetail({
           </Card>
         )}
       </div>
-
-      {/* 状态操作确认对话框 */}
-      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认{confirmAction?.label}</AlertDialogTitle>
-            <AlertDialogDescription>{confirmAction?.message}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmAction && executeAction(confirmAction.action)}>
-              确认{confirmAction?.label}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* KR 删除确认对话框 */}
       <AlertDialog open={!!krDeleteId} onOpenChange={(open) => { if (!open) setKrDeleteId(null) }}>

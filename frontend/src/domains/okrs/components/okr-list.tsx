@@ -1,15 +1,20 @@
 /**
  * @file okr-list
  * @brief OKR 列表组件
- * 
- * 展示 OKR 列表，支持筛选、创建和详情查看
+ *
+ * 展示 OKR 列表，支持创建和详情查看。
+ * [022.01] Phase 3：删除 STATUS_ORDER / STATUS_LABELS / ObjectiveStatus tabs
+ * —Objective 状态语义由 Cycle 承载，目录页由 okr-directory 替代。
+ *
+ * @remarks
+ *  - 当前仅从 components/index.ts barrel 导出，零活跃 import 路径。
+ *  - 创建/详情流仍保留以兼容旧链接；目录页使用 okr-workspace。
  */
 
 "use client"
 
 import { useState } from "react"
-import type { Objective, KeyResult } from "@/usom/types/objects"
-import type { ObjectiveStatus } from "@/usom/types/primitives"
+import type { KeyResult } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { ObjectiveCard } from "./objective-card"
 import { OKRForm } from "./okr-form"
@@ -17,18 +22,9 @@ import type { OKRFormFields } from "./okr-form"
 import { OKRDetail } from "./okr-detail"
 import { useOKRs } from "@/hooks/use-okrs"
 
-/** 状态顺序 */
-const STATUS_ORDER: ObjectiveStatus[] = ["active", "draft", "paused", "completed", "discarded"]
-/** 状态标签 */
-const STATUS_LABELS: Record<string, string> = {
-  all: "全部", active: "进行中", draft: "草稿", paused: "已暂停",
-  completed: "已完成", discarded: "已废弃",
-}
-
 export function OKRList() {
   const hook = useOKRs()
   const [showForm, setShowForm] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<ObjectiveStatus | "all">("all")
   const [detailId, setDetailId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
@@ -50,11 +46,9 @@ export function OKRList() {
         objectiveId={detailId}
         onLoad={hook.loadDetail}
         onUpdate={hook.update}
-        onActivate={hook.activate}
-        onChangeStatus={hook.changeStatus}
         onAddKR={hook.addKR}
         onUpdateKRProgress={hook.updateKRProgress}
-        onDeleteKR={hook.deleteKR}
+        onDeleteKR={async (krId) => { await hook.updateKR(krId, { discardedAt: new Date().toISOString() }); return true }}
         onBack={() => { setDetailId(null); hook.refresh() }}
       />
     )
@@ -91,18 +85,8 @@ export function OKRList() {
     )
   }
 
-  const filtered = statusFilter === "all"
-    ? hook.objectives.filter(o => o.status !== "archived")
-    : hook.objectives.filter(o => o.status === statusFilter)
-
-  const grouped = STATUS_ORDER
-    .filter(s => statusFilter === "all" || statusFilter === s)
-    .filter(s => filtered.some(o => o.status === s))
-    .map(status => ({
-      status,
-      label: STATUS_LABELS[status] ?? status,
-      objectives: filtered.filter(o => o.status === status),
-    }))
+  // [022.01] Phase 3：仅展示未软删除的目标（不再按 objective.status 过滤/分组）
+  const filtered = hook.objectives.filter(o => !o.archivedAt && !o.discardedAt)
 
   return (
     <div className="p-4 space-y-6">
@@ -111,31 +95,17 @@ export function OKRList() {
         <Button onClick={() => setShowForm(true)}>+ 新建 OKR</Button>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {(Object.keys(STATUS_LABELS) as (ObjectiveStatus | "all")[]).map(key => (
-          <Button key={key} variant={statusFilter === key ? "default" : "outline"} size="sm"
-            onClick={() => { setStatusFilter(key); hook.refresh(key === "all" ? undefined : key) }}>
-            {STATUS_LABELS[key]}
-          </Button>
-        ))}
-      </div>
-
-      {grouped.length === 0 && (
+      {filtered.length === 0 && (
         <div className="text-center text-muted-foreground py-8">
           暂无 OKR，点击右上角创建第一个目标
         </div>
       )}
 
-      {grouped.map(group => (
-        <div key={group.status}>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">{group.label} ({group.objectives.length})</h3>
-          <div className="space-y-2">
-            {group.objectives.map(obj => (
-              <ObjectiveCard key={obj.id} objective={obj} onClick={id => setDetailId(id)} />
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="space-y-2">
+        {filtered.map(obj => (
+          <ObjectiveCard key={obj.id} objective={obj} onClick={id => setDetailId(id)} />
+        ))}
+      </div>
     </div>
   )
 }

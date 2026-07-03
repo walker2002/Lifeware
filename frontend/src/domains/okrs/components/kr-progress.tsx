@@ -2,7 +2,9 @@
  * @file kr-progress
  * @brief KeyResult 进度展示组件
  *
- * 展示单个 KeyResult 的进度信息与达成信心度（[024] G2），支持编辑更新
+ * 展示单个 KeyResult 的进度信息与达成信心度（[024] G2），支持编辑更新。
+ * [022.01] Phase 3：移除 kr.status 引用——
+ * 进度条颜色、完成指示符由 progressRate 驱动；编辑权限由父组件按 cycleStatus 控制后透传 editable。
  */
 
 "use client"
@@ -61,14 +63,9 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate, onConfide
     setIsEditingConfidence(false)
   }
 
-  const statusColors: Record<string, string> = {
-    draft: "bg-muted",
-    active: "bg-primary",
-    paused: "bg-warning",
-    completed: "bg-success",
-    discarded: "bg-muted",
-    archived: "bg-muted",
-  }
+  // [022.01] Phase 3：进度条颜色由 progressRate 驱动（不再依赖 kr.status）
+  const isKRCompleted = kr.progressRate >= 1.0
+  const barColor = isKRCompleted ? "bg-success" : "bg-primary"
 
   return (
     <div className="space-y-1.5">
@@ -77,12 +74,12 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate, onConfide
           {krNumber && <span className="font-mono text-xs text-muted-foreground mr-1">{krNumber}</span>}
           {kr.title}
         </span>
-        <span className="text-xs text-muted-foreground">{kr.status}</span>
+        {isKRCompleted && <span className="text-xs text-success">✓</span>}
       </div>
 
       <div className="flex items-center gap-3">
         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${statusColors[kr.status] ?? "bg-primary"}`}
+          <div className={`h-full rounded-full transition-all ${barColor}`}
             style={{ width: `${Math.min(percent, 100)}%` }} />
         </div>
         <span className="text-sm font-mono w-12 text-right">{percent}%</span>
@@ -103,7 +100,7 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate, onConfide
         ) : (
           <>
             <span>{kr.currentValue} / {kr.targetValue} {kr.unit}</span>
-            {editable && kr.status === "active" && (
+            {editable && (
               <Button size="sm" variant="link" onClick={() => { setInputValue(String(kr.currentValue)); setIsEditing(true) }} className="h-auto p-0 text-xs">
                 更新
               </Button>
@@ -133,7 +130,7 @@ export function KRProgress({ kr, krNumber, editable, onProgressUpdate, onConfide
               <div className="h-full rounded-full bg-primary/60" style={{ width: `${kr.confidence}%` }} />
             </div>
             <span className="font-mono w-10 text-right">{kr.confidence}%</span>
-            {editable && kr.status === "active" && onConfidenceUpdate && (
+            {editable && onConfidenceUpdate && (
               <Button size="sm" variant="link" className="h-auto p-0 text-xs"
                 onClick={() => { setConfidenceInput(String(kr.confidence)); setIsEditingConfidence(true) }}>
                 更新信心

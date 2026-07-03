@@ -1,8 +1,10 @@
 /**
  * @file objective-card
  * @brief Objective 卡片组件
- * 
- * 展示单个 Objective 的摘要信息和进度
+ *
+ * 展示单个 Objective 的摘要信息和进度。
+ * [022.01] Phase 3：删除 STATUS_LABELS / statusColor / status Badge——
+ * Objective 状态语义由 Cycle 承载。
  */
 
 "use client"
@@ -23,12 +25,6 @@ interface ObjectiveCardProps {
   onClick?: (id: string) => void
 }
 
-/** 状态标签映射 */
-const STATUS_LABELS: Record<string, string> = {
-  draft: "草稿", active: "进行中", paused: "已暂停",
-  completed: "已完成", discarded: "已废弃", archived: "已归档",
-}
-
 const PRIORITY_VARIANT: Record<string, "destructive" | "default" | "outline"> = {
   P0: "destructive",
   P1: "default",
@@ -36,20 +32,15 @@ const PRIORITY_VARIANT: Record<string, "destructive" | "default" | "outline"> = 
 }
 
 export function ObjectiveCard({ objective, keyResults, onClick }: ObjectiveCardProps) {
-  const activeKRs = (keyResults ?? []).filter(kr => kr.status !== "discarded" && kr.status !== "archived")
+  // [022.01] Phase 3：KR 列表不再按 kr.status 过滤（findAll 已返回非软删行）。
+  const activeKRs = keyResults ?? []
   const avgProgress = activeKRs.length > 0
     ? Math.round(activeKRs.reduce((sum, kr) => sum + kr.progressRate * 100, 0) / activeKRs.length)
     : 0
 
-  const statusColor: Record<string, string> = {
-    draft: "border-l-gray-400", active: "border-l-primary",
-    paused: "border-l-yellow-500", completed: "border-l-green-500",
-    discarded: "border-l-gray-300", archived: "border-l-gray-400",
-  }
-
   return (
     <Card
-      className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${statusColor[objective.status] ?? ""}`}
+      className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-primary"
       onClick={() => onClick?.(objective.id)}
     >
       <CardHeader className="pb-2">
@@ -62,9 +53,6 @@ export function ObjectiveCard({ objective, keyResults, onClick }: ObjectiveCardP
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-2">
             <Badge variant={PRIORITY_VARIANT[objective.priority] ?? "default"} className="text-xs">{objective.priority}</Badge>
-            <Badge variant={objective.status === "active" ? "default" : "secondary"} className="text-xs">
-              {STATUS_LABELS[objective.status] ?? objective.status}
-            </Badge>
           </div>
         </div>
       </CardHeader>
