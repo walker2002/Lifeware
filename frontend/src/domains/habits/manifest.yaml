@@ -125,52 +125,54 @@ lifecycle:
 
 # ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode；label/required 移除）──
 # 字段执行器对未声明字段拒绝写入（F-1），须与 irepository.ts CreateHabitInput 一致。
+# [026] T23：per-objectType 嵌套；当前 habit 域仅一个 objectType（habit），保留全部字段
 field_metadata:
-  title:
-    type: string
-    mutation_mode: ContentField
-  description:
-    type: string
-    mutation_mode: ContentField
-  startDate:
-    type: date
-    mutation_mode: ContentField
-  endDate:
-    type: date
-    mutation_mode: ContentField
-  tags:
-    type: json
-    mutation_mode: ContentField
-  defaultTime:
-    type: time
-    mutation_mode: FactField
-  earliestTime:
-    type: time
-    mutation_mode: FactField
-  latestStartTime:
-    type: time
-    mutation_mode: FactField
-  defaultDuration:
-    type: number
-    mutation_mode: FactField
-  minDuration:
-    type: number
-    mutation_mode: FactField
-  trackable:
-    type: boolean
-    mutation_mode: FactField
-  frequencyType:
-    type: enum
-    options: [daily, weekly, custom]
-    mutation_mode: FactField
-  daysOfWeek:
-    type: json
-    mutation_mode: FactField
-  # [023] A3.2 archetype 接入：archetypeId 是 nullable ContentField
-  # （用户标签式，非业务事实，不发系统事件——C3 已知现实偏差见 spec）
-  activityArchetypeId:
-    type: string
-    mutation_mode: ContentField
+  habit:
+    title:
+      type: string
+      mutation_mode: ContentField
+    description:
+      type: string
+      mutation_mode: ContentField
+    startDate:
+      type: date
+      mutation_mode: ContentField
+    endDate:
+      type: date
+      mutation_mode: ContentField
+    tags:
+      type: json
+      mutation_mode: ContentField
+    defaultTime:
+      type: time
+      mutation_mode: FactField
+    earliestTime:
+      type: time
+      mutation_mode: FactField
+    latestStartTime:
+      type: time
+      mutation_mode: FactField
+    defaultDuration:
+      type: number
+      mutation_mode: FactField
+    minDuration:
+      type: number
+      mutation_mode: FactField
+    trackable:
+      type: boolean
+      mutation_mode: FactField
+    frequencyType:
+      type: enum
+      options: [daily, weekly, custom]
+      mutation_mode: FactField
+    daysOfWeek:
+      type: json
+      mutation_mode: FactField
+    # [023] A3.2 archetype 接入：archetypeId 是 nullable ContentField
+    # （用户标签式，非业务事实，不发系统事件——C3 已知现实偏差见 spec）
+    activityArchetypeId:
+      type: string
+      mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

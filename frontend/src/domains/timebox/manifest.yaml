@@ -216,66 +216,78 @@ lifecycle:
     # 实际调用方是 reconcileItineraryStatuses()（在页面 server component 加载时跑，
     # 逐条 submitDynamicIntent）。无 cron、无后台 job。
 
-# ─── 区块 C: field_metadata ──────────────────────────────────────
+# ─── 区块 C: field_metadata（[026] T23：per-objectType 嵌套）
+# 一级 key 为 objectType（timebox / itinerary），二级 key 为字段名。
+# 消除跨 objectType 字段名潜在冲突（如 timebox.title 与 itinerary.title）。
 field_metadata:
-  title:
-    type: string
-    label: 标题
-    required: true
-  startTime:
-    type: time
-    label: 开始时间
-    required: true
-  duration:
-    type: number
-    label: 时长（分钟）
-    required: true
-  endTime:
-    type: time
-    label: 结束时间
-    required: false
-  startedAt:
-    type: lifecycle_timestamp
-    label: 实际开始时间
-    required: false
-  endedAt:
-    type: lifecycle_timestamp
-    label: 实际结束时间
-    required: false
-  overtimeAt:
-    type: lifecycle_timestamp
-    label: 超时标记时间
-    required: false
-  taskIds:
-    type: json
-    label: 关联任务
-    required: false
-  habitIds:
-    type: json
-    label: 关联习惯
-    required: false
-  executionRecord:
-    type: json
-    label: 执行记录
-    required: false
+  timebox:
+    title:
+      type: string
+      label: 标题
+      required: true
+    startTime:
+      type: time
+      label: 开始时间
+      required: true
+    duration:
+      type: number
+      label: 时长（分钟）
+      required: true
+    endTime:
+      type: time
+      label: 结束时间
+      required: false
+    startedAt:
+      type: lifecycle_timestamp
+      label: 实际开始时间
+      required: false
+    endedAt:
+      type: lifecycle_timestamp
+      label: 实际结束时间
+      required: false
+    overtimeAt:
+      type: lifecycle_timestamp
+      label: 超时标记时间
+      required: false
+    taskIds:
+      type: json
+      label: 关联任务
+      required: false
+    habitIds:
+      type: json
+      label: 关联习惯
+      required: false
+    executionRecord:
+      type: json
+      label: 执行记录
+      required: false
   # [026] A1.5: 行程字段元数据（仅追加 3 个；title/startTime 沿用 timebox 字段）
   # status/inProgressAt/expiredAt/completedAt/cancelledAt 不入 field_metadata
   # （SM-driven，不经 mutationService.update，避跨字段红线）
-  durationMin:
-    type: number
-    label: 时长(分钟)
-    required: true
-    mutation_mode: FactField
-  detail:
-    type: string
-    label: 详情
-    required: false
-    mutation_mode: ContentField
-  people:
-    type: json
-    label: 关系人
-    required: false
-    mutation_mode: ContentField
+  itinerary:
+    title:
+      type: string
+      label: 标题
+      required: true
+    startTime:
+      type: time
+      label: 开始时间
+      required: true
+    durationMin:
+      type: number
+      label: 时长(分钟)
+      required: true
+      mutation_mode: FactField
+    detail:
+      type: string
+      label: 详情
+      required: false
+      mutation_mode: ContentField
+    people:
+      type: json
+      label: 关系人
+      required: false
+      mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

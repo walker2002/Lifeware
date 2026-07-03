@@ -288,49 +288,51 @@ cascade_rules:
         cascade_action: cascade_delete
         event_type: TaskCascadeDeleted
 
-# ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode 供 field-executor 消费；label/required 移除——前端表单手写硬编码）──
+# ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode 供 field-executor 消费；label/required 移除——前端表单手写硬编码）
+# [026] T23：per-objectType 嵌套；task 主对象保留全字段
 field_metadata:
-  title:
-    type: string
-    mutation_mode: ContentField
-  name:
-    type: string
-    mutation_mode: ContentField
-  description:
-    type: string
-    mutation_mode: ContentField
-  priority:
-    type: enum
-    options: [critical, high, medium, low]
-    mutation_mode: FactField
-  energyRequired:
-    type: enum
-    options: [high, medium, low]
-    mutation_mode: FactField
-  estimatedDuration:
-    type: number
-    mutation_mode: FactField
-  dueDate:
-    type: date
-    mutation_mode: FactField
-  color:
-    type: string
-    mutation_mode: ContentField
-  threadId:
-    type: string
-    mutation_mode: FactField
-  # 完成任务时记录的实际时长/备注（completeTask 走字段执行器，须在此声明）
-  actualDuration:
-    type: number
-    mutation_mode: FactField
-  notes:
-    type: string
-    mutation_mode: ContentField
-  # [023] A3.2 archetype 接入：archetypeId 是 nullable ContentField
-  # （用户标签式，非业务事实，不发系统事件——C3 已知现实偏差见 spec）
-  activityArchetypeId:
-    type: string
-    mutation_mode: ContentField
+  task:
+    title:
+      type: string
+      mutation_mode: ContentField
+    name:
+      type: string
+      mutation_mode: ContentField
+    description:
+      type: string
+      mutation_mode: ContentField
+    priority:
+      type: enum
+      options: [critical, high, medium, low]
+      mutation_mode: FactField
+    energyRequired:
+      type: enum
+      options: [high, medium, low]
+      mutation_mode: FactField
+    estimatedDuration:
+      type: number
+      mutation_mode: FactField
+    dueDate:
+      type: date
+      mutation_mode: FactField
+    color:
+      type: string
+      mutation_mode: ContentField
+    threadId:
+      type: string
+      mutation_mode: FactField
+    # 完成任务时记录的实际时长/备注（completeTask 走字段执行器，须在此声明）
+    actualDuration:
+      type: number
+      mutation_mode: FactField
+    notes:
+      type: string
+      mutation_mode: ContentField
+    # [023] A3.2 archetype 接入：archetypeId 是 nullable ContentField
+    # （用户标签式，非业务事实，不发系统事件——C3 已知现实偏差见 spec）
+    activityArchetypeId:
+      type: string
+      mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

@@ -54,18 +54,23 @@ lifecycle:
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 # [022.01] Phase 3：移除 status 字段元数据（Objective/KR 不再含 status）。
+# [026] T23：per-objectType 嵌套；objective + key_result 两类共享一套字段声明。
 field_metadata:
-  title: { type: string, mutation_mode: ContentField }
-  description: { type: string, mutation_mode: ContentField }
-  okrType: { type: string, mutation_mode: ContentField }
-  priority: { type: enum, mutation_mode: ContentField, options: [P0, P1, P2] }
-  tags: { type: json, mutation_mode: ContentField }
-  cycleId: { type: string, mutation_mode: FactField }
-  targetValue: { type: number, mutation_mode: FactField }
-  currentValue: { type: number, mutation_mode: FactField }
-  unit: { type: string, mutation_mode: ContentField }
-  progressRate: { type: number, mutation_mode: PresentationField }
-  confidence: { type: number, mutation_mode: FactField }
+  objective:
+    title: { type: string, mutation_mode: ContentField }
+    description: { type: string, mutation_mode: ContentField }
+    okrType: { type: string, mutation_mode: ContentField }
+    priority: { type: enum, mutation_mode: ContentField, options: [P0, P1, P2] }
+    tags: { type: json, mutation_mode: ContentField }
+    cycleId: { type: string, mutation_mode: FactField }
+  key_result:
+    title: { type: string, mutation_mode: ContentField }
+    description: { type: string, mutation_mode: ContentField }
+    targetValue: { type: number, mutation_mode: FactField }
+    currentValue: { type: number, mutation_mode: FactField }
+    unit: { type: string, mutation_mode: ContentField }
+    progressRate: { type: number, mutation_mode: PresentationField }
+    confidence: { type: number, mutation_mode: FactField }
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 # [022.01] Phase 3：移除 discard/archive list actions（Objective/KR 无独立状态机，
