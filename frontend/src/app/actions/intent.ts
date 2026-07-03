@@ -13,7 +13,7 @@ import type { Timebox } from "@/usom/types/objects";
 import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import { TimeboxRepository } from "@/domains/timebox/repository";
+import { TimeboxRepository, ItineraryRepository } from "@/domains/timebox/repository";
 import { ActivityArchetypeRepository } from "@/lib/db/repositories/activity-archetype.repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
@@ -296,7 +296,10 @@ async function executePipeline(
     const eventRepo = new SystemEventRepository();
     const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
-    const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
+    const timeboxRepos = createTimeboxGenericRepo({
+      timeboxRepo: timeboxRepo as any,
+      itineraryRepo: new ItineraryRepository() as any,
+    });
 
     const orchestrator = createOrchestrator({
       eventRepo,
@@ -543,7 +546,10 @@ export async function transitionTimebox(
     const eventRepo = new SystemEventRepository();
     const ruleEngine = createRuleEngine({ timeboxRepo, userId: MVP_USER_ID });
 
-    const timeboxRepos = createTimeboxGenericRepo({ timeboxRepo: timeboxRepo as any });
+    const timeboxRepos = createTimeboxGenericRepo({
+      timeboxRepo: timeboxRepo as any,
+      itineraryRepo: new ItineraryRepository() as any,
+    });
 
     const orchestrator = createOrchestrator({
       eventRepo,
