@@ -1,0 +1,378 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归 > 纯 kind: timebox 输入：snapshot 锁（方案 A 防御） 1`] = `
+<div>
+  <div
+    class="relative rounded-lg border border-hairline bg-surface-card p-4"
+  >
+    <div
+      class="relative"
+      style="height: 960px;"
+    >
+      <div
+        class="absolute left-0 right-0"
+        style="top: 0%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          00:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 4.166666666666666%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          01:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 8.333333333333332%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          02:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 12.5%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          03:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 16.666666666666664%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          04:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 20.833333333333336%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          05:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 25%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          06:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 29.166666666666668%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          07:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 33.33333333333333%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          08:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 37.5%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          09:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 41.66666666666667%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          10:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 45.83333333333333%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          11:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 50%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          12:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 54.166666666666664%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          13:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 58.333333333333336%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          14:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 62.5%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          15:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 66.66666666666666%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          16:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 70.83333333333334%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          17:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 75%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          18:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 79.16666666666666%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          19:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 83.33333333333334%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          20:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 87.5%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          21:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 91.66666666666666%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          22:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 95.83333333333334%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          23:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-0 right-0"
+        style="top: 100%;"
+      >
+        <span
+          class="absolute -left-0 -translate-y-1/2 text-xs text-body"
+        >
+          24:00
+        </span>
+        <div
+          class="ml-10 -translate-y-1/2 border-t border-hairline"
+        />
+      </div>
+      <div
+        class="absolute left-10 right-0 z-10 border-t-2 border-primary"
+        style="top: 4.166666666666666%;"
+      >
+        <div
+          class="absolute -left-1 -top-1 size-2 rounded-full bg-primary"
+        />
+      </div>
+      <div
+        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent border-t border-r border-b"
+        style="top: 66.66666666666666%; height: 4.166666666666666%;"
+      >
+        <p
+          class="truncate text-xs font-medium text-ink"
+        >
+          晨会
+        </p>
+      </div>
+      <div
+        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-primary/20 border-primary border-l-transparent border-t border-r border-b"
+        style="top: 72.91666666666666%; height: 6.25%;"
+      >
+        <p
+          class="truncate text-xs font-medium text-ink"
+        >
+          深度工作
+        </p>
+      </div>
+      <div
+        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent border-t border-r border-b"
+        style="top: 91.66666666666666%; height: 4.166666666666666%;"
+      >
+        <p
+          class="truncate text-xs font-medium text-ink"
+        >
+          复盘
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+`;

@@ -1,0 +1,177 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind: timebox 输入：snapshot 锁（方案 A 防御） 1`] = `
+<div>
+  <div
+    class="grid gap-4 sm:grid-cols-2"
+  >
+    <div
+      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-surface-card"
+    >
+      <div
+        class="flex items-center gap-2"
+      >
+        <span
+          class="text-sm text-body whitespace-nowrap"
+        >
+          16:00
+          -
+          17:00
+        </span>
+        <h3
+          class="flex-1 truncate font-display text-base font-medium text-ink"
+        >
+          <button
+            class="bg-transparent p-0 m-0 border-0 text-inherit font-inherit cursor-pointer hover:underline text-ink"
+            type="button"
+          >
+            晨会
+          </button>
+        </h3>
+        <span
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground shrink-0"
+          data-slot="badge"
+          data-variant="outline"
+        >
+          已规划
+        </span>
+        <div
+          class="flex items-center gap-1 shrink-0"
+        >
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/90 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
+            data-size="sm"
+            data-slot="button"
+            data-variant="default"
+          >
+            开始
+          </button>
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
+            data-size="sm"
+            data-slot="button"
+            data-variant="ghost"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-surface-card"
+    >
+      <div
+        class="flex items-center gap-2"
+      >
+        <span
+          class="text-sm text-body whitespace-nowrap"
+        >
+          17:30
+          -
+          19:00
+        </span>
+        <h3
+          class="flex-1 truncate font-display text-base font-medium text-ink"
+        >
+          <button
+            class="bg-transparent p-0 m-0 border-0 text-inherit font-inherit cursor-pointer hover:underline text-ink"
+            type="button"
+          >
+            深度工作
+          </button>
+        </h3>
+        <span
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 bg-primary text-primary-foreground [a&]:hover:bg-primary/90 shrink-0"
+          data-slot="badge"
+          data-variant="default"
+        >
+          进行中
+        </span>
+        <div
+          class="flex items-center gap-1 shrink-0"
+        >
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
+            data-size="sm"
+            data-slot="button"
+            data-variant="outline"
+          >
+            结束
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-col gap-1"
+      >
+        <div
+          class="flex items-center justify-between text-xs"
+        >
+          <span
+            class="font-mono text-success"
+          >
+            2:30:00
+          </span>
+          <span
+            class="text-body"
+          >
+            100
+            %
+          </span>
+        </div>
+        <div
+          class="h-1.5 rounded-full bg-muted overflow-hidden"
+        >
+          <div
+            class="h-full rounded-full transition-all duration-1000 bg-success"
+            style="width: 100%;"
+          />
+        </div>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-surface-card"
+    >
+      <div
+        class="flex items-center gap-2"
+      >
+        <span
+          class="text-sm text-body whitespace-nowrap"
+        >
+          22:00
+          -
+          23:00
+        </span>
+        <h3
+          class="flex-1 truncate font-display text-base font-medium text-ink"
+        >
+          <button
+            class="bg-transparent p-0 m-0 border-0 text-inherit font-inherit cursor-pointer hover:underline text-ink"
+            type="button"
+          >
+            复盘
+          </button>
+        </h3>
+        <span
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground shrink-0"
+          data-slot="badge"
+          data-variant="outline"
+        >
+          已结束
+        </span>
+        <div
+          class="flex items-center gap-1 shrink-0"
+        >
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
+            data-size="sm"
+            data-slot="button"
+            data-variant="outline"
+          >
+            记录
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

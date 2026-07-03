@@ -1,0 +1,279 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`[026] T15 IRON RULE — MiniCalendar 纯 timebox 渲染回归 > 纯 kind: timebox 输入：snapshot 锁（方案 A 防御） 1`] = `
+<div>
+  <div
+    class="rounded-lg border border-hairline bg-surface-card p-3"
+    style="max-width: 280px;"
+  >
+    <div
+      class="mb-2 text-center text-sm font-medium text-ink"
+    >
+      2026年7月
+    </div>
+    <div
+      class="mb-1 grid grid-cols-7 gap-0"
+    >
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        一
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        二
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        三
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        四
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        五
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        六
+      </div>
+      <div
+        class="py-1 text-center text-xs text-muted-foreground"
+      >
+        日
+      </div>
+    </div>
+    <div
+      class="grid grid-cols-7 gap-0"
+    >
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-muted-foreground/40"
+        disabled=""
+        type="button"
+      >
+        29
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-muted-foreground/40"
+        disabled=""
+        type="button"
+      >
+        30
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        1
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        2
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        3
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        4
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        5
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        6
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        7
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        8
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        9
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        10
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        11
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        12
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        13
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        14
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors bg-primary text-white font-medium"
+        type="button"
+      >
+        15
+        <span
+          class="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-white"
+        />
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        16
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        17
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        18
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        19
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        20
+        <span
+          class="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-primary"
+        />
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        21
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        22
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        23
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        24
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        25
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        26
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        27
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        28
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        29
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        30
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-ink hover:bg-surface-soft"
+        type="button"
+      >
+        31
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-muted-foreground/40"
+        disabled=""
+        type="button"
+      >
+        1
+      </button>
+      <button
+        class="relative flex items-center justify-center rounded-md py-1 text-xs transition-colors text-muted-foreground/40"
+        disabled=""
+        type="button"
+      >
+        2
+      </button>
+    </div>
+  </div>
+</div>
+`;
