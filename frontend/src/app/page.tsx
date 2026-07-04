@@ -33,6 +33,7 @@ import { TimeboxesWorkspace } from "@/domains/timebox/components/timeboxes-works
 import { ActionView } from "@/components/views/action-view"
 import { SettingsPage } from "@/components/settings/settings-page"
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog"
+import { PageBanner } from "@/components/layout/page-banner"
 import { ExecutionLogDialog } from "@/components/execution-log-dialog"
 import { Banner } from "@/components/feedback/banner"
 import { Button } from "@/components/ui/button"
@@ -107,11 +108,23 @@ function HomeContent() {
     : mainViewState.type === 'settings' ? <SettingsPage initialSection={mainViewState.section} />
     : null
 
+  // [023.03] 恢复：原主页在 'schedule' 视图下用 PageBanner 包一层（含图片 banner）。
+  // 图片 banner 用 domainId='home' 匹配 '/banner-lifeware1.png' / '/banner-lifeware2.png'，
+  // 可一键折叠/展开，折叠状态持久化到 localStorage。
+  const mainContentWithBanner = mainViewState.type === 'schedule'
+    ? (
+      <>
+        <PageBanner domainId="home" title="我的时间盒" />
+        {mainContent}
+      </>
+    )
+    : mainContent
+
   return (
     <>
       <AppShell activeTab={panelTab} onTabChange={setPanelTab} onHomeClick={handleHomeClick} onSettingsClick={handleSettingsClick}
         tilesBanner={tb.actionSurface && tb.actionSurface.tiles.length > 0 ? <TilesBanner candidates={tb.actionSurface.tiles} /> : undefined}
-        leftPanelContent={leftPanelContent} mainContent={mainContent} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
+        leftPanelContent={leftPanelContent} mainContent={mainContentWithBanner} viewKey={mainViewState.type} onFocusIntentInput={handleFocusIntentInput}
         currentViewType={mainViewState.type}
         onBottomNavNavigate={(view) => {
           // BottomNav conversation tab 需要有效的 sessionId
