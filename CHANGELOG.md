@@ -21,6 +21,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_04 — [023.04] §3.9 Timebox 末尾追加「时间盒修改/取消/删除意图统一入口」：`/editTimeboxes` shortcut 是修改/取消/删除三类意图的统一 CNUI 入口（修改 → `updateTimebox` 直调 / 取消 → `deleteTimebox` OV#8 状态守卫仅 planned 合法 / 删除 ≡ 取消）；`/cancelTimebox` shortcut 已弃用（提交 [023.04] 时从 manifest 删除），`cancelTimebox` 作为 SM action（`submitDynamicIntent('timebox','cancelTimebox',...)`）仍保留用于 mutation service 内部触发状态推进。
 - 2026_07_04 — [023-02 用户调整] 列表卡片 `MAX_VISIBLE_ROWS` 4→10；编辑器 grid `1/2/3` → `1/2/3/4/5` 列（窄卡片 + 加列）；`TemplateEditForm` 改为按 `start` 升序展示行（每次 setState 自动重排）；修订 [023-02 决议 B.2]。
 - 2026_07_04 — [023-02] §3.12 TimeboxTemplate 改写：`survivalSegments`(7键) + `subscribedHabits/Tasks/Threads` 三数组 → `daysOfWeek`(模板级星期数组) + `rows`(有序行列表，`source ∈ {habit, task, thread, custom}`)。A3 owner-check 改为遍历 rows 收集 sourceId。
 - 2026_07_03 — [026] Itinerary A3 ship：4 action（create/edit/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile + /schedule 锁定合并；ItineraryWorkspace inline Sheet drawer 触发 createItinerary（替换 T12 hash 死链 → T14 I-1 修复）；GrowthMenu 4 intent_trigger 自动归"timebox"组（registry 自动分组，零代码改动）；§3.13 / §4.X 已完整覆盖
@@ -39,6 +40,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_04 — [023.04] §4.7 timeboxes 末尾追加「时间盒重叠规则」：CNUI 提交时间盒按两层校验（客户端预检 `assertNoInternalOverlap` 纯函数 + 服务端兜底 `TimeOverlapRule` 改读 `endTime` + status-aware severity）。DB 层无唯一性约束，重叠允许但有提示用户确认。
 - 2026_07_04 — [023-02] §7.8 timebox_templates 改写：`survival_segments` + 3 个 `subscribed_*` 列 → `rows` (jsonb 有序行列表) + `days_of_week` (模板级星期)。迁移 0032 包含 7 段→7 custom 行回填（仅当 `rows='[]'`）+ DROP 4 列。
 - 2026_07_03 — [026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod TZ 一致，codex #5 落地）
 - 2026_07_03 — [026] A3 ship：§4.X itineraries 表 DDL 完整落地 + 迁移 0031 + ItineraryRepository.findActive/findNeedingReconcile + 4 transition（cancel/markInProgress/markExpired）；5 态 storage 全部由 SM transition 推进（lazy reconcile，零 cron）
@@ -195,6 +197,16 @@
 - **fix(lib)** 新增 `suggestShortcut(action, shortcuts)` 纯函数：唯一前缀匹配返回该 shortcut（createTime→/createTimebox），多义/无匹配返回 undefined。+7 单测。
 - **fix(hook)** `handleConversationSend` slash 分支加守卫：`!shortcut && !resolvedDomainId` → 拦截，给「未识别的命令 /xxx。你是否想输入 /yyy？」提示，不进任何域管道。（产品决策：未注册命令一律提示，不自动补全。）`intentTriggers` 入 deps 防闭包 stale。
 - **fix(refresh)** `handleCnuiConfirm` 成功后广播 `window` 事件 `lifeware:data-changed`（detail `{domainId, action}`）。`ActionView` 经 `mainViewState.type==='action'` **内联挂载** `HabitListPage`/`TaskTreePage` 于 page.tsx（非独立路由），CNUI 提交时仍 mounted → 之前 stale。现各加 `useEffect` 监听器按 `domainId` 自行 reload（habits→loadHabits / tasks→handleDataChanged）。timebox 仍走 `deps.loadTimeboxes`。OKR 无 create 快捷方式 + 刷新入口深埋 → defer。
+
+### [023.04] Timebox CNUI 优化
+> 2026_07_04 — ship-ready 收尾（7 commits：overlap.ts / rule endTime / CreateTimebox UI / parser / EditTimeboxes surface / handler 分支 / manifest 三合一）。**全闭环 ship-ready**。
+
+- `CreateTimebox` CNUI surface 补 `activityArchetype` 选择器（[023] A2 已有字段，UI 缺失）+ 同日 batch 内 overlap 预检（`assertNoInternalOverlap` 纯函数）+ page-aware conflict 红字提示 + 提交全程 needs_confirm AlertDialog（仿 `timebox-drawer.tsx` 原语）
+- 新增 `/editTimeboxes` CNUI action（修改/取消/删除统一入口，解析优先模式）+ server `surfaceHandlers` + client `register-client-surfaces` 双注册闭环（K-1 守护）；`/cancelTimebox` shortcut 弃用（统一到 `/editTimeboxes`）
+- 客户端 `assertNoInternalOverlap` 纯函数（`domains/timebox/lib/overlap.ts`）+ 服务端 `TimeOverlapRule` 改读 `endTime` + status-aware severity（修原 rule 失效债 — [023] A2 OV#P1-#1 后 `duration` 已撤）+ Edit path 显式 `evaluate` 双调（confirm→unconfirm，Codex #4）
+- Handler `timeboxCnuiHandler.open/submit` 接 `editTimeboxes` 分支（直调 update/delete + OV#8 状态守卫透传 + safe-default race fallback）
+- 测试 4 文件新增 + 1 改（`overlap.test.ts` / `timebox-overlap.test.ts` / `parse-timeboxes.test.ts` / `edit-timeboxes.test.tsx` / `handlers.test.ts` editTimeboxes 分支）+ CreateTimebox 3 case UI 测试 + 解析优先模式 7 case UI 测试
+- 文档同步：`docs/database-design.md` §4.7 末尾追加「时间盒重叠规则（[023.04]）」 / `docs/usom-design.md` §3.9 末尾追加「时间盒修改/取消/删除意图统一入口（[023.04]）」 / 023-01 spec 末尾追加「[023.04] 状态更新」指针
 
 ## Itinerary 域（[026]）
 
