@@ -178,16 +178,15 @@ export class TimeboxTemplateRepository {
     userId: USOM_ID,
     client: DbClient,
   ): Promise<void> {
-    const habitIds = uniq(input.rows.filter((r) => r.source === 'habit' && r.sourceId).map((r) => r.sourceId!))
-    const taskIds = uniq(input.rows.filter((r) => r.source === 'task' && r.sourceId).map((r) => r.sourceId!))
-    const threadIds = uniq(input.rows.filter((r) => r.source === 'thread' && r.sourceId).map((r) => r.sourceId!))
+    const habitIds = input.rows.filter((r) => r.source === 'habit' && r.sourceId).map((r) => r.sourceId!)
+    const taskIds = input.rows.filter((r) => r.source === 'task' && r.sourceId).map((r) => r.sourceId!)
+    const threadIds = input.rows.filter((r) => r.source === 'thread' && r.sourceId).map((r) => r.sourceId!)
 
-    const tasks = await Promise.all([
+    await Promise.all([
       habitIds.length > 0 ? this._checkHabits(habitIds, userId, client) : Promise.resolve(),
       taskIds.length > 0 ? this._checkTasks(taskIds, userId, client) : Promise.resolve(),
       threadIds.length > 0 ? this._checkThreads(threadIds, userId, client) : Promise.resolve(),
     ])
-    void tasks
   }
 
   private async _checkHabits(ids: string[], userId: USOM_ID, client: DbClient): Promise<void> {
@@ -261,9 +260,4 @@ export class TimeboxTemplateRepository {
     }
     return result
   }
-}
-
-/** 数组去重（保序）；owner-check 前置收窄 inArray */
-function uniq<T>(arr: T[]): T[] {
-  return [...new Set(arr)]
 }

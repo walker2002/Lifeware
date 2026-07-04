@@ -94,7 +94,12 @@ const RowEditor = React.memo(function RowEditor({
           aria-label="行来源"
           value={row.source}
           disabled={!sourcesReady}
-          onChange={(e) => onSourceChange(row.id, e.target.value as TemplateRowSource)}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === 'habit' || v === 'task' || v === 'thread' || v === 'custom') {
+              onSourceChange(row.id, v)
+            }
+          }}
           className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
         >
           <option value="custom">自定义</option>
