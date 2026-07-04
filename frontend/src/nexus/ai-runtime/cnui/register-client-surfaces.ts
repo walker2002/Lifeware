@@ -13,7 +13,7 @@ import { HabitCreationCard } from '@/domains/habits/cnui/surfaces/HabitCreationC
 import { TimeboxList } from '@/domains/timebox/cnui/surfaces/TimeboxList'
 import { CreateTimebox } from '@/domains/timebox/cnui/surfaces/CreateTimebox'
 import { LogTimebox } from '@/domains/timebox/cnui/surfaces/LogTimebox'
-import { AdjustSchedule } from '@/domains/timebox/cnui/surfaces/AdjustSchedule'
+import { AdjustTimeboxes } from '@/domains/timebox/cnui/surfaces/AdjustTimeboxes'
 // [023.04] T6 — editTimeboxes CNUI surface client 注册
 import { EditTimeboxes } from '@/domains/timebox/cnui/surfaces/EditTimeboxes'
 
@@ -23,7 +23,7 @@ cnuiRegistry.register('habits', 'habit-creation-card', { component: HabitCreatio
 cnuiRegistry.register('timebox', 'timebox-list', { component: TimeboxList })
 cnuiRegistry.register('timebox', 'create-timebox', { component: CreateTimebox })
 cnuiRegistry.register('timebox', 'log-timebox', { component: LogTimebox })
-cnuiRegistry.register('timebox', 'adjust-schedule', { component: AdjustSchedule })
+cnuiRegistry.register('timebox', 'adjust-timeboxes', { component: AdjustTimeboxes })
 // [023.04] T6 — editTimeboxes CNUI surface（client 双注册闭环，handler 已 server 注册）
 cnuiRegistry.register('timebox', 'edit-timeboxes', { component: EditTimeboxes })
 

@@ -538,7 +538,7 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'timebox-list': timeboxCnuiHandler,
   'create-timebox': timeboxCnuiHandler,
   'log-timebox': timeboxCnuiHandler,
-  'adjust-schedule': timeboxCnuiHandler,
+  'adjust-timeboxes': timeboxCnuiHandler,
   // [026] A2.5 — 行程 3 surface 共用 timeboxCnuiHandler（按 action 分支）
   'create-itinerary': timeboxCnuiHandler,
   'edit-itinerary': timeboxCnuiHandler,
