@@ -20,6 +20,23 @@ intent_triggers:
       - 上午10:30-12:30 OKR 季度计划
       - 上午10:30-12:30 OKR 季度计划；下午16:00-18:00 带孩子出去玩
     keywords: [时间盒, timebox, 安排, 计划, 专注]
+  # [023.04] T6：editTimeboxes 三合一入口（修改/取消/删除当日时间盒）。
+  # 取代旧的 cancelTimebox shortcut — 通过 CNUI 解析优先模式 + 全字段表单 + 删除按钮。
+  # cancelTimebox 在 lifecycle.transitions 仍作为 SM action（submitDynamicIntent('timebox', 'cancelTimebox', ...)），
+  # 仅从 intent_triggers 移除 AI/shortcut 入口。
+  - action: editTimeboxes
+    shortcut: /editTimeboxes
+    description: 修改/取消/删除当日时间盒（CNUI 三合一入口）
+    response_type: cnui
+    cnui_surface: edit-timeboxes
+    examples:
+      - 把早上的会议改到下午 14:00
+      - 把代码审查改到 16 点
+      - 把下午客户拜访改期
+      - 取消早上的会议
+      - 删除下午的会议
+      - 帮我看一下今天的时间盒
+    keywords: [修改时间盒, 改时间盒, 改时间, 调整时间盒, 取消时间盒, 删除时间盒]
   - action: startTimebox
     shortcut: /startTimebox
     description: 开始执行一个时间盒
@@ -34,12 +51,6 @@ intent_triggers:
       - 结束时间盒
       - 完成这个专注时段
     keywords: [结束, 完成, end]
-  - action: cancelTimebox
-    shortcut: /cancelTimebox
-    description: 取消一个计划中的时间盒
-    examples:
-      - 取消这个时间盒
-    keywords: [取消, cancel]
   - action: logTimebox
     shortcut: /logTimebox
     description: 记录时间盒的执行结果
@@ -437,5 +448,9 @@ cnui_surfaces:
     handler: ./cnui/handlers
   delete-itinerary:
     description: 删除行程（多选）
+    handler: ./cnui/handlers
+  # [023.04]：editTimeboxes 三合一（修改/取消/删除）
+  edit-timeboxes:
+    description: 修改/取消/删除时间盒（解析优先模式 + 全字段表单 + 删除按钮）
     handler: ./cnui/handlers
 
