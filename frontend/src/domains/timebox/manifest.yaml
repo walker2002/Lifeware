@@ -61,14 +61,14 @@ intent_triggers:
       - 这个时间盒完成度80%
       - 打卡所有时间盒
     keywords: [记录, log, 打卡]
-  - action: viewSchedule
-    shortcut: /schedule
+  - action: viewTimeboxes
+    shortcut: /timeboxes
     description: 时间盒管理
     response_type: page
     examples:
-      - 查看今天的日程
+      - 查看今天的时间盒
       - 今天有什么安排
-    keywords: [日程, schedule, 安排, 今天]
+    keywords: [时间盒, timebox, 安排, 今天]
     view_route: /timeboxes
   - action: configTimeboxTemplates
     shortcut: /timeboxTemplates
@@ -79,21 +79,21 @@ intent_triggers:
       - 配置时间盒模板
     keywords: [模板, 时间盒模板, 模板管理]
     view_route: /timebox-templates
-  - action: createSmartSchedule
-    shortcut: /smartSchedule
-    description: AI 智能编排日程
+  - action: createSmartTimeboxes
+    shortcut: /smartTimeboxes
+    description: AI 智能编排时间盒
     response_type: cnui
     cnui_surface: timebox-list
     examples:
-      - 帮我智能安排今天的日程
+      - 帮我智能安排今天的时间盒
       - 智能编排
       - 自动安排今天
-    keywords: [智能编排, smart, 自动安排, 智能日程]
-  - action: adjustRemainingSchedule
-    shortcut: /adjustSchedule
-    description: 根据剩余任务重新编排日程
+    keywords: [智能编排, smart, 自动安排, 智能时间盒]
+  - action: adjustRemainingTimeboxes
+    shortcut: /adjustTimeboxes
+    description: 根据剩余任务重新编排时间盒
     response_type: cnui
-    cnui_surface: adjust-schedule
+    cnui_surface: adjust-timeboxes
     examples:
       - 重新安排剩余时间
       - 调整今天下午的安排
@@ -359,7 +359,7 @@ subscribed_events:
 # - 其余 view_route 沿用 src/app/<route>/page.tsx 路径，component 字段
 #   标识实际入口组件（[023] A2.3 / A2.8 真实页面）。
 view_routes:
-  viewSchedule:
+  viewTimeboxes:
     component: app/timeboxes/page
     url: /timeboxes
   configTimeboxTemplates:
@@ -384,8 +384,8 @@ templates:
 
 # ─── 区块 I: generation_actions（生成型路径声明）────────────────
 generation_actions:
-  createSmartSchedule:
-    description: 智能编排日程，根据任务/习惯/能量曲线自动生成时间盒方案
+  createSmartTimeboxes:
+    description: 智能编排时间盒，根据任务/习惯/能量曲线自动生成时间盒方案
     contexts:
       - id: existingTimeboxes
         query: timeboxes_for_date
@@ -402,8 +402,8 @@ generation_actions:
     response_mode: cnui
     cnui_surface_type: timebox-list
     session_enabled: true
-  adjustRemainingSchedule:
-    description: 根据已完成项目调整剩余日程
+  adjustRemainingTimeboxes:
+    description: 根据已完成项目调整剩余时间盒
     contexts:
       - id: existingTimeboxes
         query: timeboxes_for_date
@@ -433,8 +433,8 @@ cnui_surfaces:
   create-timebox:
     description: 多条 timebox 草稿创建（AI 解析→左右翻页→逐条提交）
     handler: ./cnui/handlers
-  adjust-schedule:
-    description: 调整日程（按时间序列左右翻页，diff 提交，running/ended 禁取消）
+  adjust-timeboxes:
+    description: 调整时间盒（按时间序列左右翻页，diff 提交，running/ended 禁取消）
     handler: ./cnui/handlers
   log-timebox:
     description: 批量打卡（三态：完成/未完成/跳过 + 备注，逐条走 logTimebox）
