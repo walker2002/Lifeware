@@ -267,6 +267,18 @@ async function generateRoutes(routes: RouteEntry[], force: boolean): Promise<voi
     // 生成文件内容
     const content = generateRouteFileContent(route)
 
+    // 幂等检查：剥离时间戳行后比对，业务字段未变则跳过重写。
+    // 否则每次 `npm run dev/build` 都会让 git diff 出现「莫名其妙的修改」，
+    // 即使 component/url/params 都没动过。
+    if (existingContent && !force) {
+      const existingNormalized = stripTimestampLine(existingContent)
+      const newNormalized = stripTimestampLine(content)
+      if (existingNormalized === newNormalized) {
+        console.log(`  ⏭  ${route.url} → ${path.relative(APP_DIR, outputPath)} (unchanged, skipped)`)
+        continue
+      }
+    }
+
     // 创建目录
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
 
@@ -274,6 +286,16 @@ async function generateRoutes(routes: RouteEntry[], force: boolean): Promise<voi
     fs.writeFileSync(outputPath, content, 'utf-8')
     console.log(`  ✓ ${route.url} → ${path.relative(APP_DIR, outputPath)}`)
   }
+}
+
+/**
+ * 剥离时间戳行（幂等比对用）。
+ * `Generated at: <ISO timestamp>` 是每次运行时动态注入的，
+ * 与业务字段（component / url / params）无关；比对时移除以避免误判为「内容变更」。
+ */
+const TIMESTAMP_LINE_RE = /^\/\/ Generated at: .*$/m
+function stripTimestampLine(content: string): string {
+  return content.replace(TIMESTAMP_LINE_RE, '')
 }
 
 // ─── 生成单个路由文件内容 ───────────────────────────────────────────
