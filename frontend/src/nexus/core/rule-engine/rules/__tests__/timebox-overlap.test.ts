@@ -1,5 +1,6 @@
 // TimeOverlapRule 单元测试
 // T027: 验证时间重叠检测规则的闭包工厂创建和区间冲突判断
+// [023.04] 改读 endTime：makeIntent 默认带 endTime = startTime + 60 分钟
 
 import { describe, it, expect, vi } from 'vitest'
 import { createTimeOverlapRule } from '../timebox-overlap'
@@ -12,6 +13,7 @@ import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 
 /** 创建 mock StructuredIntent */
 function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent {
+  // [023.04] 默认带 endTime = startTime + 60 分钟，替代旧 duration: 60
   return {
     id: 'test-intent-001',
     intentionId: 'test-intention-001',
@@ -20,7 +22,7 @@ function makeIntent(fields?: Partial<Record<string, unknown>>): StructuredIntent
     fields: {
       title: '测试时间盒',
       startTime: '2026-05-03T10:00:00Z',
-      duration: 60,
+      endTime: '2026-05-03T11:00:00Z',
       ...fields,
     },
     confidence: 0.9,
@@ -187,7 +189,7 @@ describe('createTimeOverlapRule', () => {
 
     const intent = makeIntent({
       startTime: '2026-05-03T09:30:00Z',
-      duration: 60,
+      endTime: '2026-05-03T10:30:00Z',
     })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('confirm')
@@ -229,11 +231,11 @@ describe('createTimeOverlapRule', () => {
     expect(result.severity).toBe('pass')
   })
 
-  it('缺少 duration → pass（由 FieldCompletenessRule 负责）', async () => {
+  it('缺少 endTime → pass（由 FieldCompletenessRule 负责）', async () => {
     const repo = createMockTimeboxRepo([])
     const rule = createTimeOverlapRule(repo, userId)
 
-    const intent = makeIntent({ duration: undefined })
+    const intent = makeIntent({ endTime: undefined })
     const result = await rule.evaluate(intent, snapshot)
     expect(result.severity).toBe('pass')
   })
