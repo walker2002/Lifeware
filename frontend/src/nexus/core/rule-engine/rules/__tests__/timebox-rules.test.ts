@@ -200,3 +200,25 @@ describe('StartTimeInFutureRule', () => {
     expect(result.severity).toBe('pass')
   })
 })
+
+// [023.03] QA regression: status transition actions skip FieldCompletenessRule
+describe('FieldCompletenessRule — 状态转换 action 跳过字段检查', () => {
+  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
+
+  for (const action of transitionActions) {
+    it(`${action} 仅有 objectId 字段应当 pass（字段从 DB 加载）`, () => {
+      const result = FieldCompletenessRule.evaluate(
+        {
+          action,
+          targetDomain: 'timebox',
+          fields: { objectId: 'test-id' },
+          rawInput: '',
+          domain: 'timebox',
+          objectType: 'timebox',
+        } as any,
+        {} as any
+      )
+      expect(result.severity).toBe('pass')
+    })
+  }
+})
