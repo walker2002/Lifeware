@@ -216,7 +216,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   }, [initialDetailId, hook.objectives, detailData, handleSelect])
 
   return (
-    <>
+    <div className={`${standalone ? "h-full flex flex-col" : "absolute inset-0 flex flex-col"}`}>
       {/* [023.03] 补：顶部图片 Banner（domainId='okrs' 匹配 '/banner-OKRs1.png' /
           '/banner-OKRs2.png'，可折叠）。原 'standalone' 模式只显示 h1 标题行；
           改为统一显示 PageBanner，h1 标题去除（与 [023.03] UI 规范一致：
@@ -224,11 +224,11 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
       <PageBanner domainId="okrs" title="OKR 工作台" />
       {/* [024.1] B5：AppShell 路径用 absolute inset-0 绕过 Chromium 顽固 bug——
         被 stretch 的 flex item 的子元素 height:%/flex-basis:% 不解析为确定高度
-        （overflow-hidden + h-full + 去 flex-col 组合都救不了）。main 是 relative，
-        absolute inset-0 直接填满 main (712px)，彻底绕开 flex 百分比解析。standalone
-        路径保留 flex flex-1 min-h-0（父级是 explicit h-screen flex-col，无此 bug，
-        且有 header 兄弟需取剩余高度，h-full 会重叠 header）。 */}
-      <div ref={containerRef} className={`${standalone ? "flex flex-1 min-h-0" : "absolute inset-0 flex"}`}>
+        （main 是 relative，absolute inset-0 直接填满 main 区域）。
+        [023.03] 修复 PageBanner 重叠：外层改为 flex-col 容器，PageBanner 自然在
+        顶部，directory+panel 在 flex-1 min-h-0 区域（B5 仍用 absolute inset-0
+        取高度，但内部用 flex-col 排版而非 row 覆盖全父）。 */}
+      <div ref={containerRef} className="flex flex-1 min-h-0">
       <div
         className="shrink-0 overflow-y-auto min-h-0 lw-scrollbar-thin"
         style={{ width: leftWidth }}
@@ -290,6 +290,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
           />
         )}
       </div>
+      </div>
       <OKRImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
@@ -316,7 +317,6 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
-    </>
+    </div>
   )
 }
