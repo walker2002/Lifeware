@@ -81,4 +81,58 @@ describe('[023.04] TimeOverlapRule — endTime-based', () => {
     }), snapshot)
     expect(r.severity).toBe('pass')
   })
+
+  it('endTime 与 running timebox 重叠 → confirm', async () => {
+    const rule = createTimeOverlapRule(mockRepo([
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '进行中', status: 'running' },
+    ]), userId as any)
+    const r = await rule.evaluate(intent({
+      startTime: '2026-07-04T09:30:00Z',
+      endTime: '2026-07-04T10:30:00Z',
+    }), snapshot)
+    expect(r.severity).toBe('confirm')
+    if (r.severity !== 'pass') {
+      expect(r.message).toContain('进行中')
+    } else {
+      throw new Error('expected confirm, got pass')
+    }
+  })
+
+  it('endTime 与 overtime timebox 重叠 → confirm', async () => {
+    const rule = createTimeOverlapRule(mockRepo([
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '超时', status: 'overtime' },
+    ]), userId as any)
+    const r = await rule.evaluate(intent({
+      startTime: '2026-07-04T09:30:00Z',
+      endTime: '2026-07-04T10:30:00Z',
+    }), snapshot)
+    expect(r.severity).toBe('confirm')
+    if (r.severity !== 'pass') {
+      expect(r.message).toContain('超时')
+    } else {
+      throw new Error('expected confirm, got pass')
+    }
+  })
+
+  it('endTime 格式非法 → pass（由 StartTimeInFutureRule 负责）', async () => {
+    const rule = createTimeOverlapRule(mockRepo([
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: 'A', status: 'planned' },
+    ]), userId as any)
+    const r = await rule.evaluate(intent({
+      startTime: '2026-07-04T09:00:00Z',
+      endTime: '不是合法时间',
+    }), snapshot)
+    expect(r.severity).toBe('pass')
+  })
+
+  it('endTime<=startTime → pass（由 EndTimeAfterStartRule 负责）', async () => {
+    const rule = createTimeOverlapRule(mockRepo([
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: 'A', status: 'planned' },
+    ]), userId as any)
+    const r = await rule.evaluate(intent({
+      startTime: '2026-07-04T10:00:00Z',
+      endTime: '2026-07-04T09:00:00Z',
+    }), snapshot)
+    expect(r.severity).toBe('pass')
+  })
 })
