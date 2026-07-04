@@ -15,7 +15,7 @@ import { createTimeboxHooks } from './hooks'
 import { cnuiRegistry } from '@/nexus/ai-runtime/cnui/registry'
 import { TimeboxList } from './cnui/surfaces/TimeboxList'
 import { CreateTimebox } from './cnui/surfaces/CreateTimebox'
-import { AdjustSchedule } from './cnui/surfaces/AdjustSchedule'
+import { AdjustTimeboxes } from './cnui/surfaces/AdjustTimeboxes'
 import { LogTimebox } from './cnui/surfaces/LogTimebox'
 // [023.04] T6 — editTimeboxes CNUI surface（按 K-block 集中编辑多个 timebox）
 import { EditTimeboxes } from './cnui/surfaces/EditTimeboxes'
@@ -38,8 +38,8 @@ cnuiRegistry.register('timebox', 'create-timebox', {
 })
 
 // [023] A2.6 — adjustSchedule CNUI surface（按时间序列左右翻页，diff 提交）
-cnuiRegistry.register('timebox', 'adjust-schedule', {
-  component: AdjustSchedule,
+cnuiRegistry.register('timebox', 'adjust-timeboxes', {
+  component: AdjustTimeboxes,
   handlerModulePath,
 })
 

@@ -1,6 +1,6 @@
 /**
- * @file adjust-schedule
- * @brief 调整日程 CNUI surface（[023] A2，[019.1] 手写范式）
+ * @file adjust-timeboxes
+ * @brief 调整时间盒 CNUI surface（[023] A2，[019.1] 手写范式）
  *
  * AI 助手解析多条 timebox 草稿后展示：按时间序列列当日 timebox，左右切换当前
  * 编辑项，可改 title/startTime/endTime，或勾选「取消此时间盒」。提交时仅
@@ -26,7 +26,7 @@ interface AdjustItem {
   _origEnd?: string
 }
 
-interface AdjustScheduleProps {
+interface AdjustTimeboxesProps {
   surfaceType: string
   dataModel: Record<string, unknown>
   onDataChange: (d: Record<string, unknown>) => void
@@ -36,7 +36,7 @@ interface AdjustScheduleProps {
   isDone?: boolean
 }
 
-export function AdjustSchedule({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: AdjustScheduleProps) {
+export function AdjustTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: AdjustTimeboxesProps) {
   const items = ((dataModel.items as AdjustItem[]) ?? [])
     .slice()
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -55,7 +55,7 @@ export function AdjustSchedule({ dataModel, onDataChange, onConfirm, onCancel, i
   return (
     <>
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-ink">调整日程 ({page + 1}/{items.length})</span>
+        <span className="text-sm font-medium text-ink">调整时间盒 ({page + 1}/{items.length})</span>
         {items.length > 1 && (
           <div className="flex items-center gap-1.5">
             <button type="button" disabled={page <= 0} onClick={() => setPage((p) => p - 1)} className="flex size-5 items-center justify-center rounded border border-hairline bg-canvas text-xs text-ink disabled:opacity-40">‹</button>
