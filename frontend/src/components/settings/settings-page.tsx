@@ -1,42 +1,77 @@
 /**
  * @file settings-page
  * @brief 设置页面组件
- * 
- * 提供通用、LLM、时区和习惯模板的设置功能
+ *
+ * 提供通用、LLM、时区和活动原型的设置功能。
+ * 习惯模板分区已废弃（[023] A3.3 硬删 habit_templates 表），由活动原型配置取代。
+ *
+ * 「活动原型」分区：客户端按需拉取 + 内联 ArchetypeTable，
+ * 不再跳转 /config/activity-archetypes 全屏页。左右栏布局保持，
+ * 列表受右栏 `flex-1 overflow-y-auto` 约束，不覆盖整个屏幕。
  */
 
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LLMSettings } from "./llm-settings"
 import { TimezonePicker } from "./timezone-picker"
+import { ArchetypeTable } from "@/app/config/activity-archetypes/archetype-table"
+import { getArchetypes } from "@/app/actions/activity-archetype"
 import { setTraceConfig, getTraceConfig } from "@/lib/config/trace-config"
+import type { ActivityArchetype } from "@/usom/activity-archetype/types"
 
 /**
  * 设置分区类型
  */
-type SettingsSection = 'general' | 'llm' | 'timezone' | 'templates'
+type SettingsSection = 'general' | 'llm' | 'timezone' | 'archetypes'
 
 /**
  * SettingsPage 组件属性
  */
 interface SettingsPageProps {
-  /** 模板管理回调 */
-  onTemplateManage?: () => void
   /** 初始分区 */
-  initialSection?: 'general' | 'llm' | 'timezone' | 'templates'
+  initialSection?: 'general' | 'llm' | 'timezone' | 'archetypes'
 }
 
 const NAV_ITEMS: { key: SettingsSection; label: string }[] = [
   { key: 'general', label: '通用' },
   { key: 'llm', label: 'LLM' },
   { key: 'timezone', label: '时区' },
-  { key: 'templates', label: '习惯模板' },
+  { key: 'archetypes', label: '活动原型' },
 ]
 
-export function SettingsPage({ onTemplateManage, initialSection }: SettingsPageProps) {
+export function SettingsPage({ initialSection }: SettingsPageProps) {
   const [section, setSection] = useState<SettingsSection>(initialSection ?? 'general')
   const [traceEnabled, setTraceEnabled] = useState(() => getTraceConfig().enabled)
+
+  // ─── 活动原型：mount 时一次预拉（loading 初值=true，避免 effect 内同步 setState） ─
+  const [archetypes, setArchetypes] = useState<ActivityArchetype[]>([])
+  const [archetypesLoading, setArchetypesLoading] = useState(true)
+  const [archetypesError, setArchetypesError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getArchetypes()
+      .then((r) => {
+        if (cancelled) return
+        if (r.success && r.data) {
+          setArchetypes(r.data)
+        } else {
+          setArchetypesError(r.error ?? '加载活动原型失败')
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setArchetypesError(err instanceof Error ? err.message : '加载活动原型失败')
+      })
+      .finally(() => {
+        if (cancelled) return
+        setArchetypesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleTraceToggle = () => {
     const next = !traceEnabled
@@ -86,12 +121,20 @@ export function SettingsPage({ onTemplateManage, initialSection }: SettingsPageP
         )}
         {section === 'llm' && <LLMSettings />}
         {section === 'timezone' && <TimezonePicker />}
-        {section === 'templates' && (
-          <div>
-            <p className="mb-3 text-sm text-body">管理习惯模板</p>
-            <button type="button" onClick={onTemplateManage} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
-              打开模板管理
-            </button>
+        {section === 'archetypes' && (
+          <div className="space-y-3">
+            <p className="text-sm text-body">
+              管理跨域共享的活动原型词典（4 维能量消耗 + 6 维执行特征）。
+            </p>
+            {archetypesLoading && (
+              <p className="text-sm text-body/60">加载中…</p>
+            )}
+            {archetypesError && (
+              <p className="text-sm text-error">{archetypesError}</p>
+            )}
+            {!archetypesLoading && !archetypesError && (
+              <ArchetypeTable initialData={archetypes} />
+            )}
           </div>
         )}
       </div>

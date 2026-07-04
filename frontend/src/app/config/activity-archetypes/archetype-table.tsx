@@ -211,7 +211,7 @@ export function ArchetypeTable({ initialData }: ArchetypeTableProps) {
 
       {/* 分组表格 */}
       {list.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
+        <Card className="p-8 text-center text-muted-foreground border-hairline-soft">
           暂无 Archetype。点击「导入默认词典」快速开始，或「新增 Archetype」自定义条目。
         </Card>
       ) : (
@@ -220,7 +220,7 @@ export function ArchetypeTable({ initialData }: ArchetypeTableProps) {
             const rows = grouped.get(l1) ?? [];
             if (rows.length === 0) return null;
             return (
-              <Card key={l1} className="p-4 space-y-3">
+              <Card key={l1} className="p-4 space-y-3 border-hairline-soft">
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-semibold text-ink">{l1}</h2>
                   <Badge variant="secondary">{rows.length}</Badge>
