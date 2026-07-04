@@ -1,22 +1,41 @@
 /**
  * @file timebox-template-editor
- * @brief 时间盒模板编辑器（[023] A2，配置类，7 段生存时间 + pull 订阅）
+ * @brief 时间盒模板编辑器（[023-02] 行列表 + 模板级星期 + Sheet 抽屉）
  *
- * 列表 + 新建/编辑模态。CRUD 经 app/actions/timebox-templates（server action）。
- * 订阅源懒加载。配色用 CSS 变量令牌（§14 C-04）。
+ * 列表（TemplateCard 网格）+ Sheet 抽屉编辑。CRUD 经 app/actions/timebox-templates。
+ * 订阅源懒加载（fire-and-forget + 1min cache 命中）；首次打开编辑时拉取。
+ * 配色用 CSS 变量令牌（UI-DESIGN-SPEC §14 C-04）。
  *
- * 设计令牌约定（[024.1] Design Patch）：
- * - bg-surface-card 替代 bg-muted
- * - Loader2 替换「保存中…」文本（§6.7）
- * - 删除用 AlertDialog 二次确认
+ * 设计令牌约定（[024.1]）：
+ * - bg-canvas / border-hairline（卡片）
+ * - Loader2 替换「保存中…」（§6.7）
+ * - AlertDialog 二次确认
+ *
+ * 数据流 ASCII（A.3）：
+ *   PageBanner
+ *     └─► TemplateCard 网格（width 自适应，1/2/3 列）
+ *           └─► 点击「编辑」onEdit() 触发：
+ *                 ├─► ensureSources() [fire-and-forget, 1 min cache]
+ *                 │     └─► fetchSubscriptionSources (server action)
+ *                 │           └─► setSources({habits, tasks, threads})
+ *                 └─► setEditing(template) → Sheet.open = true
+ *                       └─► TemplateEditForm (独立组件，见 ./template-edit-form)
+ *                             ├─► onChange={(t) => setEditing(t)} → setState 全模板引用替换
+ *                             ├─► 行内 onChange → updateRow(id, patch) → setState 新 rows 数组
+ *                             ├─► 来源下拉 changeRowSource(id, source, sourceId?) → resolve from sources
+ *                             └─► onSave → saveTimeboxTemplate → repo.create/update → 乐观 setTemplates → setEditing(null)
+ *
+ * KEEP IN SYNC：DEFAULT_SEGMENT_SEED（行 seed 7 段数据）见
+ * lib/template-row-helpers.ts:DEFAULT_SEGMENT_SEED（B.3）。
  */
 'use client'
 
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2, LayoutTemplate } from 'lucide-react'
+import { Plus, LayoutTemplate, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
+import { PageBanner } from '@/components/layout/page-banner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,79 +47,49 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { TemplateCard } from '@/domains/timebox/components/template-card'
+import { TemplateEditForm } from '@/domains/timebox/components/template-edit-form'
 import {
   saveTimeboxTemplate,
   deleteTimeboxTemplate,
   fetchSubscriptionSources,
+  type SubscriptionSources,
 } from '@/app/actions/timebox-templates'
 import type { TimeboxTemplate } from '@/lib/db/repositories/timebox-template'
-
-/** 7 段生存时间（锁，参 design §2.1；新增/编辑按此顺序渲染） */
-const SEGMENTS: { key: string; label: string }[] = [
-  { key: 'wake', label: '起床' },
-  { key: 'morning', label: '晨间' },
-  { key: 'workAm', label: '上午上班' },
-  { key: 'noon', label: '午间' },
-  { key: 'workPm', label: '下午上班' },
-  { key: 'evening', label: '晚间' },
-  { key: 'sleep', label: '睡眠' },
-]
-
-/** 订阅源条目（habits/tasks/threads 共用） */
-interface SourceItem {
-  id: string
-  title: string
-}
-
-interface SourcesState {
-  habits: SourceItem[]
-  tasks: SourceItem[]
-  threads: SourceItem[]
-}
+import { seedTemplateRows } from '@/domains/timebox/lib/template-row-helpers'
 
 interface EditorProps {
   initialTemplates: TimeboxTemplate[]
 }
 
-/** 默认空白模板 */
+/** 默认空白模板（编辑器新建入口用）：name='' + 全周 + 0 行；调用方负责补 seed rows */
 function blankTemplate(): TimeboxTemplate {
-  const survivalSegments = Object.fromEntries(
-    SEGMENTS.map((s) => [s.key, { start: '09:00', end: '10:00' }]),
-  ) as Record<string, { start: string; end: string }>
   return {
     id: '' as TimeboxTemplate['id'],
     userId: '' as TimeboxTemplate['userId'],
     schemaVersion: 1,
     name: '',
-    survivalSegments,
-    subscribedHabits: [],
-    subscribedTasks: [],
-    subscribedThreads: [],
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    rows: [],
     createdAt: '',
     updatedAt: '',
   }
 }
 
-/** 切换某集合中 id 的订阅状态 */
-function toggleId(list: string[] | undefined, id: string): string[] {
-  const arr = list ?? []
-  return arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]
-}
-
 export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
   const [templates, setTemplates] = useState<TimeboxTemplate[]>(initialTemplates)
   const [editing, setEditing] = useState<TimeboxTemplate | null>(null)
-  const [sources, setSources] = useState<SourcesState>({ habits: [], tasks: [], threads: [] })
+  const [sources, setSources] = useState<SubscriptionSources | null>(null)
   const [sourcesLoaded, setSourcesLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
-  /** 懒加载订阅源（仅首次打开编辑时拉取） */
+  /** 懒加载订阅源（仅首次打开编辑时拉取；server action 端有 1min cache） */
   const ensureSources = useCallback(async () => {
     if (sourcesLoaded) return
     const r = await fetchSubscriptionSources()
@@ -113,7 +102,7 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
   }, [sourcesLoaded])
 
   // ─── 保存 ────────────────────────────────────────────────────
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     if (!editing) return
     if (!editing.name.trim()) {
       toast.error('请输入模板名称')
@@ -123,10 +112,8 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
     try {
       const input = {
         name: editing.name.trim(),
-        survivalSegments: editing.survivalSegments,
-        subscribedHabits: editing.subscribedHabits,
-        subscribedTasks: editing.subscribedTasks,
-        subscribedThreads: editing.subscribedThreads,
+        daysOfWeek: editing.daysOfWeek,
+        rows: editing.rows,
       }
       const r = await saveTimeboxTemplate(
         editing.id ? { id: editing.id, ...input } : input,
@@ -137,13 +124,11 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
       }
       toast.success('模板已保存')
       if (r.data) {
+        const saved = r.data
         setTemplates((prev) => {
-          const exists = prev.some((t) => t.id === r.data!.id)
-          return exists ? prev.map((t) => (t.id === r.data!.id ? r.data! : t)) : [...prev, r.data!]
+          const exists = prev.some((t) => t.id === saved.id)
+          return exists ? prev.map((t) => (t.id === saved.id ? saved : t)) : [...prev, saved]
         })
-      } else {
-        // 退化路径：刷新本地列表兜底
-        setTemplates((prev) => [...prev])
       }
       setEditing(null)
     } catch (e) {
@@ -151,10 +136,10 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
     } finally {
       setSaving(false)
     }
-  }
+  }, [editing])
 
   // ─── 删除 ────────────────────────────────────────────────────
-  async function handleConfirmDelete() {
+  const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteId) return
     const r = await deleteTimeboxTemplate(pendingDeleteId)
     if (r.success) {
@@ -164,223 +149,80 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
       toast.error(r.error ?? '删除失败')
     }
     setPendingDeleteId(null)
-  }
+  }, [pendingDeleteId])
 
   const pendingDeleteTemplate = pendingDeleteId
     ? templates.find((t) => t.id === pendingDeleteId)
     : null
 
-  return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-3xl">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-base font-display text-ink">时间盒模板</h1>
-          <Button
-            size="sm"
-            onClick={() => {
-              void ensureSources()
-              setEditing(blankTemplate())
-            }}
-          >
-            <Plus className="size-4 mr-1" />
-            新建模板
-          </Button>
-        </div>
+  const openCreate = useCallback(() => {
+    void ensureSources()
+    setEditing({ ...blankTemplate(), rows: seedTemplateRows() })
+  }, [ensureSources])
 
-        {/* 列表 */}
+  const openEdit = useCallback((t: TimeboxTemplate) => {
+    void ensureSources()
+    // 深拷贝 rows，避免编辑时直接修改父 setTemplates 引用
+    setEditing({ ...t, rows: t.rows.map((r) => ({ ...r })) })
+  }, [ensureSources])
+
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      <PageBanner domainId="timebox" title="时间盒模板" />
+
+      <div className="flex items-center justify-between px-4">
+        <h1 className="text-base font-display text-ink">时间盒模板</h1>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="size-4 mr-1" />
+          新建模板
+        </Button>
+      </div>
+
+      {/* 列表：宽度自适应 1/2/3 列 */}
+      <div className="px-4 pb-6">
         {templates.length === 0 ? (
           <EmptyState
             icon={LayoutTemplate}
             title="还没有模板"
-            description="新建一个时间盒模板，定义 7 段生存时间与订阅源"
-            action={{ label: '新建模板', onClick: () => { void ensureSources(); setEditing(blankTemplate()) } }}
+            description="新建一个时间盒模板，定义应用范围与时间安排行"
+            action={{
+              label: '新建模板',
+              onClick: openCreate,
+            }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {templates.map((t) => (
-              <div
+              <TemplateCard
                 key={t.id}
-                className="rounded-md border border-hairline bg-surface-card p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-ink">
-                    {t.name || '未命名'}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        void ensureSources()
-                        setEditing({ ...t })
-                      }}
-                    >
-                      编辑
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-error hover:text-error"
-                      onClick={() => setPendingDeleteId(t.id)}
-                    >
-                      <Trash2 className="size-3 mr-1" />
-                      删除
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {SEGMENTS.map((s) => {
-                    const seg = (t.survivalSegments as Record<string, { start: string; end: string }>)[s.key]
-                    return (
-                      <span
-                        key={s.key}
-                        className="rounded bg-surface-card border border-hairline px-1.5 py-0.5 text-[10px] text-body"
-                      >
-                        {s.label} {seg?.start ?? '--:--'}–{seg?.end ?? '--:--'}
-                      </span>
-                    )
-                  })}
-                </div>
-                {(t.subscribedHabits.length > 0 ||
-                  t.subscribedTasks.length > 0 ||
-                  t.subscribedThreads.length > 0) && (
-                  <div className="mt-2 text-[10px] text-body">
-                    订阅：{t.subscribedHabits.length} 习惯 ·{' '}
-                    {t.subscribedTasks.length} 任务 · {t.subscribedThreads.length} 主线
-                  </div>
-                )}
-              </div>
+                template={t}
+                onEdit={() => openEdit(t)}
+                onDelete={() => setPendingDeleteId(t.id)}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* 编辑/新建 模态（[/review I6] 改用 Dialog 原语：自带 focus-trap/Esc/aria-modal/scroll-lock） */}
-      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null) }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing?.id ? '编辑模板' : '新建模板'}</DialogTitle>
-          </DialogHeader>
+      {/* 编辑/新建 抽屉（Sheet → 右滑出） */}
+      <Sheet open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null) }}>
+        <SheetContent side="right" className="sm:max-w-[560px] px-6 py-6 flex flex-col">
+          <SheetHeader>
+            <SheetTitle>{editing?.id ? '编辑模板' : '新建模板'}</SheetTitle>
+          </SheetHeader>
           {editing && (
-            <>
-
-            {/* 名称 */}
-            <input
-              value={editing.name}
-              placeholder="模板名称"
-              onChange={(e) =>
-                setEditing({ ...editing, name: e.target.value })
-              }
-              className="mb-4 h-8 w-full rounded-md border border-hairline bg-canvas px-2 text-sm text-ink"
+            <TemplateEditForm
+              key={editing.id || 'new'}
+              template={editing}
+              sources={sources}
+              onChange={setEditing}
+              onSave={() => { void handleSave() }}
+              onCancel={() => setEditing(null)}
+              saving={saving}
             />
-
-            {/* 7 段起止 */}
-            <div className="space-y-2 mb-4">
-              <p className="text-xs text-body mb-1">7 段生存时间</p>
-              {SEGMENTS.map((s) => {
-                const seg = editing.survivalSegments[s.key] ?? {
-                  start: '09:00',
-                  end: '10:00',
-                }
-                return (
-                  <div key={s.key} className="flex items-center gap-2">
-                    <span className="w-20 text-xs text-body">{s.label}</span>
-                    <input
-                      type="time"
-                      value={seg.start}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          survivalSegments: {
-                            ...editing.survivalSegments,
-                            [s.key]: { ...seg, start: e.target.value },
-                          },
-                        })
-                      }
-                      className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink"
-                    />
-                    <span className="text-xs text-body">—</span>
-                    <input
-                      type="time"
-                      value={seg.end}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          survivalSegments: {
-                            ...editing.survivalSegments,
-                            [s.key]: { ...seg, end: e.target.value },
-                          },
-                        })
-                      }
-                      className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink"
-                    />
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* 订阅源 chips */}
-            <SubscriptionChips
-              title="订阅习惯（多选）"
-              items={sources.habits}
-              selected={editing.subscribedHabits}
-              onToggle={(id) =>
-                setEditing({
-                  ...editing,
-                  subscribedHabits: toggleId(editing.subscribedHabits, id),
-                })
-              }
-            />
-            <SubscriptionChips
-              title="订阅任务（多选）"
-              items={sources.tasks}
-              selected={editing.subscribedTasks}
-              onToggle={(id) =>
-                setEditing({
-                  ...editing,
-                  subscribedTasks: toggleId(editing.subscribedTasks, id),
-                })
-              }
-            />
-            <SubscriptionChips
-              title="订阅主线（多选）"
-              items={sources.threads}
-              selected={editing.subscribedThreads}
-              onToggle={(id) =>
-                setEditing({
-                  ...editing,
-                  subscribedThreads: toggleId(editing.subscribedThreads, id),
-                })
-              }
-            />
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setEditing(null)}
-              >
-                取消
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={!editing.name.trim() || saving}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-1 size-3 animate-spin" />
-                    保存中
-                  </>
-                ) : (
-                  '保存'
-                )}
-              </Button>
-            </div>
-            </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* 删除确认 AlertDialog */}
       <AlertDialog
@@ -399,56 +241,15 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDelete}
+              onClick={() => { void handleConfirmDelete() }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              <Trash2 className="size-3 mr-1" />
               删除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  )
-}
-
-// ─── 订阅源 chips 子组件 ──────────────────────────────────────────
-function SubscriptionChips({
-  title,
-  items,
-  selected,
-  onToggle,
-}: {
-  title: string
-  items: SourceItem[]
-  selected: string[]
-  onToggle: (id: string) => void
-}) {
-  return (
-    <div className="mt-3">
-      <p className="mb-1 text-xs text-body">{title}</p>
-      {items.length === 0 ? (
-        <p className="text-[10px] text-body">暂无可订阅项</p>
-      ) : (
-        <div className="flex flex-wrap gap-1">
-          {items.map((it) => {
-            const isSelected = selected.includes(it.id)
-            return (
-              <button
-                key={it.id}
-                type="button"
-                onClick={() => onToggle(it.id)}
-                className={
-                  isSelected
-                    ? 'rounded px-2 py-0.5 text-xs bg-primary text-primary-foreground'
-                    : 'rounded px-2 py-0.5 text-xs bg-surface-card text-body border border-hairline'
-                }
-              >
-                {it.title}
-              </button>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
