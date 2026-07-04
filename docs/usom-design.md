@@ -1953,6 +1953,6 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_06_30*
+*文档版本：2026_07_04*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
