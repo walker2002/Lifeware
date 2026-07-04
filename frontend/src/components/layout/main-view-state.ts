@@ -7,6 +7,7 @@
  *   的 MainViewState 路径。
  * - type 字面量保留为 'schedule'（spec OQ 未决议，沿用最小变更原则）。
  *   内部语义 = "timeboxes workspace 视图"；URL 路由不再在此 type 中体现。
+ * - [023.05] 阶段 1：type 'schedule' 保留（view state 字面量，非 schedule 对象；schedule 对象阶段 2 引入）。
  * - 后续清理：可在 T5+ 跟进把 type 重命名为 'timeboxes'，但需协调
  *   appShell.currentViewType / handleHomeClick 等引用方。
  */

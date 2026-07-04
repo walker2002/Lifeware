@@ -13,7 +13,7 @@
  * 命名约定：Component key 与 intent_trigger.action 一致（camelCase），保持
  * 单一来源以避免 manifest 与路由表双向漂移。
  *
- * 例外：timebox.viewSchedule 不走本表 —— 它在 use-intent-handler.handleGrowthAction
+ * 例外：timebox.viewTimeboxes 不走本表 —— 它在 use-intent-handler.handleGrowthAction
  *   里被前置特判：setMainViewState({type:'schedule', date, viewMode})，让主页主显示
  *   区复用 TimeboxesWorkspace（保留三栏 AppShell + 左 AI 面板）。manifest view_route
  *   /timeboxes 仅用于浏览器直接 URL 访问，不作为菜单入口跳转目标。

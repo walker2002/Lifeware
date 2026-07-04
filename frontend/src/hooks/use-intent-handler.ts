@@ -280,12 +280,12 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
       // 非 CNUI action：通过 Server Action 检查响应类型
       const { responseType } = await getActionResponse(domainId, action)
 
-      // [fix] viewSchedule 特殊入口：切到主显示区的 schedule 视图（TimeboxesWorkspace）
+      // [fix] viewTimeboxes 特殊入口：切到主显示区的 schedule 视图（TimeboxesWorkspace）
       // 而不是 ActionView —— 保留 AppShell 三栏 + 左 AI 面板，仅主显示区更新。
       // 与 manifest view_route /timeboxes（独立 route）共存：URL 直访走 /timeboxes，
       // 菜单/GrowthMenu/slash 走主显示区。viewMode 默认 'day'（与 handleHomeClick 一致）；
       // 若需保留用户上次视图模式，可在 IntentHandlerDeps 加 dateMode 后再切。
-      if (domainId === 'timebox' && action === 'viewSchedule') {
+      if (domainId === 'timebox' && action === 'viewTimeboxes') {
         setMainViewState({ type: 'schedule', date: new Date(), viewMode: 'day' })
         return
       }
