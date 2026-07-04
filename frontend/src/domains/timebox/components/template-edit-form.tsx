@@ -10,6 +10,7 @@
  * - B.1：所有「来源」<select> 在 sources === null 时禁用，避免 fire-and-forget
  *   竞态导致用户切到 habit 看到空下拉。
  * - B.2：行按用户编辑顺序展示（template.rows 直接渲染），不调 sortRowsByStart；
+ *   [2026-07-04 用户调整] 改为按 start 时间排序展示，每次新增/修改行后自动重排
  *   TemplateCard 仍排序用于展示。
  * - B.3：DEFAULT_SEGMENT_SEED 单点维护见 lib/template-row-helpers.ts:DEFAULT_SEGMENT_SEED。
  * - D.1：行编辑器抽为 RowEditor 子组件，React.memo 包裹；name 输入变化时不会
@@ -39,6 +40,7 @@ import type { TemplateRow, TemplateRowSource } from '@/lib/db/schema'
 import {
   WEEKDAY_LABELS,
   newEmptyRow,
+  sortRowsByStart,
 } from '@/domains/timebox/lib/template-row-helpers'
 import type { SubscriptionSources } from '@/app/actions/timebox-templates'
 
@@ -311,7 +313,7 @@ export function TemplateEditForm({
           <p className="text-xs text-muted-foreground">暂无行，点击「新增一行」开始添加</p>
         )}
 
-        {template.rows.map((r) => (
+        {sortRowsByStart(template.rows).map((r) => (
           <RowEditor
             key={r.id}
             row={r}

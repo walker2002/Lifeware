@@ -25,7 +25,7 @@ interface TemplateCardProps {
   onDelete: () => void
 }
 
-const MAX_VISIBLE_ROWS = 4
+const MAX_VISIBLE_ROWS = 10
 
 export function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
   const sorted = useMemo(() => sortRowsByStart(template.rows), [template.rows])

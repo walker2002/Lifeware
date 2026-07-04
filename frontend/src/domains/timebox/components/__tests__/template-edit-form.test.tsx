@@ -318,10 +318,10 @@ describe('TemplateEditForm — save / cancel 回调', () => {
   })
 })
 
-// ─── 行编辑顺序保持（B.2）─────────────────────────────────────
+// ─── 行按 start 时间排序展示（2026-07-04 用户调整）────────────────
 
-describe('TemplateEditForm — 行编辑顺序保持（B.2）', () => {
-  it('按用户编辑顺序展示（不排序），与 template.rows 顺序一致', () => {
+describe('TemplateEditForm — 行按 start 排序展示', () => {
+  it('按 start 升序展示，与 template.rows 输入顺序无关', () => {
     const tpl = makeTemplate({
       rows: [
         { id: 'late',  activityName: '晚间', start: '21:00', end: '22:00', source: 'custom' },
@@ -335,26 +335,26 @@ describe('TemplateEditForm — 行编辑顺序保持（B.2）', () => {
       container.querySelectorAll('div.flex.flex-col.gap-1.rounded.border'),
     )
     expect(rowContainers).toHaveLength(3)
-    // 验证每行的 activityName 顺序与 template.rows 顺序一致
+    // 验证每行的 activityName 按 start 升序：晨间 07:30 → 午间 12:00 → 晚间 21:00
     expect(
       (rowContainers[0]!.querySelector('input[aria-label="活动名称"]') as HTMLInputElement)?.value,
-    ).toBe('晚间')
+    ).toBe('晨间')
     expect(
       (rowContainers[1]!.querySelector('input[aria-label="活动名称"]') as HTMLInputElement)?.value,
     ).toBe('午间')
     expect(
       (rowContainers[2]!.querySelector('input[aria-label="活动名称"]') as HTMLInputElement)?.value,
-    ).toBe('晨间')
-    // start time 也按相同顺序（21:00 → 12:00 → 07:30，B.2 不排序）
+    ).toBe('晚间')
+    // start time 也按升序
     expect(
       (rowContainers[0]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
-    ).toBe('21:00')
+    ).toBe('07:30')
     expect(
       (rowContainers[1]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
     ).toBe('12:00')
     expect(
       (rowContainers[2]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
-    ).toBe('07:30')
+    ).toBe('21:00')
   })
 })
 

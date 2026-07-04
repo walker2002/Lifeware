@@ -21,6 +21,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_04 — [023-02 用户调整] 列表卡片 `MAX_VISIBLE_ROWS` 4→10；编辑器 grid `1/2/3` → `1/2/3/4/5` 列（窄卡片 + 加列）；`TemplateEditForm` 改为按 `start` 升序展示行（每次 setState 自动重排）；修订 [023-02 决议 B.2]。
 - 2026_07_04 — [023-02] §3.12 TimeboxTemplate 改写：`survivalSegments`(7键) + `subscribedHabits/Tasks/Threads` 三数组 → `daysOfWeek`(模板级星期数组) + `rows`(有序行列表，`source ∈ {habit, task, thread, custom}`)。A3 owner-check 改为遍历 rows 收集 sourceId。
 - 2026_07_03 — [026] Itinerary A3 ship：4 action（create/edit/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile + /schedule 锁定合并；ItineraryWorkspace inline Sheet drawer 触发 createItinerary（替换 T12 hash 死链 → T14 I-1 修复）；GrowthMenu 4 intent_trigger 自动归"timebox"组（registry 自动分组，零代码改动）；§3.13 / §4.X 已完整覆盖
 - 2026_07_03 — [026] Itinerary 对象（D2 reversal）：5 态存储 + lazy reconcile + 4 transition 时间戳（A1 进行中）

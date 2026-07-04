@@ -62,7 +62,7 @@ describe('TemplateCard', () => {
     expect(screen.queryByText(/还有/)).not.toBeInTheDocument()
   })
 
-  it('行数 > 4 时应截断 + 显示「还有 N 条」', () => {
+  it('行数 > 10 时应截断 + 显示「还有 N 条」', () => {
     const t = {
       ...baseTemplate,
       rows: [
@@ -72,15 +72,22 @@ describe('TemplateCard', () => {
         { id: '4', activityName: 'D', start: '07:00', end: '08:00', source: 'custom' as const },
         { id: '5', activityName: 'E', start: '09:00', end: '10:00', source: 'custom' as const },
         { id: '6', activityName: 'F', start: '11:00', end: '12:00', source: 'custom' as const },
+        { id: '7', activityName: 'G', start: '13:00', end: '14:00', source: 'custom' as const },
+        { id: '8', activityName: 'H', start: '15:00', end: '16:00', source: 'custom' as const },
+        { id: '9', activityName: 'I', start: '17:00', end: '18:00', source: 'custom' as const },
+        { id: '10', activityName: 'J', start: '19:00', end: '20:00', source: 'custom' as const },
+        { id: '11', activityName: 'K', start: '21:00', end: '22:00', source: 'custom' as const },
+        { id: '12', activityName: 'L', start: '23:00', end: '23:59', source: 'custom' as const },
       ],
     }
     render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.getByText('还有 2 条')).toBeInTheDocument()
-    // 前 4 条可见
+    // 前 10 条可见（A..J）
     expect(screen.getByText(/A/)).toBeInTheDocument()
-    expect(screen.getByText(/D/)).toBeInTheDocument()
+    expect(screen.getByText(/J/)).toBeInTheDocument()
     // 后 2 条不在静态文本中（被 Popover 包裹）
-    expect(screen.queryByText('11:00')).not.toBeInTheDocument()
+    expect(screen.queryByText('21:00')).not.toBeInTheDocument()
+    expect(screen.queryByText('23:00')).not.toBeInTheDocument()
   })
 
   it('行按 start 升序显示', () => {
@@ -124,23 +131,29 @@ describe('TemplateCard', () => {
         { id: '4', activityName: 'Delta', start: '07:00', end: '08:00', source: 'custom' as const },
         { id: '5', activityName: 'Epsilon', start: '09:00', end: '10:00', source: 'custom' as const },
         { id: '6', activityName: 'Zeta', start: '11:00', end: '12:00', source: 'custom' as const },
+        { id: '7', activityName: 'Eta', start: '13:00', end: '14:00', source: 'custom' as const },
+        { id: '8', activityName: 'Theta', start: '15:00', end: '16:00', source: 'custom' as const },
+        { id: '9', activityName: 'Iota', start: '17:00', end: '18:00', source: 'custom' as const },
+        { id: '10', activityName: 'Kappa', start: '19:00', end: '20:00', source: 'custom' as const },
+        { id: '11', activityName: 'Lambda', start: '21:00', end: '22:00', source: 'custom' as const },
+        { id: '12', activityName: 'Mu', start: '23:00', end: '23:59', source: 'custom' as const },
       ],
     }
     render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)
 
-    // 初始：前 4 条可见（按 start 升序为 Alpha/Beta/Gamma/Delta）；Epsilon、Zeta 不在主 DOM
-    expect(screen.queryByText('11:00')).not.toBeInTheDocument()
-    expect(screen.queryByText('09:00')).not.toBeInTheDocument()
+    // 初始：前 10 条可见（按 start 升序为 Alpha..Kappa）；Lambda、Mu 不在主 DOM
+    expect(screen.queryByText('21:00')).not.toBeInTheDocument()
+    expect(screen.queryByText('23:00')).not.toBeInTheDocument()
 
     // 打开 popover
     const trigger = screen.getByRole('button', { name: /还有 2 条/ })
     await user.click(trigger)
 
-    // 完整 6 行应全部在 document 中（popover 内容）
-    // Epsilon/Zeta 仅在 popover 内可见；Alpha/Beta/Gamma/Delta 同时在主区可见 → 用 getAllByText
-    expect(screen.getByText(/^09:00.*Epsilon$/)).toBeInTheDocument()
-    expect(screen.getByText(/^11:00.*Zeta$/)).toBeInTheDocument()
-    // 限定到 popover 内容，确保 Epsilon / Zeta 真在 popover 中
+    // 完整 12 行应全部在 document 中（popover 内容）
+    // Lambda/Mu 仅在 popover 内可见 → 用 getByText 限定 popover
+    expect(screen.getByText(/^21:00.*Lambda$/)).toBeInTheDocument()
+    expect(screen.getByText(/^23:00.*Mu$/)).toBeInTheDocument()
+    // 限定到 popover 内容，确保 Lambda / Mu 真在 popover 中
     const popover = screen.getByRole('dialog')
     const withinPopover = within(popover)
     expect(withinPopover.getByText(/Epsilon/)).toBeInTheDocument()
