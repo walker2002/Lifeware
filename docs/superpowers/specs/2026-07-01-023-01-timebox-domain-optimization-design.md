@@ -266,3 +266,13 @@ export function getActionDescription(domainId: string, action: string): string {
 ## 8. 后续（plan 输入）
 
 按 Section 1 → T0(复现) → Section 2 → Section 3 → Section 4 顺序，每段独立可验证。Section 2 的精确修复在 T0 后填充。
+
+---
+
+## [023.04] 状态更新
+
+[023.04] 已闭合本 spec §3.5 验证项「多条 draft 左右翻页」之外的**时间重叠**遗留债：
+
+- 客户端预检：`assertNoInternalOverlap` 纯函数
+- 服务端兜底：`timebox-overlap` rule 改读 endTime + status-aware severity
+- SSOT：[023.04] 设计文档 `2026-07-04-023-04-timebox-cnui-optimization-design.md`
