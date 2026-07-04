@@ -14,7 +14,9 @@ vi.mock('@/domains/timebox/repository', () => ({
       return [
         {
           id: 'timebox-1',
-          title: '晨间阅读',
+          // [023.04]：title 设为「晨会」以便 brief 的 prompt 「把晨会改到 10 点」命中
+          //   （parser matchByKeyword 用 input.includes(tb.title) 全子串匹配）
+          title: '晨会',
           startTime: '2026-05-29T06:00:00Z',
           endTime: '2026-05-29T07:00:00Z',
           status: 'planned',
@@ -316,5 +318,114 @@ describe('timeboxCnuiHandler', () => {
   describe('错误处理', () => {
     // 注意：错误处理测试需要更复杂的 mock 设置，暂时跳过
     it.todo('repository 查询失败时应返回空数组')
+  })
+
+  describe('open - editTimeboxes（[023.04]）', () => {
+    // [023.04]：解析优先模式；解析成功 → editing + prefill；失败 → selecting + items
+    it('解析成功（命中「晨会」）→ mode=editing + selectedId=timebox-1 + status=planned', async () => {
+      const result = await timeboxCnuiHandler.open('editTimeboxes', {
+        prompt: '把晨会改到 10 点',
+      })
+      expect(result.dataSnapshot.mode).toBe('editing')
+      expect(result.dataSnapshot.selectedId).toBe('timebox-1')  // mock 中只有这一条 title「晨间阅读」含「晨」
+      expect(result.dataSnapshot.status).toBe('planned')
+      // prefill 应含 base 字段（title/startTime/endTime）+ 解析出的新时间
+      const prefill = result.dataSnapshot.prefill as Record<string, unknown>
+      expect(prefill.title).toBe('晨会')
+      expect(prefill.startTime).toBeTruthy()
+      expect(prefill.endTime).toBeTruthy()
+    })
+
+    it('解析失败 → mode=selecting + items=当日列表（mock）', async () => {
+      const result = await timeboxCnuiHandler.open('editTimeboxes', {
+        prompt: '今天能不能看一下我的会议',  // 不含修改/取消动作词
+      })
+      expect(result.dataSnapshot.mode).toBe('selecting')
+      const items = result.dataSnapshot.items as Array<{ id: string }>
+      expect(items.length).toBeGreaterThan(0)
+    })
+
+    // [T-eng-8] race safe-default：open 当 parsed.timeboxId 不在 todayBoxes 时，
+    // silent fallback selecting（不 crash）。T-eng-R test 决议 +1 case
+    it('T-eng-8 race safe-default：解析命中但 timeboxId 不在 todayBoxes → silent fallback selecting', async () => {
+      // 解析依赖 mock timebox-1「晨间阅读」，prompt「把晨会改到 10 点」会匹配 title「晨间阅读」含「晨」
+      // 但若 todayBoxes 为空（mock 返回空数组），应降级 selecting 而非 crash
+      vi.doMock('@/domains/timebox/repository', () => ({
+        TimeboxRepository: class {
+          async findByDateRange() { return [] }
+        },
+        ItineraryRepository: class {
+          async findActive() { return [] }
+        },
+      }))
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const result = await mod.timeboxCnuiHandler.open('editTimeboxes', {
+        prompt: '把晨会改到 10 点',
+      })
+      // 解析可能命中但 todayBoxes 空 → safe fallback
+      expect(result.dataSnapshot.mode).toBe('selecting')
+      expect(result.content).toBeTruthy()
+    })
+  })
+
+  describe('submit - editTimeboxes（[023.04]）', () => {
+    // [023.04]：直调 updateTimebox / deleteTimebox
+    // OV#8：service throw 必须 try/catch 透传为 surface error
+    it('operation=update → 调 updateTimebox 服务（直调，不走 submitDynamicIntent）', async () => {
+      const updateTimebox = vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb1' } })
+      vi.doMock('@/app/actions/timebox', () => ({ updateTimebox, deleteTimebox: vi.fn() }))
+      // 动态 re-import handler 以让 mock 生效（handler 是 await import 形式）
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const result = await mod.timeboxCnuiHandler.submit('editTimeboxes', {
+        operation: 'update',
+        selectedId: 'tb1',
+        fields: { title: '新标题', startTime: '2026-07-04T10:00:00Z', endTime: '2026-07-04T11:00:00Z' },
+      })
+      expect(updateTimebox).toHaveBeenCalledWith('tb1', expect.objectContaining({ title: '新标题' }))
+      expect(result.success).toBe(true)
+    })
+
+    it('operation=delete → 调 deleteTimebox 服务', async () => {
+      const deleteTimebox = vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb1' } })
+      vi.doMock('@/app/actions/timebox', () => ({ updateTimebox: vi.fn(), deleteTimebox }))
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const result = await mod.timeboxCnuiHandler.submit('editTimeboxes', {
+        operation: 'delete',
+        selectedId: 'tb1',
+      })
+      expect(deleteTimebox).toHaveBeenCalledWith('tb1')
+      expect(result.success).toBe(true)
+    })
+
+    it('OV#8 守卫：service throw → surface error 透传（不静默）', async () => {
+      const deleteTimebox = vi.fn().mockRejectedValue(new Error('该时间盒已记录，不可删除'))
+      vi.doMock('@/app/actions/timebox', () => ({ updateTimebox: vi.fn(), deleteTimebox }))
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const result = await mod.timeboxCnuiHandler.submit('editTimeboxes', {
+        operation: 'delete',
+        selectedId: 'tb1',
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('不可删除')
+    })
+
+    // [T-eng-R] operation missing → "未选择时间盒"
+    it('T-eng-R：operation 缺失 → success=false + error 含「未选择时间盒」', async () => {
+      vi.doMock('@/app/actions/timebox', () => ({
+        updateTimebox: vi.fn(),
+        deleteTimebox: vi.fn(),
+      }))
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const result = await mod.timeboxCnuiHandler.submit('editTimeboxes', {
+        // 没有 operation 也没有 selectedId
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('未选择时间盒')
+    })
   })
 })

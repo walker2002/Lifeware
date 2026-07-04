@@ -17,11 +17,17 @@ const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 /**
  * 获取今日日期字符串
- * 
+ *
+ * [023.04] I-1 follow-up：使用 Asia/Shanghai 时区取 todayStr，
+ *   避免 now.toISOString().split('T')[0] 在 0:00-4:00 CST 时段跨日漂移
+ *   （CST=UTC+8，若 now=2026-07-04T01:00 CST → ISO=2026-07-03T17:00Z → '2026-07-03'，
+ *   而用户实际是 7-4 早上，按 ISO 切会拿到前日）
+ *
  * @returns ISO 日期字符串 (YYYY-MM-DD)
  */
 async function getTodayDate(): Promise<string> {
-  return new Date().toISOString().split('T')[0]
+  // en-CA locale 输出格式稳定为 YYYY-MM-DD，符合本函数契约
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
 }
 
 /**
@@ -241,6 +247,60 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    // [023.04]：editTimeboxes — 解析优先模式（解析成功 → editing + prefill；失败 → selecting + 当日列表）
+    if (action === 'editTimeboxes') {
+      const prompt = (intentFields?.prompt as string | undefined) ?? ''
+      const { parseTimeboxesIntent } = await import('@/domains/timebox/cnui/parse-timeboxes')
+      const todayBoxes = await getTodayTimeboxes()
+      const todaySummaries = todayBoxes.map(t => ({
+        id: t.id,
+        title: t.title,
+        startTime: t.startTime,
+        endTime: t.endTime,
+        status: t.status,
+        taskIds: t.taskIds ?? [],
+        habitIds: t.habitIds ?? [],
+      }))
+      const parsed = await parseTimeboxesIntent(prompt, todaySummaries as never)
+
+      if (parsed.kind === 'edit' || parsed.kind === 'cancel') {
+        const target = todayBoxes.find(t => t.id === parsed.timeboxId)
+        // [023.04] T-eng-8 safe-default：parsed.timeboxId 命中但不在 todayBoxes（race：
+        //   用户开的瞬间该 timebox 被外部删/改期）→ silent fallback selecting，不 crash
+        if (target) {
+          const prefill: Record<string, unknown> = {
+            title: target.title,
+            startTime: target.startTime,
+            endTime: target.endTime,
+            ...(parsed.kind === 'edit' && parsed.newStartTime ? { startTime: parsed.newStartTime } : {}),
+            ...(parsed.kind === 'edit' && parsed.newEndTime ? { endTime: parsed.newEndTime } : {}),
+            ...(target.activityArchetypeId ? { activityArchetypeId: target.activityArchetypeId } : {}),
+          }
+          return {
+            content: parsed.kind === 'cancel' ? `确认要取消「${target.title}」？` : `请确认修改「${target.title}」`,
+            dataSnapshot: {
+              mode: 'editing',
+              selectedId: target.id,
+              prefill,
+              status: target.status,
+              items: todaySummaries,
+              readOnly: false,
+            },
+          }
+        }
+      }
+
+      // 解析失败 / 不确定 / 命中无 target → selecting 模式（兜底）
+      return {
+        content: '请选择要操作的时间盒',
+        dataSnapshot: {
+          mode: 'selecting',
+          items: todaySummaries,
+          readOnly: false,
+        },
+      }
+    }
+
     return { content: '请填写信息', dataSnapshot: {} }
   },
 
@@ -396,6 +456,64 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    // [023.04]：editTimeboxes — 直调 updateTimebox / deleteTimebox（不走 submitDynamicIntent）
+    if (action === 'editTimeboxes') {
+      const selectedId = (fields as { selectedId?: string }).selectedId
+      // [023.04] T-eng-R：selectedId 缺失 → 未选择时间盒错误
+      if (!selectedId) return { success: false, error: '未选择时间盒' }
+
+      const op = (fields as { operation?: string }).operation
+
+      if (op === 'delete') {
+        const { deleteTimebox } = await import('@/app/actions/timebox')
+        try {
+          await deleteTimebox(selectedId)
+          return { success: true, data: { id: selectedId } }
+        } catch (e) {
+          // OV#8 守卫透传（service reject 必须出 surface error，不静默）
+          return { success: false, error: e instanceof Error ? e.message : '删除失败' }
+        }
+      }
+
+      // op === 'update' 默认路径（含 op 缺失也走 update）
+      const { updateTimebox } = await import('@/app/actions/timebox')
+      const patch = (fields as { fields?: Record<string, unknown> }).fields ?? {}
+      // [023.04] T-eng-1：Edit 路径显式调 createTimeOverlapRule evaluate（C1 双保险）
+      //   当前 updateTimebox 不走 rule engine（直写字段），但 plan C1 双保险要求
+      //   Edit 路径同样执行重叠检测：成功 → update；冲突 → surface 透传 message
+      //   （让 EditTimeboxes surface 端 AlertDialog 二次确认 UI 接入）
+      try {
+        const repo = new TimeboxRepository()
+        const { createTimeOverlapRule } = await import('@/nexus/core/rule-engine/rules/timebox-overlap')
+        const rule = createTimeOverlapRule(repo, MVP_USER_ID as USOM_ID)
+        const synthesizedIntent = {
+          id: crypto.randomUUID() as USOM_ID,
+          intentionId: crypto.randomUUID() as USOM_ID,
+          targetDomain: 'timebox',
+          action: 'update_timebox',
+          fields: { id: selectedId, ...patch },
+          confidence: 1,
+          resolvedBy: 'cnui_surface' as const,
+          createdAt: new Date().toISOString() as Timestamp,
+        }
+        const ruleResult = await rule.evaluate(synthesizedIntent as never, {} as never)
+        if (ruleResult.severity === 'confirm') {
+          return { success: false, error: ruleResult.message ?? '与已有时间盒冲突' }
+        }
+      } catch (e) {
+        // rule 引擎异常不阻断主路径：透传为 success（让 write 路径自我兜底）
+        console.warn('[timeboxCnuiHandler] createTimeOverlapRule evaluate 异常，继续 update:', e)
+      }
+
+      try {
+        const r = await updateTimebox(selectedId, patch)
+        if (r.status === 'needs_confirm') return { success: false, error: r.message }
+        return { success: true, data: { id: selectedId } }
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : '更新失败' }
+      }
+    }
+
     return { success: false, error: `Unknown CN-UI action: timebox/${action}` }
   },
 }
@@ -417,4 +535,6 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'create-itinerary': timeboxCnuiHandler,
   'edit-itinerary': timeboxCnuiHandler,
   'delete-itinerary': timeboxCnuiHandler,
+  // [023.04]：editTimeboxes 三合一（修改/取消/删除）
+  'edit-timeboxes': timeboxCnuiHandler,
 }
