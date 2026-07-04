@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { ImportResult } from "@/lib/okr-import/types"
 import { saveImportedOKRs } from "@/app/actions/okr-import"
+import { PageBanner } from "@/components/layout/page-banner"
 
 type PanelMode = "empty" | "detail" | "edit" | "create" | "import"
 
@@ -216,11 +217,11 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
 
   return (
     <>
-      {standalone && (
-        <div className="border-b border-hairline px-5 py-3 flex items-center gap-2 bg-canvas">
-          <h1 className="text-base font-semibold text-ink">OKR 工作台</h1>
-        </div>
-      )}
+      {/* [023.03] 补：顶部图片 Banner（domainId='okrs' 匹配 '/banner-OKRs1.png' /
+          '/banner-OKRs2.png'，可折叠）。原 'standalone' 模式只显示 h1 标题行；
+          改为统一显示 PageBanner，h1 标题去除（与 [023.03] UI 规范一致：
+          标题统一由 PageBanner 提供，不在组件内重复）。 */}
+      <PageBanner domainId="okrs" title="OKR 工作台" />
       {/* [024.1] B5：AppShell 路径用 absolute inset-0 绕过 Chromium 顽固 bug——
         被 stretch 的 flex item 的子元素 height:%/flex-basis:% 不解析为确定高度
         （overflow-hidden + h-full + 去 flex-col 组合都救不了）。main 是 relative，

@@ -137,8 +137,9 @@ export function TimeboxesWorkspace() {
     <div className="flex h-full">
       {/* 左栏：当日时间盒列表 */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
-          <h1 className="text-base font-display text-ink">我的时间盒</h1>
+        {/* [023.03] UI 统一：去重标题。PageBanner 已在主页 context 显示"我的时间盒"，
+            独立 /timeboxes 路由的 PageBanner 同样提供标题。本组件不再重复。 */}
+        <div className="flex items-center justify-end px-4 py-3 border-b border-hairline">
           <Button size="sm" onClick={() => setDrawer({ mode: 'create' })}>
             <Plus className="size-4 mr-1" />新建时间盒
           </Button>
