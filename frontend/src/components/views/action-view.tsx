@@ -13,11 +13,14 @@
  * 命名约定：Component key 与 intent_trigger.action 一致（camelCase），保持
  * 单一来源以避免 manifest 与路由表双向漂移。
  *
+ * 例外：timebox.viewSchedule 不走本表 —— 它在 use-intent-handler.handleGrowthAction
+ *   里被前置特判：setMainViewState({type:'schedule', date, viewMode})，让主页主显示
+ *   区复用 TimeboxesWorkspace（保留三栏 AppShell + 左 AI 面板）。manifest view_route
+ *   /timeboxes 仅用于浏览器直接 URL 访问，不作为菜单入口跳转目标。
+ *
  * [023.03] T4：删 ScheduleView 导入 + viewSchedule/view_schedule 特殊分支 +
- * scheduleProps 字段。route /schedule → /timeboxes 后，ActionView 不再承担
- * 主页 schedule 视图。T4+恢复：主页 mainViewState='schedule' 分支直接渲染
- * TimeboxesWorkspace；本表不再需要 viewSchedule 入口（manifest view_route
- * /timeboxes 走 URL 路由）。
+ * scheduleProps 字段。route /schedule → /timeboxes 后，主页 mainViewState='schedule'
+ * 分支直接渲染 TimeboxesWorkspace；本表不再需要 viewSchedule 入口。
  */
 
 "use client"
@@ -62,8 +65,8 @@ interface ActionViewProps {
 }
 
 export function ActionView({ domainId, action, initialFields }: ActionViewProps) {
-  // [023.03] T4：删 viewSchedule/view_schedule 特殊分支（manifest view_route 已 /timeboxes，
-  // 由 CNUI/GrowthMenu 触发等价跳转：router.push('/timeboxes')，详见 manifest view_routes.viewSchedule）
+  // [023.03] T4：删 viewSchedule/view_schedule 特殊分支（viewSchedule 已在 use-intent-handler
+  // handleGrowthAction 前置特判切到 mainViewState='schedule'，不会进 ActionView）
   const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
   if (ViewComponent) {
     const props = action === 'createHabit'
