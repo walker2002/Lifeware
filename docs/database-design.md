@@ -764,6 +764,20 @@ ALTER TABLE timeboxes ADD CONSTRAINT check_timeboxes_end_after_start
 
 > **注意**：`taskIds` 和 `habitIds` 软关联落库于本表 `task_ids` / `habit_ids`（[023] A2 OV#P1-#2 起）；`timebox_tasks` / `timebox_habits` 关联表仍保留供后续扩展（强一致性写入路径使用），USOM 中的数组字段在 Repository 层读取 `task_ids` / `habit_ids` 列后注入到 USOM 对象。`activityArchetypeId` 强外键引用 `activity_archetypes.id`，ON DELETE SET NULL。
 
+### 时间盒重叠规则（[023.04]）
+
+CNUI 提交时间盒时按两层校验：
+
+1. **客户端预检**：`assertNoInternalOverlap`（`frontend/src/domains/timebox/lib/overlap.ts`）
+   - 扫同日 batch 内多条是否区间重叠（半开：end==start 不算）
+   - 命中 → 提交按钮 disabled + 红字提示
+2. **服务端兜底**：`TimeOverlapRule`（`frontend/src/nexus/core/rule-engine/rules/timebox-overlap.ts`）
+   - 读 `intent.fields.endTime`（[023] A2 OV#P1-#1 后 duration 已撤）
+   - 与 status ∈ {planned, running, overtime} 重叠 → severity=confirm
+   - 与 status ∈ {ended, cancelled, logged} 重叠 → pass（不阻断）
+
+数据库层无唯一性约束；重叠允许但有提示用户确认。
+
 ---
 
 ### 4.7a task_execution_logs（任务执行记录表，新增 2026-05-28）

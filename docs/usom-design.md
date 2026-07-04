@@ -768,6 +768,16 @@ interface DetailedExecutionRecord extends ExecutionRecordBase {
 type ExecutionRecord = SimpleExecutionRecord | DetailedExecutionRecord
 ```
 
+### 时间盒修改/取消/删除意图统一入口（[023.04]）
+
+`/editTimeboxes` shortcut 是修改、取消、删除三类意图的统一 CNUI 入口：
+
+- 修改 → `updateTimebox(id, fields)` 直调（mutation service 字段写）
+- 取消 → `deleteTimebox(id)` OV#8 状态守卫（仅 planned 合法）
+- 删除 ≡ 取消（软退场；MVP 无硬删）
+
+`/cancelTimebox` shortcut 已弃用（提交 [023.04] 时从 manifest 删除）。`cancelTimebox` 作为 SM action（`submitDynamicIntent('timebox', 'cancelTimebox', ...)`）仍保留，用于 mutation service 内部触发状态推进。
+
 ---
 
 ### 3.10 Review（复盘）
