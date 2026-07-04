@@ -156,14 +156,20 @@ export async function parseTimeboxesIntent(
   const confidence = extracted.hadDigit ? 0.85 : 0.4
 
   // 构造新 startTime / endTime（保留原 duration）
-  // 用 now 的 ISO 日期 + UTC+08:00 偏移构造
-  const todayStr = now.toISOString().split('T')[0]
-  const newStart = new Date(`${todayStr}T${String(extracted.hour).padStart(2, '0')}:00:00+08:00`).toISOString()
-  if (isNaN(new Date(newStart).getTime())) {
+  // [023.04] I-6 polish: 用本地时区化的「今天」日期，避免 0:00-4:00 CST 时段跨日漂移
+  // （与 handlers.ts:28-31 的 getTodayDate 同源 fix）
+  const todayStr = new Date(now.getTime()).toLocaleDateString('en-CA', {
+    timeZone: 'Asia/Shanghai',
+  })
+  const newStartMs = new Date(
+    `${todayStr}T${String(extracted.hour).padStart(2, '0')}:00:00+08:00`,
+  ).getTime()
+  if (isNaN(newStartMs)) {
     return { kind: 'unsure', reason: '时间解析失败' }
   }
+  const newStart = new Date(newStartMs).toISOString()
   const duration = new Date(target.endTime).getTime() - new Date(target.startTime).getTime()
-  const newEnd = new Date(new Date(newStart).getTime() + duration).toISOString()
+  const newEnd = new Date(newStartMs + duration).toISOString()
   return {
     kind: 'edit',
     timeboxId: target.id,

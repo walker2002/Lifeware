@@ -263,8 +263,16 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }))
       const parsed = await parseTimeboxesIntent(prompt, todaySummaries as never)
 
-      if (parsed.kind === 'edit' || parsed.kind === 'cancel') {
-        const target = todayBoxes.find(t => t.id === parsed.timeboxId)
+      // [023.04] I-7 polish: T-eng-6 confidence<0.5 → 强制降级 selecting,
+      //   即使 parsed.kind==='edit' 也不直接进 editing(prefill 用 prefill 字段,但 mode=selecting
+      //   让用户在 selecting 模式用 reason 提示 prompt 补充具体小时)
+      const confidenceGate =
+        parsed.kind === 'edit' && parsed.confidence < 0.5
+          ? { kind: 'unsure' as const, reason: '未识别到具体时间,请补充如「改到 14:00」' }
+          : parsed
+
+      if (confidenceGate.kind === 'edit' || confidenceGate.kind === 'cancel') {
+        const target = todayBoxes.find(t => t.id === confidenceGate.timeboxId)
         // [023.04] T-eng-8 safe-default：parsed.timeboxId 命中但不在 todayBoxes（race：
         //   用户开的瞬间该 timebox 被外部删/改期）→ silent fallback selecting，不 crash
         if (target) {
@@ -491,7 +499,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
           intentionId: crypto.randomUUID() as USOM_ID,
           targetDomain: 'timebox',
           action: 'update_timebox',
-          fields: { id: selectedId, ...patch },
+          fields: { ...patch },  // [023.04] I-5 polish: rule 不读 fields.id,不必把 selectedId 塞进去
           confidence: 1,
           resolvedBy: 'cnui_surface' as const,
           createdAt: new Date().toISOString() as Timestamp,

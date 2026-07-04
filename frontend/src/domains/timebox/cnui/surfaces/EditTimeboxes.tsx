@@ -21,7 +21,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,10 +60,13 @@ interface EditTimeboxesProps {
 }
 
 export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: EditTimeboxesProps) {
-  // mode 由 useState 持有，初值取 dataModel.mode；onDataChange 时同步触发 setState
-  // 这样在测试 mock 下也能让组件自身驱动模式切换（不依赖父组件 rerender）。
+  // [023.04] I-2 polish: 父 rerender 时若 dataModel.mode 变化,同步 setMode
+  //   (useState 仅读第一次的 initialMode,父若换新 prompt 重 open 会带新 mode)
   const initialMode = (dataModel.mode as 'selecting' | 'editing') ?? 'selecting'
   const [mode, setMode] = useState<'selecting' | 'editing'>(initialMode)
+  useEffect(() => {
+    setMode((dataModel.mode as 'selecting' | 'editing') ?? 'selecting')
+  }, [dataModel.mode])
   const items = (dataModel.items as TimeboxSummary[]) ?? []
   const status = dataModel.status as string | undefined
   const selectedId = dataModel.selectedId as string | undefined
