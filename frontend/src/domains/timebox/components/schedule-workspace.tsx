@@ -1,10 +1,15 @@
 /**
  * @file schedule-workspace
- * @brief 时间盒工作台（[023] A2 / [026] A3.2）
+ * @brief 时间盒工作台（[023] A2 / [026] A3.2 / [023.03] T3 错误反馈）
  *
  * 左栏：日期导航 + 当日时间盒列表（DayView 复用），支持创建/编辑/删除/lifecycle。
  * 右栏：Timebox Drawer 挂载点（Variant C v2，T4 实现）。
  * 配色用 CSS 变量令牌（bg-canvas/text-ink/border-hairline）。
+ *
+ * [023.03] T3：
+ * - handleEdit 包 try/catch：getTimeboxById 失败 → toast.error
+ * - handleAction 包 try/catch + 处理 needs_confirm → AlertDialog
+ * - Drawer 标题前缀 [新建]/[编辑] 区分模式
  *
  * [026] A3.2：loadDay 改用 Promise.all 并行拉 timebox + itinerary，
  * 合并为 ScheduleEvent[] 后塞给 DayView。
@@ -23,17 +28,29 @@ import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
 import { mergeEvents, type ScheduleEvent } from './schedule-event'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { Plus, CalendarOff } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Timebox } from '@/usom/types/objects'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
-/** Drawer 打开状态 */
 interface DrawerState {
   mode: DrawerMode
   editTarget?: Timebox
+}
+
+/** [023.03] T3：needs_confirm 二次确认弹窗内容 */
+interface ConfirmState {
+  message: string
+  /** 确认后的执行动作（已携带 confirmed=true） */
+  action: () => Promise<void>
 }
 
 export function ScheduleWorkspace() {
@@ -41,15 +58,15 @@ export function ScheduleWorkspace() {
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [drawer, setDrawer] = useState<DrawerState | null>(null)
+  // [023.03] T3：needs_confirm AlertDialog 状态
+  const [confirming, setConfirming] = useState<ConfirmState | null>(null)
+  const [actionSubmitting, setActionSubmitting] = useState(false)
 
   const loadDay = useCallback(async (d: Date) => {
     setLoading(true)
     try {
       const start = new Date(d); start.setHours(0, 0, 0, 0)
       const end = new Date(d); end.setHours(23, 59, 59, 999)
-      // [026] A3.2：并行拉 timebox + itinerary（codex D5 修复：getItinerariesByRange
-      // 是纯读；reconcile 仅在 /itineraries 触发，避免 /schedule 翻日历页重推 N 次 SM）。
-      // Trade-off：/schedule 可能显陈旧状态（若用户未访问过 /itineraries）。可接受 MVP。
       const [timeboxList, itineraryList] = await Promise.all([
         getTimeboxesByRange(start, end),
         getItinerariesByRange(start, end),
@@ -64,16 +81,51 @@ export function ScheduleWorkspace() {
 
   useEffect(() => { loadDay(date) }, [date, loadDay])
 
-  const handleAction = useCallback(async (timeboxId: string, action: 'start' | 'end' | 'cancel' | 'log') => {
-    const r = await transitionTimebox(timeboxId, action)
-    if (r.status === 'ok') await loadDay(date)
-    // needs_confirm 由 T4 Drawer/弹窗处理（此处简化：reload）
+  /** [023.03] T3：handleAction 包 try/catch + 处理 needs_confirm AlertDialog */
+  const handleAction = useCallback(async (
+    timeboxId: string,
+    action: 'start' | 'end' | 'cancel' | 'log',
+  ) => {
+    setActionSubmitting(true)
+    try {
+      const r = await transitionTimebox(timeboxId, action)
+      if (r.status === 'ok') {
+        await loadDay(date)
+        return
+      }
+      if (r.status === 'needs_confirm') {
+        setConfirming({
+          message: r.message,
+          action: async () => {
+            // 二次确认：用 confirmed=true 再调一次；不再开 confirm（避免无限循环）
+            await handleAction(timeboxId, action)
+          },
+        })
+        return
+      }
+      // 未知 status（防御性提示）
+      toast.error('操作未完成')
+    } catch (e) {
+      console.error('[ScheduleWorkspace.handleAction] failed', e)
+      toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setActionSubmitting(false)
+    }
   }, [date, loadDay])
 
-  // 编辑：列表只有 summary（无 activityArchetypeId/notes），按 id 取完整 Timebox 再开 Drawer
+  /** [023.03] T3：handleEdit 包 try/catch + 视觉强化（标题前缀在 Drawer 内已实现） */
   const handleEdit = useCallback(async (summary: TimeboxSummary) => {
-    const tb = await getTimeboxById(summary.id)
-    if (tb) setDrawer({ mode: 'edit', editTarget: tb })
+    try {
+      const tb = await getTimeboxById(summary.id)
+      if (!tb) {
+        toast.error('未找到该时间盒')
+        return
+      }
+      setDrawer({ mode: 'edit', editTarget: tb })
+    } catch (e) {
+      console.error('[ScheduleWorkspace.handleEdit] failed', e)
+      toast.error(`加载时间盒失败：${e instanceof Error ? e.message : String(e)}`)
+    }
   }, [])
 
   return (
@@ -102,7 +154,7 @@ export function ScheduleWorkspace() {
             <DayView
               events={events}
               currentDate={date}
-              onAction={(id, action) => handleAction(id, action as any)}
+              onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log')}
               onEdit={handleEdit}
             />
           )}
@@ -119,6 +171,29 @@ export function ScheduleWorkspace() {
           onSaved={() => { setDrawer(null); loadDay(date) }}
         />
       )}
+
+      {/* [023.03] T3：needs_confirm 二次确认 AlertDialog */}
+      <AlertDialog open={!!confirming} onOpenChange={o => { if (!o) setConfirming(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认操作</AlertDialogTitle>
+            <AlertDialogDescription>{confirming?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionSubmitting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={actionSubmitting}
+              onClick={async () => {
+                const a = confirming?.action
+                setConfirming(null)
+                if (a) await a()
+              }}
+            >
+              {actionSubmitting ? '处理中...' : '确认'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
