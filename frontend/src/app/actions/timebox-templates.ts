@@ -1,9 +1,12 @@
 /**
  * @file timebox-templates actions
- * @brief 时间盒模板配置 server actions（[023] A2，配置类不走 Nexus）
+ * @brief 时间盒模板配置 server actions（[023] A2 / [023-02] 行列表 + 模板级星期）
  *
  * 包装 TimeboxTemplateRepository（CRUD + audit），供客户端编辑器调用。
  * 订阅源（habits/tasks/threads）按用户可订阅的状态筛选：habits=active, tasks=active, threads=active。
+ *
+ * MVP 性能优化（[023-02] 决议 D.2）：fetchSubscriptionSources 走 1 分钟 in-memory cache。
+ * 后续接入 SWR 替代（cross-tab 同步）。
  */
 'use server'
 
@@ -11,6 +14,7 @@ import { TimeboxTemplateRepository, type TimeboxTemplateInput, type TimeboxTempl
 import { HabitRepository } from '@/domains/habits/repository/habit'
 import { TaskRepository } from '@/domains/tasks/repository/task'
 import { ThreadRepository } from '@/domains/tasks/repository/thread'
+import { addMinutesToHHMM } from '@/domains/timebox/lib/template-row-helpers'
 import type { USOM_ID } from '@/usom/types/primitives'
 
 /** MVP 用户 ID（临时使用，与 activity-archetype.ts 一致） */
@@ -24,12 +28,16 @@ export interface TimeboxTemplateActionResult<T = void> {
   error?: string
 }
 
-/** 订阅源汇总（habits/tasks/threads 都用 { id, title } 简化） */
+/** 订阅源汇总（[023-02]：habit 多带 start/end；tasks/threads 仅 id+title） */
 export interface SubscriptionSources {
-  habits: Array<{ id: string; title: string }>
+  habits: Array<{ id: string; title: string; start: string; end: string }>
   tasks: Array<{ id: string; title: string }>
   threads: Array<{ id: string; title: string }>
 }
+
+/** 1 分钟 in-memory cache（[023-02] 决议 D.2） */
+let _sourcesCache: { at: number; data: SubscriptionSources } | null = null
+const SOURCES_CACHE_TTL_MS = 60_000
 
 // ─── CRUD ────────────────────────────────────────────────────────
 
@@ -74,25 +82,36 @@ export async function fetchTimeboxTemplates(): Promise<TimeboxTemplateActionResu
 
 /**
  * 拉取当前用户可选订阅的 habits/tasks/threads：
- * - habits: status='active'
+ * - habits: status='active'；返回中带 start（habit.defaultTime）+ end（start + defaultDuration）
+ *   用于编辑器行 source='habit' 时锁定起止时间。
  * - tasks: status='todo' 或 'planned' 或 'in_progress'（活跃任务）
  * - threads: status='active'
+ *
+ * 1 分钟 in-memory cache（决议 D.2）；MVP 用，后续接 SWR 替代。
  */
 export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionResult<SubscriptionSources>> {
   try {
+    if (_sourcesCache && Date.now() - _sourcesCache.at < SOURCES_CACHE_TTL_MS) {
+      return { success: true, data: _sourcesCache.data }
+    }
+
     const [habits, tasks, threads] = await Promise.all([
       new HabitRepository().findByUserId(MVP_USER_ID, { status: 'active' }),
       new TaskRepository().findByUserId(MVP_USER_ID, { status: ['todo', 'planned', 'in_progress'] }),
       new ThreadRepository().findByUserId(MVP_USER_ID, { status: 'active' }),
     ])
-    return {
-      success: true,
-      data: {
-        habits: habits.map((h) => ({ id: h.id, title: h.title })),
-        tasks: tasks.map((t) => ({ id: t.id, title: t.title })),
-        threads: threads.map((th) => ({ id: th.id, title: th.name })),
-      },
+    const data: SubscriptionSources = {
+      habits: habits.map((h) => ({
+        id: h.id,
+        title: h.title,
+        start: h.defaultTime,
+        end: addMinutesToHHMM(h.defaultTime, h.defaultDuration),
+      })),
+      tasks: tasks.map((t) => ({ id: t.id, title: t.title })),
+      threads: threads.map((th) => ({ id: th.id, title: th.name })),
     }
+    _sourcesCache = { at: Date.now(), data }
+    return { success: true, data }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : '拉取订阅源失败' }
   }

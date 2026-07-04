@@ -1273,9 +1273,24 @@ Connector Layer 预留，MVP 不实现。
 
 索引：`(user_id, table_name, created_at DESC)`、`(user_id, created_at DESC)`
 
-### timebox_templates（时间盒模板，[023] A2）
+### timebox_templates（时间盒模板，[023-02]）
 
-用户定义的时间盒模板。锚定 7 段生存时间（wake/morning/workAm/noon/workPm/evening/sleep），每段用 `{start, end}` 表示，并通过 JSONB 数组订阅（pull）habits/tasks/threads。**配置类实体**，不走 SM，每次 CUD 写 `user_audit_log`。
+用户定义的时间盒模板。`rows`（有序行列表）描述时间安排行（来源 = 习惯/任务/主线/自定义），`days_of_week`（模板级星期数组）描述应用范围（`[]` = 不限）。**配置类实体**，不走 SM，每次 CUD 写 `user_audit_log`。
+
+```sql
+-- [023-02] 0032：rows 列表 + 模板级 days_of_week，移除 survival_segments + 3 订阅列
+CREATE TABLE timebox_templates (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  schema_version  integer NOT NULL DEFAULT 1,
+  name            text NOT NULL,
+  days_of_week    jsonb NOT NULL DEFAULT '[0,1,2,3,4,5,6]'::jsonb,
+  rows            jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_timebox_templates_user ON timebox_templates(user_id);
+```
 
 | 列 | 类型 | 约束 | 说明 |
 |----|------|------|------|
@@ -1283,27 +1298,29 @@ Connector Layer 预留，MVP 不实现。
 | user_id | uuid | NOT NULL, FK→users(id) ON DELETE CASCADE | 多租户隔离 |
 | schema_version | integer | NOT NULL DEFAULT 1 | USOM 版本号 |
 | name | text | NOT NULL | 模板名称 |
-| survival_segments | jsonb | NOT NULL | 7 段锚点 `{wake, morning, workAm, noon, workPm, evening, sleep}`，每段 `{start: 'HH:mm', end: 'HH:mm'}` |
-| subscribed_habits | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 habit id 数组 |
-| subscribed_tasks | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 task id 数组 |
-| subscribed_threads | jsonb | NOT NULL DEFAULT '[]' | pull 订阅的 thread id 数组 |
+| days_of_week | jsonb | NOT NULL DEFAULT `[0,1,2,3,4,5,6]` | 模板级星期，0=周日..6=周六；`[]`=不限 |
+| rows | jsonb | NOT NULL DEFAULT `[]` | 有序行列表，每行 `{id, activityName, start, end, source, sourceId?}` |
 | created_at | timestamptz | NOT NULL DEFAULT now() | 创建时间 |
 | updated_at | timestamptz | NOT NULL DEFAULT now() | 更新时间 |
 
 索引：`(user_id)`
 
-**迁移**：`frontend/src/lib/db/migrations/0024_timebox_templates.sql`（手写，`IF NOT EXISTS` 幂等）
+**迁移**：`frontend/src/lib/db/migrations/0032_023_02_timebox_template_redesign.sql`（手写，`IF [NOT] EXISTS` 幂等）
 
-**7 段生存时间模型**（见 `docs/usom-design.md` §3.12）：
-1. `wake` 起床 — 默认起床时间
-2. `morning` 晨间 — 通勤 + 早餐合并段
-3. `workAm` 上午上班 — 上午工作段
-4. `noon` 午间 — 午餐 + 午休合并段
-5. `workPm` 下午上班 — 下午工作段（含下班通勤）
-6. `evening` 晚间 — 晚餐 + 休息段
-7. `sleep` 睡眠 — 默认睡眠时间
+**迁移说明**（0032）：
+- ADD COLUMN `rows` / `days_of_week`，缺省分别为 `[]` / `[0,1,2,3,4,5,6]`。
+- 若 `survival_segments` 列仍存在，旧 7 段回填为 7 条 `source='custom'` 的行（activityName 对应段名中文：`起床/晨间/上午上班/午间/下午上班/晚间/睡眠`），仅当 `rows='[]'` 时回填（防覆盖已编辑数据）。
+- DROP `survival_segments` / `subscribed_habits` / `subscribed_tasks` / `subscribed_threads`（已无下游消费者，spec §0 确认）。
+- 行 id 用 `md5('seg-<key>')::text` 生成稳定值，便于后续 row 级引用。
 
-**A3 owner-check**：`create`/`update` 写入前校验 `subscribed_habits/tasks/threads` 中每个 id 归属当前 userId（跨用户 id 拒绝）。
+**行来源（`rows[].source`）**：
+- `custom`：用户手填活动名 + 起止时间。
+- `habit`：行 `activityName` / `start` / `end` 由 server action `fetchSubscriptionSources` 从 `defaultTime` + `defaultDuration` 推算，UI 端起止锁时。
+- `task` / `thread`：行 `activityName` 由对象 title resolve；起止时间由用户手填。
+
+**A3 owner-check**：`create`/`update` 写入前遍历 `rows` 收集 `source∈{habit,task,thread}` 的 `sourceId`，按来源分组去重后分别校验归属（habits / tasks / threads 三张表）。任一 id 不归属或不存在则抛错。`update()` 在 `old.rows === input.rows`（引用相等）时跳过 owner-check，避免无谓的全表 inArray。
+
+**配置管理权限（OQ-7）**：TimeboxTemplate 修改是配置变更（非业务执行写入口），走 Intent Engine 路由 + Repository 直写 + `user_audit_log`。不走 SM（无 lifecycle），无需 Rule Engine 校验。
 
 ---
 

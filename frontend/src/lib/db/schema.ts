@@ -722,18 +722,30 @@ export const activityArchetypes = pgTable('activity_archetypes', {
   index('idx_activity_archetypes_user_system').on(table.userId, table.isSystem),
 ])
 
-// ─── 7.6b timebox_templates (时间盒模板，[023] A2，配置类不走 Nexus) ─
+// ─── 7.6b timebox_templates (时间盒模板，[023-02] 行列表 + 模板级星期) ─
+
+/** 模板行来源类型 [023-02] */
+export type TemplateRowSource = 'habit' | 'task' | 'thread' | 'custom'
+
+/** 模板中一条时间安排行 [023-02] */
+export interface TemplateRow {
+  id: string
+  activityName: string
+  start: string
+  end: string
+  source: TemplateRowSource
+  sourceId?: string
+}
+
 export const timeboxTemplates = pgTable('timebox_templates', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
   name: text('name').notNull(),
-  /** 7 段生存时间锚点 { wake, morning, workAm, noon, workPm, evening, sleep } 每段 {start, end} */
-  survivalSegments: jsonb('survival_segments').$type<Record<string, { start: string; end: string }>>().notNull(),
-  /** pull 订阅的 habits/tasks/threads id */
-  subscribedHabits: jsonb('subscribed_habits').$type<string[]>().notNull().default([]),
-  subscribedTasks: jsonb('subscribed_tasks').$type<string[]>().notNull().default([]),
-  subscribedThreads: jsonb('subscribed_threads').$type<string[]>().notNull().default([]),
+  /** 应用范围：0=周日..6=周六；空数组=不限 [023-02] */
+  daysOfWeek: jsonb('days_of_week').$type<number[]>().notNull().default([0, 1, 2, 3, 4, 5, 6]),
+  /** 有序行列表 [023-02]；每行 {id, activityName, start, end, source, sourceId?} */
+  rows: jsonb('rows').$type<TemplateRow[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
