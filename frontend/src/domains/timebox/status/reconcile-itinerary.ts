@@ -8,7 +8,7 @@
  * submitDynamicIntent 走 SM 写库。零 cron、零后台 job。
  *
  * 纯函数：不 IO、不写库。按日历日（localDayKey：年*10000+月*100+日）比较，
- * 与 /schedule loadDay 日界对齐（T8 + T13 用）。
+ * 与 /timeboxes loadDay 日界对齐（T8 + T13 用）。
  *
  * 设计抉择：判别字段命名 kind，前缀 needs（"需要做"而非"动作本身"）——codex D6
  * 统一治理（brief Step 1 原本写 action: 'markInProgress'，与 Step 3 实现的

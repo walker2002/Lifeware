@@ -4,9 +4,11 @@
  *
  * 三栏布局：左 TimeboxList（紧凑列），中 TimeboxTimeline（日时间轴），右 MiniCalendar。
  *
- * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
- * - 排序由 mergeEvents()（schedule-event.ts）完成，本组件不再排序
- * - 三个子组件接 events: ScheduleEvent[]
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
+ * - 排序由 mergeEvents()（timeboxes-event.ts）完成，本组件不再排序
+ * - 三个子组件接 events: TimeboxesEvent[]
+ *
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
  *
  * IRON RULE：纯 timebox-only 输入（含空 itinerary）时，
  * 渲染输出与 T13 改动前字节级一致——T15 回归测试会守护。
@@ -16,11 +18,11 @@
 import { TimeboxList } from "./timebox-list"
 import { TimeboxTimeline } from "./timebox-timeline"
 import { MiniCalendar } from "./mini-calendar"
-import type { ScheduleEvent } from "./schedule-event"
+import type { TimeboxesEvent } from "./timeboxes-event"
 import type { TimeboxSummary } from "@/usom/types/summaries"
 
 interface DayViewProps {
-  events: ScheduleEvent[]
+  events: TimeboxesEvent[]
   currentDate: Date
   onDateSelect?: (date: Date) => void
   onAction?: (timeboxId: string, action: string) => void

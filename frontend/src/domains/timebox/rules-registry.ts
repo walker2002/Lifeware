@@ -85,7 +85,26 @@ const endTimeFormat: RealtimeCheck = (value) => {
 
 // ── submit 聚合（phase: submit，复刻原 onValidate 全逻辑）──────────
 
+/**
+ * 状态转换 action（不含 createTimebox/editTimebox）：title/startTime/endTime 从 DB
+ * 行加载（不是 form 提交），submit 端字段必含检查应跳过。
+ *
+ * 包含 startTimebox / endTimebox / cancelTimebox / logTimebox + 行程
+ * cancelItinerary / startItinerary / completeItinerary / expireItinerary —
+ * 这些 action 在 submitDynamicIntent 时 fields 仅有 { objectId }，跑字段必含
+ * 校验会被错判 Rejected，阻塞 SM transition（[023.03] QA 发现：点开始无反应）。
+ */
+const STATUS_TRANSITION_ACTIONS = new Set([
+  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox',
+  'overtimeTimebox',
+  'cancelItinerary', 'startItinerary', 'completeItinerary', 'expireItinerary',
+])
+
 const timeboxFieldsValid: SubmitCheck = async (intent: StructuredIntent) => {
+  // [023.03] QA fix: 状态转换 action 跳过字段必含检查（字段从 DB 加载）
+  if (STATUS_TRANSITION_ACTIONS.has(intent.action)) {
+    return validationPassed()
+  }
   const errors: string[] = []
   const { fields } = intent
 

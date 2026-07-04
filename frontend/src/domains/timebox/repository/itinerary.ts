@@ -72,7 +72,7 @@ export class ItineraryRepository {
       .where(and(eq(s.itineraries.id, id as any), eq(s.itineraries.userId, userId as any)))
   }
 
-  /** 范围查询：startTime 落在 [start,end] 且未终态。/schedule 读时合并用。 */
+  /** 范围查询：startTime 落在 [start,end] 且未终态。/timeboxes 读时合并用。 */
   async findByDateRange(start: Timestamp, end: Timestamp, userId: USOM_ID, tx: DbClient = db): Promise<Itinerary[]> {
     const rows = await tx.select().from(s.itineraries)
       .where(and(

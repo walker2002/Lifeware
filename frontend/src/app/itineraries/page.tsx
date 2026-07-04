@@ -3,7 +3,7 @@
  * @brief /itineraries 独立页面路由（[026] A3）
  *
  * 手写 Next.js page route（不走 codegen）。h-screen 锚定视口，避免内层
- * overflow-y-auto 因缺高度天花板失效（参 app/schedule/page.tsx 同款约束）。
+ * overflow-y-auto 因缺高度天花板失效（参 app/timeboxes/page.tsx 同款约束）。
  *
  * [026] D2 reversal: server component 加载时调 reconcileAndAdvanceItineraries
  *   推进非终态行程。零 cron、零后台 job —— reconcile 是 page-level caller

@@ -170,8 +170,9 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
     <div className="flex flex-col gap-4 w-full">
       <PageBanner domainId="timebox" title="时间盒模板" />
 
-      <div className="flex items-center justify-between px-4">
-        <h1 className="text-base font-display text-ink">时间盒模板</h1>
+      {/* [023.03] UI 统一：去重标题。PageBanner 标题行已含"时间盒模板"，
+          此处不再重复。新建按钮单独成行（无 h1 兄弟）。 */}
+      <div className="flex items-center justify-end px-4">
         <Button size="sm" onClick={openCreate}>
           <Plus className="size-4 mr-1" />
           新建模板

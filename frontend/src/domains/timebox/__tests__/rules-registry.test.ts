@@ -186,3 +186,27 @@ describe('[020] R14 fail-CLOSED 行为', () => {
     expect(result.kind).toBe('Rejected')
   })
 })
+
+// [023.03] QA regression: status transition actions skip field validation
+describe('STATUS_TRANSITION_ACTIONS — 状态转换 action 跳过字段必含检查', () => {
+  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
+
+  for (const action of transitionActions) {
+    it(`${action} 仅有 objectId 字段也应当 Passed（字段从 DB 加载）`, async () => {
+      const intent = {
+        action,
+        targetDomain: 'timebox',
+        fields: { objectId: 'test-id' },
+        rawInput: '',
+        domain: 'timebox',
+        objectType: 'timebox',
+      } as any
+      const result = await evaluateDomainRules('timebox', intent, {
+        repos: {} as any,
+        userId: '00000000-0000-0000-0000-000000000001' as any,
+        now: Date.now(),
+      }, timeboxRuleRegistry)
+      expect(result.kind).toBe('Passed')
+    })
+  }
+})

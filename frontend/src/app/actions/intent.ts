@@ -815,12 +815,12 @@ export async function getTimeboxesByRange(
  * 按 [start, end] 范围读取行程摘要列表（[026] A1.7）。
  *
  * [026] codex D5 修复：纯读函数，**不**内联 reconcileItineraryStatuses。
- * 原因：避免 /itineraries 双调 + /schedule 翻日历页重推 N 次。
+ * 原因：避免 /itineraries 双调 + /timeboxes 翻日历页重推 N 次。
  *
  * 调用方契约（必须遵守）：
  * - A3.1 /itineraries server component：在调本函数前先调
  *   reconcileAndAdvanceItineraries()（T8 helper）。
- * - A3.2 /schedule loadDay：在读日历日行程前先对当天用户行程调
+ * - A3.2 /timeboxes loadDay：在读日历日行程前先对当天用户行程调
  *   reconcileAndAdvanceItineraries()（T8 helper）。
  * 不直接调本函数会读到陈旧 status（未 reconcile 的 scheduled/in_progress）。
  *

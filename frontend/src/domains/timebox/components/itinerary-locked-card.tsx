@@ -1,6 +1,6 @@
 /**
  * @file itinerary-locked-card
- * @brief /schedule 上 itinerary 锁定卡（[026] A3.2）
+ * @brief /timeboxes 上 itinerary 锁定卡（[026] A3.2 / [023.03] T4 重命名）
  *
  * 与 TimeboxCard 同构（compact + 完整模式），但 itinerary **只读**：
  * - 无 onAction / onEdit 回调
@@ -46,11 +46,13 @@ interface ItineraryLockedCardProps {
 }
 
 /**
- * ItineraryLockedCard — 行程只读卡（schedule 视图）。
+ * ItineraryLockedCard — 行程只读卡（timeboxes 视图）。
  *
  * [026] A3.2：不可执行（无 onAction / onEdit）。点击行为：
- * - T14 阶段接 GrowthMenu 触发 CNUI surface 'editItinerary'（与既有 schedule
+ * - T14 阶段接 GrowthMenu 触发 CNUI surface 'editItinerary'（与既有 timeboxes
  *   action 模式同模型）。当前 click 行为 = noop（占位 div 不可点）。
+ *
+ * [023.03] T4：route /schedule → /timeboxes 命名同步。
  *
  * 视觉规范：border-l-4 border-primary（锁定）+ bg-canvas（与 timebox 的
  * surface-card 区分），用 token 颜色，禁 Tailwind 默认色。

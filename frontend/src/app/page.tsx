@@ -1,8 +1,19 @@
 /**
  * @file page
  * @brief 应用主页组件
- * 
- * 应用的主入口页面，包含完整的应用布局和核心交互逻辑
+ *
+ * 应用的主入口页面，包含完整的应用布局和核心交互逻辑。
+ *
+ * [023.03] 恢复说明：本 PR 早期 T4 错误地将主页改为 redirect('/timeboxes')，
+ * 导致主页的左 Panel（assistant/growth AI 助手）和完整 AppShell 布局丢失。
+ * 沟通澄清后恢复：主页保留原结构，**主显示区在 'schedule' 视图下复用
+ * TimeboxesWorkspace**（[023] A2 引入的独立页组件 [023.03] 改名自
+ * ScheduleWorkspace），不再用 legacy ScheduleView。HomeBanner 4 按钮按需求
+ * (3) 已删，ScheduleView 整体下线（已无引用）。
+ *
+ * 主页默认视图（mainViewState 初始）即 'schedule'，进入主页即看到时间盒管理。
+ * 4 个 HomeBanner 按钮的快捷能力由 /timeboxes 顶部的"新建时间盒"按钮 + 主页
+ * 左侧 Panel 的 GrowthMenu 提供。
  */
 
 "use client"
@@ -18,7 +29,7 @@ import { SessionList } from "@/components/layout/session-list"
 import { GrowthMenu } from "@/components/layout/growth-menu"
 import { ConversationView } from "@/components/layout/conversation-view"
 import { SplitView } from "@/components/layout/main-content"
-import { ScheduleView } from "@/components/views/schedule-view"
+import { TimeboxesWorkspace } from "@/domains/timebox/components/timeboxes-workspace"
 import { ActionView } from "@/components/views/action-view"
 import { SettingsPage } from "@/components/settings/settings-page"
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog"
@@ -88,16 +99,18 @@ function HomeContent() {
         <SessionList sessions={conv.sessions} activeSessionId={conv.activeSessionId} onSelectSession={conv.handleSelectSession} onNewSession={conv.handleNewSession} onDeleteSession={conv.handleDeleteSession} /></>
     : <GrowthMenu domainActions={intent.domainActions as any} onAction={intent.handleGrowthAction} />
 
-  const scheduleProps = { timeboxes: tb.timeboxes, dateMode: tb.dateMode, currentDate: tb.currentDate, onAction: intent.handleGrowthAction, onDateModeChange: tb.handleDateModeChange, onNavigate: tb.handleNavigate, onDateSelect: tb.handleDateSelect, onTimeboxAction: tb.handleTimeboxAction }
-
-  const mainContent = mainViewState.type === 'schedule' ? <ScheduleView {...scheduleProps} />
+  // [023.03] 恢复：主显示区在 'schedule' 视图下复用 TimeboxesWorkspace（[023] A2 引入）
+  const mainContent = mainViewState.type === 'schedule' ? <TimeboxesWorkspace />
     : mainViewState.type === 'conversation' ? (intent.splitWith
       ? <SplitView left={<ConversationView messages={conv.conversationMessages} sessionId={conv.activeSessionId} onSendMessage={intent.handleConversationSend} isLoading={isLoading} recentSessions={conv.sessions.slice(0, 3)} onSelectSession={conv.handleSelectSession} intentTriggers={intent.intentTriggers} frequentIntents={intent.frequentIntents} onCnuiConfirm={intent.handleCnuiConfirm} onSurfaceStateChange={conv.handleSurfaceStateChange} />} right={<div className="p-4"><div className="flex items-center justify-between mb-3"><h3 className="text-sm font-medium text-ink">{intent.splitWith.mode === 'form' ? '表单编辑' : 'Markdown 编辑'}</h3><button type="button" onClick={intent.handleCloseSplit} className="text-xs text-body/50 hover:text-ink">关闭</button></div><p className="text-sm text-body">编辑区（{intent.splitWith.domainId}/{intent.splitWith.action}）</p></div>} />
       : <ConversationView messages={conv.conversationMessages} sessionId={conv.activeSessionId} onSendMessage={intent.handleConversationSend} isLoading={isLoading} recentSessions={conv.sessions.slice(0, 3)} onSelectSession={conv.handleSelectSession} intentTriggers={intent.intentTriggers} frequentIntents={intent.frequentIntents} onCnuiConfirm={intent.handleCnuiConfirm} onSurfaceStateChange={conv.handleSurfaceStateChange} />)
-    : mainViewState.type === 'action' ? <ActionView domainId={mainViewState.domainId} action={mainViewState.action} initialFields={mainViewState.initialFields} scheduleProps={scheduleProps} />
+    : mainViewState.type === 'action' ? <ActionView domainId={mainViewState.domainId} action={mainViewState.action} initialFields={mainViewState.initialFields} />
     : mainViewState.type === 'settings' ? <SettingsPage initialSection={mainViewState.section} />
     : null
 
+  // [023.03] 恢复：原主页在 'schedule' 视图下用 PageBanner 包一层（含图片 banner）。
+  // 图片 banner 用 domainId='home' 匹配 '/banner-lifeware1.png' / '/banner-lifeware2.png'，
+  // 可一键折叠/展开，折叠状态持久化到 localStorage。
   const mainContentWithBanner = mainViewState.type === 'schedule'
     ? (
       <>

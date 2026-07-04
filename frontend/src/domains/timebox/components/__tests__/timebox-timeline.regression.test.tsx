@@ -2,7 +2,7 @@
  * @file timebox-timeline.regression.test
  * @brief [026] T15 P1 CRITICAL IRON RULE 守护 — TimeboxTimeline 纯 timebox-only 输入
  *
- * [026] A3.2 把 TimeboxTimeline 改为接受 `events: ScheduleEvent[]` 并按 kind 分支。
+ * [026] A3.2 把 TimeboxTimeline 改为接受 `events: TimeboxesEvent[]` 并按 kind 分支。
  * IRON RULE 承诺：纯 kind='timebox' 输入的渲染输出与 T13 改动前字节级一致
  * （timebox 路径走 STATUS_COLORS + getCardBorderColor，itinerary 走 ITINERARY_COLOR）。
  *
@@ -16,8 +16,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { render } from '@testing-library/react'
 import { TimeboxTimeline } from '../timebox-timeline'
 import type { TimeboxSummary } from '@/usom/types/summaries'
-import type { ScheduleEvent } from '../schedule-event'
-import { timeboxToEvent } from '../schedule-event'
+import type { TimeboxesEvent } from '../timeboxes-event'
+import { timeboxToEvent } from '../timeboxes-event'
 
 // 固定"现在"让 timeline 的"当前时间线"位置确定，snapshot 才能稳定。
 const FROZEN_NOW = new Date('2026-07-15T17:00:00.000Z')
@@ -29,7 +29,7 @@ afterAll(() => {
   vi.useRealTimers()
 })
 
-function makeSamples(): ScheduleEvent[] {
+function makeSamples(): TimeboxesEvent[] {
   const s1: TimeboxSummary = {
     id: 'tb-1',
     title: '晨会',

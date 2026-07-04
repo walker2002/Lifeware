@@ -50,7 +50,7 @@ export interface TimeboxSummary {
   executionRecord?: import('./objects').ExecutionRecord
 }
 
-/** 行程摘要（≤7 字段，供 /schedule 合并展示 + ContextSnapshot + 编辑入口用） */
+/** 行程摘要（≤7 字段，供 /timeboxes 合并展示 + ContextSnapshot + 编辑入口用） */
 export interface ItinerarySummary {
   id:        USOM_ID
   title:     string

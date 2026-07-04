@@ -343,8 +343,8 @@ exports[`[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归 > 纯 
         />
       </div>
       <div
-        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent border-t border-r border-b"
-        style="top: 66.66666666666666%; height: 4.166666666666666%;"
+        class="absolute rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent  border-t border-r border-b"
+        style="top: 66.66666666666666%; height: 4.166666666666666%; left: calc(2.5rem + 0 * (100% - 2.5rem - 0.5rem)); width: calc(1 * (100% - 2.5rem - 0.5rem));"
       >
         <p
           class="truncate text-xs font-medium text-ink"
@@ -353,8 +353,8 @@ exports[`[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归 > 纯 
         </p>
       </div>
       <div
-        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-primary/20 border-primary border-l-transparent border-t border-r border-b"
-        style="top: 72.91666666666666%; height: 6.25%;"
+        class="absolute rounded-md border-l-4 px-2 py-1 bg-primary/20 border-primary border-l-transparent  border-t border-r border-b"
+        style="top: 72.91666666666666%; height: 6.25%; left: calc(2.5rem + 0 * (100% - 2.5rem - 0.5rem)); width: calc(1 * (100% - 2.5rem - 0.5rem));"
       >
         <p
           class="truncate text-xs font-medium text-ink"
@@ -363,8 +363,8 @@ exports[`[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归 > 纯 
         </p>
       </div>
       <div
-        class="absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent border-t border-r border-b"
-        style="top: 91.66666666666666%; height: 4.166666666666666%;"
+        class="absolute rounded-md border-l-4 px-2 py-1 bg-surface-soft border-hairline border-l-transparent  border-t border-r border-b"
+        style="top: 91.66666666666666%; height: 4.166666666666666%; left: calc(2.5rem + 0 * (100% - 2.5rem - 0.5rem)); width: calc(1 * (100% - 2.5rem - 0.5rem));"
       >
         <p
           class="truncate text-xs font-medium text-ink"

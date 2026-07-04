@@ -1,23 +1,26 @@
 /**
- * @file schedule-event
- * @brief /schedule 联合事件类型（[026] A3 D2 reversal）
+ * @file timeboxes-event
+ * @brief /timeboxes 联合事件类型（[026] A3 D2 reversal / [023.03] T4 重命名）
  *
- * ScheduleEvent 是 /schedule 页面读时合并的 discriminated union：
+ * TimeboxesEvent 是 /timeboxes 页面读时合并的 discriminated union：
  * - kind: 'timebox'  来自 TimeboxRepository
  * - kind: 'itinerary' 来自 ItineraryRepository
  *
  * [026] D2 reversal: itinerary.status 直接来自 DB（5 态枚举），
  * 不再 read-time 计算（避免在每次翻日历页时推 N 次 SM）。
  *
+ * [023.03] T4：route /schedule → /timeboxes，类型名 ScheduleEvent → TimeboxesEvent；
+ * 文件路径 schedule-event.ts → timeboxes-event.ts。
+ *
  * [026] codex D5 决议：loadDay 不调 reconcileAndAdvanceItineraries（避免
- * /schedule 翻日历页重推 N 次 SM）。Trade-off：/schedule 可能显陈旧状态
+ * /timeboxes 翻日历页重推 N 次 SM）。Trade-off：/timeboxes 可能显陈旧状态
  * （若用户未访问过 /itineraries 触发 reconcile）。可接受 MVP——D5 修复
  * 优先于绝对时效性。
  */
 import type { TimeboxSummary, ItinerarySummary } from '@/usom/types/summaries'
 import type { ItineraryStatus } from '@/usom/types/primitives'
 
-export type ScheduleEvent =
+export type TimeboxesEvent =
   | {
       kind: 'timebox'
       id: string
@@ -38,8 +41,8 @@ export type ScheduleEvent =
       source: ItinerarySummary
     }
 
-/** TimeboxSummary → ScheduleEvent（kind='timebox'） */
-export function timeboxToEvent(tb: TimeboxSummary): ScheduleEvent {
+/** TimeboxSummary → TimeboxesEvent（kind='timebox'） */
+export function timeboxToEvent(tb: TimeboxSummary): TimeboxesEvent {
   return {
     kind: 'timebox',
     id: tb.id,
@@ -51,9 +54,9 @@ export function timeboxToEvent(tb: TimeboxSummary): ScheduleEvent {
   }
 }
 
-/** ItinerarySummary → ScheduleEvent（kind='itinerary'）。
+/** ItinerarySummary → TimeboxesEvent（kind='itinerary'）。
  * end = start + durationMin；status 直接来自 DB（D2 reversal）。 */
-export function itineraryToEvent(it: ItinerarySummary): ScheduleEvent {
+export function itineraryToEvent(it: ItinerarySummary): TimeboxesEvent {
   const end = new Date(
     new Date(it.startTime).getTime() + it.durationMin * 60_000,
   ).toISOString()
@@ -69,11 +72,11 @@ export function itineraryToEvent(it: ItinerarySummary): ScheduleEvent {
   }
 }
 
-/** 合并 timebox + itinerary 为按 start 升序的 ScheduleEvent 列表。 */
+/** 合并 timebox + itinerary 为按 start 升序的 TimeboxesEvent 列表。 */
 export function mergeEvents(
   timeboxes: TimeboxSummary[],
   itineraries: ItinerarySummary[],
-): ScheduleEvent[] {
+): TimeboxesEvent[] {
   return [
     ...timeboxes.map(timeboxToEvent),
     ...itineraries.map(itineraryToEvent),

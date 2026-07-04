@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TimeboxList } from "@/domains/timebox/components/timebox-list";
-import { timeboxToEvent, itineraryToEvent } from "@/domains/timebox/components/schedule-event";
+import { timeboxToEvent, itineraryToEvent } from "@/domains/timebox/components/timeboxes-event";
 import type { TimeboxSummary, ItinerarySummary } from "@/usom/types/summaries";
 
 // ─── 测试数据 ───────────────────────────────────────────────────

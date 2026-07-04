@@ -38,11 +38,31 @@ function isValidNumber(value: unknown): boolean {
 // 见 A2 OV#P1-#1 + 客户端把 duration 折成 endTime 上送）
 const REQUIRED_FIELDS = ['title', 'startTime', 'endTime']
 
+/**
+ * 状态转换 action（不含 createTimebox/editTimebox）：title/startTime/endTime 从 DB
+ * 行加载（不是 form 提交），字段必含检查应跳过。
+ *
+ * 与 domains/timebox/rules-registry.ts:STATUS_TRANSITION_ACTIONS 同源——两侧都需
+ * 跳过，否则一边漏一边拦截仍会弹 confirmation dialog。
+ *
+ * [023.03] QA fix: status transition 应当 pass（字段从 DB 加载，submit 端不会
+ * 携带），否则核心规则仍会误判 warning → orchestrator 聚合成 NeedConfirm。
+ */
+const STATUS_TRANSITION_ACTIONS = new Set([
+  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox', 'overtimeTimebox',
+  'cancelItinerary', 'startItinerary', 'completeItinerary', 'expireItinerary',
+])
+
 export const FieldCompletenessRule: Rule = {
   name: 'FieldCompletenessRule',
 
   evaluate(intent: StructuredIntent, _snapshot: ContextSnapshot): RuleResult {
     if (intent.targetDomain !== 'timebox') return { severity: 'pass' }
+
+    // [023.03] QA fix: 状态转换 action 跳过字段必含检查（字段从 DB 加载）
+    if (typeof intent.action === 'string' && STATUS_TRANSITION_ACTIONS.has(intent.action)) {
+      return { severity: 'pass' }
+    }
 
     // [026] P0-2 修复（issue #2 误判 itinerary 缺 endTime → NeedConfirm）：
     //   itinerary 域用 durationMin 而非 endTime（行程时长由 durationMin 决定，

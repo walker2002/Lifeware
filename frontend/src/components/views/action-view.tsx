@@ -12,6 +12,12 @@
  *
  * 命名约定：Component key 与 intent_trigger.action 一致（camelCase），保持
  * 单一来源以避免 manifest 与路由表双向漂移。
+ *
+ * [023.03] T4：删 ScheduleView 导入 + viewSchedule/view_schedule 特殊分支 +
+ * scheduleProps 字段。route /schedule → /timeboxes 后，ActionView 不再承担
+ * 主页 schedule 视图。T4+恢复：主页 mainViewState='schedule' 分支直接渲染
+ * TimeboxesWorkspace；本表不再需要 viewSchedule 入口（manifest view_route
+ * /timeboxes 走 URL 路由）。
  */
 
 "use client"
@@ -22,7 +28,6 @@ import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
 import { OkrWorkspacePage } from "@/domains/okrs/pages/OkrWorkspacePage"
 import { TimeboxTemplatesPage } from "@/domains/timebox/pages/TimeboxTemplatesPage"
 import { ItineraryPage } from "@/domains/timebox/pages/ItineraryPage"
-import { ScheduleView } from "@/components/views/schedule-view"
 
 const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
   habits: {
@@ -53,15 +58,12 @@ interface ActionViewProps {
   domainId: string
   action: string
   initialFields?: Record<string, unknown>
-  scheduleProps?: React.ComponentProps<typeof ScheduleView>
+  // [023.03] T4：删 scheduleProps（主页 redirect 后无来源）
 }
 
-export function ActionView({ domainId, action, initialFields, scheduleProps }: ActionViewProps) {
-  if (domainId === 'timebox' && (action === 'viewSchedule' || action === 'view_schedule')) {
-    if (!scheduleProps) return null
-    return <ScheduleView {...scheduleProps} />
-  }
-
+export function ActionView({ domainId, action, initialFields }: ActionViewProps) {
+  // [023.03] T4：删 viewSchedule/view_schedule 特殊分支（manifest view_route 已 /timeboxes，
+  // 由 CNUI/GrowthMenu 触发等价跳转：router.push('/timeboxes')，详见 manifest view_routes.viewSchedule）
   const ViewComponent = VIEW_PAGE_COMPONENTS[domainId]?.[action]
   if (ViewComponent) {
     const props = action === 'createHabit'

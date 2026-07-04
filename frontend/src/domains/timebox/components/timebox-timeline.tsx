@@ -1,23 +1,34 @@
 /**
  * @file timebox-timeline
- * @brief 垂直可视化时间轴（[026] A3.2 适配 kind 分支）
+ * @brief 垂直可视化时间轴（[026] A3.2 适配 kind 分支 + [023.03] T2 重叠布局）
  *
  * 左侧 06:00-23:00 时间刻度，右侧事件色块。
  *
- * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
+ * [023.03] T2：timebox 块接入 computeOverlapLayout 算法。
+ * - 同时间点 active 数 ≤4：等分宽度 + 列偏移
+ * - >4：isOvercrowded fallback，width=100%, left=0（仅边框提示）
+ * - itinerary 仍按现状显示在底层（不参与列分配）
+ *
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - kind='timebox'：既有渲染路径（**与改动前字节级一致**，IRON RULE 守护）
  * - kind='itinerary'：行程色块（border-l-primary 锁定视觉）
  *
- * 拆分规则：调用方传 ScheduleEvent[]，本组件按 e.kind 分支渲染。
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 分支渲染。
  */
 "use client"
 
-import type { ScheduleEvent } from "./schedule-event"
+import type { TimeboxesEvent } from "./timeboxes-event"
 import type { TimeboxStatus } from "@/usom/types/primitives"
 import { getCardBorderColor } from "@/lib/color-coding"
+import { computeOverlapLayout } from "@/domains/timebox/lib/overlap-layout"
+import {
+  Tooltip, TooltipTrigger, TooltipContent,
+} from "@/components/ui/tooltip"
 
 interface TimeboxTimelineProps {
-  events: ScheduleEvent[]
+  events: TimeboxesEvent[]
 }
 
 // 时间轴范围
@@ -38,6 +49,10 @@ const STATUS_COLORS: Record<TimeboxStatus, string> = {
 /** itinerary 行程色块样式（border-l-primary 锁定视觉） */
 const ITINERARY_COLOR = "bg-primary/10 border-primary"
 
+/** 时间轴左侧刻度宽度 + 右侧间距（用于 left/width 计算） */
+const AXIS_LEFT_REM = 2.5
+const AXIS_RIGHT_REM = 0.5
+
 /** 将 ISO 时间戳转换为小时数（小数） */
 function timestampToHours(ts: string): number {
   const d = new Date(ts)
@@ -54,12 +69,6 @@ function formatHour(h: number): string {
   return `${String(h).padStart(2, "0")}:00`
 }
 
-/**
- * TimeboxTimeline — 垂直可视化时间轴
- *
- * [026] A3.2 IRON RULE：纯 timebox-only 输入（含空 itinerary）时，
- * 渲染输出与 T13 改动前字节级一致——T15 回归测试会守护。
- */
 export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
   if (events.length === 0) {
     return (
@@ -71,6 +80,10 @@ export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
 
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60
   const nowPercent = Math.max(0, Math.min(100, ((currentHour - TIMELINE_START) / HOURS) * 100))
+
+  // [023.03] T2：计算重叠布局
+  const layouts = computeOverlapLayout(events)
+  const layoutByEventId = new Map(layouts.map(l => [l.event.id, l]))
 
   return (
     <div className="relative rounded-lg border border-hairline bg-surface-card p-4">
@@ -111,18 +124,41 @@ export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
             const tb = e.source
             const colorClass = STATUS_COLORS[tb.status as TimeboxStatus] ?? STATUS_COLORS.planned
             const borderColor = getCardBorderColor(tb.executionRecord)
-            return (
+            const layout = layoutByEventId.get(e.id)!
+            // [023.03] T2：基于布局计算 left/width
+            const widthPct = layout.isOvercrowded ? 100 : 100 / layout.totalCols
+            const leftPct = layout.isOvercrowded ? 0 : layout.col * widthPct
+            const overlapBorder = layout.totalCols > 1 ? "border-2 border-error" : ""
+            const leftStyle = `calc(${AXIS_LEFT_REM}rem + (100% - ${AXIS_LEFT_REM}rem - ${AXIS_RIGHT_REM}rem) * ${leftPct / 100})`
+            const widthStyle = `calc((100% - ${AXIS_LEFT_REM}rem - ${AXIS_RIGHT_REM}rem) * ${widthPct / 100})`
+            const block = (
               <div
                 key={e.id}
-                className={`absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 ${colorClass} ${borderColor} border-t border-r border-b`}
-                style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }}
+                className={`absolute rounded-md border-l-4 px-2 py-1 ${colorClass} ${borderColor} ${overlapBorder} border-t border-r border-b`}
+                style={{
+                  top: `${top}%`,
+                  height: `${Math.max(height, 2)}%`,
+                  left: leftStyle,
+                  width: widthStyle,
+                }}
               >
                 <p className="truncate text-xs font-medium text-ink">{tb.title}</p>
               </div>
             )
+            if (layout.totalCols > 1) {
+              return (
+                <Tooltip key={e.id}>
+                  <TooltipTrigger asChild>{block}</TooltipTrigger>
+                  <TooltipContent>
+                    <p>本时段有 {layout.totalCols} 个时间盒重叠</p>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            }
+            return block
           }
 
-          // kind === "itinerary"
+          // kind === "itinerary"（[023.03] T2：itinerary 不参与布局，保持 left-12 right-2）
           return (
             <div
               key={e.id}

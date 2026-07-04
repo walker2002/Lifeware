@@ -2,7 +2,7 @@
  * @file mini-calendar.regression.test
  * @brief [026] T15 P1 CRITICAL IRON RULE 守护 — MiniCalendar 纯 timebox-only 输入
  *
- * [026] A3.2 把 MiniCalendar 改为接受 `events: ScheduleEvent[]`。
+ * [026] A3.2 把 MiniCalendar 改为接受 `events: TimeboxesEvent[]`。
  * MiniCalendar 仅判断"指定日期是否有任意事件"（不按 kind 派生态），因此：
  * - IRON RULE：纯 timebox-only 输入（kind 全部 = 'timebox'）的渲染输出
  *   与 T13 改动前字节级一致。
@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { render } from '@testing-library/react'
 import { MiniCalendar } from '../mini-calendar'
 import type { TimeboxSummary } from '@/usom/types/summaries'
-import type { ScheduleEvent } from '../schedule-event'
-import { timeboxToEvent } from '../schedule-event'
+import type { TimeboxesEvent } from '../timeboxes-event'
+import { timeboxToEvent } from '../timeboxes-event'
 
 // 固定"今天"：MiniCalendar 用 `new Date()` 判 isToday，
 // snapshot 必须有确定日期才能稳定。
@@ -31,7 +31,7 @@ afterAll(() => {
   vi.useRealTimers()
 })
 
-function makeSamples(): ScheduleEvent[] {
+function makeSamples(): TimeboxesEvent[] {
   const s1: TimeboxSummary = {
     id: 'tb-1',
     title: '晨会',

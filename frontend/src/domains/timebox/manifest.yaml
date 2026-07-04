@@ -58,7 +58,7 @@ intent_triggers:
       - 查看今天的日程
       - 今天有什么安排
     keywords: [日程, schedule, 安排, 今天]
-    view_route: /schedule
+    view_route: /timeboxes
   - action: configTimeboxTemplates
     shortcut: /timeboxTemplates
     description: 时间盒模板管理
@@ -349,8 +349,8 @@ subscribed_events:
 #   标识实际入口组件（[023] A2.3 / A2.8 真实页面）。
 view_routes:
   viewSchedule:
-    component: app/schedule/page
-    url: /schedule
+    component: app/timeboxes/page
+    url: /timeboxes
   configTimeboxTemplates:
     component: domains/timebox/pages/TimeboxTemplatesPage
     url: /timebox-templates

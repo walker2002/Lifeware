@@ -4,11 +4,13 @@
  *
  * 显示当月日历网格，标记有事件的日期。
  *
- * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - 有任意 kind 的事件（timebox/itinerary）都标点
  * - 纯 timebox-only 输入（含空 itinerary）时与 T13 改动前字节级一致（IRON RULE 守护）
  *
- * 拆分规则：调用方传 ScheduleEvent[]，本组件按 e.kind 派生态不分支（仅判断有无）。
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 派生态不分支（仅判断有无）。
  */
 "use client"
 
@@ -24,19 +26,19 @@ import {
   endOfWeek,
 } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import type { ScheduleEvent } from "./schedule-event"
+import type { TimeboxesEvent } from "./timeboxes-event"
 
 interface MiniCalendarProps {
   currentDate: Date
   selectedDate?: Date
-  events: ScheduleEvent[]
+  events: TimeboxesEvent[]
   onDateSelect?: (date: Date) => void
 }
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
 /** 判断指定日期是否有任意事件（timebox 或 itinerary） */
-function hasEventOnDate(date: Date, events: ScheduleEvent[]): boolean {
+function hasEventOnDate(date: Date, events: TimeboxesEvent[]): boolean {
   return events.some((e) => {
     const start = new Date(e.start)
     return isSameDay(start, date)
