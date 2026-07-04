@@ -90,6 +90,47 @@
 - 测试 4 文件新增 + 1 改（`overlap.test.ts` / `timebox-overlap.test.ts` / `parse-timeboxes.test.ts` / `edit-timeboxes.test.tsx` / `handlers.test.ts` editTimeboxes 分支）+ CreateTimebox 3 case UI 测试 + 解析优先模式 7 case UI 测试
 - 文档同步：`docs/database-design.md` §4.7 末尾追加「时间盒重叠规则（[023.04]）」 / `docs/usom-design.md` §3.9 末尾追加「时间盒修改/取消/删除意图统一入口（[023.04]）」 / 023-01 spec 末尾追加「[023.04] 状态更新」指针
 
+## [023.05-1] Timebox 域 schedule 命名释放
+
+> 2026_07_05 — ship-ready（7 commits: manifest 6 块 + AdjustTimeboxes + orchestration-handler + viewSchedule 替换 + 测试同步 + C-1 双注册 + ship-then-polish）。**[023.05] PR1 阶段 1 ship-ready**，为 PR2 itinerary→schedule 释放 `schedule` 命名空间。
+
+### 关键决策
+
+- **D1 双向清理**：中文「日程」→「时间盒」（manifest keywords/examples/description + cnui/handlers UI 文案 + AdjustSchedule UI）。避免「日程 vs 日程计划」撞车
+- **D2 orchestration-handler**：class `SchedulingHandler` → `TimeboxOrchestrationHandler`；文件 + 5 处注释引用同步
+- **D3 双 PR 手动**：本 PR 为 PR1 阶段 1（纯 refactor, 无 DB 迁移）；PR2 阶段 2 itinerary→schedule 全层 + 0033 rename 迁移后续启
+
+### 改动清单
+
+- `manifest.yaml` 6 块改名：`viewSchedule`→`viewTimeboxes` / `createSmartSchedule`→`createSmartTimeboxes` / `adjustRemainingSchedule`→`adjustRemainingTimeboxes` + view_routes/generation_actions/cnui_surfaces `adjust-schedule`→`adjust-timeboxes` + 中文清理
+- git mv `AdjustSchedule.tsx`→`AdjustTimeboxes.tsx` + `domain/index.ts` import + cnuiRegistry 双注册
+- git mv `scheduling-handler.ts`→`orchestration-handler.ts` (98% similarity) + class 改名 + handlers/index.ts map + 5 处注释引用 (energy-state-manager/energy-curve-provider/rules-registry/cnui-handlers/primitives) + cnui/handlers.ts UI 文案
+- `use-intent-handler.ts:288` action 名 `viewSchedule`→`viewTimeboxes`；保留 `mainViewState.type='schedule'` 字面量（OQ-1，view state literal 非 schedule 对象）
+- `cnui/handlers.ts` dispatch 4 branch + surfaceHandlers map + cnui/handlers UI 文案「日程」→「时间盒」
+- 测试 15+ 文件同步：git mv `scheduling-handler.test.ts`→`orchestration-handler.test.ts` + 14 文件全局 rename
+- ship-then-polish 4 cosmetic Minor：handlers.test.ts:139 it() title + domain-types.test.ts:170-172 fixture + action-view.test.tsx:75 INLINE_DISPATCH + orchestration-handler.ts ScheduleItem→TimeboxItem interface
+
+### 验证
+
+- `grep -E "action:.*Schedule" frontend/src/domains/timebox/manifest.yaml` = **0 hits**（F1 grep gate）
+- `npm run validate:manifest` = **0 errors**（2 WARN + 2 INFO pre-existing）
+- `tsc --noEmit` = **89 errors**（与 base 一致）
+- vitest polished tests = **17/17 PASS**（orchestration-handler + cnui-handlers）
+- `/timeboxes` HTTP 200 + GrowthMenu 显示 `viewTimeboxes`/`createSmartTimeboxes`/`adjustRemainingTimeboxes`
+
+### C-1 风格双注册修复（3 处，Task 1+3 漏 → Task 5 补齐）
+
+- `domain/index.ts:41` cnuiRegistry.register('timebox','adjust-timeboxes',{ component: AdjustTimeboxes })
+- `nexus/ai-runtime/cnui/register-client-surfaces.ts:26` framework 客户端注册
+- `cnui/handlers.ts:541` server surfaceHandlers map + 4 dispatch branches (L106/L164/L348/L372)
+- 任何一处漏改 → runtime 「Handler 未找到」或 11+ 测试失败
+
+### 范围
+
+- 29 文件 / 139+ / 138-（rename 平衡）
+- 无 DB 迁移（PR1 阶段 1 明确不碰 schema.ts/migrations）
+- 无 itinerary/Itinerary* 改动（PR2 阶段 2 范围）
+
 ## [026] Itinerary 域
 
 > 2026_07_03 — A3 ship（14 commits：4 action + 5 态存储 + lazy reconcile + /schedule 锁定合并 + I-1 修复 + Tier 2 docs）。**[026] 全闭环 ship-ready**
