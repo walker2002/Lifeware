@@ -9,15 +9,17 @@
  * - >4：isOvercrowded fallback，width=100%, left=0（仅边框提示）
  * - itinerary 仍按现状显示在底层（不参与列分配）
  *
- * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - kind='timebox'：既有渲染路径（**与改动前字节级一致**，IRON RULE 守护）
  * - kind='itinerary'：行程色块（border-l-primary 锁定视觉）
  *
- * 拆分规则：调用方传 ScheduleEvent[]，本组件按 e.kind 分支渲染。
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 分支渲染。
  */
 "use client"
 
-import type { ScheduleEvent } from "./schedule-event"
+import type { TimeboxesEvent } from "./timeboxes-event"
 import type { TimeboxStatus } from "@/usom/types/primitives"
 import { getCardBorderColor } from "@/lib/color-coding"
 import { computeOverlapLayout } from "@/domains/timebox/lib/overlap-layout"
@@ -26,7 +28,7 @@ import {
 } from "@/components/ui/tooltip"
 
 interface TimeboxTimelineProps {
-  events: ScheduleEvent[]
+  events: TimeboxesEvent[]
 }
 
 // 时间轴范围

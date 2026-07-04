@@ -6,22 +6,24 @@
  * compact=true: 单列紧凑列表。
  * 列表为空时显示空状态提示。
  *
- * [026] A3.2 适配：props 由 TimeboxSummary[] → ScheduleEvent[]。
+ * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - kind='timebox' 走 TimeboxCard（**与改动前字节级一致**，IRON RULE 守护）
  * - kind='itinerary' 走新的 ItineraryLockedCard（锁定行程卡）
  *
- * 拆分规则：调用方传 ScheduleEvent[]，本组件按 e.kind 分支渲染。
- * 排序已在 mergeEvents()（schedule-event.ts）完成；本组件不再排序。
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 分支渲染。
+ * 排序已在 mergeEvents()（timeboxes-event.ts）完成；本组件不再排序。
  */
 "use client";
 
 import { TimeboxCard } from "./timebox-card";
 import { ItineraryLockedCard } from "./itinerary-locked-card";
-import type { ScheduleEvent } from "./schedule-event";
+import type { TimeboxesEvent } from "./timeboxes-event";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 
 interface TimeboxListProps {
-  events: ScheduleEvent[];
+  events: TimeboxesEvent[];
   /** 紧凑模式：单列列表，用于今日模式左列 */
   compact?: boolean;
   /** 状态转换操作回调（仅对 timebox 生效，itinerary 走 CNUI） */

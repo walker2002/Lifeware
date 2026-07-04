@@ -3,7 +3,7 @@
  * @brief 行程 lazy reconcile server action helper（[026] D2 reversal 收口）
  *
  * 对 userId 所有非终态行程跑 reconcileItineraryStatuses，逐条走 SM transition。
- * 供 A3.1 (/itineraries server component) + A3.2 (/schedule loadDay) 显式调用。
+ * 供 A3.1 (/itineraries server component) + A3.2 (/timeboxes loadDay) 显式调用。
  * 零 cron、零后台 job。
  *
  * [026] codex D5 决议（先于本任务落实于 T7）: getItinerariesByRange 是纯读函数，

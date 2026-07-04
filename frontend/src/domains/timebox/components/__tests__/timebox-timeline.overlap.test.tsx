@@ -7,8 +7,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { TimeboxTimeline } from '../timebox-timeline'
 import type { TimeboxSummary } from '@/usom/types/summaries'
-import type { ScheduleEvent } from '../schedule-event'
-import { timeboxToEvent } from '../schedule-event'
+import type { TimeboxesEvent } from '../timeboxes-event'
+import { timeboxToEvent } from '../timeboxes-event'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 const FROZEN_NOW = new Date('2026-07-15T17:00:00.000Z')
@@ -25,7 +25,7 @@ afterAll(() => {
 const renderWithTooltip = (ui: React.ReactElement) =>
   render(<TooltipProvider>{ui}</TooltipProvider>)
 
-const tb = (id: string, start: string, end: string): ScheduleEvent => {
+const tb = (id: string, start: string, end: string): TimeboxesEvent => {
   const s: TimeboxSummary = {
     id, title: id, status: 'planned', startTime: start, endTime: end, taskIds: [], habitIds: [],
   }

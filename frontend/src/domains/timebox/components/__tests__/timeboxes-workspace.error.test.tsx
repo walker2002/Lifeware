@@ -1,5 +1,5 @@
 /**
- * @file schedule-workspace.error.test
+ * @file timeboxes-workspace.error.test
  * @brief [023.03] T3: handleEdit/handleAction 错误反馈单测
  */
 
@@ -28,12 +28,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 
-import { ScheduleWorkspace } from '../schedule-workspace'
+import { TimeboxesWorkspace } from '../timeboxes-workspace'
 
 describe('[023.03] T3 — handleEdit 错误反馈', () => {
   it('getTimeboxById 抛错 → toast.error 出现', async () => {
     getTimeboxByIdMock.mockRejectedValue(new Error('数据库连接失败'))
-    render(<ScheduleWorkspace />)
+    render(<TimeboxesWorkspace />)
     // 等待初始 loadDay 完成
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     // 通过 DayView 的 TimeboxCard 触发 onEdit；此处通过暴露的 handleEdit 行为触发：找到空状态点击新建不会触发 edit；
@@ -51,7 +51,7 @@ describe('[023.03] T3 — handleEdit 错误反馈', () => {
 describe('[023.03] T3 — handleAction 错误反馈', () => {
   it('transitionTimebox 抛错 → toast.error 出现', async () => {
     transitionTimeboxMock.mockRejectedValue(new Error('SM transition rejected'))
-    render(<ScheduleWorkspace />)
+    render(<TimeboxesWorkspace />)
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     expect(transitionTimeboxMock).toBeDefined()
   })
@@ -63,7 +63,7 @@ describe('[023.03] T3 — handleAction 错误反馈', () => {
       confirmAction: 'startTimebox',
       confirmFields: {},
     })
-    render(<ScheduleWorkspace />)
+    render(<TimeboxesWorkspace />)
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     expect(transitionTimeboxMock).toBeDefined()
   })

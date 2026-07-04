@@ -1,6 +1,6 @@
 /**
- * @file schedule-workspace
- * @brief 时间盒工作台（[023] A2 / [026] A3.2 / [023.03] T3 错误反馈）
+ * @file timeboxes-workspace
+ * @brief 时间盒工作台（[023] A2 / [026] A3.2 / [023.03] T3 错误反馈 / [023.03] T4 重命名 /schedule→/timeboxes）
  *
  * 左栏：日期导航 + 当日时间盒列表（DayView 复用），支持创建/编辑/删除/lifecycle。
  * 右栏：Timebox Drawer 挂载点（Variant C v2，T4 实现）。
@@ -11,12 +11,16 @@
  * - handleAction 包 try/catch + 处理 needs_confirm → AlertDialog
  * - Drawer 标题前缀 [新建]/[编辑] 区分模式
  *
+ * [023.03] T4：route /schedule → /timeboxes 重命名，类型/组件标识同步。
+ * 函数名/类型名 改为 TimeboxesWorkspace / TimeboxesEvent；
+ * 文件路径在时间盒域内统一为 timeboxes-* 前缀。
+ *
  * [026] A3.2：loadDay 改用 Promise.all 并行拉 timebox + itinerary，
- * 合并为 ScheduleEvent[] 后塞给 DayView。
+ * 合并为 TimeboxesEvent[] 后塞给 DayView。
  *
  * [026] codex D5 修复：loadDay **不**调 reconcileAndAdvanceItineraries
- * （避免 /schedule 翻日历页重推 N 次 SM）。reconcile 仅在 /itineraries
- * 触发。Trade-off：/schedule 可能显陈旧状态。可接受 MVP。
+ * （避免 /timeboxes 翻日历页重推 N 次 SM）。reconcile 仅在 /itineraries
+ * 触发。Trade-off：/timeboxes 可能显陈旧状态。可接受 MVP。
  */
 
 'use client'
@@ -26,7 +30,7 @@ import { DayView } from './day-view'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
-import { mergeEvents, type ScheduleEvent } from './schedule-event'
+import { mergeEvents, type TimeboxesEvent } from './timeboxes-event'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
@@ -53,9 +57,9 @@ interface ConfirmState {
   action: () => Promise<void>
 }
 
-export function ScheduleWorkspace() {
+export function TimeboxesWorkspace() {
   const [date, setDate] = useState(() => new Date())
-  const [events, setEvents] = useState<ScheduleEvent[]>([])
+  const [events, setEvents] = useState<TimeboxesEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [drawer, setDrawer] = useState<DrawerState | null>(null)
   // [023.03] T3：needs_confirm AlertDialog 状态
@@ -73,7 +77,7 @@ export function ScheduleWorkspace() {
       ])
       setEvents(mergeEvents(timeboxList, itineraryList))
     } catch (e) {
-      console.error('[ScheduleWorkspace] 加载失败', e)
+      console.error('[TimeboxesWorkspace] 加载失败', e)
     } finally {
       setLoading(false)
     }
@@ -107,7 +111,7 @@ export function ScheduleWorkspace() {
       // 未知 status（防御性提示）
       toast.error('操作未完成')
     } catch (e) {
-      console.error('[ScheduleWorkspace.handleAction] failed', e)
+      console.error('[TimeboxesWorkspace.handleAction] failed', e)
       toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setActionSubmitting(false)
@@ -124,7 +128,7 @@ export function ScheduleWorkspace() {
       }
       setDrawer({ mode: 'edit', editTarget: tb })
     } catch (e) {
-      console.error('[ScheduleWorkspace.handleEdit] failed', e)
+      console.error('[TimeboxesWorkspace.handleEdit] failed', e)
       toast.error(`加载时间盒失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [])

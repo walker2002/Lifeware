@@ -2,25 +2,27 @@
  * @file overlap-layout
  * @brief 时间盒重叠区间扫描 + 列分配（B3 算法，[023.03] T1）
  *
- * 对 ScheduleEvent[] 按 startTime 升序，贪心装箱分配 column；
+ * 对 TimeboxesEvent[] 按 startTime 升序，贪心装箱分配 column；
  * 同时间点 active 的最大 column 数 = totalCols；
  * totalCols > 4 → isOvercrowded=true（fallback 仅边框提示不缩宽）。
  *
  * itinerary 不参与（仅 kind='timebox'），输出 col=0, totalCols=1。
  *
+ * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
  * @see docs/superpowers/specs/2026-07-04-023.03-timebox-page-optimization-design.md §4
  */
 
-import type { ScheduleEvent } from '../components/schedule-event'
+import type { TimeboxesEvent } from '../components/timeboxes-event'
 
 export interface OverlapLayout {
-  event: ScheduleEvent
+  event: TimeboxesEvent
   col: number
   totalCols: number
   isOvercrowded: boolean
 }
 
-export function computeOverlapLayout(events: ScheduleEvent[]): OverlapLayout[] {
+export function computeOverlapLayout(events: TimeboxesEvent[]): OverlapLayout[] {
   const timeboxes = events.filter(e => e.kind === 'timebox')
   const others = events.filter(e => e.kind !== 'timebox')
 
@@ -31,7 +33,7 @@ export function computeOverlapLayout(events: ScheduleEvent[]): OverlapLayout[] {
 
   // 3. 贪心 column 分配
   const cols: number[] = [] // index = col, value = last event end (ms)
-  type Placement = { event: ScheduleEvent; col: number; endMs: number }
+  type Placement = { event: TimeboxesEvent; col: number; endMs: number }
   const placements: Placement[] = []
   for (const ev of sorted) {
     const startMs = new Date(ev.start).getTime()

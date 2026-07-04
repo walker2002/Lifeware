@@ -7,10 +7,10 @@
 
 import { describe, it, expect } from 'vitest'
 import { computeOverlapLayout } from '../overlap-layout'
-import type { ScheduleEvent } from '../../components/schedule-event'
+import type { TimeboxesEvent } from '../../components/timeboxes-event'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 
-const tb = (id: string, start: string, end: string): ScheduleEvent => ({
+const tb = (id: string, start: string, end: string): TimeboxesEvent => ({
   kind: 'timebox',
   id,
   title: id,
@@ -20,7 +20,7 @@ const tb = (id: string, start: string, end: string): ScheduleEvent => ({
   source: { id, title: id, startTime: start, endTime: end, status: 'planned', taskIds: [], habitIds: [] } as TimeboxSummary,
 })
 
-const itn = (id: string, start: string, end: string): ScheduleEvent => ({
+const itn = (id: string, start: string, end: string): TimeboxesEvent => ({
   kind: 'itinerary',
   id,
   title: id,

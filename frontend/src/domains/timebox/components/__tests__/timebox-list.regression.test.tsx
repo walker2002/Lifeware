@@ -2,7 +2,7 @@
  * @file timebox-list.regression.test
  * @brief [026] T15 P1 CRITICAL IRON RULE 守护 — TimeboxList 纯 timebox-only 输入
  *
- * [026] A3.2 把 TimeboxList 改为接受 `events: ScheduleEvent[]` 并按 kind 分支。
+ * [026] A3.2 把 TimeboxList 改为接受 `events: TimeboxesEvent[]` 并按 kind 分支。
  * IRON RULE 承诺：纯 kind='timebox' 输入的渲染输出与 T13 改动前字节级一致。
  *
  * 本测试同时使用两种守护手段：
@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { render } from '@testing-library/react'
 import { TimeboxList } from '../timebox-list'
 import type { TimeboxSummary } from '@/usom/types/summaries'
-import type { ScheduleEvent } from '../schedule-event'
-import { timeboxToEvent } from '../schedule-event'
+import type { TimeboxesEvent } from '../timeboxes-event'
+import { timeboxToEvent } from '../timeboxes-event'
 
 // 固定"现在"避免 TimeboxCard 的倒计时/timeline 的当前线每次跑都漂，
 // snapshot 才能跨运行一致。
@@ -32,7 +32,7 @@ afterAll(() => {
 })
 
 /** 构造 3 个不同形态的 TimeboxSummary 样本（覆盖 status / taskIds / habitIds / startedAt） */
-function makeSamples(): ScheduleEvent[] {
+function makeSamples(): TimeboxesEvent[] {
   const s1: TimeboxSummary = {
     id: 'tb-1',
     title: '晨会',
