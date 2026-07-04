@@ -15,7 +15,9 @@
  *
  * [023.03] T4：删 ScheduleView 导入 + viewSchedule/view_schedule 特殊分支 +
  * scheduleProps 字段。route /schedule → /timeboxes 后，ActionView 不再承担
- * 主页 schedule 视图（主页整页 redirect 到 /timeboxes）。
+ * 主页 schedule 视图。T4+恢复：主页 mainViewState='schedule' 分支直接渲染
+ * TimeboxesWorkspace；本表不再需要 viewSchedule 入口（manifest view_route
+ * /timeboxes 走 URL 路由）。
  */
 
 "use client"
