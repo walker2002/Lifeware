@@ -16,7 +16,7 @@ describe('GenerationRequest 扩展 (T026b)', () => {
         id: '1',
         intentionId: 'i1',
         targetDomain: 'timebox',
-        action: 'createSmartSchedule',
+        action: 'createSmartTimeboxes',
         fields: {},
         confidence: 0.9,
         resolvedBy: 'ai',
@@ -35,7 +35,7 @@ describe('GenerationRequest 扩展 (T026b)', () => {
         id: '1',
         intentionId: 'i1',
         targetDomain: 'timebox',
-        action: 'createSmartSchedule',
+        action: 'createSmartTimeboxes',
         fields: {},
         confidence: 0.9,
         resolvedBy: 'ai',
@@ -59,7 +59,7 @@ describe('GenerationRequest 扩展 (T026b)', () => {
         id: '1',
         intentionId: 'i1',
         targetDomain: 'timebox',
-        action: 'createSmartSchedule',
+        action: 'createSmartTimeboxes',
         fields: {},
         confidence: 0.9,
         resolvedBy: 'ai',
@@ -80,7 +80,7 @@ describe('GenerationRequest 扩展 (T026b)', () => {
     const request: GenerationRequest = {
       intent: {
         id: '1', intentionId: 'i1', targetDomain: 'timebox',
-        action: 'createSmartSchedule', fields: {},
+        action: 'createSmartTimeboxes', fields: {},
         confidence: 0.9, resolvedBy: 'ai', createdAt: new Date().toISOString(),
       },
       contexts: {},
@@ -169,7 +169,7 @@ describe('AISessionManager (T025)', () => {
 
     const session = await manager.create({
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       userId: 'user-001',
     })
 
@@ -183,7 +183,7 @@ describe('AISessionManager (T025)', () => {
 
     const session = await manager.create({
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       userId: 'user-001',
     })
 
@@ -206,7 +206,7 @@ describe('AISessionManager (T025)', () => {
 
     const session = await manager.create({
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       userId: 'user-001',
     })
 
@@ -220,7 +220,7 @@ describe('AISessionManager (T025)', () => {
 
     const session = await manager.create({
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       userId: 'user-001',
     })
 

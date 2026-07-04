@@ -24,7 +24,7 @@ function makeRequest(overrides?: Partial<GenerationRequest>): GenerationRequest 
   return {
     intent: {
       id: '1', intentionId: 'i1', targetDomain: 'timebox',
-      action: 'createSmartSchedule', fields: {},
+      action: 'createSmartTimeboxes', fields: {},
       confidence: 0.9, resolvedBy: 'ai', createdAt: new Date().toISOString(),
     },
     contexts: {},
@@ -32,12 +32,12 @@ function makeRequest(overrides?: Partial<GenerationRequest>): GenerationRequest 
   }
 }
 
-// ─── T027: SchedulingHandler onGenerate ───────────────────────
+// ─── T027: TimeboxOrchestrationHandler onGenerate ───────────────────────
 
-describe('SchedulingHandler onGenerate (T027)', () => {
+describe('TimeboxOrchestrationHandler onGenerate (T027)', () => {
   it('onGenerate 调用 aiRuntime.generate 并返回增强结果', async () => {
-    const { SchedulingHandler } = await import('@/domains/timebox/handlers/scheduling-handler')
-    const handler = new SchedulingHandler()
+    const { TimeboxOrchestrationHandler } = await import('@/domains/timebox/handlers/orchestration-handler')
+    const handler = new TimeboxOrchestrationHandler()
 
     const aiRuntime = createMockAIRuntime({
       content: '建议将高优先级任务安排在上午 9-11 点',
@@ -53,8 +53,8 @@ describe('SchedulingHandler onGenerate (T027)', () => {
   })
 
   it('onGenerate AI 返回空内容时降级到 handle 结果', async () => {
-    const { SchedulingHandler } = await import('@/domains/timebox/handlers/scheduling-handler')
-    const handler = new SchedulingHandler()
+    const { TimeboxOrchestrationHandler } = await import('@/domains/timebox/handlers/orchestration-handler')
+    const handler = new TimeboxOrchestrationHandler()
 
     const aiRuntime = createMockAIRuntime({ content: '' })
 
@@ -64,8 +64,8 @@ describe('SchedulingHandler onGenerate (T027)', () => {
   })
 
   it('handle() 仍可独立调用（向后兼容）', async () => {
-    const { SchedulingHandler } = await import('@/domains/timebox/handlers/scheduling-handler')
-    const handler = new SchedulingHandler()
+    const { TimeboxOrchestrationHandler } = await import('@/domains/timebox/handlers/orchestration-handler')
+    const handler = new TimeboxOrchestrationHandler()
 
     const result = await handler.handle(makeRequest())
 
@@ -149,13 +149,13 @@ describe('Context Engine assembler 扩展 (T028b)', () => {
 describe('Session + Handler 端到端 (T029)', () => {
   it('Session 创建 → Handler onGenerate → Session 归档', async () => {
     const { createAISessionManager } = await import('../session/index')
-    const { SchedulingHandler } = await import('@/domains/timebox/handlers/scheduling-handler')
+    const { TimeboxOrchestrationHandler } = await import('@/domains/timebox/handlers/orchestration-handler')
 
     // 1. 创建 Session
     const sessionManager = createAISessionManager()
     const session = await sessionManager.create({
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       userId: 'user-001',
     })
     expect(session.status).toBe('created')
@@ -168,7 +168,7 @@ describe('Session + Handler 端到端 (T029)', () => {
     const messages = [{ role: 'user', content: '生成今日时间盒计划' }]
 
     // 4. Handler 处理（带 session 信息）
-    const handler = new SchedulingHandler()
+    const handler = new TimeboxOrchestrationHandler()
     const aiRuntime = createMockAIRuntime({ content: '建议安排 3 个时间盒' })
 
     const request = makeRequest({

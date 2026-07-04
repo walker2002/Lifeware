@@ -41,7 +41,7 @@ describe('Memory L2 Episode Layer (T050)', () => {
       userId: 'user-001',
       sessionId: 'session-001',
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       messages: [
         { role: 'user', content: '帮我安排今天的计划' },
         { role: 'assistant', content: '好的，已为您安排3个时间盒' },
@@ -64,7 +64,7 @@ describe('Memory L2 Episode Layer (T050)', () => {
       userId: 'user-001',
       sessionId: 'session-001',
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       messages: [],
     }, aiRuntime)
 
@@ -82,7 +82,7 @@ describe('Memory L2 Episode Layer (T050)', () => {
       userId: 'user-001',
       sessionId: 'session-001',
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       messages: [
         { role: 'user', content: '帮我安排今天的计划' },
         { role: 'assistant', content: '已安排3个时间盒' },

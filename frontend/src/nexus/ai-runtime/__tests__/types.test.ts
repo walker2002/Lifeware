@@ -26,13 +26,13 @@ describe('AIGenerateRequest', () => {
   it('should have required fields', () => {
     const request: AIGenerateRequest = {
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       systemPrompt: 'You are a helpful assistant',
       messages: [{ role: 'user', content: 'Hello' }],
       taskType: 'intent_routing',
     }
     expect(request.domainId).toBe('timebox')
-    expect(request.action).toBe('createSmartSchedule')
+    expect(request.action).toBe('createSmartTimeboxes')
     expect(request.taskType).toBe('intent_routing')
   })
 
@@ -40,7 +40,7 @@ describe('AIGenerateRequest', () => {
     const schema = z.object({ result: z.string() })
     const request: AIGenerateRequest = {
       domainId: 'timebox',
-      action: 'createSmartSchedule',
+      action: 'createSmartTimeboxes',
       systemPrompt: 'system',
       messages: [],
       taskType: 'content_generation',

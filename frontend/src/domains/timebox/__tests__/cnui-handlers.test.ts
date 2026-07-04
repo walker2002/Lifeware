@@ -34,7 +34,7 @@ describe('[023] A2 createTimebox CNUI handler', () => {
   })
 })
 
-describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
+describe('[023] A2.6 adjustRemainingTimeboxes CNUI handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(updateTimebox as any).mockResolvedValue({ status: 'ok' })
@@ -62,7 +62,7 @@ describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
     // 动态 re-import handler 以让 mock 生效
     vi.resetModules()
     const mod = await import('@/domains/timebox/cnui/handlers')
-    const r = await mod.timeboxCnuiHandler.open('adjustRemainingSchedule', {})
+    const r = await mod.timeboxCnuiHandler.open('adjustRemainingTimeboxes', {})
     const items = (r.dataSnapshot as any).items
     expect(items).toHaveLength(2)
     expect(items[0]).toMatchObject({
@@ -77,7 +77,7 @@ describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
   })
 
   it('submit cancel 调 deleteTimebox（非 submitDynamicIntent）', async () => {
-    const r = await timeboxCnuiHandler.submit('adjustRemainingSchedule', {
+    const r = await timeboxCnuiHandler.submit('adjustRemainingTimeboxes', {
       items: [{ id: 'tb-1', title: '会议', startTime: '14:00', endTime: '15:00', status: 'planned', cancel: true, _origTitle: '会议', _origStart: '14:00', _origEnd: '15:00' }],
     })
     expect(r.success).toBe(true)
@@ -87,7 +87,7 @@ describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
   })
 
   it('submit 无改动（与 _orig* 一致）不调用 updateTimebox/deleteTimebox', async () => {
-    const r = await timeboxCnuiHandler.submit('adjustRemainingSchedule', {
+    const r = await timeboxCnuiHandler.submit('adjustRemainingTimeboxes', {
       items: [{ id: 'tb-1', title: '会议', startTime: '14:00', endTime: '15:00', status: 'planned', _origTitle: '会议', _origStart: '14:00', _origEnd: '15:00' }],
     })
     expect(r.success).toBe(true)
@@ -96,7 +96,7 @@ describe('[023] A2.6 adjustRemainingSchedule CNUI handler', () => {
   })
 
   it('submit 有字段改动 → 调 updateTimebox', async () => {
-    const r = await timeboxCnuiHandler.submit('adjustRemainingSchedule', {
+    const r = await timeboxCnuiHandler.submit('adjustRemainingTimeboxes', {
       items: [{ id: 'tb-1', title: '会议延迟', startTime: '15:00', endTime: '16:00', status: 'planned', _origTitle: '会议', _origStart: '14:00', _origEnd: '15:00' }],
     })
     expect(r.success).toBe(true)

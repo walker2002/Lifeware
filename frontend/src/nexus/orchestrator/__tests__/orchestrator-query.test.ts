@@ -246,7 +246,7 @@ describe('Orchestrator Query Path', () => {
         required_fields: {},
         subscribed_events: [],
         generation_actions: {
-          createSmartSchedule: {
+          createSmartTimeboxes: {
             description: 'test',
             contexts: [{ id: 'existingTimeboxes', query: 'test', params: [] }],
           },
@@ -255,7 +255,7 @@ describe('Orchestrator Query Path', () => {
     })
 
     vi.mocked(assembleContext).mockResolvedValue({
-      intent: makeIntent('createSmartSchedule', 'timebox'),
+      intent: makeIntent('createSmartTimeboxes', 'timebox'),
       contexts: { existingTimeboxes: [] },
     } as any)
 
@@ -267,7 +267,7 @@ describe('Orchestrator Query Path', () => {
 
     const deps = makeDeps()
     const orchestrator = createOrchestrator(deps as any)
-    const intent = makeIntent('createSmartSchedule', 'timebox')
+    const intent = makeIntent('createSmartTimeboxes', 'timebox')
 
     const result = await orchestrator.executeIntent(intent, 'user1' as USOM_ID)
 

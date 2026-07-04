@@ -5,7 +5,7 @@ import type { USOM_ID } from '@/usom/types/primitives'
 // Mock context-engine
 vi.mock('@/nexus/context-engine', () => ({
   assembleContext: vi.fn().mockResolvedValue({
-    intent: { id: 'i1', action: 'createSmartSchedule' },
+    intent: { id: 'i1', action: 'createSmartTimeboxes' },
     contexts: { existingTimeboxes: [], activeTasks: [] },
   }),
 }))
@@ -137,7 +137,7 @@ describe('Orchestrator Generative Path', () => {
         required_fields: {},
         subscribed_events: [],
         generation_actions: {
-          createSmartSchedule: {
+          createSmartTimeboxes: {
             description: 'test',
             contexts: [{ id: 'existingTimeboxes', query: 'test', params: ['date'] }],
           },
@@ -156,7 +156,7 @@ describe('Orchestrator Generative Path', () => {
 
     const deps = makeDeps()
     const orchestrator = createOrchestrator(deps as any)
-    const intent = makeIntent('createSmartSchedule')
+    const intent = makeIntent('createSmartTimeboxes')
 
     const result = await orchestrator.executeIntent(intent, 'user1' as USOM_ID)
 
@@ -164,7 +164,7 @@ describe('Orchestrator Generative Path', () => {
     expect(result.generativeResult).toBeDefined()
     expect(result.generativeResult!.proposalSet.label).toBe('test')
     expect(assembleContext).toHaveBeenCalled()
-    expect(findHandler).toHaveBeenCalledWith('timebox', 'createSmartSchedule')
+    expect(findHandler).toHaveBeenCalledWith('timebox', 'createSmartTimeboxes')
     expect(mockHandler.handle).toHaveBeenCalled()
   })
 
@@ -196,7 +196,7 @@ describe('Orchestrator Generative Path', () => {
         required_fields: {},
         subscribed_events: [],
         generation_actions: {
-          createSmartSchedule: {
+          createSmartTimeboxes: {
             description: 'test',
             contexts: [{ id: 'existingTimeboxes', query: 'test', params: [] }],
           },
@@ -210,7 +210,7 @@ describe('Orchestrator Generative Path', () => {
 
     const deps = makeDeps()
     const orchestrator = createOrchestrator(deps as any)
-    const intent = makeIntent('createSmartSchedule')
+    const intent = makeIntent('createSmartTimeboxes')
 
     const result = await orchestrator.executeIntent(intent, 'user1' as USOM_ID)
 
@@ -234,7 +234,7 @@ describe('Orchestrator Generative Path', () => {
         required_fields: {},
         subscribed_events: [],
         generation_actions: {
-          createSmartSchedule: {
+          createSmartTimeboxes: {
             description: 'test',
             contexts: [{ id: 'existingTimeboxes', query: 'test', params: [] }],
           },
@@ -251,7 +251,7 @@ describe('Orchestrator Generative Path', () => {
     const traceSteps: unknown[] = []
     const deps = { ...makeDeps(), onTrace: (step: unknown) => traceSteps.push(step) }
     const orchestrator = createOrchestrator(deps as any)
-    const intent = makeIntent('createSmartSchedule')
+    const intent = makeIntent('createSmartTimeboxes')
 
     await orchestrator.executeIntent(intent, 'user1' as USOM_ID)
 

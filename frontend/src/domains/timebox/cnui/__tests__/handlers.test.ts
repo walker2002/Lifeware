@@ -93,11 +93,11 @@ vi.mock('@/domains/habits/repository/habit-log', () => ({
 }))
 
 describe('timeboxCnuiHandler', () => {
-  describe('open - createSmartSchedule', () => {
+  describe('open - createSmartTimeboxes', () => {
     it('应返回智能编排所需的数据', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartSchedule')
+      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
 
-      expect(result.content).toContain('智能编排日程')
+      expect(result.content).toContain('智能编排时间盒')
       expect(result.dataSnapshot).toHaveProperty('existingTimeboxes')
       expect(result.dataSnapshot).toHaveProperty('activeTasks')
       expect(result.dataSnapshot).toHaveProperty('pendingHabits')
@@ -117,7 +117,7 @@ describe('timeboxCnuiHandler', () => {
     })
 
     it('应包含未关联到 timebox 的任务', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartSchedule')
+      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
 
       const tasks = result.dataSnapshot.activeTasks
       expect(tasks.length).toBeGreaterThan(0)
@@ -126,7 +126,7 @@ describe('timeboxCnuiHandler', () => {
     })
 
     it('应包含未打卡的习惯', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartSchedule')
+      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
 
       const habits = result.dataSnapshot.pendingHabits
       expect(habits.length).toBeGreaterThan(0)
@@ -135,11 +135,11 @@ describe('timeboxCnuiHandler', () => {
     })
   })
 
-  describe('open - adjustRemainingSchedule', () => {
+  describe('open - adjustRemainingTimeboxes', () => {
     it('应返回调整日程所需的数据', async () => {
-      const result = await timeboxCnuiHandler.open('adjustRemainingSchedule')
+      const result = await timeboxCnuiHandler.open('adjustRemainingTimeboxes')
 
-      expect(result.content).toContain('调整剩余日程')
+      expect(result.content).toContain('调整剩余时间盒')
       expect(result.dataSnapshot).toHaveProperty('existingTimeboxes')
       expect(result.dataSnapshot).toHaveProperty('remainingTasks')
 
@@ -149,7 +149,7 @@ describe('timeboxCnuiHandler', () => {
     })
 
     it('应过滤出未关联到 timebox 的任务', async () => {
-      const result = await timeboxCnuiHandler.open('adjustRemainingSchedule')
+      const result = await timeboxCnuiHandler.open('adjustRemainingTimeboxes')
 
       const remainingTasks = result.dataSnapshot.remainingTasks
       // task-1 已经在 existingTimeboxes 中，所以应该被过滤掉
@@ -290,17 +290,17 @@ describe('timeboxCnuiHandler', () => {
     })
   })
 
-  describe('submit - createSmartSchedule', () => {
+  describe('submit - createSmartTimeboxes', () => {
     it('应返回成功（暂未实现）', async () => {
-      const result = await timeboxCnuiHandler.submit('createSmartSchedule', {})
+      const result = await timeboxCnuiHandler.submit('createSmartTimeboxes', {})
 
       expect(result.success).toBe(true)
     })
   })
 
-  describe('submit - adjustRemainingSchedule', () => {
+  describe('submit - adjustRemainingTimeboxes', () => {
     it('应返回成功（暂未实现）', async () => {
-      const result = await timeboxCnuiHandler.submit('adjustRemainingSchedule', {})
+      const result = await timeboxCnuiHandler.submit('adjustRemainingTimeboxes', {})
 
       expect(result.success).toBe(true)
     })

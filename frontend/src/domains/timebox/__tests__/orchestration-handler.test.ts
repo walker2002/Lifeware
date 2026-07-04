@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SchedulingHandler } from '../handlers/scheduling-handler'
+import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
 import type { GenerationRequest } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 
@@ -8,7 +8,7 @@ function makeIntent(fields: Record<string, unknown> = {}): StructuredIntent {
     id: 'test-intent-1' as any,
     intentionId: '' as any,
     targetDomain: 'timebox',
-    action: 'createSmartSchedule',
+    action: 'createSmartTimeboxes',
     fields,
     confidence: 1.0,
     resolvedBy: 'ai',
@@ -23,8 +23,8 @@ function makeRequest(contexts: Record<string, unknown>, fields?: Record<string, 
   }
 }
 
-describe('SchedulingHandler', () => {
-  const handler = new SchedulingHandler()
+describe('TimeboxOrchestrationHandler', () => {
+  const handler = new TimeboxOrchestrationHandler()
 
   it('generates proposals from tasks and habits', async () => {
     const request = makeRequest({

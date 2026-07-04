@@ -68,8 +68,8 @@ describe('Assembler', () => {
     const ids = ['ctx1', 'ctx2', 'ctx3', 'ctx4', 'ctx5']
     ids.forEach(id => registerContextCapability(makeCap(id, {})))
 
-    const intent = makeIntent('createSmartSchedule', { date: '2026-05-20' })
-    const manifest = makeManifest('createSmartSchedule', ids, ids.map(() => ['date']))
+    const intent = makeIntent('createSmartTimeboxes', { date: '2026-05-20' })
+    const manifest = makeManifest('createSmartTimeboxes', ids, ids.map(() => ['date']))
 
     const result = await assembleContext(intent, manifest)
 
@@ -79,8 +79,8 @@ describe('Assembler', () => {
   })
 
   it('throws when a declared capability does not exist', async () => {
-    const intent = makeIntent('createSmartSchedule')
-    const manifest = makeManifest('createSmartSchedule', ['missingCap'])
+    const intent = makeIntent('createSmartTimeboxes')
+    const manifest = makeManifest('createSmartTimeboxes', ['missingCap'])
 
     await expect(assembleContext(intent, manifest)).rejects.toThrow(/missingCap/)
   })
@@ -138,8 +138,8 @@ describe('Assembler', () => {
     it('still assembles generation context from generation_actions', async () => {
       registerContextCapability(makeCap('ctx1', {}))
 
-      const intent = makeIntent('createSmartSchedule', { date: '2026-05-20' })
-      const manifest = makeManifest('createSmartSchedule', ['ctx1'], [['date']])
+      const intent = makeIntent('createSmartTimeboxes', { date: '2026-05-20' })
+      const manifest = makeManifest('createSmartTimeboxes', ['ctx1'], [['date']])
 
       const result = await assembleContext(intent, manifest)
 

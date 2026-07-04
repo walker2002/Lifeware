@@ -11,7 +11,7 @@ describe('DEFAULT_ENERGY_CURVE', () => {
     expect(DEFAULT_ENERGY_CURVE.peakHours).toEqual([9, 10, 11])
   })
 
-  it('lowHours 为 [14,15,16]（修复 scheduling-handler [13,14] 与 provider [14,15,16] 的不一致）', () => {
+  it('lowHours 为 [14,15,16]（修复 orchestration-handler [13,14] 与 provider [14,15,16] 的不一致）', () => {
     expect(DEFAULT_ENERGY_CURVE.lowHours).toEqual([14, 15, 16])
   })
 

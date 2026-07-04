@@ -166,7 +166,7 @@ describe('domain-types', () => {
 
   it('IntentTrigger 应支持 view_route 可选字段', () => {
     const trigger: IntentTrigger = {
-      action: 'viewSchedule',
+      action: 'viewTimeboxes',
       description: '查看日程',
       examples: ['查看今天的日程'],
       keywords: ['日程', 'schedule'],

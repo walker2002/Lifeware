@@ -103,7 +103,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'createSmartSchedule') {
+    if (action === 'createSmartTimeboxes') {
       const [timeboxes, tasks, habits] = await Promise.all([
         getTodayTimeboxes(),
         getActiveTasks(),
@@ -161,7 +161,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'adjustRemainingSchedule') {
+    if (action === 'adjustRemainingTimeboxes') {
       const [timeboxes, tasks] = await Promise.all([
         getTodayTimeboxes(),
         getActiveTasks(),
@@ -345,7 +345,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     // [023] A2.6 — adjustSchedule CNUI surface 提交：仅写 diff 项，字段走 updateTimebox 直调、
     // cancel 走 deleteTimebox（OV#8 状态守卫），非死调 submitDynamicIntent
     // （manifest 无 updateTimebox/cancelTimebox intent_trigger，路径不同）。
-    if (action === 'adjustRemainingSchedule') {
+    if (action === 'adjustRemainingTimeboxes') {
       const { updateTimebox, deleteTimebox } = await import('@/app/actions/timebox')
       const items = (fields.items as any[]) ?? []
       for (const it of items) {
@@ -369,7 +369,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       return { success: true, data: { count: items.length } }
     }
 
-    if (action === 'createSmartSchedule') {
+    if (action === 'createSmartTimeboxes') {
       // 这里应该调用 AI scheduling handler
       // 暂时返回成功，实际实现需要调用 orchestration-handler
       return { success: true }

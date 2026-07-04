@@ -86,8 +86,8 @@ describe('parseHabitIntentOnly', () => {
 //   后，调用方 use-intent-handler.ts 必须能拿到精确的 'page' 字面量以做 narrowing。
 //   端到端验证 getActionResponse → manifest-utils.getResponseType 链路不断。
 describe('getActionResponse（[023-01] type narrowing smoke）', () => {
-  it('viewSchedule 返回 page（依赖 Task 1 显式声明 + Task 6 manifest-utils SSOT）', async () => {
-    const result = await getActionResponse('timebox', 'viewSchedule')
+  it('viewTimeboxes 返回 page（依赖 Task 1 显式声明 + Task 6 manifest-utils SSOT）', async () => {
+    const result = await getActionResponse('timebox', 'viewTimeboxes')
     expect(result.responseType).toBe('page')
   })
 
