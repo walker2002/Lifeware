@@ -30,7 +30,7 @@ import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manage
 /**
  * 时间盒项
  */
-interface ScheduleItem {
+interface TimeboxItem {
   /** ID */
   id: string
   /** 标题 */
@@ -89,7 +89,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   async handle(request: GenerationRequest): Promise<GenerationResult> {
     const date = this.resolveDate(request)
     const materials = this.collectMaterials(request.contexts)
-    const items = this.buildScheduleItems(materials)
+    const items = this.buildTimeboxItems(materials)
     const sorted = this.sortItems(items)
     const occupied = this.extractOccupiedSlots(materials.existingTimeboxes)
     const proposals = this.generateProposals(sorted, occupied, materials.energyCurve, date)
@@ -150,10 +150,10 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     return { pendingHabits, activeTasks, existingTimeboxes, energyCurve }
   }
 
-  // ─── buildScheduleItems: 将 4 个来源统一为 ScheduleItem ────
+  // ─── buildTimeboxItems: 将 4 个来源统一为 TimeboxItem ────
 
-  private buildScheduleItems(materials: ReturnType<typeof this.collectMaterials>): ScheduleItem[] {
-    const items: ScheduleItem[] = []
+  private buildTimeboxItems(materials: ReturnType<typeof this.collectMaterials>): TimeboxItem[] {
+    const items: TimeboxItem[] = []
 
     // 来源 1: pendingHabits
     for (const habit of materials.pendingHabits) {
@@ -188,7 +188,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
 
   // ─── sortItems: 按优先级 + sourceType 排序 ─────────────────
 
-  private sortItems(items: ScheduleItem[]): ScheduleItem[] {
+  private sortItems(items: TimeboxItem[]): TimeboxItem[] {
     return [...items].sort((a, b) => {
       const pa = PRIORITY_WEIGHT[a.priority] ?? 9
       const pb = PRIORITY_WEIGHT[b.priority] ?? 9
@@ -217,7 +217,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   // ─── generateProposals: 分配时间槽，生成提案 ───────────────
 
   private generateProposals(
-    items: ScheduleItem[],
+    items: TimeboxItem[],
     occupied: TimeSlot[],
     energyCurve: EnergyCurve,
     date: string,

@@ -167,12 +167,12 @@ describe('domain-types', () => {
   it('IntentTrigger 应支持 view_route 可选字段', () => {
     const trigger: IntentTrigger = {
       action: 'viewTimeboxes',
-      description: '查看日程',
-      examples: ['查看今天的日程'],
-      keywords: ['日程', 'schedule'],
-      view_route: '/schedule',
+      description: '查看时间盒',
+      examples: ['查看今天的时间盒'],
+      keywords: ['时间盒', 'timebox'],
+      view_route: '/timeboxes',
     }
 
-    expect(trigger.view_route).toBe('/schedule')
+    expect(trigger.view_route).toBe('/timeboxes')
   })
 })

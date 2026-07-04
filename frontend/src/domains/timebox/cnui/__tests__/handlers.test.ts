@@ -136,7 +136,7 @@ describe('timeboxCnuiHandler', () => {
   })
 
   describe('open - adjustRemainingTimeboxes', () => {
-    it('应返回调整日程所需的数据', async () => {
+    it('应返回调整剩余时间盒所需的数据', async () => {
       const result = await timeboxCnuiHandler.open('adjustRemainingTimeboxes')
 
       expect(result.content).toContain('调整剩余时间盒')
