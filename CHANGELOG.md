@@ -93,6 +93,7 @@
 
 ## Domain 路由生成规范（docs/route-generation-spec.md）
 
+- 2026_07_04 — §4.3 幂等写入：generate-routes 写盘前剥离时间戳行比对，业务字段未变则 skip；prod.sh 加 EXIT trap 自动恢复 tsconfig.json（Next.js 启动会注入 .next-prod/types + 重写数组格式）
 - 2026_05_26 — 创建：构建时路由生成方案 B；manifest.yaml view_routes.url 字段规范；generate-routes.ts 集成
 
 ## Domain 注册指南（已并入 domain-development-guide）

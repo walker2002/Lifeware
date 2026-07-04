@@ -29,6 +29,24 @@ fail()  { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ─── tsconfig.json 自动恢复 ────────────────────────────
+# 当 NEXT_DIST_DIR=.next-prod 时，Next.js 启动会自动往 tsconfig.json 的
+# `include` 注入 `.next-prod/types/**/*.ts` 并把整个文件重写（数组展开成多行）。
+# 这是 Next.js 的默认行为，无法禁用。脚本退出时把 tsconfig.json 还原到进入前
+# 的状态，避免每次跑 prod.sh 都留下「莫名其妙的修改」。
+TSCONFIG_FILE="$SCRIPT_DIR/frontend/tsconfig.json"
+TSCONFIG_BAK="$(mktemp)"
+if [ -f "$TSCONFIG_FILE" ]; then
+  cp "$TSCONFIG_FILE" "$TSCONFIG_BAK"
+fi
+restore_tsconfig() {
+  if [ -f "$TSCONFIG_BAK" ]; then
+    cp "$TSCONFIG_BAK" "$TSCONFIG_FILE"
+    rm -f "$TSCONFIG_BAK"
+  fi
+}
+trap restore_tsconfig EXIT
+
 # ─── 参数解析 ──────────────────────────────────────────
 DO_MIGRATE=false
 BACKUP_ONLY=false

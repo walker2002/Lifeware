@@ -4,6 +4,7 @@
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
+| 1.1 | 2026-07-04 | Claude | 幂等写入：业务字段未变则跳过重写，避免「Generated at: 时间戳漂移」污染 git diff |
 | 1.0 | 2026-05-26 | Claude | 初始版本 |
 
 ---
@@ -133,6 +134,7 @@ export default function HabitsListPage() {
 | 嵌套路径 | `/okrs/objectives` → `app/okrs/objectives/page.tsx` |
 | 覆盖策略 | 默认不覆盖已存在文件（除非 `--force`） |
 | 空目录处理 | 自动创建中间目录 |
+| **幂等写入** | 业务字段（component/url/params）未变则跳过重写；时间戳行不计入比对，否则每次 dev/build 都会留下「时间戳漂移」 |
 
 ### 4.4 示例映射
 
