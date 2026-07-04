@@ -111,7 +111,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       ])
 
       return {
-        content: '智能编排日程 — 根据您的任务、习惯和能量曲线，AI 将自动生成今日时间盒方案',
+        content: '智能编排时间盒 — 根据您的任务、习惯和能量曲线，AI 将自动生成今日时间盒方案',
         dataSnapshot: {
           existingTimeboxes: timeboxes.map(t => ({
             id: t.id,
@@ -172,7 +172,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       )
 
       return {
-        content: '调整剩余日程 — 根据已完成项目重新安排今日剩余时间',
+        content: '调整剩余时间盒 — 根据已完成项目重新安排今日剩余时间',
         dataSnapshot: {
           existingTimeboxes: timeboxes.map(t => ({
             id: t.id,
@@ -371,7 +371,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
 
     if (action === 'createSmartSchedule') {
       // 这里应该调用 AI scheduling handler
-      // 暂时返回成功，实际实现需要调用 scheduling-handler
+      // 暂时返回成功，实际实现需要调用 orchestration-handler
       return { success: true }
     }
 

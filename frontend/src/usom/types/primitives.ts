@@ -111,7 +111,7 @@ export interface EnergyCurvePoint {
  * - `EnergyCurvePoint` 是**逐小时基线点**（hour+baseline 单点）
  *
  * D10 整合：原 `peakHours/lowHours` 在 5 处重复定义
- * （energy-profile-provider / register-providers / scheduling-handler /
+ * （energy-profile-provider / register-providers / orchestration-handler /
  * DerivedSignals.energyPattern / schema energyPattern jsonb），统一为本类型。
  * 归 ContextEngine 管理（EnergyStateManager.curve()），MVP 静态默认值。
  *

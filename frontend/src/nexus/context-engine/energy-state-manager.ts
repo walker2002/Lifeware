@@ -25,7 +25,7 @@ import type { EnergyState, EnergyScore, EnergyCurve } from '@/usom/types/primiti
  * 默认能量曲线（D10 SSOT）。
  *
  * 整合前各处不一致：provider 用 [9,10,11]/[14,15,16]，
- * scheduling-handler fallback 用 [9,10,11]/[13,14]。统一为本常量。
+ * orchestration-handler fallback 用 [9,10,11]/[13,14]。统一为本常量。
  * MVP 静态（符合"只做静态设置"），未来用户校准走 EnergyStateManager.curve()。
  *
  * R7：`Object.freeze` 防运行时误改。**EnergyCurve interface 不带 readonly 字段**

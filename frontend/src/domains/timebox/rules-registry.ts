@@ -14,7 +14,7 @@
  *
  * ## R10 — core/rule-engine vs nexus/rules 职责区分（codex E2 + 实施期确认）
  *
- * - `frontend/src/nexus/core/rule-engine/` — **提案评估层**（scheduling-handler 生成的
+ * - `frontend/src/nexus/core/rule-engine/` — **提案评估层**（orchestration-handler 生成的
  *   schedule 提案校验）。`createRuleEngine` 在 `intent.ts:265,512` + `okr.ts:177` 调用，
  *   关联 timebox rules（FieldCompletenessRule / DurationRangeRule / StartTimeInFutureRule）。
  * - `frontend/src/nexus/rules/` — **意图校验层**（onValidate 走 evaluateDomainRules）。

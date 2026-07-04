@@ -4,7 +4,7 @@
  *
  * 实现 ContextProvider 接口，提供用户能量曲线数据。
  * D10 整合：peakHours/lowHours 引用 DEFAULT_ENERGY_CURVE（SSOT），
- * 消除与 scheduling-handler 的默认值不一致。
+ * 消除与 orchestration-handler 的默认值不一致。
  *
  * R13：EnergyCurve SSOT 不含 source 字段；source 是 provider 运行时附加的元数据。
  *

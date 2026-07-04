@@ -1,6 +1,6 @@
 /**
- * @file scheduling-handler
- * @brief 智能日程编排 Handler
+ * @file orchestration-handler
+ * @brief 智能时间盒编排 Handler
  * 
  * Handler + Context Engine 双轨架构中的 Handler 组件
  * 接收 GenerationRequest（意图 + 组装好的上下文数据），产出 GenerationResult
@@ -28,7 +28,7 @@ import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manage
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
 
 /**
- * 日程项
+ * 时间盒项
  */
 interface ScheduleItem {
   /** ID */
@@ -85,7 +85,7 @@ const SOURCE_WEIGHT: Record<string, number> = {
 
 // ─── Handler 实现 ─────────────────────────────────────────────
 
-export class SchedulingHandler implements DomainHandler {
+export class TimeboxOrchestrationHandler implements DomainHandler {
   async handle(request: GenerationRequest): Promise<GenerationResult> {
     const date = this.resolveDate(request)
     const materials = this.collectMaterials(request.contexts)
