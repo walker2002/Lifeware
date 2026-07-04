@@ -85,10 +85,11 @@ export function ScheduleWorkspace() {
   const handleAction = useCallback(async (
     timeboxId: string,
     action: 'start' | 'end' | 'cancel' | 'log',
+    confirmed = false,
   ) => {
     setActionSubmitting(true)
     try {
-      const r = await transitionTimebox(timeboxId, action)
+      const r = await transitionTimebox(timeboxId, action, {}, confirmed)
       if (r.status === 'ok') {
         await loadDay(date)
         return
@@ -97,8 +98,8 @@ export function ScheduleWorkspace() {
         setConfirming({
           message: r.message,
           action: async () => {
-            // 二次确认：用 confirmed=true 再调一次；不再开 confirm（避免无限循环）
-            await handleAction(timeboxId, action)
+            // 二次确认：用 confirmed=true 再调一次；二次调用 SM 应当返回 ok，不再开 confirm
+            await handleAction(timeboxId, action, true)
           },
         })
         return
