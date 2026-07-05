@@ -15,6 +15,10 @@
  *   - 传 ruleEngine → 调 createRuleEngine().evaluate(intent, snapshot)
  *   - 不传 → 走 [023.07] 谓词 fallback（向后兼容）
  *   - rule-engine 抛错 → 走 fallback（不阻塞业务）
+ *
+ * [023.10] T4 A2 fold: snapshot builder 派生自 proposal.date + deriveDayOfWeek/TimeOfDay，
+ *   废除当前硬编码 currentDate='2026-07-05' / dayOfWeek=0 / timeOfDay='morning'。
+ *   resolveDate 复用 [023.08] T1 ship 版（line 545），本任务未新增同名方法。
  */
 
 import type {
@@ -378,6 +382,13 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
 
     for (const proposal of proposals) {
       const intent = this.proposalToIntent(proposal)
+      // [023.10] T4 A2 stale-date fix: snapshot 派生自 proposal date + server now，
+      // 废除硬编码 '2026-07-05' / dayOfWeek=0 / timeOfDay='morning'。复用 [023.08] T1
+      // resolveDate 同源语义（先读 .fields.date，回退 server today UTC），但因
+      // detectConflictsViaRuleEngine 只持 proposals（不持 request），此处 inline
+      // 复制 resolveDate 逻辑而不是新增同名私有方法。
+      const resolvedDate = (proposal.payload.date as string | undefined)
+        ?? new Date().toISOString().slice(0, 10)
       const snapshot: ContextSnapshot = {
         // 占位 snapshotId — handler 评估 intent 时不需要 persistent snapshot id；
         // rule-engine 仅读 snapshot 字段（如 upcomingTimeboxes / currentDate）。
@@ -396,9 +407,10 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         upcomingTimeboxes: existingTimeboxes as any,
         pendingIntentions: [],
         currentTime: new Date().toISOString(),
-        currentDate: '2026-07-05',
-        dayOfWeek: 0,
-        timeOfDay: 'morning',
+        // [023.10] T4: 从 resolved proposal date 派生，不再硬编码 dev date
+        currentDate: resolvedDate,
+        dayOfWeek: this.deriveDayOfWeek(resolvedDate),
+        timeOfDay: this.deriveTimeOfDay(new Date()),
         energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' },
         // [F9 fold / partial] metadata 标记 batch 预取就绪；当前仅作 hook，不影响查询路径。
         metadata: { batchPreFetched: true },
@@ -563,6 +575,30 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     const date = request.intent.fields.date
     if (typeof date === 'string' && date) return date
     return new Date().toISOString().slice(0, 10)
+  }
+
+  /**
+   * [023.10] T4 A2 fix: derive dayOfWeek from a YYYY-MM-DD date string。
+   * 用 UTC midday (T12:00:00Z) parse 避开 TZ 漂移；getUTCDay() 返 0-6 (Sun-Sat)。
+   * 仅供 snapshot builder 内部使用 — rule-engine 实际不消费 dayOfWeek（占位字段保留，
+   * 是 future rule 的扩展点）。
+   */
+  private deriveDayOfWeek(date: string): number {
+    return new Date(`${date}T12:00:00Z`).getUTCDay()
+  }
+
+  /**
+   * [023.10] T4 A2 fix: derive timeOfDay from server now UTC hour。
+   * 分段: night <6, morning <12, afternoon <18, evening >=18。UTC canonical，
+   * 跨浏览器 TZ 一致；与 [023.09] I-3 UTC 改造同源。
+   * 仅供 snapshot builder 内部使用。
+   */
+  private deriveTimeOfDay(date: Date): 'night' | 'morning' | 'afternoon' | 'evening' {
+    const h = date.getUTCHours()
+    if (h < 6) return 'night'
+    if (h < 12) return 'morning'
+    if (h < 18) return 'afternoon'
+    return 'evening'
   }
 
   private normalizePriority(priority: string): string {

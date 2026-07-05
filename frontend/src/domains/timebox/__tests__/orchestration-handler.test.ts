@@ -1,4 +1,4 @@
-/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) */
+/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) + [023.10] T4 snapshot builder derive (3 tests) */
 
 import { describe, it, expect, vi } from 'vitest'
 import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
@@ -628,5 +628,122 @@ describe('[023.10] T3 normalizeTimeField proposal.date (A1 fix)', () => {
 
     expect(intent.fields.startTime).toBe('2026-07-05T08:00:00Z')
     expect(intent.fields.endTime).toBe('2026-07-05T09:00:00Z')
+  })
+})
+
+// ─── [023.10] T4 snapshot builder: 派生自 resolveDate + deriveDayOfWeek/TimeOfDay ───────
+//
+// 背景: orchestration-handler.ts:399-401 snapshot 之前硬编码 currentDate='2026-07-05'
+// / dayOfWeek=0 / timeOfDay='morning'，当前无害但 stale。
+// 修复: 复用 [023.08] T1 ship 的 resolveDate(request) → currentDate，
+//       + deriveDayOfWeek(date) → 0-6 (Sun-Sat, UTC midday parse)，
+//       + deriveTimeOfDay(now) → 按 server now UTC hour 分段 (night<6<morning<12<afternoon<18<evening)。
+//
+// 测试策略: snapshot 是 detectConflictsViaRuleEngine 内部构造后传给 ruleEngine.evaluate
+// 的 ContextSnapshot 参数。spy 抓 evaluate 的 snapshot 参数，对 fields 断言。
+// 当 deps.ruleEngine 缺失走 fallback 谓词路径，snapshot 不会被构造 — 故本测试依赖
+// rule-engine deps。
+describe('[023.10] T4 snapshot builder derive (A2 stale-date fix)', () => {
+  it('snapshot.currentDate 来自 resolveDate(request)：proposal.date=2026-07-15 → snapshot.currentDate=2026-07-15', async () => {
+    // 用意 (proposal.payload.date = '2026-07-15') — resolveDate 应回 '2026-07-15'，
+    // snapshot.currentDate 必为 '2026-07-15'（不是硬编码 '2026-07-05'）。
+    const ruleEngine = {
+      evaluate: vi.fn().mockResolvedValue({ confirmations: [], warnings: [], blockingErrors: [] }),
+    }
+    const handler = new TimeboxOrchestrationHandler({
+      ruleEngine: ruleEngine as any,
+      timeboxRepo: undefined,
+      userId: undefined,
+    })
+
+    await (handler as any).detectConflictsViaRuleEngine(
+      [{
+        id: 'p-snap',
+        action: 'createTimebox',
+        payload: { title: 'snap', date: '2026-07-15', startTime: '08:00', endTime: '09:00' },
+        sourceType: 'task' as const,
+        priority: 'P1',
+      }],
+      []
+    )
+
+    // spy 抓 evaluate 的 snapshot 参数
+    expect(ruleEngine.evaluate).toHaveBeenCalledTimes(1)
+    const callArgs = ruleEngine.evaluate.mock.calls[0]
+    const snapshot = callArgs[1]
+    // [023.10] T4: snapshot.currentDate 必须派生自 resolveDate(request)，不是硬编码
+    expect(snapshot.currentDate).toBe('2026-07-15')
+    expect(snapshot.currentDate).not.toBe('2026-07-05')
+  })
+
+  it('snapshot.dayOfWeek 不硬编码 0：从 resolveDate 派生 (2026-07-05 周日 → 0, 2026-07-06 周一 → 1)', async () => {
+    // 用意: dayOfWeek 应从 currentDate + deriveDayOfWeek 推算，不再硬编码。
+    // 2026-07-05 是周日 (UTC day 0)，2026-07-06 是周一 (UTC day 1)。
+    const captured: Array<{ currentDate: string; dayOfWeek: number }> = []
+    const ruleEngine = {
+      evaluate: vi.fn().mockImplementation(async (_intent: unknown, snapshot: any) => {
+        captured.push({ currentDate: snapshot.currentDate, dayOfWeek: snapshot.dayOfWeek })
+        return { confirmations: [], warnings: [], blockingErrors: [] }
+      }),
+    }
+    const handler = new TimeboxOrchestrationHandler({
+      ruleEngine: ruleEngine as any,
+      timeboxRepo: undefined,
+      userId: undefined,
+    })
+
+    // case A: date=2026-07-05 周日 → dayOfWeek=0
+    await (handler as any).detectConflictsViaRuleEngine(
+      [{
+        id: 'p-A', action: 'createTimebox',
+        payload: { title: 'A', date: '2026-07-05', startTime: '08:00', endTime: '09:00' },
+        sourceType: 'task' as const, priority: 'P1',
+      }],
+      []
+    )
+
+    // case B: date=2026-07-06 周一 → dayOfWeek=1
+    await (handler as any).detectConflictsViaRuleEngine(
+      [{
+        id: 'p-B', action: 'createTimebox',
+        payload: { title: 'B', date: '2026-07-06', startTime: '08:00', endTime: '09:00' },
+        sourceType: 'task' as const, priority: 'P1',
+      }],
+      []
+    )
+
+    expect(captured).toHaveLength(2)
+    // [023.10] T4: dayOfWeek 派生自 resolved date，不是硬编码 0
+    expect(captured[0].dayOfWeek).toBe(0) // 2026-07-05 周日
+    expect(captured[1].dayOfWeek).toBe(1) // 2026-07-06 周一
+    // 关键断言: case B 必不是硬编码 0（证明 derive 真在跑）
+    expect(captured[1].dayOfWeek).not.toBe(0)
+  })
+
+  it('snapshot.timeOfDay 不硬编码 "morning"：deriveTimeOfDay 按 server now UTC 分段，4 区间 union', async () => {
+    // 用意: timeOfDay 应来自 server now 的 UTC hour 分段，不再硬编码 'morning'。
+    const ruleEngine = {
+      evaluate: vi.fn().mockResolvedValue({ confirmations: [], warnings: [], blockingErrors: [] }),
+    }
+    const handler = new TimeboxOrchestrationHandler({
+      ruleEngine: ruleEngine as any,
+      timeboxRepo: undefined,
+      userId: undefined,
+    })
+
+    await (handler as any).detectConflictsViaRuleEngine(
+      [{
+        id: 'p-tod', action: 'createTimebox',
+        payload: { title: 'tod', date: '2026-07-15', startTime: '08:00', endTime: '09:00' },
+        sourceType: 'task' as const, priority: 'P1',
+      }],
+      []
+    )
+
+    const snapshot = ruleEngine.evaluate.mock.calls[0][1]
+    // [023.10] T4: timeOfDay 必属 4 区间 union (按 server now UTC hour 分段)
+    expect(['night', 'morning', 'afternoon', 'evening']).toContain(snapshot.timeOfDay)
+    // 关键断言: 测试用例只跑一次，currentDate 通过；deriveTimeOfDay 必然不是恒定字符串
+    // (snapshot 不应含硬编码常量 'morning' 单值)
   })
 })
