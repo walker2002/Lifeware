@@ -275,7 +275,6 @@ describe('[023.09] orchestration-handler TZ fragility (UTC canonical)', () => {
   it('extractOccupiedSlots: UTC ISO timestamp 解出 UTC hour（不应受浏览器 local TZ 影响）', async () => {
     const handler = new TimeboxOrchestrationHandler()
 
-    // @ts-expect-error — 访问 private method 做 unit guard
     const slots = (handler as any).extractOccupiedSlots(
       ([{ startTime: '2026-07-05T22:00:00Z', endTime: '2026-07-05T23:00:00Z' }] as any)
     )
