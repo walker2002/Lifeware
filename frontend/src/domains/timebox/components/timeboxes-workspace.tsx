@@ -40,8 +40,41 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { Plus, CalendarOff } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  startOfDay, endOfDay,
+  startOfWeek, endOfWeek,
+  startOfMonth, endOfMonth,
+  addDays, addWeeks, addMonths,
+} from 'date-fns'
 import type { Timebox } from '@/usom/types/objects'
 import type { TimeboxSummary } from '@/usom/types/summaries'
+import type { DateViewMode } from './types'
+
+/**
+ * [023.06] 按视图模式计算日期范围（与 hooks/use-timebox.ts 同源，避免行为漂移）
+ */
+export function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
+  switch (mode) {
+    case 'day':
+      return { start: startOfDay(date), end: endOfDay(date) }
+    case 'week':
+      return { start: startOfWeek(date, { weekStartsOn: 1 }), end: endOfWeek(date, { weekStartsOn: 1 }) }
+    case 'month':
+      return { start: startOfMonth(date), end: endOfMonth(date) }
+  }
+}
+
+/**
+ * [023.06] 按视图模式步进日期
+ */
+function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'): Date {
+  const delta = direction === 'next' ? 1 : -1
+  switch (mode) {
+    case 'day': return addDays(date, delta)
+    case 'week': return addWeeks(date, delta)
+    case 'month': return addMonths(date, delta)
+  }
+}
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
