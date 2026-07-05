@@ -230,14 +230,14 @@ export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived' | 'delet
 export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'
 
 /**
- * 行程状态（[026]，Cycle 模式：全部存储，经 SM transition 推进）
+ * 约定状态（[026]，Cycle 模式：全部存储，经 SM transition 推进）
  * - scheduled：initial state（SM null→scheduled）
  * - in_progress：执行中，到日触发（SM scheduled→in_progress，lazy reconcile）
  * - expired：已过期，过日触发（SM scheduled/in_progress→expired，lazy reconcile；终态）
  * - cancelled：用户取消（SM {scheduled,in_progress}→cancelled；终态；spec "已过期/已完成不能删除"）
  * - completed：已完成（[027] SM →completed，timebox 打卡后；终态）
  */
-export type ItineraryStatus = 'scheduled' | 'in_progress' | 'expired' | 'cancelled' | 'completed'
+export type AppointmentStatus = 'scheduled' | 'in_progress' | 'expired' | 'cancelled' | 'completed'
 /**
  * 完成状态
  * - completed: 已完成

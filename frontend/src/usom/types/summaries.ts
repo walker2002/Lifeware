@@ -5,7 +5,7 @@ import type {
   USOM_ID, DateOnly, Timestamp,
   Priority, EnergyLevel, PeriodType,
   TaskStatus,
-  HabitStatus, TimeboxStatus, ItineraryStatus, IntentionStatus,
+  HabitStatus, TimeboxStatus, AppointmentStatus, IntentionStatus,
   ClarityLevel, DecompositionLevel,
 } from './primitives'
 
@@ -50,14 +50,14 @@ export interface TimeboxSummary {
   executionRecord?: import('./objects').ExecutionRecord
 }
 
-/** 行程摘要（≤7 字段，供 /timeboxes 合并展示 + ContextSnapshot + 编辑入口用） */
-export interface ItinerarySummary {
+/** 约定摘要（≤7 字段，供 /timeboxes 合并展示 + ContextSnapshot + 编辑入口用） */
+export interface AppointmentSummary {
   id:        USOM_ID
   title:     string
   startTime: Timestamp
   durationMin: number
-  status:    ItineraryStatus            // 直接来自 DB
-  // [026] 编辑入口需要：UI 双击/编辑按钮开 EditItineraryDrawer，复用 <ItineraryFormFields> 5 字段。
+  status:    AppointmentStatus            // 直接来自 DB
+  // [026] 编辑入口需要：UI 双击/编辑按钮开 EditAppointmentDrawer，复用 <AppointmentFormFields> 5 字段。
   // 原 summary 仅 4 字段，编辑前需再 fetch；扩 2 字段 → 客户端编辑零延迟、零额外往返。
   detail?:   string | null
   people?:   string[]
