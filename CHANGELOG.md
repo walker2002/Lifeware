@@ -222,6 +222,52 @@
 - 2026_06_30 — A3.1 tasks/habits 接入 activity_archetype + 删 energyProfile
 - 2026_06_29 — A2 Timebox 域重写（timeboxes +3 列 + createTimeboxMutationService + /schedule 工作台 + 3 CNUI surface + /timebox-templates）
 
+## [023.10] createSmartTimeBoxes 链路 post-ship defer cleanup
+
+> 2026_07_05 — **6 commits ship on feat/023-10-postship-defer-cleanup**: T1→T6; T7 验证 non-orphan (Codex #10 守门生效, 安全网救了一个潜在错删); T8 defer to [023.11] (useOrchestrationRecommendations hook 不存在)。
+
+### Scope (6 shipped + 1 verified no-op + 1 deferred)
+
+- **T1 [P1]** workspace handleAiConfirm revert 真 wire 到 submitCnuiSurface（[023.08] P0 同源防御 — `timebox`/`revertSmartTimeboxes`/`{batchId}`; 附 `useCallback` deps 加 `revertableBatches` 修潜在 stale closure; placeholder toast "撤销状态已重置（[023.10] 提供 server action）" 删除）
+- **T2 [P1]** B1 G15 跨 task integration test（5 断言拦 P0 class routing 错配; mock 只在 DB 层, submitCnuiSurface 走真实 routing — 避免 mock-of-mock; 413 lines）
+- **T3 [P1]** A1 normalizeTimeField 用 proposal.date 替代 `new Date()`（未来日期 proposal 治本; 2 处 call sites 同步更新; 手工 `YYYY-MM-DDTHH:MM:SSZ` 格式保持与 legacy 路径一致）
+- **T4 [P1]** A2 snapshot 派生自已有 resolveDate + deriveDayOfWeek/TimeOfDay（[023.08] T1 ship 的 resolveDate 复用, **不新增同名**; snapshot 硬编码 `'2026-07-05'`/`0`/`'morning'` 废除）
+- **T5 [P2]** A4 cnui/handlers.ts:446 createSmartTimeboxes guard message 改进（**保留 guard branch** — Codex #5 守门生效, 不是死代码; 新 message 含 `'CreateSmartTimebox'` + `'acceptProposals'` 指明正确 surface/intent）
+- **T6 [P2]** A3 batch-proposals `findByUserId(_, 200)` → `(_, 2000)` (Codex #7 路径修订: 实路径在 `nexus/ai-runtime/memory/`, **不是 domains/timebox/**; 2 处而非 brief 估的 4 处)
+- **T7 [P2]** B4 orphan `'timebox-list'` 清理 — **ABORT**（4 grep 命中 + manifest ref + 测试 ref + live component; 实为 live CNUI surface; plan brief 假设错）
+- **T8** ~~workspace proposals 接 useOrchestrationRecommendations 真实化~~ — DEFER to [023.11]（hook 不存在, Code #6 实际验证）
+
+### Decisions
+
+- **D3**: T6 limit 修法 = 提限 200 → 2000（vs cursor pagination — 留给 [023.11+] 单独 ticket）
+- **D4**: T5 guard = 保留 + 改进 message（vs 删除 — Codex #5 守门）
+- **D5**: runtime-only + 写 CHANGELOG section（runtime-only 不豁免 CHANGELOG）
+- **D9**: T3+T4 串（同文件 orchestration-handler.ts），T1 + T6 + T2 各自独立
+- **D10**: T1 workspace test mock setup 复用 [023.08] 4d6e7ca commit 模式
+- **D11**: T2 mock strategy 重设计 = mock only DB layer（real production routing）
+- **D12 (Codex cold read 修订)**: T1 phantom → 真 wire placeholder rewrite; T2 mock-of-mock → real routing + mocked DB; T4 dup-method → 复用已有 resolveDate; T5 dead-code misclaim → guard 保留; T6 path → nexus/ai-runtime/memory/; T8 → defer; T7 → ABORT per Codex #10 guard
+
+### Verification
+
+- vitest base=head 失败集合 net -1（64→63 fail, 主要来自 G15 新 5 assertions + T3/T4/T6 新 tests）—— **STRICTLY BETTER**
+- tsc 错误 ≤ baseline（86 errors pre-existing 不变，T1 implementer 报 70=70, T6 报 -1 net）
+- validate:manifest 0 errors
+- validate:domain-structure ✓
+- whole-branch review: 待 [023.10] T9 后跑
+- post-ship Codex cold read: 待 ship-to-main 后跑
+
+### Out of Scope (deferred to [023.11+])
+
+- T8 workspace proposals 真实化（useOrchestrationRecommendations hook 不在 scope）
+- **P1 PUSH**: `manifest.yaml` 缺 `revertSmartTimeboxes` intent_trigger 入口（T1 ship 后 catch 的生产路径 blocker — submitCnuiSurface 找不到 surfaceType 会返 `Unknown CN-UI action`; [023.10] T1 wire 在 unit test 覆盖, 生产需 manifest 注册; 建议：[023.11] 或本 PR 追加一个 sub-T1.5 commit）
+- A5 test mock vs DB replace 行为分叉（P3, latent）
+- C1 Playwright runner 接入
+- C2/C3 deploy-gate (real LLM provider / eval)
+- D1 F9 N+1 实际修复
+- D2 F4 abstraction leak 迁移
+
+---
+
 ## [020] 系统规则管理重设计
 
 - 2026_06_24 — plan：去 C/L 范式重构（registry 即 SSOT，7 Phase/~20 Task）；constitution MINOR 2.0.0 → 2.1.0
