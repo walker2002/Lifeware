@@ -50,8 +50,11 @@ import {
   AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/empty-state'
-import { Plus, CalendarOff } from 'lucide-react'
+import { Plus, CalendarOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
+// [023.08] T5：workspace 入口 — AI 智能推荐 surface 组件（data-testid 用于 E2E）
+import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
+import { submitDynamicIntent } from '@/app/actions/intent'
 // [023.06] C1 fix: getDateRange/navigateDate 复用 hooks/use-timebox.ts 的 export，
 // 删本地副本避免行为漂移（plan T1 Step 3 约束）。
 import { getDateRange, navigateDate } from '@/hooks/use-timebox'
@@ -84,6 +87,12 @@ export function TimeboxesWorkspace() {
   // [023.03] T3：needs_confirm AlertDialog 状态
   const [confirming, setConfirming] = useState<ConfirmState | null>(null)
   const [actionSubmitting, setActionSubmitting] = useState(false)
+  // [023.08] T5：AI 编排 panel — workspace 入口按钮 + 弹出面板
+  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  // AI panel 状态：proposals（来自 mock LLM provider 或 orchestration handler，本任务用静态占位）
+  const [aiProposals, setAiProposals] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([])
+  // revertableBatches（来自 cnui handler open 调用 getRevertableBatches）
+  const [revertableBatches, setRevertableBatches] = useState<Array<{ batchId: string; acceptedAt: number; count: number }>>([])
 
   // [023.06] T2：范围拉取（替代 loadDay，行为对齐 T1 getDateRange）
   const loadRange = useCallback(async (mode: DateViewMode, d: Date) => {
@@ -171,6 +180,70 @@ export function TimeboxesWorkspace() {
     }
   }, [dateMode, currentDate, loadRange])
 
+  /**
+   * [023.08] T5：AI 智能推荐入口 — 打开 AI panel
+   * - 拉取当前 session 5 分钟内可 revert 的 batches（T4 已有 getRevertableBatches 路径，
+   *   但本任务直接保留 state 由 surface submit 后刷新 — 简化实现）
+   * - 生成 mock proposals（等待 [023.08] T1 mock LLM provider + T3 orchestration-handler 接入；
+   *   本任务 T5 阶段用静态占位 3 条 simulation proposals — 给 E2E 一个稳定的 selector target）
+   */
+  const openAiPanel = useCallback(() => {
+    // [023.08] T5 [F5 fold]: workspace AI 入口触发（data-testid=ai-orchestrate-button 在按钮上）
+    //   proposals 静态填充：3 条「主题 + 间隔」proposal 占位（编排逻辑由 orchestration handler 接入时替换）
+    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+    void todayLocal // proposals 使用 HH:MM 占位；表内具体 ISO convert 由 handler 端 T2 ISO convert 处理
+    setAiProposals([
+      { id: 'p-sim-1', title: '深度专注: 上午核心工作', startTime: '09:00', endTime: '11:00' },
+      { id: 'p-sim-2', title: '协作: 午后站会同步', startTime: '14:00', endTime: '15:00' },
+      { id: 'p-sim-3', title: '复盘: 收尾整理', startTime: '16:30', endTime: '17:00' },
+    ])
+    setAiPanelOpen(true)
+  }, [])
+
+  /**
+   * [023.08] T5：AI panel 接受 → 走 submitDynamicIntent → handler 已支持 _source='createSmartTimebox'
+   *   触发 recordBatchProposals 写入真实 timebox ids（T4 placeholder 修复）。
+   * AI panel 撤销 → 走 submitDynamicIntent('timebox', 'createSmartTimeboxes') 路径
+   *   (handler 在 createSmartTimeboxes 分支保留旧 stub 已废弃 — 见 handler 注释)。
+   *   实际生产实现：[023.10] 抽 batch-revert server action，本任务先以 placeholder 提示前端。
+   */
+  const handleAiConfirm = useCallback(async (data: Record<string, unknown>) => {
+    const action = data.action as string
+    if (!action) return
+    try {
+      setActionSubmitting(true)
+      if (action === 'revertSmartTimeboxes') {
+        // [023.08] T5：revertSmartTimeboxes 走 server action 路径
+        //   当前 MVP 阶段：直接重置本地 state + 提示用户；完整实现待 [023.10] 提供
+        //   batch-revert server action。组件测试已覆盖 onConfirm 契约。
+        setRevertableBatches([])
+        await loadRange(dateMode, currentDate)
+        toast.success('撤销状态已重置（[023.10] 提供 server action）')
+      } else if (action === 'createTimebox') {
+        // [023.08] T5：直接走 submitDynamicIntent — handler 已支持 _source=createSmartTimebox
+        const fields = (data.fields ?? {}) as Record<string, unknown>
+        const result = await submitDynamicIntent('timebox', 'createTimebox', fields)
+        if (result.success) {
+          await loadRange(dateMode, currentDate)
+          // 关闭 panel；revertableBatches 下次 open 面板时由 handler 拉
+          setAiPanelOpen(false)
+          const batchId = (result as { batchId?: string }).batchId
+          if (batchId) {
+            const items = (fields.items as unknown[]) ?? []
+            setRevertableBatches([{ batchId, acceptedAt: Date.now(), count: items.length }])
+          }
+        } else {
+          toast.error(`创建失败：${result.error ?? '未知错误'}`)
+        }
+      }
+    } catch (e) {
+      console.error('[TimeboxesWorkspace.handleAiConfirm] failed', e)
+      toast.error(`AI panel 操作失败：${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setActionSubmitting(false)
+    }
+  }, [dateMode, currentDate, loadRange])
+
   /** [023.03] T3：handleEdit 包 try/catch + 视觉强化（标题前缀在 Drawer 内已实现） */
   const handleEdit = useCallback(async (summary: TimeboxSummary) => {
     try {
@@ -200,9 +273,21 @@ export function TimeboxesWorkspace() {
             onModeChange={handleDateModeChange}
             onNavigate={handleNavigate}
           />
-          <Button size="sm" onClick={() => setDrawer({ mode: 'create' })}>
-            <Plus className="size-4 mr-1" />新建时间盒
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* [023.08] T5 [F5 fold]: AI 智能推荐入口（data-testid 给 E2E + 验证测试用） */}
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="ai-orchestrate-button"
+              onClick={openAiPanel}
+            >
+              <Sparkles className="mr-1 size-4" />
+              AI 智能推荐
+            </Button>
+            <Button size="sm" onClick={() => setDrawer({ mode: 'create' })}>
+              <Plus className="size-4 mr-1" />新建时间盒
+            </Button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
@@ -250,6 +335,42 @@ export function TimeboxesWorkspace() {
           onClose={() => setDrawer(null)}
           onSaved={() => { setDrawer(null); loadRange(dateMode, currentDate) }}
         />
+      )}
+
+      {/* [023.08] T5 [F5 fold]: AI 智能推荐 panel — 右栏 Drawer 同位 420px 浮层 */}
+      {aiPanelOpen && (
+        <aside
+          className="flex w-[420px] flex-col border-l border-hairline bg-canvas"
+          data-testid="ai-panel-overlay"
+        >
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <h2 className="text-sm font-medium text-ink">AI 智能推荐</h2>
+            </div>
+            <button
+              type="button"
+              data-testid="ai-panel-close"
+              onClick={() => setAiPanelOpen(false)}
+              className="text-xs text-body hover:text-ink"
+            >
+              关闭
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <CreateSmartTimebox
+              surfaceType="createSmartTimebox"
+              dataModel={{
+                proposals: aiProposals,
+                revertableBatches,
+              }}
+              onDataChange={() => undefined}
+              onConfirm={handleAiConfirm}
+              onCancel={() => setAiPanelOpen(false)}
+              isLoading={actionSubmitting}
+            />
+          </div>
+        </aside>
       )}
 
       {/* [023.03] T3：needs_confirm 二次确认 AlertDialog */}
