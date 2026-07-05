@@ -19,7 +19,7 @@ export type MainViewState =
   | { type: 'schedule'; date: Date; viewMode: DateViewMode }
   | { type: 'conversation'; sessionId: string }
   | { type: 'action'; domainId: string; action: string; initialFields?: Partial<HabitFormFields> }
-  | { type: 'settings'; section?: 'general' | 'llm' | 'timezone' | 'templates' }
+  | { type: 'settings'; section?: 'general' | 'llm' | 'timezone' | 'archetypes' }
 
 export type PanelTab = 'assistant' | 'growth'
 

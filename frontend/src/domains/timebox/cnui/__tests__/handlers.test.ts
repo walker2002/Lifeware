@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { timeboxCnuiHandler } from '../handlers'
 import { TimeboxRepository } from '@/domains/timebox/repository'
 import type { CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
+import type { IntentSubmissionResult } from '@/app/actions/intent'
 
 // [023-01+] mock submitDynamicIntent（让 submit 测试可控）
 vi.mock('@/app/actions/intent', () => ({
@@ -295,7 +296,7 @@ describe('timeboxCnuiHandler', () => {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       // 重置 mock 并捕获调用参数
       vi.mocked(submitDynamicIntent).mockReset()
-      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-conv' } })
+      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-conv' } } as unknown as IntentSubmissionResult)
 
       await timeboxCnuiHandler.submit('createTimebox', {
         items: [{ title: '牙医', date: '2026-07-05', startTime: '08:00', endTime: '09:00' }],
@@ -314,7 +315,7 @@ describe('timeboxCnuiHandler', () => {
     it('[023.08] T2 G3 createTimebox submit 透传 ISO 串（不二次 convert）', async () => {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       vi.mocked(submitDynamicIntent).mockReset()
-      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-iso' } })
+      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-iso' } } as unknown as IntentSubmissionResult)
 
       await timeboxCnuiHandler.submit('createTimebox', {
         items: [{ title: '会议', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z' }],

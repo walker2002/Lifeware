@@ -65,7 +65,7 @@ export function createLLMGateway(): LLMGateway {
         structuredOutput: request.structuredOutput,
         // [023.08] T1 [F7 fix]: 透传 taskType 让 mock 按任务类型分支
         taskType: request.taskType,
-      } as LLMCallRequest & { taskType?: AITaskType }
+      }
 
       try {
         const caller = selectProvider(route.provider)

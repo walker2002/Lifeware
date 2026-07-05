@@ -1,5 +1,5 @@
 import { createClient, resolveModel } from '@/lib/llm/config'
-import type { ChatMessage, TokenUsage } from '../../types'
+import type { ChatMessage, TokenUsage, AITaskType } from '../../types'
 
 export interface LLMCallRequest {
   model: string
@@ -8,6 +8,8 @@ export interface LLMCallRequest {
   maxTokens?: number
   temperature?: number
   structuredOutput?: unknown
+  // [023.08] T1 F7 fix: 透传 taskType 让 provider 按任务类型分支（mock 必用，其他 provider 忽略）
+  taskType?: AITaskType
 }
 
 export interface LLMCallResponse {
