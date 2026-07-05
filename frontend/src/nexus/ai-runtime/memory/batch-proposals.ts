@@ -152,7 +152,8 @@ export async function revertBatchProposals(input: RevertBatchInput): Promise<Rev
 
   // 读取 batch episode (by session+id 简化查找：先按 userId 列,再 filter)
   // [F4 adaptation] EpisodeRepository 当前无 findById;用 findByUserId 拉全集再 filter id
-  const all = await repo.findByUserId(input.userId, 200)
+  // [023.10] T6 — limit 200 → 2000 (旧 hard limit 200 在 episode 累积后让 >200 batch 静默不可见)
+  const all = await repo.findByUserId(input.userId, 2000)
   const episode = all.find(ep => ep.id === input.batchId)
   const meta = episode?.metadata as Partial<BatchMetadata> | undefined
 
@@ -227,7 +228,8 @@ export async function getRevertableBatches(input: {
 }): Promise<RevertableBatch[]> {
   const repo = new EpisodeRepository()
   const now = Date.now()
-  const all = await repo.findByUserId(input.userId, 200)
+  // [023.10] T6 — limit 200 → 2000
+  const all = await repo.findByUserId(input.userId, 2000)
   return all
     .filter(ep => {
       if (ep.episodeType !== 'batch_proposals') return false
