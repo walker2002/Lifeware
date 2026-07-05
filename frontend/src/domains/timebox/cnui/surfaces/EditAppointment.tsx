@@ -1,18 +1,18 @@
 /**
- * @file EditItinerary
- * @brief 修改行程 CNUI surface（[026] D2 reversal）
+ * @file EditAppointment
+ * @brief 修改约定 CNUI surface（[026][023.05] D2 reversal）
  *
  * 默认 {scheduled, in_progress} 列表（用户可改计划/执行），选中切编辑表单。
- * 4 字段复用 <ItineraryFormFields>（D4 决议 A）。
+ * 4 字段复用 <AppointmentFormFields>（D4 决议 A）。
  * 终态 expired/cancelled/completed 不在列表（不可改，UI 自然隐藏）。
  */
 
 'use client'
 
 import { useState } from 'react'
-import { ItineraryFormFields, type ItineraryDraftFields } from './ItineraryFormFields'
+import { AppointmentFormFields, type AppointmentDraftFields } from './AppointmentFormFields'
 
-interface EditItineraryProps {
+interface EditAppointmentProps {
   surfaceType: string
   dataModel: Record<string, unknown>
   onDataChange: (d: Record<string, unknown>) => void
@@ -23,17 +23,17 @@ interface EditItineraryProps {
   serverErrors?: string[]
 }
 
-export function EditItinerary({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: EditItineraryProps) {
-  const items = (dataModel.items as (ItineraryDraftFields & { status: string })[]) ?? []
+export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: EditAppointmentProps) {
+  const items = (dataModel.items as (AppointmentDraftFields & { status: string })[]) ?? []
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<(ItineraryDraftFields & { status: string }) | null>(null)
+  const [draft, setDraft] = useState<(AppointmentDraftFields & { status: string }) | null>(null)
 
-  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 行程已更新</p>
+  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 约定已更新</p>
 
   const selected = items.find(i => i.id === selectedId)
 
   if (selected && draft) {
-    const update = (patch: Partial<ItineraryDraftFields>) => setDraft(d => d ? { ...d, ...patch } : d)
+    const update = (patch: Partial<AppointmentDraftFields>) => setDraft(d => d ? { ...d, ...patch } : d)
     const back = () => { setSelectedId(null); setDraft(null) }
     const submit = () => {
       onDataChange({ ...dataModel, selected: draft })
@@ -43,10 +43,10 @@ export function EditItinerary({ dataModel, onDataChange, onConfirm, onCancel, is
     return (
       <>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">编辑行程（{selected.status === 'in_progress' ? '执行中' : '计划'}）</span>
+          <span className="text-sm font-medium text-ink">编辑约定（{selected.status === 'in_progress' ? '执行中' : '计划'}）</span>
           <button type="button" onClick={back} className="text-xs text-body/70 underline">返回列表</button>
         </div>
-        <ItineraryFormFields draft={draft} onChange={update} />
+        <AppointmentFormFields draft={draft} onChange={update} />
         <div className="flex items-center justify-end gap-2 pt-2">
           {onCancel && <button type="button" onClick={onCancel}
             className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink hover:bg-hover-overlay">取消</button>}
@@ -62,9 +62,9 @@ export function EditItinerary({ dataModel, onDataChange, onConfirm, onCancel, is
 
   return (
     <>
-      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要修改的行程（仅计划/执行中）</span></div>
+      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要修改的约定（仅计划/执行中）</span></div>
       {items.length === 0
-        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的行程</p>
+        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的约定</p>
         : <div className="space-y-1 max-h-72 overflow-y-auto">
             {items.map(it => (
               <button key={it.id} type="button"

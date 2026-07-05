@@ -1,8 +1,8 @@
 /**
- * @file ItineraryFormFields
- * @brief [026] A2.x 行程 4 字段共享表单组件（D4 决议 A）
+ * @file AppointmentFormFields
+ * @brief [026][023.05] A2.x 约定 4 字段共享表单组件（D4 决议 A）
  *
- * CreateItinerary / EditItinerary 共用，避免 3 处重复字段定义 + 多端修正。
+ * CreateAppointment / EditAppointment 共用，避免 3 处重复字段定义 + 多端修正。
  * 字段：title (input) + startTime (datetime-local) + durationMin (number) +
  *       people (逗号分隔 input) + detail (textarea)
  *
@@ -14,10 +14,10 @@
 import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
 
 /**
- * 行程 draft 形态（与 ai-parser 的 ItineraryDraft 对齐，扩展 id/detail）。
+ * 约定 draft 形态（与 ai-parser 的 AppointmentDraft 对齐，扩展 id/detail）。
  * id 由 handler 在注入时分配（runtime 唯一标识）；detail 为可选详情文本。
  */
-export interface ItineraryDraftFields {
+export interface AppointmentDraftFields {
   id: string
   title: string
   startTime: string
@@ -26,9 +26,9 @@ export interface ItineraryDraftFields {
   people: string[]
 }
 
-export interface ItineraryFormFieldsProps {
-  draft: ItineraryDraftFields
-  onChange: (patch: Partial<ItineraryDraftFields>) => void
+export interface AppointmentFormFieldsProps {
+  draft: AppointmentDraftFields
+  onChange: (patch: Partial<AppointmentDraftFields>) => void
   /** [026] 表单整体 disabled（提交后只读 / SM 终态禁编等） */
   disabled?: boolean
 }
@@ -37,8 +37,8 @@ export interface ItineraryFormFieldsProps {
  * 4 字段表单（不含提交按钮 / 翻页 / 列表）。父组件负责 view/pagination/状态。
  * id 前缀动态生成（避免多 surface 同时挂载时 label-for 冲突）。
  */
-export function ItineraryFormFields({ draft, onChange, disabled }: ItineraryFormFieldsProps) {
-  const idPrefix = `iff-${draft.id}`
+export function AppointmentFormFields({ draft, onChange, disabled }: AppointmentFormFieldsProps) {
+  const idPrefix = `app-ff-${draft.id}`
   return (
     <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
       <div>

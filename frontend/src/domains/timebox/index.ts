@@ -19,10 +19,10 @@ import { AdjustTimeboxes } from './cnui/surfaces/AdjustTimeboxes'
 import { LogTimebox } from './cnui/surfaces/LogTimebox'
 // [023.04] T6 — editTimeboxes CNUI surface（按 K-block 集中编辑多个 timebox）
 import { EditTimeboxes } from './cnui/surfaces/EditTimeboxes'
-// [026] A2.5 — 行程 3 surface 注册（handler 共用 timebox 模块，按 action 分支）
-import { CreateItinerary } from './cnui/surfaces/CreateItinerary'
-import { EditItinerary } from './cnui/surfaces/EditItinerary'
-import { DeleteItinerary } from './cnui/surfaces/DeleteItinerary'
+// [026][023.05] A2.5 — 约定 3 surface 注册（handler 共用 timebox 模块，按 action 分支）
+import { CreateAppointment } from './cnui/surfaces/CreateAppointment'
+import { EditAppointment } from './cnui/surfaces/EditAppointment'
+import { DeleteAppointment } from './cnui/surfaces/DeleteAppointment'
 // [023.08] T5 — CreateSmartTimebox CNUI surface（AI 智能推荐 proposals + 接受/拒绝 + 撤销 batch）
 import { CreateSmartTimebox } from './cnui/surfaces/CreateSmartTimebox'
 
@@ -63,19 +63,19 @@ cnuiRegistry.register('timebox', 'create-smart-timebox', {
   handlerModulePath,
 })
 
-// [026] A2.5 — 行程 3 surface（K-block manifest 已声明，handler 共用 timebox 模块）
-cnuiRegistry.register('timebox', 'create-itinerary', {
-  component: CreateItinerary,
+// [026][023.05] A2.5 — 约定 3 surface（K-block manifest 已声明，handler 共用 timebox 模块）
+cnuiRegistry.register('timebox', 'create-appointment', {
+  component: CreateAppointment,
   handlerModulePath,
 })
 
-cnuiRegistry.register('timebox', 'edit-itinerary', {
-  component: EditItinerary,
+cnuiRegistry.register('timebox', 'edit-appointment', {
+  component: EditAppointment,
   handlerModulePath,
 })
 
-cnuiRegistry.register('timebox', 'delete-itinerary', {
-  component: DeleteItinerary,
+cnuiRegistry.register('timebox', 'delete-appointment', {
+  component: DeleteAppointment,
   handlerModulePath,
 })
 

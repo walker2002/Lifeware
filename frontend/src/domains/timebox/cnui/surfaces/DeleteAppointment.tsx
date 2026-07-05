@@ -1,6 +1,6 @@
 /**
- * @file DeleteItinerary
- * @brief 删除行程 CNUI surface（[026] D2 reversal）
+ * @file DeleteAppointment
+ * @brief 删除约定 CNUI surface（[026][023.05] D2 reversal）
  *
  * 列表筛 {scheduled, in_progress}（expired/cancelled/completed 不可删，UI 自然隐藏）。
  * 多选 → executeIntent(cancel)。SM 守卫 enforce from {scheduled, in_progress}。
@@ -12,7 +12,7 @@ import { useState } from 'react'
 
 interface DeleteItem { id: string; title: string; startTime: string; status: string }
 
-interface DeleteItineraryProps {
+interface DeleteAppointmentProps {
   surfaceType: string
   dataModel: Record<string, unknown>
   onDataChange: (d: Record<string, unknown>) => void
@@ -23,11 +23,11 @@ interface DeleteItineraryProps {
   serverErrors?: string[]
 }
 
-export function DeleteItinerary({ dataModel, onConfirm, onCancel, isLoading, isDone }: DeleteItineraryProps) {
+export function DeleteAppointment({ dataModel, onConfirm, onCancel, isLoading, isDone }: DeleteAppointmentProps) {
   const items = (dataModel.items as DeleteItem[]) ?? []
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ {items.length} 个行程已删除</p>
+  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ {items.length} 个约定已删除</p>
 
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev)
@@ -38,9 +38,9 @@ export function DeleteItinerary({ dataModel, onConfirm, onCancel, isLoading, isD
 
   return (
     <>
-      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要删除的行程（仅计划/执行中，可多选）</span></div>
+      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要删除的约定（仅计划/执行中，可多选）</span></div>
       {items.length === 0
-        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的行程（过期/已完成不可删）</p>
+        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的约定（过期/已完成不可删）</p>
         : <div className="space-y-1 max-h-72 overflow-y-auto">
             {items.map(it => {
               const checked = selected.has(it.id)
