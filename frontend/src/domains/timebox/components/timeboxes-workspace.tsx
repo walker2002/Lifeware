@@ -54,7 +54,7 @@ import { Plus, CalendarOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 // [023.08] T5：workspace 入口 — AI 智能推荐 surface 组件（data-testid 用于 E2E）
 import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
-import { submitDynamicIntent } from '@/app/actions/intent'
+import { submitDynamicIntent, submitCnuiSurface } from '@/app/actions/intent'
 // [023.06] C1 fix: getDateRange/navigateDate 复用 hooks/use-timebox.ts 的 export，
 // 删本地副本避免行为漂移（plan T1 Step 3 约束）。
 import { getDateRange, navigateDate } from '@/hooks/use-timebox'
@@ -220,13 +220,22 @@ export function TimeboxesWorkspace() {
         await loadRange(dateMode, currentDate)
         toast.success('撤销状态已重置（[023.10] 提供 server action）')
       } else if (action === 'createTimebox') {
-        // [023.08] T5：直接走 submitDynamicIntent — handler 已支持 _source=createSmartTimebox
+        // [023.08] T5 [P0 fix]: 走 submitCnuiSurface (非 submitDynamicIntent) 才能路由到
+        //   cnui/handlers.ts createTimebox submit branch — 该 branch 迭代 items[]、
+        //   HH:MM→ISO convert、调 submitDynamicIntent 单条、记录 batch (recordBatchProposals)。
+        //   submitDynamicIntent 走 SM 契约路径期望单条 timebox 顶层字段,会拒绝 { items } 格式。
         const fields = (data.fields ?? {}) as Record<string, unknown>
-        const result = await submitDynamicIntent('timebox', 'createTimebox', fields)
+        const result = await submitCnuiSurface(
+          '',  // cnuiSurfaceId — ignored by handler
+          'timebox',
+          'createTimebox',
+          fields,
+        )
         if (result.success) {
           await loadRange(dateMode, currentDate)
-          // 关闭 panel；revertableBatches 下次 open 面板时由 handler 拉
           setAiPanelOpen(false)
+          // submitCnuiSurface 把 handler.submit 返回的 result.data spread 到顶层,
+          // 所以 batchId 直接可读 (来自 cnui/handlers.ts:408 data.batchId)
           const batchId = (result as { batchId?: string }).batchId
           if (batchId) {
             const items = (fields.items as unknown[]) ?? []
