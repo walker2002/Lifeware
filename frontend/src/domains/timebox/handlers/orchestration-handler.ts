@@ -92,8 +92,11 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     const items = this.buildTimeboxItems(materials)
     const sorted = this.sortItems(items)
     const occupied = this.extractOccupiedSlots(materials.existingTimeboxes)
-    const proposals = this.generateProposals(sorted, occupied, materials.energyCurve, date)
-    const warnings = this.detectConflicts(proposals, materials.existingTimeboxes)
+    // [023.07] #3 — 解构新 shape：generateProposals 现返回 { proposals, warnings }，
+    // warnings 携带 SCHEDULER_BOUND_EXCEEDED（detection in deep loop），与 detectConflicts 并列追加。
+    // 顺序：bound warnings 在前，conflict warnings 在后。
+    const { proposals, warnings: boundWarnings } = this.generateProposals(sorted, occupied, materials.energyCurve, date)
+    const conflictWarnings = this.detectConflicts(proposals, materials.existingTimeboxes)
     const presentation = this.renderMarkdown(proposals, date)
 
     return {
@@ -104,7 +107,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         tags: ['auto-schedule', 'smart'],
       },
       presentation,
-      warnings,
+      warnings: [...boundWarnings, ...conflictWarnings],
     }
   }
 
@@ -221,20 +224,36 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     occupied: TimeSlot[],
     energyCurve: EnergyCurve,
     date: string,
-  ): GeneratedProposal[] {
+  ): { proposals: GeneratedProposal[]; warnings: Warning[] } {
     const proposals: GeneratedProposal[] = []
+    const warnings: Warning[] = []
     let cursorHour = 8  // 从 08:00 开始
     let cursorMinute = 0
+
+    // [023.07] #3 — 动态 iteration bound（defense-in-depth）：
+    // 单 item 最多走 ~28 个半小时槽（8:00-22:00），items.length × 48 给足余量，
+    // +100 兜底空 items / 极端 occupied。超出 → break + emit warning + 返 partial。
+    // 正常路径（谓词统一后 fallback 实质死代码）永不触发；纯粹防止未来回归。
+    const maxIterations = items.length * 48 + 100
+    let iterations = 0
 
     for (const item of items) {
       // 向前移动游标，跳过被占用的时段
       while (this.isSlotOccupied(cursorHour, cursorMinute, item.durationMinutes, occupied)) {
-        const overlap = this.findOccupyingSlot(cursorHour, cursorMinute, occupied)
+        if (++iterations > maxIterations) {
+          warnings.push({
+            code: 'SCHEDULER_BOUND_EXCEEDED',
+            message: `智能编排超出最大推进次数 ${maxIterations}，已返回部分方案（${proposals.length} 项）。可能存在异常占用数据。`,
+            severity: 'warn',
+          })
+          return { proposals, warnings }
+        }
+        const overlap = this.findOccupyingSlot(cursorHour, cursorMinute, item.durationMinutes, occupied)
         if (overlap) {
           cursorHour = overlap.endHour
           cursorMinute = overlap.endMinute
         } else {
-          // 安全回退：前进 30 分钟
+          // 安全回退：前进 30 分钟（谓词统一后此分支为死代码，bound 兜底）
           cursorMinute += 30
           if (cursorMinute >= 60) {
             cursorHour += Math.floor(cursorMinute / 60)
@@ -276,7 +295,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       if (cursorHour >= 22) break
     }
 
-    return proposals
+    return { proposals, warnings }
   }
 
   // ─── detectConflicts: 检测提案与已有 timebox 的时间重叠 ────
@@ -404,13 +423,19 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   private findOccupyingSlot(
     startHour: number,
     startMinute: number,
+    durationMinutes: number,
     occupied: TimeSlot[],
   ): TimeSlot | undefined {
+    // [023.07] #3 — 谓词统一为区间重叠语义（与 isSlotOccupied 一致）：
+    // 旧谓词 `sStart >= oStart && sStart < oEnd`（包含起点）与 isSlotOccupied 的重叠语义
+    // 不一致，导致「cursor 槽重叠但起点不在 occupied 内」时返 undefined → 走 fallback +30，
+    // 多数情况能自愈但异常 occupied 数据可触发长时间不退出。
     const sStart = startHour * 60 + startMinute
+    const sEnd = sStart + durationMinutes
     for (const slot of occupied) {
       const oStart = slot.startHour * 60 + slot.startMinute
       const oEnd = slot.endHour * 60 + slot.endMinute
-      if (sStart >= oStart && sStart < oEnd) return slot
+      if (sStart < oEnd && sEnd > oStart) return slot
     }
     return undefined
   }
