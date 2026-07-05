@@ -8,8 +8,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-// [023.06] T1：纯函数单测，测试文件紧贴 workspace
-import { getDateRange, TimeboxesWorkspace } from '../timeboxes-workspace'
+// [023.06] T1：纯函数单测。getDateRange 已 dedupe 到 hooks/use-timebox（C1 fix），
+// 测试从该 SSOT 导入，与生产代码路径一致。
+import { getDateRange } from '@/hooks/use-timebox'
+import { TimeboxesWorkspace } from '../timeboxes-workspace'
 
 describe('[023.06] getDateRange', () => {
   it('day 模式 → startOfDay ~ endOfDay（00:00:00 ~ 23:59:59.999）', () => {

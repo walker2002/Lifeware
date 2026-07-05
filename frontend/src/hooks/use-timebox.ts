@@ -32,7 +32,8 @@ const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
  * @param date - 基准日期
  * @returns 日期范围
  */
-function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
+// [023.06] C1 fix: 升格为 export，供 timeboxes-workspace 等其他消费者复用，避免行为漂移
+export function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date } {
   switch (mode) {
     case 'day':
       return { start: startOfDay(date), end: endOfDay(date) };
@@ -43,7 +44,7 @@ function getDateRange(mode: DateViewMode, date: Date): { start: Date; end: Date 
   }
 }
 
-function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'): Date {
+export function navigateDate(mode: DateViewMode, date: Date, direction: 'prev' | 'next'): Date {
   const delta = direction === 'next' ? 1 : -1;
   switch (mode) {
     case 'day': return addDays(date, delta);
