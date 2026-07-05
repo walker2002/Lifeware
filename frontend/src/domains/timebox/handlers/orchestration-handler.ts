@@ -208,11 +208,17 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     return timeboxes.map(tb => {
       const start = new Date(tb.startTime)
       const end = new Date(tb.endTime)
+      // [023.09] I-3 TZ fragility 治本：DB / USOM 存 UTC ISO timestamp，
+      // 过去用 .getHours()/.getMinutes() 读浏览器 local TZ（CST 浏览器下 UTC 22:00
+      // 被读成 6 = 次日 06:00），与 findOccupyingSlot/isSlotOccupied UTC-invariant
+      // 谓词（[023.07] 已统一）+ formatTime(HH:MM, UTC cursor) 错位。
+      // 改用 .getUTCHours()/.getUTCMinutes() 与 DB 储存 canonical 一致，
+      // arithmetic 与 proposal.payload.startTime zone-consistent。
       return {
-        startHour: start.getHours(),
-        startMinute: start.getMinutes(),
-        endHour: end.getHours(),
-        endMinute: end.getMinutes(),
+        startHour: start.getUTCHours(),
+        startMinute: start.getUTCMinutes(),
+        endHour: end.getUTCHours(),
+        endMinute: end.getUTCMinutes(),
       }
     })
   }
@@ -314,13 +320,17 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       for (const tb of existingTimeboxes) {
         const tbStart = new Date(tb.startTime)
         const tbEnd = new Date(tb.endTime)
-        const tStart = tbStart.getHours() * 60 + tbStart.getMinutes()
-        const tEnd = tbEnd.getHours() * 60 + tbEnd.getMinutes()
+        // [023.09] I-3 TZ fragility 治本：与 extractOccupiedSlots 同 — UTC arithmetic。
+        // tStart/tEnd 单位 = UTC minute-of-day；与 pStart/pEnd 来自 formatTime(cursorHour, ..)
+        // (UTC cursor, [023.07] 已统一) zone-consistent。message 用 UTC hour 字符串，
+        // 跨 TZ 一致；UI 期望 user-local 显示 留给 surface render layer (out-of-scope)。
+        const tStart = tbStart.getUTCHours() * 60 + tbStart.getUTCMinutes()
+        const tEnd = tbEnd.getUTCHours() * 60 + tbEnd.getUTCMinutes()
 
         if (pStart < tEnd && pEnd > tStart) {
           warnings.push({
             code: 'SCHEDULE_OVERLAP',
-            message: `"${payload.title}" 与已有时间盒 "${tb.title}" (${this.formatTime(tbStart.getHours(), tbStart.getMinutes())}-${this.formatTime(tbEnd.getHours(), tbEnd.getMinutes())}) 存在时间重叠`,
+            message: `"${payload.title}" 与已有时间盒 "${tb.title}" (${this.formatTime(tbStart.getUTCHours(), tbStart.getUTCMinutes())}-${this.formatTime(tbEnd.getUTCHours(), tbEnd.getUTCMinutes())}) 存在时间重叠`,
             severity: 'warn',
             affectedProposalIds: [proposal.id],
           })
