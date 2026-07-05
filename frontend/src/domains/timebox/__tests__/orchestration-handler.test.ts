@@ -425,11 +425,18 @@ describe('[023.08] T3 rule-engine 集成', () => {
   })
 })
 
-// [023.08] T3 [G16] 4 equivalence cases: rule-engine 路径 与 fallback 谓词路径
-//  对同一组 (existing, proposal) 给出一致的「是否触发 SCHEDULE_OVERLAP」判定。
-//  双向断言: 边界相切、零时长、全天跨度、status-aware — 四个最易出现路径不一致的边界。
-describe('[023.08] T3 [G16] rule-engine ↔ fallback equivalence', () => {
-  const cases = [
+// [023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix
+//
+// 历史说明：此 describe 块原命名 "[G16] rule-engine ↔ fallback equivalence" 措辞
+// 过于严格。review 发现 4 个 case 中 2 个（零时长 + status=ended）路径**故意**不同
+// ——是 T3 升级带来的语义收紧（rule-engine 状态感知 + 端点零时长不视为重叠）。
+// 重命名后拆为两组：严格等价 case 走 expectOverlap；已知分歧 case 走
+// ruleEngineTriggers / fallbackTriggers 分路径断言。
+describe('[023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix', () => {
+  // ─── Strict equivalence (both paths produce identical result) ───
+  // 边界相切（endpoint tangent）与全天跨度——两种路径行为一致，是 fallback 安全网
+  // 验证的关键。
+  const strictEquivalenceCases = [
     {
       name: '相邻区间 (boundary tangent, 不重叠)',
       existing: [{
@@ -441,21 +448,6 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback equivalence', () => {
       expectOverlap: false,
     },
     {
-      name: '零时长 proposal (端点撞)',
-      existing: [{
-        id: 'e1', title: 'e',
-        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
-        status: 'planned', taskIds: [], habitIds: [],
-      }],
-      proposalSpec: { startTime: '08:30', endTime: '08:30', title: 'zero-duration' },
-      // 零时长 = 端点；rule-engine TimeOverlapRule: e<=s → severity:pass → 不算 overlap。
-      // fallback 谓词: pStart < tEnd && pEnd > tStart → 510<540 && 510>480 → true → overlap。
-      // 路径分歧：此 case G16 **不严格等价**——这是 rule-engine 与 fallback 谓词语义差异。
-      // 我们仅断言 rule-engine 行为（业务权威源）+ 不要求 fallback 同结果。
-      ruleEngineTriggers: false,
-      fallbackTriggers: true,
-    },
-    {
       name: '全天跨度 (00:00-23:59)',
       existing: [{
         id: 'e1', title: 'e',
@@ -465,24 +457,10 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback equivalence', () => {
       proposalSpec: { startTime: '00:00', endTime: '23:59', title: 'all-day' },
       expectOverlap: true,
     },
-    {
-      name: 'status=ended (与已结束重叠 → rule-engine 不触发, fallback 触发)',
-      existing: [{
-        id: 'e1', title: 'e',
-        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
-        status: 'ended', taskIds: [], habitIds: [],
-      }],
-      proposalSpec: { startTime: '08:30', endTime: '09:30', title: 'after-ended' },
-      // 这是预期行为差异：rule-engine status-aware (active only) → 不触发；
-      // fallback 谓词 status-agnostic → 触发。这是 T3 升级动机之一。
-      // G16 不要求严格等价——分 case 各自断言预期路径。
-      ruleEngineTriggers: false,
-      fallbackTriggers: true,
-    },
   ]
 
-  for (const c of cases) {
-    it(`[equivalence] ${c.name}: rule-engine 与 fallback 同结果`, async () => {
+  for (const c of strictEquivalenceCases) {
+    it(`[strict-equivalence] ${c.name}: rule-engine 与 fallback 同结果`, async () => {
       const proposals = [{
         id: 'p-test', action: 'createTimebox',
         payload: { ...c.proposalSpec, date: '2026-07-05' },
@@ -507,24 +485,85 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback equivalence', () => {
       const resB: Array<{ code: string }> = await (handlerB as any).detectConflicts(proposals, existing as any)
       const overlapB = resB.filter(w => w.code === 'SCHEDULE_OVERLAP').length
 
-      // G16 等价 + 已知差异处理
-      if ('ruleEngineTriggers' in c) {
-        // 已知行为差异 case：分别断言各路径，不强求一致
-        if (c.ruleEngineTriggers) {
-          expect(overlapA).toBeGreaterThan(0)
-        } else {
-          expect(overlapA).toBe(0)
-        }
-        if (c.fallbackTriggers) {
-          expect(overlapB).toBeGreaterThan(0)
-        } else {
-          expect(overlapB).toBe(0)
-        }
-      } else if (c.expectOverlap) {
+      // 严格等价 case：rule-engine 与 fallback 必须同结果
+      if (c.expectOverlap) {
         expect(overlapA).toBeGreaterThan(0)
         expect(overlapB).toBeGreaterThan(0)
       } else {
         expect(overlapA).toBe(0)
+        expect(overlapB).toBe(0)
+      }
+    })
+  }
+
+  // ─── Expected divergence (rule-engine has stricter semantics) ───
+  // 零时长 proposal 端点撞 / status=ended 已结束重叠——rule-engine 是业务权威源，
+  // fallback 谓词会多报（status-agnostic + 区间重叠语义不区分零时长端点）。
+  // T3 升级动机就是收紧这两类误报；不要求 fallback 与 rule-engine 同结果。
+  const expectedDivergenceCases = [
+    {
+      name: '零时长 proposal (端点撞)',
+      existing: [{
+        id: 'e1', title: 'e',
+        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+        status: 'planned', taskIds: [], habitIds: [],
+      }],
+      proposalSpec: { startTime: '08:30', endTime: '08:30', title: 'zero-duration' },
+      // 零时长 = 端点；rule-engine TimeOverlapRule: e<=s → severity:pass → 不算 overlap。
+      // fallback 谓词: pStart < tEnd && pEnd > tStart → 510<540 && 510>480 → true → overlap。
+      ruleEngineTriggers: false,
+      fallbackTriggers: true,
+    },
+    {
+      name: 'status=ended (与已结束重叠 → rule-engine 不触发, fallback 触发)',
+      existing: [{
+        id: 'e1', title: 'e',
+        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+        status: 'ended', taskIds: [], habitIds: [],
+      }],
+      proposalSpec: { startTime: '08:30', endTime: '09:30', title: 'after-ended' },
+      // 这是预期行为差异：rule-engine status-aware (active only) → 不触发；
+      // fallback 谓词 status-agnostic → 触发。这是 T3 升级动机之一。
+      ruleEngineTriggers: false,
+      fallbackTriggers: true,
+    },
+  ]
+
+  for (const c of expectedDivergenceCases) {
+    it(`[expected-divergence] ${c.name}: rule-engine 与 fallback 路径各自断言`, async () => {
+      const proposals = [{
+        id: 'p-test', action: 'createTimebox',
+        payload: { ...c.proposalSpec, date: '2026-07-05' },
+        sourceType: 'task' as const,
+        priority: 'P1',
+      }]
+      const existing = c.existing
+
+      // 路径 A: rule-engine（业务权威源）
+      const repo = makeMockTimeboxRepo(existing.map((tb: any) => ({
+        id: tb.id, title: tb.title,
+        startTime: tb.startTime, endTime: tb.endTime,
+        status: tb.status,
+      })))
+      const ruleEngine = createRuleEngine({ timeboxRepo: repo, userId: 'user-1' as USOM_ID })
+      const handlerA = new TimeboxOrchestrationHandler({ ruleEngine, timeboxRepo: repo, userId: 'user-1' as USOM_ID })
+      const resA: Array<{ code: string }> = await (handlerA as any).detectConflicts(proposals, existing as any)
+      const overlapA = resA.filter(w => w.code === 'SCHEDULE_OVERLAP').length
+
+      // 路径 B: fallback（无 deps）
+      const handlerB = new TimeboxOrchestrationHandler()
+      const resB: Array<{ code: string }> = await (handlerB as any).detectConflicts(proposals, existing as any)
+      const overlapB = resB.filter(w => w.code === 'SCHEDULE_OVERLAP').length
+
+      // 已知行为差异：分别断言各路径，不强求一致
+      if (c.ruleEngineTriggers) {
+        expect(overlapA).toBeGreaterThan(0)
+      } else {
+        expect(overlapA).toBe(0)
+      }
+      if (c.fallbackTriggers) {
+        expect(overlapB).toBeGreaterThan(0)
+      } else {
         expect(overlapB).toBe(0)
       }
     })

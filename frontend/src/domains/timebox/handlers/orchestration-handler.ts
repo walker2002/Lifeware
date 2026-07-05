@@ -350,11 +350,14 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     proposals: GeneratedProposal[],
     existingTimeboxes: TimeboxSummary[],
   ): Promise<Warning[]> {
-    // [F9 fold]: existingTimeboxes 已在 contexts 一次性传入（context-engine pre-fetched），
-    // 透传 rule-engine 作为 snapshot context 字段。TimeOverlapRule 内部仍按 proposal 区间
-    // 调 timeboxRepo.findByDateRange 做精确 status-aware 查询（这是 rule-engine 设计意图）。
-    // 当前 handle() 调用上下文里 existingTimeboxes 就是 context-engine 提供的同日快照，
-    // 与 TimeOverlapRule 的 per-proposal 查询结果范围对齐。
+    // [F9 fold / partial]: existingTimeboxes 已在 contexts 一次性传入（context-engine
+    // pre-fetched），透传 rule-engine 作为 snapshot.upcomingTimeboxes context 字段。
+    // **重要**: TimeOverlapRule 当前实现仍按 proposal 区间调 timeboxRepo.findByDateRange
+    // 做精确 status-aware 查询（per-proposal N 次），并不消费 snapshot.upcomingTimeboxes。
+    // 因此本批 pre-fetch 实质是 **snapshot availability hook**（为未来 rule-engine 版本
+    // 能复用 snapshot 提前到位而 wiring 已就绪），**不消解 N+1**。真正的 N+1 优化
+    // 需 rule-engine 改造消费 snapshot.upcomingTimeboxes（[023.08] P1 backlog）。
+    // 当前 handle() 调用上下文里 existingTimeboxes 即 context-engine 提供的同日快照。
     const preFetchedOccupied = existingTimeboxes
 
     if (this.deps.ruleEngine) {
@@ -386,7 +389,10 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         activeKeyResults: [],
         activeTasks: [],
         pendingHabits: [],
-        // [F9 fold]: 透传 batch pre-fetched existingTimeboxes 给 rule-engine 作 context。
+        // [F9 fold / partial]: 透传 batch pre-fetched existingTimeboxes 给 rule-engine
+        // 作 snapshot.upcomingTimeboxes context。注意：当前 TimeOverlapRule 不消费
+        // snapshot.upcomingTimeboxes（仍 per-proposal 查 DB），故此字段是
+        // snapshot availability hook，不消解 N+1（N+1 修复需后续 rule-engine 改造）。
         upcomingTimeboxes: existingTimeboxes as any,
         pendingIntentions: [],
         currentTime: new Date().toISOString(),
@@ -394,7 +400,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         dayOfWeek: 0,
         timeOfDay: 'morning',
         energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' },
-        // [F9 fold] metadata 让下游 rule 知道 batch 预取已就绪（避免再查 DB）。
+        // [F9 fold / partial] metadata 标记 batch 预取就绪；当前仅作 hook，不影响查询路径。
         metadata: { batchPreFetched: true },
       } as any
 
