@@ -30,7 +30,7 @@ import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
 import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
 import { OkrWorkspacePage } from "@/domains/okrs/pages/OkrWorkspacePage"
 import { TimeboxTemplatesPage } from "@/domains/timebox/pages/TimeboxTemplatesPage"
-import { ItineraryPage } from "@/domains/timebox/pages/ItineraryPage"
+import { AppointmentPage } from "@/domains/timebox/pages/AppointmentPage"
 
 const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<any>>> = {
   habits: {
@@ -51,7 +51,7 @@ const VIEW_PAGE_COMPONENTS: Record<string, Record<string, React.ComponentType<an
     okrs: OkrWorkspacePage,
   },
   timebox: {
-    viewItineraries: ItineraryPage, // [026] 行程管理页（manifest view_routes.viewItineraries）
+    viewAppointments: AppointmentPage, // [026] 约定管理页（manifest view_routes.viewAppointments；[023.05] viewItineraries → viewAppointments）
     configTimeboxTemplates: TimeboxTemplatesPage,
 
   },

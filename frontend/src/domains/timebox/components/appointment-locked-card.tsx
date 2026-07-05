@@ -1,11 +1,11 @@
 /**
- * @file itinerary-locked-card
- * @brief /timeboxes 上 itinerary 锁定卡（[026] A3.2 / [023.03] T4 重命名）
+ * @file appointment-locked-card
+ * @brief /timeboxes 上 appointment 锁定卡（[026] A3.2 / [023.03] T4 重命名 / [023.05] PR2 T9 itinerary→appointment）
  *
- * 与 TimeboxCard 同构（compact + 完整模式），但 itinerary **只读**：
+ * 与 TimeboxCard 同构（compact + 完整模式），但 appointment **只读**：
  * - 无 onAction / onEdit 回调
  * - 视觉用 border-l-primary（"锁定"语义）区分 timebox 的"可执行"卡
- * - 状态徽章来自 ItineraryStatus 5 态（scheduled / in_progress / expired / completed / cancelled）
+ * - 状态徽章来自 AppointmentStatus 5 态（scheduled / in_progress / expired / completed / cancelled）
  *
  * status 直接来自 DB（D2 reversal），不读时算。
  */
@@ -13,12 +13,12 @@
 
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock } from "lucide-react";
-import type { ItinerarySummary } from "@/usom/types/summaries";
-import type { ItineraryStatus } from "@/usom/types/primitives";
+import type { AppointmentSummary } from "@/usom/types/summaries";
+import type { AppointmentStatus } from "@/usom/types/primitives";
 
-/** ItineraryStatus 5 态 → Badge 变体 + 中文 label */
+/** AppointmentStatus 5 态 → Badge 变体 + 中文 label */
 const STATUS_STYLES: Record<
-  ItineraryStatus,
+  AppointmentStatus,
   { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
 > = {
   scheduled: { variant: "outline", label: "计划" },
@@ -39,26 +39,29 @@ function formatTime(timestamp: string): string {
   });
 }
 
-interface ItineraryLockedCardProps {
-  itinerary: ItinerarySummary;
+interface AppointmentLockedCardProps {
+  appointment: AppointmentSummary;
   /** 紧凑模式：与 TimeboxCard compact 保持同尺寸 */
   compact?: boolean;
 }
 
 /**
- * ItineraryLockedCard — 行程只读卡（timeboxes 视图）。
+ * AppointmentLockedCard — 约定只读卡（timeboxes 视图）。
  *
  * [026] A3.2：不可执行（无 onAction / onEdit）。点击行为：
- * - T14 阶段接 GrowthMenu 触发 CNUI surface 'editItinerary'（与既有 timeboxes
+ * - T14 阶段接 GrowthMenu 触发 CNUI surface 'editAppointment'（与既有 timeboxes
  *   action 模式同模型）。当前 click 行为 = noop（占位 div 不可点）。
  *
  * [023.03] T4：route /schedule → /timeboxes 命名同步。
  *
+ * [023.05] PR2 T9：ItineraryLockedCard → AppointmentLockedCard；
+ * itinerary: ItinerarySummary → appointment: AppointmentSummary。
+ *
  * 视觉规范：border-l-4 border-primary（锁定）+ bg-canvas（与 timebox 的
  * surface-card 区分），用 token 颜色，禁 Tailwind 默认色。
  */
-export function ItineraryLockedCard({ itinerary, compact = false }: ItineraryLockedCardProps) {
-  const statusStyle = STATUS_STYLES[itinerary.status] ?? STATUS_STYLES.scheduled;
+export function AppointmentLockedCard({ appointment, compact = false }: AppointmentLockedCardProps) {
+  const statusStyle = STATUS_STYLES[appointment.status] ?? STATUS_STYLES.scheduled;
 
   if (compact) {
     return (
@@ -67,10 +70,10 @@ export function ItineraryLockedCard({ itinerary, compact = false }: ItineraryLoc
         <div className="flex items-center gap-2 px-3 py-2">
           <MapPin className="size-3 shrink-0 text-primary" />
           <span className="text-xs text-body whitespace-nowrap">
-            {formatTime(itinerary.startTime)} · {itinerary.durationMin}分钟
+            {formatTime(appointment.startTime)} · {appointment.durationMin}分钟
           </span>
           <span className="flex-1 truncate text-sm font-medium text-ink">
-            {itinerary.title}
+            {appointment.title}
           </span>
           <Badge variant={statusStyle.variant} className="text-xs shrink-0">
             {statusStyle.label}
@@ -86,10 +89,10 @@ export function ItineraryLockedCard({ itinerary, compact = false }: ItineraryLoc
       <div className="flex items-center gap-2">
         <MapPin className="size-4 shrink-0 text-primary" />
         <span className="text-sm text-body whitespace-nowrap">
-          {formatTime(itinerary.startTime)} · {itinerary.durationMin}分钟
+          {formatTime(appointment.startTime)} · {appointment.durationMin}分钟
         </span>
         <h3 className="flex-1 truncate font-display text-base font-medium text-ink">
-          {itinerary.title}
+          {appointment.title}
         </h3>
         <Badge variant={statusStyle.variant} className="shrink-0">
           {statusStyle.label}
@@ -98,7 +101,7 @@ export function ItineraryLockedCard({ itinerary, compact = false }: ItineraryLoc
       {/* 第二行：锁定提示 + 时长说明 */}
       <div className="flex items-center gap-1 text-xs text-muted">
         <Clock className="size-3 shrink-0" />
-        <span>行程已锁定 · {itinerary.durationMin} 分钟</span>
+        <span>约定已锁定 · {appointment.durationMin} 分钟</span>
       </div>
     </div>
   );

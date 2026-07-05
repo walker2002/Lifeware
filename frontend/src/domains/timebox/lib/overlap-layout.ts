@@ -1,12 +1,12 @@
 /**
  * @file overlap-layout
- * @brief 时间盒重叠区间扫描 + 列分配（B3 算法，[023.03] T1）
+ * @brief 时间盒重叠区间扫描 + 列分配（B3 算法，[023.03] T1 / [023.05] PR2 T9 itinerary→appointment）
  *
  * 对 TimeboxesEvent[] 按 startTime 升序，贪心装箱分配 column；
  * 同时间点 active 的最大 column 数 = totalCols；
  * totalCols > 4 → isOvercrowded=true（fallback 仅边框提示不缩宽）。
  *
- * itinerary 不参与（仅 kind='timebox'），输出 col=0, totalCols=1。
+ * appointment 不参与（仅 kind='timebox'），输出 col=0, totalCols=1。
  *
  * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
  *

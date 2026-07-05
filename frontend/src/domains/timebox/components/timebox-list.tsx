@@ -1,6 +1,6 @@
 /**
  * @file timebox-list
- * @brief 时间盒列表组件（[026] A3.2 适配 kind 分支）
+ * @brief 时间盒列表组件（[026] A3.2 适配 kind 分支 / [023.05] PR2 T9 kind='appointment'）
  *
  * compact=false: 响应式网格展示。
  * compact=true: 单列紧凑列表。
@@ -8,9 +8,12 @@
  *
  * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - kind='timebox' 走 TimeboxCard（**与改动前字节级一致**，IRON RULE 守护）
- * - kind='itinerary' 走新的 ItineraryLockedCard（锁定行程卡）
+ * - kind='appointment' 走新的 AppointmentLockedCard（锁定约定卡）
  *
  * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * [023.05] PR2 T9：kind='itinerary' → 'appointment'（运行时判别）+ ItineraryLockedCard
+ * → AppointmentLockedCard。kind === 'timebox' 保留；注释「行程」→「约定」。
  *
  * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 分支渲染。
  * 排序已在 mergeEvents()（timeboxes-event.ts）完成；本组件不再排序。
@@ -18,7 +21,7 @@
 "use client";
 
 import { TimeboxCard } from "./timebox-card";
-import { ItineraryLockedCard } from "./itinerary-locked-card";
+import { AppointmentLockedCard } from "./appointment-locked-card";
 import type { TimeboxesEvent } from "./timeboxes-event";
 import type { TimeboxSummary } from "@/usom/types/summaries";
 
@@ -26,16 +29,16 @@ interface TimeboxListProps {
   events: TimeboxesEvent[];
   /** 紧凑模式：单列列表，用于今日模式左列 */
   compact?: boolean;
-  /** 状态转换操作回调（仅对 timebox 生效，itinerary 走 CNUI） */
+  /** 状态转换操作回调（仅对 timebox 生效，appointment 走 CNUI） */
   onAction?: (timeboxId: string, action: string) => void;
   /** [023] A2 C1：卡片标题点击进入编辑 Drawer（仅 timebox） */
   onEdit?: (tb: TimeboxSummary) => void;
 }
 
 /**
- * TimeboxList — 时间盒/行程联合列表组件
+ * TimeboxList — 时间盒/约定联合列表组件
  *
- * [026] A3.2 IRON RULE：纯 timebox-only 输入（含空 itinerary）时，
+ * [026] A3.2 IRON RULE：纯 timebox-only 输入（含空 appointment）时，
  * 渲染输出与 T13 改动前字节级一致——T15 回归测试会守护。
  */
 export function TimeboxList({ events, compact = false, onAction, onEdit }: TimeboxListProps) {
@@ -54,7 +57,7 @@ export function TimeboxList({ events, compact = false, onAction, onEdit }: Timeb
           e.kind === "timebox" ? (
             <TimeboxCard key={e.id} timebox={e.source} compact onAction={onAction} onEdit={onEdit} />
           ) : (
-            <ItineraryLockedCard key={e.id} itinerary={e.source} compact />
+            <AppointmentLockedCard key={e.id} appointment={e.source} compact />
           ),
         )}
       </div>
@@ -67,7 +70,7 @@ export function TimeboxList({ events, compact = false, onAction, onEdit }: Timeb
         e.kind === "timebox" ? (
           <TimeboxCard key={e.id} timebox={e.source} onAction={onAction} onEdit={onEdit} />
         ) : (
-          <ItineraryLockedCard key={e.id} itinerary={e.source} />
+          <AppointmentLockedCard key={e.id} appointment={e.source} />
         ),
       )}
     </div>

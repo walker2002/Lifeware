@@ -24,7 +24,7 @@ import {
   fetchDomainActions,
   parseHabitIntentOnly,
   parseTimeboxBatchIntentOnly,  // [023-01+] chat 路径 dry-run 入口
-  parseItineraryIntentOnly,     // [026] A2.1 行程 dry-run 入口
+  parseAppointmentIntentOnly,   // [026] A2.1 [023.05] PR2 T9 itinerary→appointment 重命名
   openCnuiSurface,
   submitCnuiSurface,
   isCnuiSurface,
@@ -567,23 +567,23 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
               return
             }
 
-            // [026] A2.1 行程创建/编辑/删除意图 → 走行程 dry-run 解析（";" 多记录 + "@" 关系人）
-            //   路由条件：slash 解析出 action ∈ {createItinerary, editItinerary, deleteItinerary}
+            // [026] A2.1 [023.05] PR2 T9 约定创建/编辑/删除意图 → 走约定 dry-run 解析（";" 多记录 + "@" 关系人）
+            //   路由条件：slash 解析出 action ∈ {createAppointment, editAppointment, deleteAppointment}
             //   之前：chat 路径只调 parseHabitIntentOnly + parseTimeboxBatchIntentOnly，
-            //         行程 slash 落空走 submitIntent → parseWithAI 弱 systemPrompt → 解析失败
-            //   现在：直接调 parseItineraryIntentOnly → ITINERARY_PARSE_PROMPT（多记录+@people）
+            //         约定 slash 落空走 submitIntent → parseWithAI 弱 systemPrompt → 解析失败
+            //   现在：直接调 parseAppointmentIntentOnly → APPOINTMENT_PARSE_PROMPT（多记录+@people）
             if (
               (resolvedDomainId === "timebox" || slashResult.domainId === "timebox") &&
-              (slashResult.action === "createItinerary" ||
-                slashResult.action === "editItinerary" ||
-                slashResult.action === "deleteItinerary")
+              (slashResult.action === "createAppointment" ||
+                slashResult.action === "editAppointment" ||
+                slashResult.action === "deleteAppointment")
             ) {
-              const itinParse = await parseItineraryIntentOnly(content)
-              if (itinParse.success && itinParse.drafts && itinParse.drafts.length > 0) {
-                const cnuiResult = await openCnuiSurface("timebox", slashResult.action, { drafts: itinParse.drafts })
+              const apptParse = await parseAppointmentIntentOnly(content)
+              if (apptParse.success && apptParse.drafts && apptParse.drafts.length > 0) {
+                const cnuiResult = await openCnuiSurface("timebox", slashResult.action, { drafts: apptParse.drafts })
                 const cnuiMsg: ChatMessage = {
                   role: "assistant",
-                  content: `已识别 ${itinParse.drafts.length} 个行程，请确认：`,
+                  content: `已识别 ${apptParse.drafts.length} 个约定，请确认：`,
                   timestamp: new Date().toISOString(),
                   cnuiSurface: cnuiResult.surface,
                 }
@@ -595,7 +595,7 @@ export function useIntentHandler(deps: IntentHandlerDeps) {
               const cnuiResult = await openCnuiSurface("timebox", slashResult.action)
               const cnuiMsg: ChatMessage = {
                 role: "assistant",
-                content: "请填写行程信息：",
+                content: "请填写约定信息：",
                 timestamp: new Date().toISOString(),
                 cnuiSurface: cnuiResult.surface,
               }

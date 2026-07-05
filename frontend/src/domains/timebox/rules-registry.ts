@@ -86,18 +86,18 @@ const endTimeFormat: RealtimeCheck = (value) => {
 // ── submit 聚合（phase: submit，复刻原 onValidate 全逻辑）──────────
 
 /**
- * 状态转换 action（不含 createTimebox/editTimebox）：title/startTime/endTime 从 DB
- * 行加载（不是 form 提交），submit 端字段必含检查应跳过。
+ * 状态转换 action（不含 createTimebox/editTimebox / createAppointment/editAppointment）：
+ * title/startTime/endTime 从 DB 行加载（不是 form 提交），submit 端字段必含检查应跳过。
  *
- * 包含 startTimebox / endTimebox / cancelTimebox / logTimebox + 行程
- * cancelItinerary / startItinerary / completeItinerary / expireItinerary —
+ * 包含 startTimebox / endTimebox / cancelTimebox / logTimebox + 约定
+ * cancelAppointment / startAppointment / completeAppointment / expireAppointment —
  * 这些 action 在 submitDynamicIntent 时 fields 仅有 { objectId }，跑字段必含
  * 校验会被错判 Rejected，阻塞 SM transition（[023.03] QA 发现：点开始无反应）。
  */
 const STATUS_TRANSITION_ACTIONS = new Set([
   'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox',
   'overtimeTimebox',
-  'cancelItinerary', 'startItinerary', 'completeItinerary', 'expireItinerary',
+  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
 ])
 
 const timeboxFieldsValid: SubmitCheck = async (intent: StructuredIntent) => {
@@ -170,67 +170,68 @@ export const timeboxRuleRegistry: DomainRuleRegistry = {
   },
 }
 
-// ── [026] A1.6 itinerary 规则（D2 reversal）───────────────────────────
+// ── [026] A1.6 appointment 规则（D2 reversal）/ [023.05] PR2 T9 itinerary→appointment
 //
-// 行程是独立对象（[026] D2 reversal：5 态存储，SM 驱动全部 transition）。
+// 约定是独立对象（[026] D2 reversal：5 态存储，SM 驱动全部 transition）。
 // 与 timebox 规则不同点：
-// - 字段为 title / startTime / durationMin（无 endTime——行程时长由 durationMin 决定，
+// - 字段为 title / startTime / durationMin（无 endTime——约定时长由 durationMin 决定，
 //   客户端计算 endTime 上送）
-// - 行程可标记 cancelled / completed 等终态（timebox 走 logged），但 submit 端
-//   itinerary_fields_valid 复刻 timebox 范式：纯字段校验，不做 SM 终态/转移检查
+// - 约定可标记 cancelled / completed 等终态（timebox 走 logged），但 submit 端
+//   appointment_fields_valid 复刻 timebox 范式：纯字段校验，不做 SM 终态/转移检查
 //   （SM 由 orchestrator 独立把关）
-// - 走独立 itineraryRuleRegistry，由 hooks.ts onValidate 按 objectType 分派
+// - 走独立 appointmentRuleRegistry，由 hooks.ts onValidate 按 objectType 分派
 // - 复用 validationPassed/validationRejected（同 process 模块）
 
-/** itinerary 规则提示文案（单源，与 realtime message 同源） */
-const ITINERARY_RULE_MESSAGES = {
+/** appointment 规则提示文案（单源，与 realtime message 同源） */
+const APPOINTMENT_RULE_MESSAGES = {
   titleRequired: '事件名称不能为空',
   startTimeInFuture: '开始时间必须是未来',
   durationPositive: '时长必须大于 0 分钟',
-  fieldsValid: '行程字段校验失败',
+  fieldsValid: '约定字段校验失败',
 } as const
 
 // ── realtime checks（phase: both，单字段纯函数）──────────
 
-const itineraryTitleRequired: RealtimeCheck = (value) => {
+const appointmentTitleRequired: RealtimeCheck = (value) => {
   if (typeof value === 'string' && value.trim() === '') {
-    return [{ field: 'title', message: ITINERARY_RULE_MESSAGES.titleRequired }]
+    return [{ field: 'title', message: APPOINTMENT_RULE_MESSAGES.titleRequired }]
   }
   return []
 }
 
-const itineraryStartTimeInFuture: RealtimeCheck = (value) => {
+const appointmentStartTimeInFuture: RealtimeCheck = (value) => {
   // [026] 与 timebox F2 一致：缺值/空值 fail-OPEN（部分更新语义），submit 兜底
   if (value === undefined || value === null || value === '') return []
   if (typeof value !== 'string' || isNaN(Date.parse(value))) {
-    return [{ field: 'startTime', message: ITINERARY_RULE_MESSAGES.startTimeInFuture }]
+    return [{ field: 'startTime', message: APPOINTMENT_RULE_MESSAGES.startTimeInFuture }]
   }
   if (Date.parse(value) <= Date.now()) {
-    return [{ field: 'startTime', message: ITINERARY_RULE_MESSAGES.startTimeInFuture }]
+    return [{ field: 'startTime', message: APPOINTMENT_RULE_MESSAGES.startTimeInFuture }]
   }
   return []
 }
 
-const itineraryDurationPositive: RealtimeCheck = (value) => {
+const appointmentDurationPositive: RealtimeCheck = (value) => {
   if (value === undefined || value === null) return [] // 缺值由 submit 兜底
   if (typeof value !== 'number' || value <= 0) {
-    return [{ field: 'durationMin', message: ITINERARY_RULE_MESSAGES.durationPositive }]
+    return [{ field: 'durationMin', message: APPOINTMENT_RULE_MESSAGES.durationPositive }]
   }
   return []
 }
 
 // ── submit 聚合（phase: submit，复刻 realtime 3 条 + 跨字段检查）──────────
 
-const itineraryFieldsValid: SubmitCheck = async (
+const appointmentFieldsValid: SubmitCheck = async (
   intent: StructuredIntent,
   ctx,
 ) => {
   // [026] P0-1 修复（issue #1 阻断 reconcile / mark / delete 路径）：
   //   submit 规则对所有 action 都校验字段会把 mark* / delete* 阻断（这些 action 只传
-  //   {objectId, at}，缺 title/startTime/durationMin → reject）。故仅在 createItinerary
-  //   / editItinerary 时校验字段；其他 action（markInProgressItinerary /
-  //   markExpiredItinerary / deleteItinerary）立即通过，由 SM 独立把关终态/转移检查。
-  if (intent.action !== 'createItinerary' && intent.action !== 'editItinerary') {
+  //   {objectId, at}，缺 title/startTime/durationMin → reject）。故仅在 createAppointment
+  //   / editAppointment 时校验字段；其他 action（markInProgressAppointment /
+  //   markExpiredAppointment / deleteAppointment）立即通过，由 SM 独立把关终态/转移检查。
+  // [023.05] PR2 T9: action 名 itinerary→appointment
+  if (intent.action !== 'createAppointment' && intent.action !== 'editAppointment') {
     return validationPassed()
   }
 
@@ -241,7 +242,7 @@ const itineraryFieldsValid: SubmitCheck = async (
   // realtime fail-OPEN 是部分更新语义，但 submit 不允许缺值通过
   const title = fields['title']
   if (!title || (typeof title === 'string' && title.trim() === '')) {
-    errors.push(ITINERARY_RULE_MESSAGES.titleRequired)
+    errors.push(APPOINTMENT_RULE_MESSAGES.titleRequired)
   }
 
   const startTime = fields['startTime']
@@ -252,7 +253,7 @@ const itineraryFieldsValid: SubmitCheck = async (
     isNaN(Date.parse(startTime)) ||
     Date.parse(startTime) <= ctx.now
   ) {
-    errors.push(ITINERARY_RULE_MESSAGES.startTimeInFuture)
+    errors.push(APPOINTMENT_RULE_MESSAGES.startTimeInFuture)
   }
 
   const durationMin = fields['durationMin']
@@ -262,35 +263,35 @@ const itineraryFieldsValid: SubmitCheck = async (
     typeof durationMin !== 'number' ||
     durationMin <= 0
   ) {
-    errors.push(ITINERARY_RULE_MESSAGES.durationPositive)
+    errors.push(APPOINTMENT_RULE_MESSAGES.durationPositive)
   }
 
   return errors.length === 0 ? validationPassed() : validationRejected(errors)
 }
 
-export const itineraryRuleRegistry: DomainRuleRegistry = {
+export const appointmentRuleRegistry: DomainRuleRegistry = {
   realtime: {
-    itinerary_title_required: {
-      check: itineraryTitleRequired,
+    appointment_title_required: {
+      check: appointmentTitleRequired,
       fields: ['title'],
-      message: ITINERARY_RULE_MESSAGES.titleRequired,
+      message: APPOINTMENT_RULE_MESSAGES.titleRequired,
     },
-    itinerary_start_time_in_future: {
-      check: itineraryStartTimeInFuture,
+    appointment_start_time_in_future: {
+      check: appointmentStartTimeInFuture,
       fields: ['startTime'],
-      message: ITINERARY_RULE_MESSAGES.startTimeInFuture,
+      message: APPOINTMENT_RULE_MESSAGES.startTimeInFuture,
     },
-    itinerary_duration_positive: {
-      check: itineraryDurationPositive,
+    appointment_duration_positive: {
+      check: appointmentDurationPositive,
       fields: ['durationMin'],
-      message: ITINERARY_RULE_MESSAGES.durationPositive,
+      message: APPOINTMENT_RULE_MESSAGES.durationPositive,
     },
   },
   submit: {
-    itinerary_fields_valid: {
-      check: itineraryFieldsValid,
+    appointment_fields_valid: {
+      check: appointmentFieldsValid,
       fields: ['title', 'startTime', 'durationMin'],
-      message: ITINERARY_RULE_MESSAGES.fieldsValid,
+      message: APPOINTMENT_RULE_MESSAGES.fieldsValid,
     },
   },
 }

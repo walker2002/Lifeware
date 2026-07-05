@@ -15,11 +15,11 @@
  * 函数名/类型名 改为 TimeboxesWorkspace / TimeboxesEvent；
  * 文件路径在时间盒域内统一为 timeboxes-* 前缀。
  *
- * [026] A3.2：loadDay 改用 Promise.all 并行拉 timebox + itinerary，
+ * [026] A3.2：loadDay 改用 Promise.all 并行拉 timebox + appointment，
  * 合并为 TimeboxesEvent[] 后塞给 DayView。
  *
- * [026] codex D5 修复：loadDay **不**调 reconcileAndAdvanceItineraries
- * （避免 /timeboxes 翻日历页重推 N 次 SM）。reconcile 仅在 /itineraries
+ * [026] codex D5 修复：loadDay **不**调 reconcileAndAdvanceAppointments
+ * （避免 /timeboxes 翻日历页重推 N 次 SM）。reconcile 仅在 /appointments
  * 触发。Trade-off：/timeboxes 可能显陈旧状态。可接受 MVP。
  *
  * [023.06] T2：注入视图模式状态 dateMode，渲染 <DateNav> 切换日/周/月。
@@ -28,8 +28,8 @@
  * [023.06] T3：events 渲染分支改为三向路由（DayView / WeekView / MonthView）。
  * WeekView/MonthView 接收 TimeboxSummary[]，而 workspace 内部 state 是
  * TimeboxesEvent[]（discriminated union），所以在 workspace 里过滤
- * kind='timebox' 转 source 数组传入。itinerary 在周/月视图不渲染
- * ——设计如此，时间盒域视图只显示 timebox，行程计划由 /itineraries 域承担。
+ * kind='timebox' 转 source 数组传入。appointment 在周/月视图不渲染
+ * ——设计如此，时间盒域视图只显示 timebox，约定由 /appointments 域承担。
  */
 
 'use client'
@@ -41,7 +41,7 @@ import { MonthView } from './month-view'
 import { DateNav } from './date-nav'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
-import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
+import { getTimeboxesByRange, getAppointmentsByRange } from '@/app/actions/intent'
 import { mergeEvents, type TimeboxesEvent } from './timeboxes-event'
 import { Button } from '@/components/ui/button'
 import {
@@ -99,11 +99,11 @@ export function TimeboxesWorkspace() {
     setLoading(true)
     try {
       const { start, end } = getDateRange(mode, d)
-      const [timeboxList, itineraryList] = await Promise.all([
+      const [timeboxList, appointmentList] = await Promise.all([
         getTimeboxesByRange(start, end),
-        getItinerariesByRange(start, end),
+        getAppointmentsByRange(start, end),
       ])
-      setEvents(mergeEvents(timeboxList, itineraryList))
+      setEvents(mergeEvents(timeboxList, appointmentList))
     } catch (e) {
       console.error('[TimeboxesWorkspace] 加载失败', e)
     } finally {
@@ -136,7 +136,7 @@ export function TimeboxesWorkspace() {
   // [023.06] T3：WeekView/MonthView 的 props 是 TimeboxSummary[]；
   // workspace 内部 state 是 TimeboxesEvent[]（discriminated union）。
   // 在 workspace 里把 events 过滤 kind='timebox' 转 source 数组传——
-  // itinerary 在周/月视图不渲染（设计如此；时间盒域视图只显 timebox）。
+  // appointment 在周/月视图不渲染（设计如此；时间盒域视图只显 timebox）。
   const timeboxSources = useMemo(
     () =>
       events

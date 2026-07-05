@@ -1,19 +1,23 @@
 /**
  * @file timebox-timeline
- * @brief 垂直可视化时间轴（[026] A3.2 适配 kind 分支 + [023.03] T2 重叠布局）
+ * @brief 垂直可视化时间轴（[026] A3.2 适配 kind 分支 + [023.03] T2 重叠布局 / [023.05] PR2 T9 kind='appointment'）
  *
  * 左侧 06:00-23:00 时间刻度，右侧事件色块。
  *
  * [023.03] T2：timebox 块接入 computeOverlapLayout 算法。
  * - 同时间点 active 数 ≤4：等分宽度 + 列偏移
  * - >4：isOvercrowded fallback，width=100%, left=0（仅边框提示）
- * - itinerary 仍按现状显示在底层（不参与列分配）
+ * - appointment 仍按现状显示在底层（不参与列分配）
  *
  * [026] A3.2 适配：props 由 TimeboxSummary[] → TimeboxesEvent[]。
  * - kind='timebox'：既有渲染路径（**与改动前字节级一致**，IRON RULE 守护）
- * - kind='itinerary'：行程色块（border-l-primary 锁定视觉）
+ * - kind='appointment'：约定色块（border-l-primary 锁定视觉）
  *
  * [023.03] T4：route /schedule → /timeboxes，类型 ScheduleEvent → TimeboxesEvent。
+ *
+ * [023.05] PR2 T9：kind='itinerary' → 'appointment'（运行时判别）；注释「行程」
+ * →「约定」；kind === "timebox" 保留；kind === "appointment" 区块标识保留
+ * [023.03] T2 历史注释「itinerary 不参与布局」→「appointment 不参与布局」。
  *
  * 拆分规则：调用方传 TimeboxesEvent[]，本组件按 e.kind 分支渲染。
  */
@@ -46,8 +50,8 @@ const STATUS_COLORS: Record<TimeboxStatus, string> = {
   logged: "bg-success/20 border-success",
 }
 
-/** itinerary 行程色块样式（border-l-primary 锁定视觉） */
-const ITINERARY_COLOR = "bg-primary/10 border-primary"
+/** appointment 约定色块样式（border-l-primary 锁定视觉） */
+const APPOINTMENT_COLOR = "bg-primary/10 border-primary"
 
 /** 时间轴左侧刻度宽度 + 右侧间距（用于 left/width 计算） */
 const AXIS_LEFT_REM = 2.5
@@ -158,11 +162,11 @@ export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
             return block
           }
 
-          // kind === "itinerary"（[023.03] T2：itinerary 不参与布局，保持 left-12 right-2）
+          // kind === "appointment"（[023.03] T2：appointment 不参与布局，保持 left-12 right-2）
           return (
             <div
               key={e.id}
-              className={`absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 ${ITINERARY_COLOR} border-t border-r border-b`}
+              className={`absolute left-12 right-2 rounded-md border-l-4 px-2 py-1 ${APPOINTMENT_COLOR} border-t border-r border-b`}
               style={{ top: `${top}%`, height: `${Math.max(height, 2)}%` }}
             >
               <p className="truncate text-xs font-medium text-ink">{e.title}</p>

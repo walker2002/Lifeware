@@ -5,6 +5,18 @@ const nextConfig: NextConfig = {
   // 用于 prod.sh 与 dev.sh 并行运行（避免 .next/dev/lock 锁文件冲突）。
   // 未设置时保持 Next.js 默认行为（.next/）。
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // [023.05] PR2: /itineraries → /appointments 永久跳转
+  // （itinerary→appointment 重命名，防存链接 + AI 历史 session 失效）。
+  // Next.js 308 permanent 状态码对 SEO/书签/外链保留请求方法。
+  async redirects() {
+    return [
+      {
+        source: "/itineraries/:path*",
+        destination: "/appointments/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
