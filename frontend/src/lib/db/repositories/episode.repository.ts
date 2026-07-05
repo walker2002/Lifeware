@@ -1,4 +1,7 @@
-// Episode Repository — Memory L2 摘要记录持久化
+/**
+ * @file episode.repository
+ * @brief Memory L2 Episode 仓储 — memory_episodes 表 CRUD（[023.08] T4 加 updateMetadata 支持 batch_proposals retry）
+ */
 import { db } from '@/lib/db'
 import { memoryEpisodes } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
@@ -49,5 +52,20 @@ export class EpisodeRepository {
       .limit(limit)
 
     return rows as unknown as MemoryEpisodeRecord[]
+  }
+
+  // [023.08] T4 — 局部更新 metadata/summary（用于 batch_proposals retry status）
+  async updateMetadata(
+    id: string,
+    patch: { metadata?: Record<string, unknown>; summary?: string }
+  ): Promise<void> {
+    const setClause: Record<string, unknown> = {}
+    if (patch.metadata !== undefined) setClause.metadata = patch.metadata
+    if (patch.summary !== undefined) setClause.summary = patch.summary
+    if (Object.keys(setClause).length === 0) return
+    await db
+      .update(memoryEpisodes)
+      .set(setClause)
+      .where(eq(memoryEpisodes.id, id))
   }
 }

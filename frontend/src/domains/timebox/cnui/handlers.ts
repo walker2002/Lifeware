@@ -13,6 +13,8 @@ import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
 import type { Timebox, Task, Habit } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import { hhmmToIso } from './surfaces/time-input-helpers'
+// [023.08] T4 — batch undo：AI session state 记录 + revert（revertSmartTimeboxes action）
+import { recordBatchProposals, revertBatchProposals, getRevertableBatches } from '@/nexus/ai-runtime/memory/batch-proposals'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -111,6 +113,14 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         getPendingHabits(),
       ])
 
+      // [023.08] T4 — 列当前 session 5 分钟内可 revert 的 batches
+      //  AI panel 据此显示「撤销刚才创建的 N 个时间盒」按钮
+      const revertableBatches = await getRevertableBatches({
+        sessionId: `timebox-${action}`,
+        userId: MVP_USER_ID,
+        windowMs: 5 * 60 * 1000,
+      }).catch(() => [])
+
       return {
         content: '智能编排时间盒 — 根据您的任务、习惯和能量曲线，AI 将自动生成今日时间盒方案',
         dataSnapshot: {
@@ -132,6 +142,11 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             title: h.title,
             defaultTime: h.defaultTime,
             defaultDuration: h.defaultDuration,
+          })),
+          revertableBatches: revertableBatches.map(b => ({
+            batchId: b.batchId,
+            acceptedAt: b.acceptedAt,
+            count: b.proposals.length,
           })),
         },
       }
@@ -392,7 +407,51 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     if (action === 'createSmartTimeboxes') {
       // 这里应该调用 AI scheduling handler
       // 暂时返回成功，实际实现需要调用 orchestration-handler
+      // [023.08] T4：AI 编排完成后写入 batch record（让 AI panel 显示「撤销刚才创建的 N 个时间盒」）。
+      //   proposals 占位（空数组即可记录 batchId；真实 proposals 由 orchestration-handler 写时间盒后注入）。
+      //   当前 orchestration-handler 未返回 proposals 故此处仅留 hook，等 orchestration 接上后再注入。
+      try {
+        await recordBatchProposals({
+          sessionId: `timebox-${action}`,
+          userId: MVP_USER_ID,
+          proposals: [],  // 占位：orchestration-handler 接上后填充实际 created timebox ids
+        })
+      } catch (e) {
+        console.warn('[timeboxCnuiHandler] recordBatchProposals 失败（不影响主流程）:', e)
+      }
       return { success: true }
+    }
+
+    // [023.08] T4 — revertSmartTimeboxes action：撤销最近一次 batch 创建
+    //   走 revertBatchProposals（memory_episodes 持久化记录 + deleteTimebox 逐条删除 + 状态机容错）
+    if (action === 'revertSmartTimeboxes') {
+      const { batchId } = (fields ?? {}) as { batchId?: string }
+      if (!batchId) return { success: false, error: 'batchId 必填' }
+
+      const { deleteTimebox } = await import('@/app/actions/timebox')
+      const result = await revertBatchProposals({
+        batchId,
+        userId: MVP_USER_ID,
+        deleteTimebox: async (id) => {
+          try {
+            await deleteTimebox(id)
+            return { success: true }
+          } catch (e) {
+            return { success: false, error: e instanceof Error ? e.message : '删除失败' }
+          }
+        },
+      })
+      return {
+        success: result.success,
+        error: result.failed.length
+          ? `${result.failed.length} 个 timebox 撤销失败：${result.failed.map(f => `${f.id}（${f.error}）`).join('；')}`
+          : undefined,
+        data: {
+          batchId,
+          succeededCount: result.succeeded.length,
+          failedCount: result.failed.length,
+        },
+      }
     }
 
     // [023] A2.7 — logTimebox CNUI surface 提交：逐条 log，跳过 state='skipped' 或无 state 的项
