@@ -8,12 +8,12 @@
 
 "use server";
 
-import type { TimeboxSummary, ItinerarySummary } from "@/usom/types/summaries";
+import type { TimeboxSummary, AppointmentSummary } from "@/usom/types/summaries";
 import type { Timebox } from "@/usom/types/objects";
 import type { USOM_ID, Timestamp } from "@/usom/types/primitives";
 import type { ActionSurface } from "@/usom/types/process";
 import type { TraceSession } from "@/nexus/infrastructure/trace-logger/trace-types";
-import { TimeboxRepository, ItineraryRepository } from "@/domains/timebox/repository";
+import { TimeboxRepository, AppointmentRepository } from "@/domains/timebox/repository";
 import { ActivityArchetypeRepository } from "@/lib/db/repositories/activity-archetype.repository";
 import { SystemEventRepository } from "@/lib/db/repositories/system-event.repository";
 import { IntentionRepository } from "@/lib/db/repositories/intention.repository";
@@ -23,7 +23,7 @@ import { createRuleEngine } from "../../nexus/core/rule-engine";
 import { createTimeboxGenericRepo } from "@/domains/timebox/repository/generic-repo-adapter";
 import { createHabitsGenericRepo } from "@/domains/habits/repository/generic-repo-adapter";
 import { parse as parseIntent, parseBatch } from "../../nexus/core/intent-engine";
-import { parseHabitWithAI, parseMultiTask, parseItineraryWithAI } from "../../nexus/core/intent-engine/ai-parser";
+import { parseHabitWithAI, parseMultiTask, parseAppointmentWithAI } from "../../nexus/core/intent-engine/ai-parser";
 import type { AIParserResult } from "../../nexus/core/intent-engine/ai-parser";
 import type { BatchIntentResult } from "../../nexus/core/intent-engine";
 export type { BatchIntentResult } from "../../nexus/core/intent-engine";
@@ -298,7 +298,7 @@ async function executePipeline(
 
     const timeboxRepos = createTimeboxGenericRepo({
       timeboxRepo: timeboxRepo as any,
-      itineraryRepo: new ItineraryRepository() as any,
+      appointmentRepo: new AppointmentRepository() as any,
     });
 
     const orchestrator = createOrchestrator({
@@ -550,7 +550,7 @@ export async function transitionTimebox(
 
     const timeboxRepos = createTimeboxGenericRepo({
       timeboxRepo: timeboxRepo as any,
-      itineraryRepo: new ItineraryRepository() as any,
+      appointmentRepo: new AppointmentRepository() as any,
     });
 
     const orchestrator = createOrchestrator({
@@ -813,32 +813,32 @@ export async function getTimeboxesByRange(
   return fetchTimeboxSummariesByRange(start, end);
 }
 
-// ─── Itinerary Read Action（A1.7，codex D5 修复：纯读）─────────────
+// ─── Appointment Read Action（A1.7，codex D5 修复：纯读）─────────────
 
 /**
- * 按 [start, end] 范围读取行程摘要列表（[026] A1.7）。
+ * 按 [start, end] 范围读取约定摘要列表（[026] A1.7）。
  *
- * [026] codex D5 修复：纯读函数，**不**内联 reconcileItineraryStatuses。
- * 原因：避免 /itineraries 双调 + /timeboxes 翻日历页重推 N 次。
+ * [026] codex D5 修复：纯读函数，**不**内联 reconcileAppointmentStatuses。
+ * 原因：避免 /appointments 双调 + /timeboxes 翻日历页重推 N 次。
  *
  * 调用方契约（必须遵守）：
- * - A3.1 /itineraries server component：在调本函数前先调
- *   reconcileAndAdvanceItineraries()（T8 helper）。
- * - A3.2 /timeboxes loadDay：在读日历日行程前先对当天用户行程调
- *   reconcileAndAdvanceItineraries()（T8 helper）。
+ * - A3.1 /appointments server component：在调本函数前先调
+ *   reconcileAndAdvanceAppointments()（T8 helper）。
+ * - A3.2 /timeboxes loadDay：在读日历日约定前先对当天用户约定调
+ *   reconcileAndAdvanceAppointments()（T8 helper）。
  * 不直接调本函数会读到陈旧 status（未 reconcile 的 scheduled/in_progress）。
  *
  * 多租户 T-02：透传 MVP_USER_ID。
  *
  * @param start - 起始时间（含）
  * @param end - 结束时间（含）
- * @returns 行程摘要列表（5 态 status 直接来自 DB）
+ * @returns 约定摘要列表（5 态 status 直接来自 DB）
  */
-export async function getItinerariesByRange(
+export async function getAppointmentsByRange(
   start: Date,
   end: Date,
-): Promise<ItinerarySummary[]> {
-  const repo = new ItineraryRepository();
+): Promise<AppointmentSummary[]> {
+  const repo = new AppointmentRepository();
   // [026] A1.7 / codex D5：纯读，不内联 reconcile
   const list = await repo.findByDateRange(
     start.toISOString() as Timestamp,
@@ -1248,15 +1248,15 @@ export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<Tim
   }
 }
 
-// ─── Itinerary 意图仅解析（[026] A2.1 dry-run Server Action）─────
+// ─── Appointment 意图仅解析（[026] A2.1 dry-run Server Action）─────
 
 /**
- * [026] A2.1 仅解析行程意图（不提交），返回 drafts 给 CNUI surface 预填。
+ * [026] A2.1 仅解析约定意图（不提交），返回 drafts 给 CNUI surface 预填。
  *
  * 与 parseTimeboxBatchIntentOnly / parseHabitIntentOnly 模式一致：
  * dry-run，仅返回 drafts 让用户在 CNUI 表单里编辑确认后再提交。
  *
- * 路由来源：use-intent-handler.ts:createItinerary/editItinerary/deleteItinerary
+ * 路由来源：use-intent-handler.ts:createAppointment/editAppointment/deleteAppointment
  * 三条路由分支检测 `slashResult.action` 命中后调本函数，
  * 避免 chat 路径走 submitIntent → parseWithAI（弱 systemPrompt）。
  *
@@ -1269,19 +1269,19 @@ export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<Tim
  * @param rawInput - 用户原始自然语言输入
  * @returns 解析结果（drafts 给 CNUI 预填）
  */
-export interface ItineraryParseIntentResult {
+export interface AppointmentParseIntentResult {
   success: boolean
   drafts?: Array<{ title: string; startTime: string; durationMin: number; people: string[] }>
   error?: string
 }
 
-export async function parseItineraryIntentOnly(rawInput: string): Promise<ItineraryParseIntentResult> {
+export async function parseAppointmentIntentOnly(rawInput: string): Promise<AppointmentParseIntentResult> {
   try {
     const aiRuntime = createAIRuntime()
-    const parseResult = await parseItineraryWithAI(rawInput, aiRuntime)
+    const parseResult = await parseAppointmentWithAI(rawInput, aiRuntime)
 
     if (!parseResult.success) {
-      return { success: false, error: parseResult.error ?? '未识别到有效的行程' }
+      return { success: false, error: parseResult.error ?? '未识别到有效的约定' }
     }
 
     return { success: true, drafts: parseResult.drafts }

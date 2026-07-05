@@ -6,7 +6,7 @@
  * 供 A3.1 (/itineraries server component) + A3.2 (/timeboxes loadDay) 显式调用。
  * 零 cron、零后台 job。
  *
- * [026] codex D5 决议（先于本任务落实于 T7）: getItinerariesByRange 是纯读函数，
+ * [026] codex D5 决议（先于本任务落实于 T7）: getAppointmentsByRange 是纯读函数，
  *   **不**内联 reconcile。helper 抽出来是 page-level caller 显式调用的入口。
  *
  * [026] codex D6 修复（落实于本任务）: 用 `act.kind` 判别（不是 SM action 名
