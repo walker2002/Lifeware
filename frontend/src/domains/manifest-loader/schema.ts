@@ -269,8 +269,8 @@ export const ManifestSchema = z.object({
   lifecycle: z.record(z.string(), LifecycleDefinitionSchema),
   /**
    * 字段元数据（[026] T23：per-objectType 嵌套）。
-   * 一级 key 为 objectType（如 task / habit / okr / itinerary），
-   * 二级 key 为字段名。消除各域平铺时潜在字段名冲突（如 timebox itinerary
+   * 一级 key 为 objectType（如 task / habit / okr / appointment），
+   * 二级 key 为字段名。消除各域平铺时潜在字段名冲突（如 timebox appointment
    * 与未来其它域同名字段）。
    */
   field_metadata: z.record(z.string(), z.record(z.string(), FieldMetadataSchema)),

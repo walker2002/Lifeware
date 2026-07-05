@@ -98,42 +98,42 @@ intent_triggers:
       - 重新安排剩余时间
       - 调整今天下午的安排
     keywords: [调整, 重排, adjust]
-  # [026] A1.5: 行程管理 4 action（create/edit/delete/viewItineraries）
+  # [026] A1.5 + [023.05] PR2 阶段 2: 约定管理 4 action（create/edit/delete/viewAppointments）
   # 注：markInProgress / markExpired 不在 intent_triggers——它们由 reconcile
   # 走 submitDynamicIntent 调 SM，无需 intent_trigger。
-  - action: createItinerary
-    shortcut: /createItinerary
-    description: 增加一个未来行程
+  - action: createAppointment
+    shortcut: /createAppointment
+    description: 增加一个未来约定
     response_type: cnui
-    cnui_surface: create-itinerary
+    cnui_surface: create-appointment
     examples:
       - 7月15日下午2点看牙医
       - 下周三19:00 和张三吃饭
-    keywords: [行程, 安排, 约会, 日历]
-  - action: editItinerary
-    shortcut: /editItinerary
-    description: 修改一个计划或执行中的行程
+    keywords: [约定, 安排, 约会, 日历]
+  - action: editAppointment
+    shortcut: /editAppointment
+    description: 修改一个计划或执行中的约定
     response_type: cnui
-    cnui_surface: edit-itinerary
+    cnui_surface: edit-appointment
     examples:
       - 把看牙医改到下午3点
-    keywords: [修改行程, 改行程]
-  - action: deleteItinerary
-    shortcut: /deleteItinerary
-    description: 删除计划或执行中的行程（可多选）
+    keywords: [修改约定, 改约定]
+  - action: deleteAppointment
+    shortcut: /deleteAppointment
+    description: 删除计划或执行中的约定（可多选）
     response_type: cnui
-    cnui_surface: delete-itinerary
+    cnui_surface: delete-appointment
     examples:
-      - 删掉下周的行程
-    keywords: [删除行程]
-  - action: viewItineraries
-    shortcut: /itineraries
-    description: 行程管理
+      - 删掉下周的约定
+    keywords: [删除约定]
+  - action: viewAppointments
+    shortcut: /appointments
+    description: 约定管理
     response_type: page
-    view_route: /itineraries
+    view_route: /appointments
     examples:
-      - 看看我的行程
-    keywords: [行程, 日历]
+      - 看看我的约定
+    keywords: [约定, 日历]
 
 # ─── 区块 B: lifecycle ───────────────────────────────────────────
 lifecycle:
@@ -177,9 +177,9 @@ lifecycle:
         action: log
         event_type: TimeboxLogged
     terminal_states: [cancelled, logged]
-  # [026] A1.5: D2 reversal — 行程=独立对象读时算状态（按日历日，零 cron）。
+  # [026] A1.5 + [023.05] PR2 阶段 2: D2 reversal — 约定=独立对象读时算状态（按日历日，零 cron）。
   # 5 态全部存储，SM 驱动全部 transition。
-  itinerary:
+  appointment:
     # [026] D2 reversal: 5 态全部存储，SM 驱动全部 transition
     states: [scheduled, in_progress, expired, cancelled, completed]
     initial_state: scheduled
@@ -188,36 +188,36 @@ lifecycle:
         to: scheduled
         trigger: intent
         action: create
-        event_type: ItineraryCreated
+        event_type: AppointmentCreated
       # 时间驱动：lazy reconcile 在 startTime 日历日=今日 触发（仅 from scheduled）
       - from: scheduled
         to: in_progress
         trigger: intent
         action: markInProgress
-        event_type: ItineraryMarkedInProgress
+        event_type: AppointmentMarkedInProgress
       # 时间驱动：lazy reconcile 在今日日历日>startTime 日历日 触发（from {scheduled, in_progress}）
       - from: scheduled
         to: expired
         trigger: intent
         action: markExpired
-        event_type: ItineraryMarkedExpired
+        event_type: AppointmentMarkedExpired
       - from: in_progress
         to: expired
         trigger: intent
         action: markExpired
-        event_type: ItineraryMarkedExpired
+        event_type: AppointmentMarkedExpired
       # 用户取消：spec + 用户 "计划/执行状态可以任意修改、删除"（cancel from {scheduled, in_progress}）
       # 终态 expired/cancelled/completed 不可删（SM 拒绝；spec "已过期/已完成不能删除"）
       - from: scheduled
         to: cancelled
         trigger: intent
         action: cancel
-        event_type: ItineraryCancelled
+        event_type: AppointmentCancelled
       - from: in_progress
         to: cancelled
         trigger: intent
         action: cancel
-        event_type: ItineraryCancelled
+        event_type: AppointmentCancelled
       # [027] 后补：completed（timebox 打卡后）
       # - from: scheduled,   to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
       # - from: in_progress, to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
@@ -272,10 +272,10 @@ field_metadata:
       type: json
       label: 执行记录
       required: false
-  # [026] A1.5: 行程字段元数据（仅追加 3 个；title/startTime 沿用 timebox 字段）
+  # [026] A1.5 + [023.05] PR2 阶段 2: 约定字段元数据（仅追加 3 个；title/startTime 沿用 timebox 字段）
   # status/inProgressAt/expiredAt/completedAt/cancelledAt 不入 field_metadata
   # （SM-driven，不经 mutationService.update，避跨字段红线）
-  itinerary:
+  appointment:
     title:
       type: string
       label: 标题
@@ -368,10 +368,10 @@ view_routes:
   config_activity_archetypes:
     component: app/config/activity-archetypes/page
     url: /config/activity-archetypes
-  # [026] A1.5: 行程管理页
-  viewItineraries:
-    component: app/itineraries/page
-    url: /itineraries
+  # [026] A1.5 + [023.05] PR2 阶段 2: 约定管理页
+  viewAppointments:
+    component: app/appointments/page
+    url: /appointments
 
 # ─── 区块 H: templates ───────────────────────────────────────────
 templates:
@@ -441,15 +441,15 @@ cnui_surfaces:
   log-timebox:
     description: 批量打卡（三态：完成/未完成/跳过 + 备注，逐条走 logTimebox）
     handler: ./cnui/handlers
-  # [026] A1.5: 行程管理 3 surface（K-block 错误待 A2 = T10 创建后清零）
-  create-itinerary:
-    description: 增加行程（默认编辑表单/可切列表）
+  # [026] A1.5 + [023.05] PR2 阶段 2: 约定管理 3 surface（K-block 错误待 A2 = T10 创建后清零）
+  create-appointment:
+    description: 增加约定（默认编辑表单/可切列表）
     handler: ./cnui/handlers
-  edit-itinerary:
-    description: 修改行程（默认列表/选中切表单）
+  edit-appointment:
+    description: 修改约定（默认列表/选中切表单）
     handler: ./cnui/handlers
-  delete-itinerary:
-    description: 删除行程（多选）
+  delete-appointment:
+    description: 删除约定（多选）
     handler: ./cnui/handlers
   # [023.04]：editTimeboxes 三合一（修改/取消/删除）
   edit-timeboxes:
