@@ -1,3 +1,5 @@
+/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) */
+
 import { describe, it, expect, vi } from 'vitest'
 import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
 import type { GenerationRequest } from '@/usom/types/process'
