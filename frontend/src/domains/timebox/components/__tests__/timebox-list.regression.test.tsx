@@ -7,7 +7,7 @@
  *
  * 本测试同时使用两种守护手段：
  * - **方案 B（结构断言）**：DOM 必须含 timebox 特有 className / 文本；
- *   **不得**含 itinerary 独有 className（`border-l-primary` + MapPin SVG）。
+ *   **不得**含 appointment 独有 className（`border-l-primary` + MapPin SVG）。
  * - **方案 A（snapshot 锁）**：对当前已通过的渲染输出做 `toMatchSnapshot`，
  *   future 任意回归会自动 fail。
  *
@@ -73,16 +73,16 @@ describe('[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归', () => {
     expect(container.textContent).toContain('晨会')
     expect(container.textContent).toContain('深度工作')
     expect(container.textContent).toContain('复盘')
-    // TimeboxCard 内不出现 itinerary 标签
-    expect(container.textContent).not.toContain('行程已锁定')
+    // TimeboxCard 内不出现 appointment 标签
+    expect(container.textContent).not.toContain('约定已锁定')
   })
 
-  it('纯 kind: timebox 输入：不含 itinerary 独有的 border-l-primary + MapPin 标记', () => {
+  it('纯 kind: timebox 输入：不含 appointment 独有的 border-l-primary + MapPin 标记', () => {
     const { container } = render(<TimeboxList events={makeSamples()} />)
-    // ItineraryLockedCard 用 `border-l-primary`（TimeboxCard 来自 executionRecord 走 coral/amber/gray/transparent）
+    // AppointmentLockedCard 用 `border-l-primary`（TimeboxCard 来自 executionRecord 走 coral/amber/gray/transparent）
     const polluted = container.querySelectorAll('.border-l-primary')
     expect(polluted.length).toBe(0)
-    // ItineraryLockedCard 含 MapPin lucide icon（path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"）
+    // AppointmentLockedCard 含 MapPin lucide icon（path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"）
     // —— TimeboxCard 不渲染该 SVG
     const mapPins = container.querySelectorAll('svg.lucide-map-pin')
     expect(mapPins.length).toBe(0)
@@ -93,7 +93,7 @@ describe('[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归', () => {
     expect(container).toMatchSnapshot()
   })
 
-  it('空 events 数组：渲染空状态，不分支到 timebox/itinerary', () => {
+  it('空 events 数组：渲染空状态，不分支到 timebox/appointment', () => {
     const { container } = render(<TimeboxList events={[]} />)
     expect(container.textContent).toContain('还没有时间盒')
     expect(container.querySelectorAll('.border-l-primary').length).toBe(0)

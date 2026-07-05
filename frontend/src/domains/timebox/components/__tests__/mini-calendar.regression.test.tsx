@@ -8,8 +8,8 @@
  *   与 T13 改动前字节级一致。
  *
  * 方案 B：DOM 中应出现 3 个事件点（timebox 起点落在 7/15）；
- *   不应出现 itinerary 独有的渲染标记（MiniCalendar 不区分 kind，所以没有
- *   itinerary 特有 className；守卫点是有事件日子数 = 3）。
+ *   不应出现 appointment 独有的渲染标记（MiniCalendar 不区分 kind，所以没有
+ *   appointment 特有 className；守卫点是有事件日子数 = 3）。
  *
  * 方案 A：snapshot 锁当前已通过的渲染。
  */
@@ -80,15 +80,15 @@ describe('[026] T15 IRON RULE — MiniCalendar 纯 timebox 渲染回归', () => 
     expect(dots.length).toBe(2)
   })
 
-  it('纯 kind: timebox 输入：不含 itinerary 独有 className 标记', () => {
+  it('纯 kind: timebox 输入：不含 appointment 独有 className 标记', () => {
     const currentDate = new Date('2026-07-15T00:00:00.000Z')
     const { container } = render(
       <MiniCalendar currentDate={currentDate} events={makeSamples()} />,
     )
-    // MiniCalendar 不按 kind 派生态，不存在 itinerary 独有 className；
-    // 守卫：与改前一致地不出现 ItineraryLockedCard / MapPin 等
+    // MiniCalendar 不按 kind 派生态，不存在 appointment 独有 className；
+    // 守卫：与改前一致地不出现 AppointmentLockedCard / MapPin 等
     expect(container.querySelectorAll('svg.lucide-map-pin').length).toBe(0)
-    expect(container.textContent).not.toContain('行程已锁定')
+    expect(container.textContent).not.toContain('约定已锁定')
   })
 
   it('纯 kind: timebox 输入：snapshot 锁（方案 A 防御）', () => {

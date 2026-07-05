@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TimeboxList } from "@/domains/timebox/components/timebox-list";
-import { timeboxToEvent, itineraryToEvent } from "@/domains/timebox/components/timeboxes-event";
-import type { TimeboxSummary, ItinerarySummary } from "@/usom/types/summaries";
+import { timeboxToEvent, appointmentToEvent } from "@/domains/timebox/components/timeboxes-event";
+import type { TimeboxSummary, AppointmentSummary } from "@/usom/types/summaries";
 
 // ─── 测试数据 ───────────────────────────────────────────────────
 
@@ -21,9 +21,9 @@ function createMockTimebox(
   };
 }
 
-function createMockItinerary(
-  overrides: Partial<ItinerarySummary> = {},
-): ItinerarySummary {
+function createMockAppointment(
+  overrides: Partial<AppointmentSummary> = {},
+): AppointmentSummary {
   return {
     id: "it-001",
     title: "散步",
@@ -66,10 +66,10 @@ describe("TimeboxList", () => {
   });
 
   // [026] A3.2 IRON RULE 测试：纯 timebox-only 输入时渲染与改动前一致
-  it("渲染 itinerary 行程锁定卡（kind 分支）", () => {
+  it("渲染 appointment 约定锁定卡（kind 分支）", () => {
     const events = [
       timeboxToEvent(createMockTimebox({ id: "tb-001", title: "深度工作" })),
-      itineraryToEvent(createMockItinerary({ id: "it-001", title: "公园散步" })),
+      appointmentToEvent(createMockAppointment({ id: "it-001", title: "公园散步" })),
     ];
 
     render(<TimeboxList events={events} />);

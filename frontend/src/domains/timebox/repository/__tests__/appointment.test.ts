@@ -1,15 +1,15 @@
 /**
- * @file itinerary repository test
- * @brief ItineraryRepository 集成测试（[026] A1.4，D2 reversal: 5 态存储）
+ * @file appointment repository test
+ * @brief AppointmentRepository 集成测试（[026] A1.4，D2 reversal: 5 态存储）
  *
- * 对接真实 Docker PostgreSQL，验证 ItineraryRepository 的 CRUD +
+ * 对接真实 Docker PostgreSQL，验证 AppointmentRepository 的 CRUD +
  * updateStatus 完整 5 态路径 + findNeedingReconcile 候选过滤 + findByDateRange 范围查询。
  *
- * 测试用户隔离：固定 userId ...001（与 T4 brief 一致），beforeEach 清理该用户行程。
+ * 测试用户隔离：固定 userId ...001（与 T4 brief 一致），beforeEach 清理该用户约定。
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { ItineraryRepository } from '../itinerary'
+import { AppointmentRepository } from '../appointment'
 import * as s from '@/lib/db/schema'
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
@@ -29,11 +29,11 @@ const baseIt = (overrides: Partial<any> = {}): any => ({
   schemaVersion: 1, ...overrides,
 })
 
-describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
-  beforeEach(async () => { await db.delete(s.itineraries).where(eq(s.itineraries.userId, USER)) })
+describe('AppointmentRepository（D2 reversal: 5 态存储）', () => {
+  beforeEach(async () => { await db.delete(s.appointments).where(eq(s.appointments.userId, USER)) })
 
   it('save → findById 往返保持 status=scheduled', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const it = baseIt()
     await repo.save(it, USER)
     const got = await repo.findById(it.id, USER)
@@ -43,7 +43,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('save → findById 往返保持 in_progress + inProgressAt', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const it = baseIt({ status: 'in_progress', inProgressAt: '2026-07-15T10:00:00.000Z' })
     await repo.save(it, USER)
     const got = await repo.findById(it.id, USER)
@@ -52,7 +52,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('markInProgress 盖 status + inProgressAt', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const id = crypto.randomUUID() as any
     await repo.save(baseIt({ id }), USER)
     await repo.markInProgress(id, USER, new Date('2026-07-15T10:00:00.000Z'))
@@ -62,7 +62,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('markExpired 盖 status + expiredAt', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const id = crypto.randomUUID() as any
     await repo.save(baseIt({ id, startTime: past }), USER)
     await repo.markExpired(id, USER, new Date('2026-07-16T00:00:00.000Z'))
@@ -72,7 +72,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('cancel 盖 status + cancelledAt', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const id = crypto.randomUUID() as any
     await repo.save(baseIt({ id }), USER)
     await repo.cancel(id, USER)
@@ -82,7 +82,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('findNeedingReconcile 只返非终态', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const idA = crypto.randomUUID() as any
     const idB = crypto.randomUUID() as any
     const idC = crypto.randomUUID() as any
@@ -97,7 +97,7 @@ describe('ItineraryRepository（D2 reversal: 5 态存储）', () => {
   })
 
   it('findByDateRange 只返非终态 + 落区间', async () => {
-    const repo = new ItineraryRepository()
+    const repo = new AppointmentRepository()
     const idIn = crypto.randomUUID() as any
     const idOut = crypto.randomUUID() as any
     await repo.save(baseIt({ id: idIn, startTime: '2026-07-15T14:00:00.000Z' }), USER)

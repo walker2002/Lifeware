@@ -2,7 +2,7 @@
  * @file overlap-layout.test
  * @brief [023.03] T1: B3 重叠布局算法单测
  *
- * 覆盖：单事件 / 2 重叠 / 3 重叠 / 链式重叠 / 4+ 重叠 / itinerary 不参与。
+ * 覆盖：单事件 / 2 重叠 / 3 重叠 / 链式重叠 / 4+ 重叠 / appointment 不参与。
  */
 
 import { describe, it, expect } from 'vitest'
@@ -21,7 +21,7 @@ const tb = (id: string, start: string, end: string): TimeboxesEvent => ({
 })
 
 const itn = (id: string, start: string, end: string): TimeboxesEvent => ({
-  kind: 'itinerary',
+  kind: 'appointment',
   id,
   title: id,
   start,
@@ -79,8 +79,8 @@ describe('computeOverlapLayout — 多事件重叠', () => {
   })
 })
 
-describe('computeOverlapLayout — itinerary 不参与', () => {
-  it('itinerary 与 timebox 同时存在 → itinerary 输出 col=0,totalCols=1', () => {
+describe('computeOverlapLayout — appointment 不参与', () => {
+  it('appointment 与 timebox 同时存在 → appointment 输出 col=0,totalCols=1', () => {
     const ev = tb('t', '2026-07-15T08:00:00Z', '2026-07-15T09:00:00Z')
     const iv = itn('i', '2026-07-15T08:30:00Z', '2026-07-15T09:30:00Z')
     const result = computeOverlapLayout([ev, iv])

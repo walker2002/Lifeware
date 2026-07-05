@@ -8,14 +8,14 @@
  * 关键 assertion：WeekView/MonthView 用 react-big-calendar，会渲染 .rbc-calendar 节点；
  * DayView 不会渲染 .rbc-calendar。所以「点周/月后 .rbc-calendar 出现」是 T3 三向路由的强证据。
  *
- * 数据 fixture：mock 1 个 timebox + 1 个 itinerary 验证「events 过滤 kind='timebox'」
- * 的 adapter 路径正确——itinerary 应被剔除，WeekView/MonthView 只接收 TimeboxSummary[]。
+ * 数据 fixture：mock 1 个 timebox + 1 个 appointment 验证「events 过滤 kind='timebox'」
+ * 的 adapter 路径正确——appointment 应被剔除，WeekView/MonthView 只接收 TimeboxSummary[]。
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { TimeboxSummary, ItinerarySummary } from '@/usom/types/summaries'
+import type { TimeboxSummary, AppointmentSummary } from '@/usom/types/summaries'
 
 // [023.06] T3 数据 fixture：保证切到周/月时 timeboxSources 非空，否则渲染空态分支
 const timeboxFixture: TimeboxSummary = {
@@ -27,7 +27,7 @@ const timeboxFixture: TimeboxSummary = {
   taskIds: [],
   habitIds: [],
 }
-const itineraryFixture: ItinerarySummary = {
+const appointmentFixture: AppointmentSummary = {
   id: 'it-1',
   title: '咖啡馆',
   startTime: '2026-07-05T10:00:00.000Z',
@@ -36,11 +36,11 @@ const itineraryFixture: ItinerarySummary = {
 }
 
 const getTimeboxesByRangeMock = vi.fn().mockResolvedValue([timeboxFixture])
-const getItinerariesByRangeMock = vi.fn().mockResolvedValue([itineraryFixture])
+const getAppointmentsByRangeMock = vi.fn().mockResolvedValue([appointmentFixture])
 
 vi.mock('@/app/actions/intent', () => ({
   getTimeboxesByRange: (...a: unknown[]) => getTimeboxesByRangeMock(...a),
-  getItinerariesByRange: (...a: unknown[]) => getItinerariesByRangeMock(...a),
+  getAppointmentsByRange: (...a: unknown[]) => getAppointmentsByRangeMock(...a),
 }))
 
 vi.mock('@/app/actions/timebox', () => ({
@@ -56,9 +56,9 @@ import { TimeboxesWorkspace } from '../timeboxes-workspace'
 describe('[023.06] T3 — 周/月三向路由', () => {
   beforeEach(() => {
     getTimeboxesByRangeMock.mockClear()
-    getItinerariesByRangeMock.mockClear()
+    getAppointmentsByRangeMock.mockClear()
     getTimeboxesByRangeMock.mockResolvedValue([timeboxFixture])
-    getItinerariesByRangeMock.mockResolvedValue([itineraryFixture])
+    getAppointmentsByRangeMock.mockResolvedValue([appointmentFixture])
   })
 
   it('click 周 → workspace 切到 WeekView（.rbc-calendar 出现，week 范围被拉取）', async () => {

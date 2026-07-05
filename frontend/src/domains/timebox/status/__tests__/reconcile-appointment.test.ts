@@ -1,6 +1,6 @@
 /**
- * @file reconcile-itinerary.test.ts
- * @brief reconcileItineraryStatuses 纯函数单元测试（[026] A1.3 TDD）
+ * @file reconcile-appointment.test.ts
+ * @brief reconcileAppointmentStatuses 纯函数单元测试（[026] A1.3 TDD）
  *
  * 覆盖 spec D2 reversal 各 branch：
  * - 未来 / 当日 / 昨日 三种时态 × 各状态（scheduled / in_progress / 终态三态）
@@ -17,13 +17,13 @@
  *   → 任意 TZ 下都落在 2026-07-15 本地日。
  */
 import { describe, it, expect } from 'vitest'
-import { reconcileItineraryStatuses } from '../reconcile-itinerary'
-import type { Itinerary } from '@/usom/types/objects'
-import type { ItineraryStatus } from '@/usom/types/primitives'
+import { reconcileAppointmentStatuses } from '../reconcile-appointment'
+import type { Appointment } from '@/usom/types/objects'
+import type { AppointmentStatus } from '@/usom/types/primitives'
 
-const base = (overrides: Partial<Itinerary> = {}): Itinerary => ({
+const base = (overrides: Partial<Appointment> = {}): Appointment => ({
   id: 'i1',
-  status: 'scheduled' as ItineraryStatus,
+  status: 'scheduled' as AppointmentStatus,
   title: 't',
   detail: null,
   // startTime 取本地正午（12:00:00 无时区后缀）→ 任意 TZ 下 localDayKey 都是 2026-07-15
@@ -41,37 +41,37 @@ const base = (overrides: Partial<Itinerary> = {}): Itinerary => ({
   ...overrides,
 })
 
-// future: nowDay < startDay（行程还没到）→ 跳过
+// future: nowDay < startDay（约定还没到）→ 跳过
 //   startTime=2026-07-15, now=2026-07-10 → 20260710 < 20260715
 const future = new Date(2026, 6, 10, 12, 0, 0)
 // today: nowDay === startDay → scheduled → needsMarkInProgress
 //   startTime=2026-07-15, now=2026-07-15 → 20260715 === 20260715
 const today = new Date(2026, 6, 15, 12, 0, 0)
-// yesterday: nowDay > startDay（行程日已过）→ needsMarkExpired
+// yesterday: nowDay > startDay（约定日已过）→ needsMarkExpired
 //   startTime=2026-07-15, now=2026-07-16 → 20260716 > 20260715
 const yesterday = new Date(2026, 6, 16, 12, 0, 0)
 
-describe('reconcileItineraryStatuses', () => {
-  it('未来行程：status=scheduled 不变，返回 []', () => {
-    expect(reconcileItineraryStatuses([base()], future)).toEqual([])
+describe('reconcileAppointmentStatuses', () => {
+  it('未来约定：status=scheduled 不变，返回 []', () => {
+    expect(reconcileAppointmentStatuses([base()], future)).toEqual([])
   })
 
-  it('当日行程：scheduled → needsMarkInProgress', () => {
-    const actions = reconcileItineraryStatuses([base()], today)
+  it('当日约定：scheduled → needsMarkInProgress', () => {
+    const actions = reconcileAppointmentStatuses([base()], today)
     expect(actions).toEqual([
-      { itineraryId: 'i1', kind: 'needsMarkInProgress', at: today },
+      { appointmentId: 'i1', kind: 'needsMarkInProgress', at: today },
     ])
   })
 
-  it('过日行程：scheduled → needsMarkExpired', () => {
-    const actions = reconcileItineraryStatuses([base()], yesterday)
+  it('过日约定：scheduled → needsMarkExpired', () => {
+    const actions = reconcileAppointmentStatuses([base()], yesterday)
     expect(actions).toEqual([
-      { itineraryId: 'i1', kind: 'needsMarkExpired', at: yesterday },
+      { appointmentId: 'i1', kind: 'needsMarkExpired', at: yesterday },
     ])
   })
 
   it('in_progress 当日：不变（仍 in_progress 范围内）', () => {
-    const actions = reconcileItineraryStatuses(
+    const actions = reconcileAppointmentStatuses(
       [base({ status: 'in_progress' })],
       today,
     )
@@ -79,18 +79,18 @@ describe('reconcileItineraryStatuses', () => {
   })
 
   it('in_progress 过日 → needsMarkExpired', () => {
-    const actions = reconcileItineraryStatuses(
+    const actions = reconcileAppointmentStatuses(
       [base({ status: 'in_progress' })],
       yesterday,
     )
     expect(actions).toEqual([
-      { itineraryId: 'i1', kind: 'needsMarkExpired', at: yesterday },
+      { appointmentId: 'i1', kind: 'needsMarkExpired', at: yesterday },
     ])
   })
 
   it('终态 cancelled：跳过，不返回', () => {
     expect(
-      reconcileItineraryStatuses(
+      reconcileAppointmentStatuses(
         [base({ status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' })],
         yesterday,
       ),
@@ -99,7 +99,7 @@ describe('reconcileItineraryStatuses', () => {
 
   it('终态 expired：跳过，不返回', () => {
     expect(
-      reconcileItineraryStatuses(
+      reconcileAppointmentStatuses(
         [base({ status: 'expired', expiredAt: '2026-07-14T12:00:00' })],
         yesterday,
       ),
@@ -108,7 +108,7 @@ describe('reconcileItineraryStatuses', () => {
 
   it('终态 completed：跳过，不返回', () => {
     expect(
-      reconcileItineraryStatuses(
+      reconcileAppointmentStatuses(
         [base({ status: 'completed', completedAt: '2026-07-14T12:00:00' })],
         yesterday,
       ),
@@ -122,10 +122,10 @@ describe('reconcileItineraryStatuses', () => {
       base({ id: 'c', startTime: '2026-07-10T12:00:00' }), // scheduled, 过日 → needsMarkExpired
     ]
     // now=today (2026-07-15): a=当日, b=未来(20260720>20260715), c=过日(20260710<20260715)
-    const actions = reconcileItineraryStatuses(list, today)
+    const actions = reconcileAppointmentStatuses(list, today)
     expect(actions).toEqual([
-      { itineraryId: 'a', kind: 'needsMarkInProgress', at: today },
-      { itineraryId: 'c', kind: 'needsMarkExpired', at: today },
+      { appointmentId: 'a', kind: 'needsMarkInProgress', at: today },
+      { appointmentId: 'c', kind: 'needsMarkExpired', at: today },
     ])
   })
 })

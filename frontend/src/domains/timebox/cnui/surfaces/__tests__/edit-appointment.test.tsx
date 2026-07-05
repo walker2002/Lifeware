@@ -1,9 +1,9 @@
 /**
- * @file edit-itinerary.test.tsx
- * @brief [026] T17 P2 CNUI EditItinerary surface 渲染测试
+ * @file edit-appointment.test.tsx
+ * @brief [026] T17 P2 CNUI EditAppointment surface 渲染测试
  *
  * 守护 3 个分支：
- * - items=0 → "暂无计划/执行中的行程" 空态
+ * - items=0 → "暂无计划/执行中的约定" 空态
  * - items>0 → 列表（点击 item 进入编辑表单）
  * - 编辑表单 submit → 调 onConfirm(dataModel with selected)
  *
@@ -13,10 +13,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
-import { EditItinerary } from '../EditItinerary'
-import type { ItineraryDraftFields } from '../ItineraryFormFields'
+import { EditAppointment } from '../EditAppointment'
+import type { AppointmentDraftFields } from '../AppointmentFormFields'
 
-type EditItem = ItineraryDraftFields & { status: string }
+type EditItem = AppointmentDraftFields & { status: string }
 
 /** 构造 items（2 条） */
 function makeItems(): EditItem[] {
@@ -26,29 +26,29 @@ function makeItems(): EditItem[] {
   ]
 }
 
-describe('[026] T17 <EditItinerary> 渲染稳定性', () => {
-  it('items.length=0 渲染「暂无计划/执行中的行程」空态', () => {
+describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
+  it('items.length=0 渲染「暂无计划/执行中的约定」空态', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: [] }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('暂无计划/执行中的行程')).toBeInTheDocument()
+    expect(screen.getByText('暂无计划/执行中的约定')).toBeInTheDocument()
   })
 
   it('items>0 渲染列表：标题 + 状态标签 + 时间 + 时长', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('选择要修改的行程（仅计划/执行中）')).toBeInTheDocument()
+    expect(screen.getByText('选择要修改的约定（仅计划/执行中）')).toBeInTheDocument()
     expect(screen.getByText('看牙医')).toBeInTheDocument()
     expect(screen.getByText('买菜')).toBeInTheDocument()
     // status 标签
@@ -56,18 +56,18 @@ describe('[026] T17 <EditItinerary> 渲染稳定性', () => {
     expect(screen.getByText('执行中')).toBeInTheDocument()
   })
 
-  it('点击 item 进入编辑表单：渲染「编辑行程」标题 + 字段', () => {
+  it('点击 item 进入编辑表单：渲染「编辑约定」标题 + 字段', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
     fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    // 进入 form 态：标题变为「编辑行程（计划）」
-    expect(screen.getByText('编辑行程（计划）')).toBeInTheDocument()
+    // 进入 form 态：标题变为「编辑约定（计划）」
+    expect(screen.getByText('编辑约定（计划）')).toBeInTheDocument()
     // 字段预填
     expect((screen.getByLabelText('事件名称') as HTMLInputElement).value).toBe('看牙医')
     expect((screen.getByLabelText('时长(分)') as HTMLInputElement).value).toBe('30')
@@ -77,8 +77,8 @@ describe('[026] T17 <EditItinerary> 渲染稳定性', () => {
     const onConfirm = vi.fn()
     const onDataChange = vi.fn()
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={onDataChange}
         onConfirm={onConfirm}
@@ -99,8 +99,8 @@ describe('[026] T17 <EditItinerary> 渲染稳定性', () => {
 
   it('编辑表单：title 空 → 保存按钮 disabled', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
@@ -115,29 +115,29 @@ describe('[026] T17 <EditItinerary> 渲染稳定性', () => {
 
   it('编辑表单：点「返回列表」回到列表态（selectedId 重置）', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
     fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    expect(screen.getByText('编辑行程（计划）')).toBeInTheDocument()
+    expect(screen.getByText('编辑约定（计划）')).toBeInTheDocument()
     fireEvent.click(screen.getByText('返回列表'))
-    expect(screen.getByText('选择要修改的行程（仅计划/执行中）')).toBeInTheDocument()
+    expect(screen.getByText('选择要修改的约定（仅计划/执行中）')).toBeInTheDocument()
   })
 
-  it('isDone=true 渲染「✅ 行程已更新」', () => {
+  it('isDone=true 渲染「✅ 约定已更新」', () => {
     render(
-      <EditItinerary
-        surfaceType="editItinerary"
+      <EditAppointment
+        surfaceType="editAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
         isDone
       />,
     )
-    expect(screen.getByText('✅ 行程已更新')).toBeInTheDocument()
+    expect(screen.getByText('✅ 约定已更新')).toBeInTheDocument()
   })
 })

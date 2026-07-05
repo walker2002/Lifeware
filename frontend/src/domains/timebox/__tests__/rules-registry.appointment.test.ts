@@ -1,29 +1,29 @@
 /**
- * @file rules-registry.itinerary.test
- * @brief [026] A1.6 itinerary 规则注册表单元测试
+ * @file rules-registry.appointment.test
+ * @brief [026] A1.6 appointment 规则注册表单元测试
  *
  * - realtime check 行为（title / startTime / durationMin 边界）
- * - submit 聚合规则 itinerary_fields_valid（合法 / durationMin<=0 / startTime 过去）
+ * - submit 聚合规则 appointment_fields_valid（合法 / durationMin<=0 / startTime 过去）
  * - [020] registry rule 自带 meta（check/fields/message）不变式
  *
  * 与既有 timebox 范式（`rules-registry.test.ts`）保持一致：纯单元测试，不依赖 DB，
  * `startTime` 时间相关 case 用 `vi.useFakeTimers().setSystemTime` 模拟 now。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { itineraryRuleRegistry } from '../rules-registry'
+import { appointmentRuleRegistry } from '../rules-registry'
 import type { DomainRuleRegistry } from '@/nexus/rules'
 import type { StructuredIntent } from '@/usom/types/objects'
 
 afterEach(() => vi.useRealTimers())
 
-const { realtime } = itineraryRuleRegistry
+const { realtime } = appointmentRuleRegistry
 
 /** 构造测试用 StructuredIntent 桩（仅 submit check 需的最小字段） */
 const baseIntent = (fields: Record<string, unknown>): StructuredIntent => ({
   id: '1' as any,
   intentionId: 'i1' as any,
   targetDomain: 'timebox',
-  action: 'createItinerary',
+  action: 'createAppointment',
   fields,
   confidence: 1,
   resolvedBy: 'form',
@@ -33,8 +33,8 @@ const baseIntent = (fields: Record<string, unknown>): StructuredIntent => ({
 /** submit check 必传 ctx（[020] SubmitCheck 签名 (intent, ctx) => Promise<ValidationResult>） */
 const baseCtx = (now: number) => ({ repos: {}, userId: 'u' as any, now })
 
-describe('itinerary_title_required (realtime)', () => {
-  const check = realtime.itinerary_title_required.check
+describe('appointment_title_required (realtime)', () => {
+  const check = realtime.appointment_title_required.check
 
   it('非空字符串 → 无错误', () => {
     expect(check('看牙医', {})).toEqual([])
@@ -56,8 +56,8 @@ describe('itinerary_title_required (realtime)', () => {
   })
 })
 
-describe('itinerary_start_time_in_future (realtime)', () => {
-  const check = realtime.itinerary_start_time_in_future.check
+describe('appointment_start_time_in_future (realtime)', () => {
+  const check = realtime.appointment_start_time_in_future.check
 
   it('未来 ISO → 无错误', () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-07-01T00:00:00Z'))
@@ -82,8 +82,8 @@ describe('itinerary_start_time_in_future (realtime)', () => {
   })
 })
 
-describe('itinerary_duration_positive (realtime)', () => {
-  const check = realtime.itinerary_duration_positive.check
+describe('appointment_duration_positive (realtime)', () => {
+  const check = realtime.appointment_duration_positive.check
 
   it('正数 → 无错误', () => {
     expect(check(60, {})).toEqual([])
@@ -112,8 +112,8 @@ describe('itinerary_duration_positive (realtime)', () => {
   })
 })
 
-describe('itinerary_fields_valid (submit — 聚合规则)', () => {
-  const check = itineraryRuleRegistry.submit.itinerary_fields_valid.check
+describe('appointment_fields_valid (submit — 聚合规则)', () => {
+  const check = appointmentRuleRegistry.submit.appointment_fields_valid.check
 
   it('合法字段（startTime 在 now 之后） → Passed', async () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-07-01T00:00:00Z'))
@@ -175,9 +175,9 @@ describe('itinerary_fields_valid (submit — 聚合规则)', () => {
 })
 
 // ─── [020] registry rule 自带 meta 不变式 ──────────────────────────
-describe('[020] itinerary registry rule 自带 meta', () => {
+describe('[020] appointment registry rule 自带 meta', () => {
   it('每条 realtime rule 含 check/fields/message 且 fields 恰 1 字段', () => {
-    for (const [id, rule] of Object.entries(itineraryRuleRegistry.realtime)) {
+    for (const [id, rule] of Object.entries(appointmentRuleRegistry.realtime)) {
       expect(typeof rule.check, `${id} check`).toBe('function')
       expect(Array.isArray(rule.fields), `${id} fields`).toBe(true)
       expect(rule.fields.length, `${id} fields 恰 1 字段`).toBe(1)
@@ -186,16 +186,16 @@ describe('[020] itinerary registry rule 自带 meta', () => {
     }
   })
 
-  it('submit 聚合规则 itinerary_fields_valid 含 meta', () => {
-    const rule = itineraryRuleRegistry.submit.itinerary_fields_valid
+  it('submit 聚合规则 appointment_fields_valid 含 meta', () => {
+    const rule = appointmentRuleRegistry.submit.appointment_fields_valid
     expect(rule).toBeDefined()
     expect(typeof rule.check).toBe('function')
     expect(Array.isArray(rule.fields)).toBe(true)
     expect(rule.message.length).toBeGreaterThan(0)
   })
 
-  it('itinerary_rule_registry 类型契约 = DomainRuleRegistry（[020] SSOT）', () => {
-    const r: DomainRuleRegistry = itineraryRuleRegistry
+  it('appointment_rule_registry 类型契约 = DomainRuleRegistry（[020] SSOT）', () => {
+    const r: DomainRuleRegistry = appointmentRuleRegistry
     expect(r.realtime).toBeDefined()
     expect(r.submit).toBeDefined()
   })

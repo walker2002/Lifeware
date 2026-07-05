@@ -28,12 +28,12 @@ vi.mock('@/domains/timebox/repository', () => ({
       ]
     }
   },
-  // [026] A2.5 — itinerary 3 surface open 分支用 findActive，handler mock 必须含此方法
-  ItineraryRepository: class {
+  // [026] A2.5 — appointment 3 surface open 分支用 findActive，handler mock 必须含此方法
+  AppointmentRepository: class {
     async findActive() {
       return [
         {
-          id: 'itinerary-1',
+          id: 'appointment-1',
           title: '看牙医',
           startTime: '2026-07-10T14:00:00Z',
           durationMin: 60,
@@ -439,7 +439,7 @@ describe('timeboxCnuiHandler', () => {
         TimeboxRepository: class {
           async findByDateRange() { return [] }
         },
-        ItineraryRepository: class {
+        AppointmentRepository: class {
           async findActive() { return [] }
         },
       }))

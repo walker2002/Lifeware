@@ -4,10 +4,10 @@
  *
  * [026] A3.2 把 TimeboxTimeline 改为接受 `events: TimeboxesEvent[]` 并按 kind 分支。
  * IRON RULE 承诺：纯 kind='timebox' 输入的渲染输出与 T13 改动前字节级一致
- * （timebox 路径走 STATUS_COLORS + getCardBorderColor，itinerary 走 ITINERARY_COLOR）。
+ * （timebox 路径走 STATUS_COLORS + getCardBorderColor，appointment 走 ITINERARY_COLOR）。
  *
  * 方案 B：DOM 必须仅含 timebox status 颜色类（`bg-primary/20` / `bg-surface-soft` /
- * `bg-warning/20` / `bg-muted/20` / `bg-success/20`），**不得**含 itinerary 独有的
+ * `bg-warning/20` / `bg-muted/20` / `bg-success/20`），**不得**含 appointment 独有的
  * `bg-primary/10`（ITINERARY_COLOR）。
  *
  * 方案 A：snapshot 锁当前已通过的渲染。
@@ -70,13 +70,13 @@ describe('[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归', () 
     expect(container.textContent).toContain('晨会')
     expect(container.textContent).toContain('深度工作')
     expect(container.textContent).toContain('复盘')
-    // running 状态对应 bg-primary/20（timebox 状态颜色，非 itinerary 的 bg-primary/10）
+    // running 状态对应 bg-primary/20（timebox 状态颜色，非 appointment 的 bg-primary/10）
     expect(container.querySelectorAll('.bg-primary\\/20').length).toBeGreaterThan(0)
     // planned / ended 状态对应 bg-surface-soft
     expect(container.querySelectorAll('.bg-surface-soft').length).toBeGreaterThan(0)
   })
 
-  it('纯 kind: timebox 输入：不含 itinerary 独有的 bg-primary/10（ITINERARY_COLOR）', () => {
+  it('纯 kind: timebox 输入：不含 appointment 独有的 bg-primary/10（ITINERARY_COLOR）', () => {
     const { container } = render(<TimeboxTimeline events={makeSamples()} />)
     // ITINERARY_COLOR = "bg-primary/10 border-primary" — 出现即污染
     const polluted = container.querySelectorAll('.bg-primary\\/10')
@@ -88,7 +88,7 @@ describe('[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归', () 
     expect(container).toMatchSnapshot()
   })
 
-  it('空 events 数组：渲染空状态，不分支到 timebox/itinerary', () => {
+  it('空 events 数组：渲染空状态，不分支到 timebox/appointment', () => {
     const { container } = render(<TimeboxTimeline events={[]} />)
     expect(container.textContent).toContain('暂无时间安排')
     expect(container.querySelectorAll('.bg-primary\\/10').length).toBe(0)

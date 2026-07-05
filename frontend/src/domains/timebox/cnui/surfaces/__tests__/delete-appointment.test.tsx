@@ -1,9 +1,9 @@
 /**
- * @file delete-itinerary.test.tsx
- * @brief [026] T17 P2 CNUI DeleteItinerary surface 渲染测试
+ * @file delete-appointment.test.tsx
+ * @brief [026] T17 P2 CNUI DeleteAppointment surface 渲染测试
  *
  * 守护 3 个分支：
- * - items=0 → "暂无计划/执行中的行程（过期/已完成不可删）" 空态
+ * - items=0 → "暂无计划/执行中的约定（过期/已完成不可删）" 空态
  * - items>0 → 多选 toggle（点 item 切勾选）
  * - 提交 → 调 onConfirm({ ...dataModel, selectedIds })
  *
@@ -13,7 +13,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
-import { DeleteItinerary } from '../DeleteItinerary'
+import { DeleteAppointment } from '../DeleteAppointment'
 
 interface DeleteItem { id: string; title: string; startTime: string; status: string }
 
@@ -25,29 +25,29 @@ function makeItems(): DeleteItem[] {
   ]
 }
 
-describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
-  it('items.length=0 渲染「暂无计划/执行中的行程（过期/已完成不可删）」空态', () => {
+describe('[026] T17 <DeleteAppointment> 渲染稳定性', () => {
+  it('items.length=0 渲染「暂无计划/执行中的约定（过期/已完成不可删）」空态', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: [] }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('暂无计划/执行中的行程（过期/已完成不可删）')).toBeInTheDocument()
+    expect(screen.getByText('暂无计划/执行中的约定（过期/已完成不可删）')).toBeInTheDocument()
   })
 
   it('items>0 渲染列表（标题 + 状态标签）', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('选择要删除的行程（仅计划/执行中，可多选）')).toBeInTheDocument()
+    expect(screen.getByText('选择要删除的约定（仅计划/执行中，可多选）')).toBeInTheDocument()
     expect(screen.getByText('看牙医')).toBeInTheDocument()
     expect(screen.getByText('买菜')).toBeInTheDocument()
     expect(screen.getByText('计划')).toBeInTheDocument()
@@ -56,8 +56,8 @@ describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
 
   it('未选任何 item → 删除按钮 disabled（selected.size=0）', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
@@ -71,8 +71,8 @@ describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
 
   it('点击 item 切勾选：勾选态有「✓」+ 计数 +1', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
@@ -89,8 +89,8 @@ describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
 
   it('再次点击已勾选 item → 取消勾选（计数回 0，✓ 消失）', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
@@ -108,8 +108,8 @@ describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
   it('多选 2 条 → submit 调 onConfirm({ ...dataModel, selectedIds: [i1, i2] })', () => {
     const onConfirm = vi.fn()
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={onConfirm}
@@ -127,16 +127,16 @@ describe('[026] T17 <DeleteItinerary> 渲染稳定性', () => {
     expect(arg.items).toEqual(makeItems())
   })
 
-  it('isDone=true 渲染「✅ N 个行程已删除」', () => {
+  it('isDone=true 渲染「✅ N 个约定已删除」', () => {
     render(
-      <DeleteItinerary
-        surfaceType="deleteItinerary"
+      <DeleteAppointment
+        surfaceType="deleteAppointment"
         dataModel={{ items: makeItems() }}
         onDataChange={vi.fn()}
         onConfirm={vi.fn()}
         isDone
       />,
     )
-    expect(screen.getByText('✅ 2 个行程已删除')).toBeInTheDocument()
+    expect(screen.getByText('✅ 2 个约定已删除')).toBeInTheDocument()
   })
 })
