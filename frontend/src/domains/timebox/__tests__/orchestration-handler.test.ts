@@ -1,4 +1,4 @@
-/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) */
+/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) */
 
 import { describe, it, expect, vi } from 'vitest'
 import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
@@ -568,4 +568,65 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix', () 
       }
     })
   }
+})
+
+// ─── [023.10] T3 normalizeTimeField: A1 stale-date fix ───────
+//
+// 背景: normalizeTimeField 旧实现用 server today (new Date()) 转 HH:MM 为 ISO，
+// 未来日期 proposal（cursor date > server today）的 intent.startTime 会被错算到 server today。
+// TimeOverlapRule 拿到错的日期窗口 → 漏报/错报冲突。
+// 修复: normalizeTimeField 接 proposalDate 参数，proposalDate 优先（不依赖 today fallback）。
+//       legacy 调用未传 proposalDate 时回退 today UTC（向后兼容）。
+//
+// 测试策略: 直接调 private proposalToIntent（normalizeTimeField 的唯一上游），验证
+// intent.fields.startTime/endTime 是否反映 proposal.payload.date。
+// 这是 TimeOverlapRule 实际消费的契约（不是 result.proposalSet.proposals[].startTime，
+// 那个仍是 payload HH:MM 原值）。
+describe('[023.10] T3 normalizeTimeField proposal.date (A1 fix)', () => {
+  const handler = new TimeboxOrchestrationHandler()
+
+  it('未来日期 proposal：intent.startTime 应用 proposal.date（不是 server today）', () => {
+    // proposal date: '2026-07-15'（未来 10 天，假设 server today = 2026-07-05）
+    // normalizeTimeField 必须用 proposal.date 转 ISO，否则会回到 server today
+    const proposal = {
+      id: 'p-future',
+      action: 'createTimebox',
+      payload: {
+        title: 'future-timebox',
+        date: '2026-07-15',
+        startTime: '08:00',
+        endTime: '09:00',
+      },
+      sourceType: 'task' as const,
+      priority: 'P1',
+    }
+
+    const intent = (handler as any).proposalToIntent(proposal)
+
+    // [023.10] T3: proposalDate 路径走手工拼接，与 legacy 路径同格式（无 .000Z 后缀），
+    // 关键断言：日期部分必须是 proposal.date '2026-07-15'，不是 server today。
+    expect(intent.fields.startTime).toBe('2026-07-15T08:00:00Z')
+    expect(intent.fields.endTime).toBe('2026-07-15T09:00:00Z')
+  })
+
+  it('边界：今天 proposal 用 today date（不回归 today 行为）', () => {
+    // proposal date: '2026-07-05'（与 server today 一致）
+    const proposal = {
+      id: 'p-today',
+      action: 'createTimebox',
+      payload: {
+        title: 'today-timebox',
+        date: '2026-07-05',
+        startTime: '08:00',
+        endTime: '09:00',
+      },
+      sourceType: 'task' as const,
+      priority: 'P1',
+    }
+
+    const intent = (handler as any).proposalToIntent(proposal)
+
+    expect(intent.fields.startTime).toBe('2026-07-05T08:00:00Z')
+    expect(intent.fields.endTime).toBe('2026-07-05T09:00:00Z')
+  })
 })

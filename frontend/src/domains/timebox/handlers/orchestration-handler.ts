@@ -474,11 +474,15 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
    * TimeOverlapRule 读 intent.fields.startTime/endTime（[023.04] 改读 endTime）。
    *
    *   - 若 startTime/endTime 已是 ISO (含 'T' / 'Z' / '+')，直接用
-   *   - 否则按 HH:MM 视作今日 UTC 时间，组合成 ISO
+   *   - 否则按 HH:MM + proposalDate 组合成 ISO（[023.10] T3 A1 fix）
    */
   private proposalToIntent(proposal: GeneratedProposal): StructuredIntent {
     const startTime = proposal.payload.startTime as string
     const endTime = proposal.payload.endTime as string
+    // [023.10] T3 A1 fix: 传 proposal.payload.date 让 normalizeTimeField 用 proposal 日期
+    // 而不是 server today（否则未来日期 proposal 的 intent.startTime 会被错算到 today，
+    // TimeOverlapRule 用 today 窗口查冲突 → 漏报/错报）
+    const proposalDate = proposal.payload.date as string | undefined
     return {
       id: crypto.randomUUID() as any,
       intentionId: '' as any,
@@ -486,8 +490,8 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       action: 'createTimebox',
       fields: {
         title: proposal.payload.title,
-        startTime: this.normalizeTimeField(startTime),
-        endTime: this.normalizeTimeField(endTime),
+        startTime: this.normalizeTimeField(proposalDate, startTime),
+        endTime: this.normalizeTimeField(proposalDate, endTime),
       },
       confidence: 1.0,
       resolvedBy: 'template_form',
@@ -496,17 +500,30 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   }
 
   /**
-   * 把 HH:MM 转换为今日 UTC ISO；已是 ISO 格式则原样返回。
+   * 把 HH:MM 转换为 ISO；已是 ISO 格式则原样返回。
    * TimeOverlapRule 内部用 Date.parse，HH:MM 会得到 NaN；统一转 ISO。
+   *
+   * [023.10] T3 A1 fix: 接 proposalDate 参数（形如 '2026-07-15'），proposalDate 优先；
+   * 仅 legacy 调用未传 proposalDate 时回退 today UTC（向后兼容）。
+   * 旧实现用 server today (new Date()) 转 HH:MM 为 ISO，导致未来日期 proposal
+   * （cursor date > server today）的 intent.startTime 被错算到 today，
+   * TimeOverlapRule 拿错日期窗口查冲突。
    */
-  private normalizeTimeField(time: string): string {
+  private normalizeTimeField(proposalDate: string | null | undefined, time: string): string {
     if (!time) return time
     // ISO 串：含 'T' 或 'Z' 或 '+' 时区偏移 → 已是 ISO
     if (time.includes('T') || time.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(time)) {
       return time
     }
-    // HH:MM → today UTC ISO（与 orchestration cursor zone-consistent，[023.07] 统一 UTC）
+    // HH:MM → 必须配日期：proposalDate 优先；缺省回退 today UTC（向后兼容 legacy caller）
     const [h, m] = time.split(':').map(Number)
+    if (proposalDate) {
+      const [y, mo, d] = proposalDate.split('-').map(Number)
+      // 手工拼接 YYYY-MM-DDTHH:MM:SSZ，与 legacy 路径格式一致（无 .000Z 后缀），
+      // 保证下游 Date.parse / string compare 不受毫秒表示差异影响。
+      return `${proposalDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
+    }
+    // legacy 路径：HH:MM + server today UTC（与 orchestration cursor zone-consistent）
     const today = new Date().toISOString().slice(0, 10)
     return `${today}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
   }
