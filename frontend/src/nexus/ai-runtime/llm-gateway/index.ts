@@ -4,6 +4,8 @@ import { DEFAULT_ROUTING, type ProviderRoute } from './config'
 import { callWithOpenAI, type LLMCallRequest, type LLMCallResponse } from './providers/openai-compatible'
 import { callWithAnthropic } from './providers/anthropic'
 import { callWithOllama } from './providers/ollama'
+// [023.08] T1: 加 mock 分支 — dev 默认，不依赖外部 API
+import { callWithMock } from './providers/mock'
 
 export interface LLMGateway {
   route(taskType: AITaskType): ProviderRoute
@@ -22,8 +24,12 @@ export interface LLMGatewayRequest {
 
 const ANTHROPIC_PROVIDERS = new Set(['anthropic'])
 const OLLAMA_PROVIDERS = new Set(['ollama'])
+const MOCK_PROVIDERS = new Set(['mock'])
 
 function selectProvider(providerId: string): (req: LLMCallRequest) => Promise<LLMCallResponse> {
+  if (MOCK_PROVIDERS.has(providerId)) {
+    return callWithMock
+  }
   if (ANTHROPIC_PROVIDERS.has(providerId)) {
     return callWithAnthropic
   }
@@ -57,7 +63,9 @@ export function createLLMGateway(): LLMGateway {
         maxTokens: request.maxTokens,
         temperature: request.temperature,
         structuredOutput: request.structuredOutput,
-      }
+        // [023.08] T1 [F7 fix]: 透传 taskType 让 mock 按任务类型分支
+        taskType: request.taskType,
+      } as LLMCallRequest & { taskType?: AITaskType }
 
       try {
         const caller = selectProvider(route.provider)
