@@ -385,8 +385,8 @@ export const timeboxes = pgTable('timeboxes', {
   index('idx_timeboxes_user_end').on(table.userId, table.endTime),
 ])
 
-// ─── 4.7 itineraries（[026] 行程，D2 reversal: 5 态存储 + 4 transition 时间戳）──
-export const itineraries = pgTable('itineraries', {
+// ─── 4.7 appointments（[026] 约定，D2 reversal: 5 态存储 + 4 transition 时间戳；[023.05] PR2 rename 自 itineraries）──
+export const appointments = pgTable('appointments', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
@@ -406,12 +406,12 @@ export const itineraries = pgTable('itineraries', {
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   // reconcile 高频查询：未终态 + 起始日 ≤ 今天
-  index('idx_itineraries_user_status_start').on(table.userId, table.status, table.startTime),
+  index('idx_appointments_user_status_start').on(table.userId, table.status, table.startTime),
   // Page 列表：未取消 + 按 startTime 排序
-  index('idx_itineraries_user_status').on(table.userId, table.status),
+  index('idx_appointments_user_status').on(table.userId, table.status),
 ])
 // 不存 endTime 列（endTime = startTime + durationMin 派生）
-// 不加 FK 到 timeboxes（D2=C 读时合并，行程不物化为 timebox 行）
+// 不加 FK 到 timeboxes（D2=C 读时合并，约定不物化为 timebox 行）
 
 // ─── 4.8 reviews ──────────────────────────────────────────────
 export const reviews = pgTable('reviews', {

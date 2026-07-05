@@ -232,6 +232,13 @@
       "when": 1783122305000,
       "tag": "0032_023_02_timebox_template_redesign",
       "breakpoints": false
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1783249628888,
+      "tag": "0033_rename_itineraries_to_appointments",
+      "breakpoints": false
     }
   ]
 }
