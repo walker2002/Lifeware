@@ -11,7 +11,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { AIRuntime, AIGenerateResponse } from '@/nexus/ai-runtime'
+import type { AIRuntime } from '@/nexus/ai-runtime'
+import type { AIGenerateResponse } from '@/nexus/ai-runtime/types'
 
 // ── Mock AIRuntime factory（参考 ai-parser-migration.test.ts） ──
 

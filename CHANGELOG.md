@@ -133,7 +133,7 @@
 
 ## [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2，WIP）
 
-> 2026_07_05 — **WIP**：Tier 2 docs 先行（Task 1/11 完成）。本 section 为 ship 时回填占位。
+> 2026_07_05 — **ship-ready**：11 task 全绿，1 fixup commit（C1 stale assertion + T11 修复 test import 路径）。覆盖决议：schedule→**appointment/约定**（eng-review 用户识别 schedule 与 timebox 撞车）全 PR2 实装。
 
 ### 设计覆盖决议（eng-review 期用户识别）
 
@@ -157,11 +157,33 @@
 - T10 测试同步 + F1/T1 回归
 - T11 全量验收（tsc / vitest / validate:manifest / validate:domain-structure / /browse E2E）
 
-### Ship 时回填
+### Ship 时回填（2026-07-05 验收完成）
 
-- commit hash / diff stat（`git diff --stat 4d6e7ca..HEAD`）
-- 验证：tsc / vitest base=head / validate:manifest 0 errors / validate:domain-structure ✓ / /appointments HTTP 200
-- 任何 follow-up / defer
+- **commits**：11 impl + 1 fixup = 12 commits（4d6e7ca..9d12ed8）
+  - c3833a7 docs / f5464a6 DB+0033 / 3ebd7b2 USOM / 984cd42 仓储+reconcile / 12a722e nexus / d61bc27 server actions / 58e473c manifest / db21eb7 CNUI / e681073 components+pages+redirect / 3589d93 测试 / 9d12ed8 C1 fix
+- **diff stat**：71 files changed, 1702 insertions(+), 1396 deletions(-)（rename 平衡，1702/1396 ≈ 1.22）
+- **测试守护（新增）**：
+  - F1 `resolveObjectType` 回归测试（manifest PascalCase key 分派守护）
+  - T1 `isAppointmentIntent` 回归测试（includes('Appointment') 误判守护）
+  - C1 stale assertion 修复（`rules-registry.appointment.test.ts` 删除 prev-deps header unused `it()`）
+- **T11 fixup**：`parse-appointment.test.ts` import 路径修复（`AIGenerateResponse` type-only 直接从 `@/nexus/ai-runtime/types` re-export 路径导入，TS2459 消解）
+- **验证（2026-07-05）**：
+  - tsc base=head：**零新增 error**（71 → 70，T11 fixup 后 base 对齐）
+  - vitest base=head：**STRICTLY BETTER**（30 fails vs base 64 fails，少 34 个失败。1854-1608 tests 增加 76 测试（T9/T10 增量）. Pre-existing flake 1 个 [025] 已知）
+  - validate:manifest：**0 errors**（2 INFO + 2 WARN pre-existing）
+  - validate:domain-structure ✓
+  - HTTP：`/appointments` 200 / `/timeboxes` 200 / `/itineraries/foo` 308 → `/appointments/foo`（F6 redirect 工作）
+  - lazy reconcile：DB 手改 `start_time=NOW()-2 days` 后访问 `/appointments` 触发 server reconcile，`scheduled → expired` 自动推进 ✓
+  - 0033 down→forward：双向幂等迁移，dev DB 2 行数据保留 ✓
+  - F1 grep 守护：manifest 4 appointment action（createAppointment/editAppointment/deleteAppointment/viewAppointments）+ manifest lifecycle key `appointment` ✓
+  - F4 contract：`{status:'ok';appointment:Appointment}` tsc base=head 零调用方错配
+  - F5 down migration：`0033_rename_itineraries_to_appointments.{up,down}.sql` 双向通
+- **dev OQ-1 row count**：appointments 表 2 行（迁移保留）
+- **Follow-up / Defer（不下于 ship gate）**：
+  - mainViewState.type='schedule' → 'timeboxes' 重命名 defer [023.10]
+  - LLM prompt `APPOINTMENT_PARSE_PROMPT` [→EVAL] eval suite 独立 follow-up
+  - [027] 打卡→completed + 智能编排归集约定
+  - drizzle snapshot 重置（[023.05-1] 沿用 F2 convention）
 
 ## [026] Itinerary 域
 
