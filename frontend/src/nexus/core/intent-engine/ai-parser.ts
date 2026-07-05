@@ -494,10 +494,10 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-// ─── 行程解析系统提示词 ─────────────────────────────────────────
+// ─── 约定解析系统提示词 ─────────────────────────────────────────
 
 /**
- * [026] A2.1 行程意图解析系统提示词。
+ * [026] A2.1 约定意图解析系统提示词。
  *
  * 输出结构（JSON）：
  * {
@@ -513,17 +513,17 @@ function generateUUID(): string {
  * }
  *
  * 关键约束：
- * - 多记录分隔符：全角"；" / 半角";"（与 MULTI_TASK_PROMPT 保持一致）
+ * - 多条约定之间用分隔符：全角"；" / 半角";"（与 MULTI_TASK_PROMPT 保持一致）
  * - 关系人提取：@ 前导（"@张三" → people=["张三"]）
- * - 不确定时长时使用 60 分钟作为默认（与行程常用时长对齐）
+ * - 不确定时长时使用 60 分钟作为默认（与常见约定时长对齐）
  */
-const ITINERARY_PARSE_PROMPT = (now: Date) => `
-你是 Lifeware 行程意图解析器。将用户的自然语言输入解析为结构化的行程列表。
+const APPOINTMENT_PARSE_PROMPT = (now: Date) => `
+你是 Lifeware 约定意图解析器。将用户的自然语言输入解析为结构化的约定列表。
 
 当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'full', timeStyle: 'short' })}
 时区：Asia/Shanghai (UTC+8)
 
-支持的动作：仅解析行程相关输入。其他意图返回空 drafts 数组 + confidence < 0.5。
+支持的动作：仅解析约定相关输入。其他意图返回空 drafts 数组 + confidence < 0.5。
 
 输出 JSON 格式：
 {
@@ -540,8 +540,8 @@ const ITINERARY_PARSE_PROMPT = (now: Date) => `
 
 解析规则：
 
-1. 多记录分隔符
-   - 全角分号"；"和半角分号";"都作为行程分隔符
+1. 多条约定之间用分隔符
+   - 全角分号"；"和半角分号";"都作为约定之间的分隔符
    - 优先级：全角"；" > 半角";" > 换行
    - 没有分隔符 → 单条 draft
 
@@ -597,32 +597,32 @@ const ITINERARY_PARSE_PROMPT = (now: Date) => `
 本例应返回 people=[]。
 `
 
-// ─── 行程解析函数 ──────────────────────────────────────────────
+// ─── 约定解析函数 ──────────────────────────────────────────────
 
 /**
- * [026] A2.1 使用 AI 解析自然语言输入为行程 drafts。
+ * [026] A2.1 使用 AI 解析自然语言输入为约定 drafts。
  *
  * 与 parseMultiTask 行为相似但输出结构不同：
  *  - parseMultiTask 返回 StructuredIntent 数组（timebox 域）
- *  - parseItineraryWithAI 返回 { drafts, success, error? }（行程域，
- *    供 parseItineraryIntentOnly 转成最终对外契约）
+ *  - parseAppointmentWithAI 返回 { drafts, success, error? }（约定域，
+ *    供 parseAppointmentIntentOnly 转成最终对外契约）
  *
  * 解析容错：缺字段的 draft 会被过滤，最终为空数组时返回 success=false。
  */
-export interface ItineraryDraft {
+export interface AppointmentDraft {
   title: string
   startTime: string
   durationMin: number
   people: string[]
 }
 
-export interface ItineraryParseResult {
+export interface AppointmentParseResult {
   success: boolean
-  drafts: ItineraryDraft[]
+  drafts: AppointmentDraft[]
   error?: string
 }
 
-interface LLMItineraryResponse {
+interface LLMAppointmentResponse {
   drafts: Array<{
     title: string
     startTime: string
@@ -632,15 +632,15 @@ interface LLMItineraryResponse {
   }>
 }
 
-export async function parseItineraryWithAI(
+export async function parseAppointmentWithAI(
   rawInput: string,
   aiRuntime: AIRuntime,
-): Promise<ItineraryParseResult> {
+): Promise<AppointmentParseResult> {
   try {
     const response = await aiRuntime.generate({
       domainId: 'timebox',
-      action: 'parseItineraryIntent',
-      systemPrompt: ITINERARY_PARSE_PROMPT(new Date()),
+      action: 'parseAppointmentIntent',
+      systemPrompt: APPOINTMENT_PARSE_PROMPT(new Date()),
       messages: [{ role: 'user', content: rawInput }],
       taskType: 'field_extraction',
       temperature: 0.3,
@@ -652,18 +652,18 @@ export async function parseItineraryWithAI(
     }
 
     const jsonStr = typeof content === 'string' ? extractJSON(content) : JSON.stringify(content)
-    let parsed: LLMItineraryResponse
+    let parsed: LLMAppointmentResponse
     try {
-      parsed = JSON.parse(jsonStr) as LLMItineraryResponse
+      parsed = JSON.parse(jsonStr) as LLMAppointmentResponse
     } catch {
-      return { success: false, drafts: [], error: '无法解析行程 JSON 响应' }
+      return { success: false, drafts: [], error: '无法解析约定 JSON 响应' }
     }
 
     if (!Array.isArray(parsed.drafts) || parsed.drafts.length === 0) {
-      return { success: false, drafts: [], error: '未识别到有效的行程' }
+      return { success: false, drafts: [], error: '未识别到有效的约定' }
     }
 
-    const drafts: ItineraryDraft[] = []
+    const drafts: AppointmentDraft[] = []
     for (const d of parsed.drafts) {
       if (!d.title || !d.startTime) continue
       if (typeof d.durationMin !== 'number' || d.durationMin <= 0) continue
@@ -676,13 +676,13 @@ export async function parseItineraryWithAI(
     }
 
     if (drafts.length === 0) {
-      return { success: false, drafts: [], error: '所有行程信息不完整，请补充时间/时长' }
+      return { success: false, drafts: [], error: '所有约定信息不完整，请补充时间/时长' }
     }
 
     return { success: true, drafts }
   } catch (err) {
     const message = err instanceof Error ? err.message : '未知错误'
-    return { success: false, drafts: [], error: `行程解析失败：${message}` }
+    return { success: false, drafts: [], error: `约定解析失败：${message}` }
   }
 }
 

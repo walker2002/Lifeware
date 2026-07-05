@@ -50,7 +50,7 @@ const REQUIRED_FIELDS = ['title', 'startTime', 'endTime']
  */
 const STATUS_TRANSITION_ACTIONS = new Set([
   'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox', 'overtimeTimebox',
-  'cancelItinerary', 'startItinerary', 'completeItinerary', 'expireItinerary',
+  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
 ])
 
 export const FieldCompletenessRule: Rule = {
@@ -64,12 +64,12 @@ export const FieldCompletenessRule: Rule = {
       return { severity: 'pass' }
     }
 
-    // [026] P0-2 修复（issue #2 误判 itinerary 缺 endTime → NeedConfirm）：
-    //   itinerary 域用 durationMin 而非 endTime（行程时长由 durationMin 决定，
+    // [026] P0-2 修复（issue #2 误判 appointment 缺 endTime → NeedConfirm）：
+    //   appointment 域用 durationMin 而非 endTime（约定时长由 durationMin 决定，
     //   客户端不折 endTime 上送），timebox 域用 endTime。按 action/objectType
-    //   分派：itinerary 类（action 名含 "Itinerary"）必含 title/startTime/durationMin；
+    //   分派：appointment 类（action 名含 "Appointment"）必含 title/startTime/durationMin；
     //   timebox 类保持原 title/startTime/endTime 三必含。
-    if (isItineraryIntent(intent)) {
+    if (isAppointmentIntent(intent)) {
       return evaluateCompleteness(intent, ['title', 'startTime', 'durationMin'])
     }
     return evaluateCompleteness(intent, REQUIRED_FIELDS)
@@ -77,22 +77,22 @@ export const FieldCompletenessRule: Rule = {
 }
 
 /**
- * 判断 intent 是否属于 itinerary 域。
+ * 判断 intent 是否属于 appointment 域。
  *
- * 当前约定：submitDynamicIntent('timebox', 'createItinerary'/'editItinerary'/...) 路由后
- * intent.targetDomain === 'timebox'，但 action 名含 "Itinerary" 是 itinerary 域的
+ * 当前约定：submitDynamicIntent('timebox', 'createAppointment'/'editAppointment'/...) 路由后
+ * intent.targetDomain === 'timebox'，但 action 名含 "Appointment" 是 appointment 域的
  * 标志（与 resolveObjectType 同款分派逻辑，参 app/actions/timebox.ts:354 / 392 / 409）。
  * 若未来 objectType 字段下推到 intent 层，可改为读 intent.objectType。
  */
-function isItineraryIntent(intent: StructuredIntent): boolean {
-  return typeof intent.action === 'string' && intent.action.includes('Itinerary')
+function isAppointmentIntent(intent: StructuredIntent): boolean {
+  return typeof intent.action === 'string' && intent.action.includes('Appointment')
 }
 
 /**
  * 字段必含检查（共享实现）。
  *
  * 接受非空字符串（title/startTime/endTime）或有效 number（durationMin 等数值字段）。
- * 跨类型：timebox 域全字符串字段，itinerary 域 durationMin 是 number —— 兼容。
+ * 跨类型：timebox 域全字符串字段，appointment 域 durationMin 是 number —— 兼容。
  *
  * @param intent 结构化意图
  * @param requiredFields 必须存在的字段名集合（任意字段为空 → warning）

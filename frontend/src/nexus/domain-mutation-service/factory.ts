@@ -68,11 +68,11 @@ export function createDomainMutationServiceFactory(
 
   /**
    * 从本域 manifest 读取指定 objectType 的 field_metadata（[026] T23 per-objectType 嵌套）。
-   * 一级 key 为 objectType（如 task / itinerary），二级 key 为字段名。
+   * 一级 key 为 objectType（如 task / appointment），二级 key 为字段名。
    * 缺省回退 {}（field-executor 接到空表 → 拒绝未声明字段，行为与平铺版一致）。
    *
    * @param _domainId - 域 ID（闭包固定，忽略入参）
-   * @param objectType - 对象类型（task / habit / itinerary / objective / key_result 等）
+   * @param objectType - 对象类型（task / habit / appointment / objective / key_result 等）
    */
   function getFieldMetadata(
     _domainId: string,
