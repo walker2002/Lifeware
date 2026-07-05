@@ -213,12 +213,33 @@ export function TimeboxesWorkspace() {
     try {
       setActionSubmitting(true)
       if (action === 'revertSmartTimeboxes') {
-        // [023.08] T5：revertSmartTimeboxes 走 server action 路径
-        //   当前 MVP 阶段：直接重置本地 state + 提示用户；完整实现待 [023.10] 提供
-        //   batch-revert server action。组件测试已覆盖 onConfirm 契约。
+        // [023.10] T1 — workspace revert 真 wire 到 submitCnuiSurface（取代 [023.08] placeholder toast）
+        // 关联：[023.08] P0 (4d6e7ca) 同源路由错配 — accept 已修，revert 仍 placeholder。
+        // cnui/handlers.ts:revertSmartTimeboxes 分支（line 452-482）只在 submitCnuiSurface 路由下可达：
+        //   迭代 revertBatchProposals 内部 items[] → EpisodeRepository.markReverted → 逐条 deleteTimebox。
+        // batchId 优先取自 surface 上送的 data.fields.batchId（避免 stale closure 陷阱，
+        //   handleAiConfirm deps 缺 revertableBatches 会导致旧 closure 读到 []）。
+        const fields = (data.fields ?? {}) as { batchId?: string }
+        const firstBatch = revertableBatches[0]
+        const batchId = fields.batchId ?? firstBatch?.batchId
+        if (!batchId) {
+          toast.error('无可撤销批次')
+          return
+        }
+        const result = await submitCnuiSurface(
+          '',  // cnuiSurfaceId — ignored by handler
+          'timebox',
+          'revertSmartTimeboxes',
+          { batchId },
+        )
+        // 清空本地状态 + 刷新（与原 placeholder 行为一致）
         setRevertableBatches([])
         await loadRange(dateMode, currentDate)
-        toast.success('撤销状态已重置（[023.10] 提供 server action）')
+        if (result.success) {
+          toast.success('已撤销最近批次')
+        } else {
+          toast.error(`撤销失败：${result.error ?? '未知错误'}`)
+        }
       } else if (action === 'createTimebox') {
         // [023.08] T5 [P0 fix]: 走 submitCnuiSurface (非 submitDynamicIntent) 才能路由到
         //   cnui/handlers.ts createTimebox submit branch — 该 branch 迭代 items[]、
@@ -251,7 +272,7 @@ export function TimeboxesWorkspace() {
     } finally {
       setActionSubmitting(false)
     }
-  }, [dateMode, currentDate, loadRange])
+  }, [dateMode, currentDate, loadRange, revertableBatches])
 
   /** [023.03] T3：handleEdit 包 try/catch + 视觉强化（标题前缀在 Drawer 内已实现） */
   const handleEdit = useCallback(async (summary: TimeboxSummary) => {
