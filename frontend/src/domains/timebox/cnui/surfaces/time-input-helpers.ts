@@ -31,3 +31,28 @@ export function localDatetimeInputToIso(local: string): string {
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString()
 }
+
+/**
+ * [023.08] T2 [F6 fold]: HH:MM + date → UTC ISO 8601 timestamp.
+ *
+ * Orchestration proposal payload.startTime/endTime 用 "HH:MM" 字符串（human-friendly），
+ * 但 DB timebox schema 要求 ISO 8601。本 helper 是 server-side bridge,与 [023.09]
+ * canonical UTC arithmetic 一致;24:00 / 8:00 等 invalid 抛错(fail-CLOSED)。
+ */
+export function hhmmToIso(hhmm: string, date: string): string {
+  if (!/^\d{2}:\d{2}$/.test(hhmm)) {
+    throw new Error(`hhmmToIso: invalid hh:mm format: "${hhmm}"`)
+  }
+  const [hStr, mStr] = hhmm.split(':')
+  const hour = Number(hStr)
+  const minute = Number(mStr)
+  if (hour < 0 || hour > 23) throw new Error(`hhmmToIso: invalid hour: ${hour}`)
+  if (minute < 0 || minute > 59) throw new Error(`hhmmToIso: invalid minute: ${minute}`)
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`hhmmToIso: invalid date format: "${date}"`)
+  }
+
+  // UTC ISO (Z 结尾);与 [023.09] canonical UTC invariant 一致
+  return `${date}T${hhmm}:00.000Z`
+}

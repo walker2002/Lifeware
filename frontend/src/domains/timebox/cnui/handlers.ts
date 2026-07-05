@@ -12,6 +12,7 @@ import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
 import type { Timebox, Task, Habit } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
+import { hhmmToIso } from './surfaces/time-input-helpers'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -332,7 +333,16 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const failed: { title: string; error: string }[] = []
       for (const it of items) {
         try {
-          const r = await submitDynamicIntent('timebox', 'createTimebox', it)
+          // [023.08] T2: ISO 时间 convert — orchestration proposal 发 HH:MM + date,
+          // server action 接收时显式 convert 为 ISO UTC,落库前规范化
+          const normalized: Record<string, unknown> = { ...it }
+          if (typeof it.startTime === 'string' && /^\d{2}:\d{2}$/.test(it.startTime) && typeof it.date === 'string') {
+            normalized.startTime = hhmmToIso(it.startTime, it.date)
+          }
+          if (typeof it.endTime === 'string' && /^\d{2}:\d{2}$/.test(it.endTime) && typeof it.date === 'string') {
+            normalized.endTime = hhmmToIso(it.endTime, it.date)
+          }
+          const r = await submitDynamicIntent('timebox', 'createTimebox', normalized)
           if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
           else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
         } catch (e) {

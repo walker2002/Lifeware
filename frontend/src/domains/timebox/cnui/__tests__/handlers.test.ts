@@ -289,6 +289,43 @@ describe('timeboxCnuiHandler', () => {
       expect(result.error).toContain('缺少必需字段')
       expect(result.error).toContain('endTime 必须晚于 startTime')
     })
+
+    // [023.08] T2 G3: createTimebox submit 调用 hhmmToIso 把 HH:MM + date 转 ISO UTC
+    it('[023.08] T2 G3 createTimebox submit calls hhmmToIso at the HH:MM branch', async () => {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      // 重置 mock 并捕获调用参数
+      vi.mocked(submitDynamicIntent).mockReset()
+      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-conv' } })
+
+      await timeboxCnuiHandler.submit('createTimebox', {
+        items: [{ title: '牙医', date: '2026-07-05', startTime: '08:00', endTime: '09:00' }],
+      })
+
+      // submitDynamicIntent 应收到 ISO UTC 串，而非 HH:MM
+      expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'createTimebox', {
+        title: '牙医',
+        date: '2026-07-05',
+        startTime: '2026-07-05T08:00:00.000Z',
+        endTime: '2026-07-05T09:00:00.000Z',
+      })
+    })
+
+    // [023.08] T2 G3 follow-up: 已是 ISO 串时不二次转换（idempotent 守护）
+    it('[023.08] T2 G3 createTimebox submit 透传 ISO 串（不二次 convert）', async () => {
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      vi.mocked(submitDynamicIntent).mockReset()
+      vi.mocked(submitDynamicIntent).mockResolvedValue({ success: true, object: { id: 'tb-iso' } })
+
+      await timeboxCnuiHandler.submit('createTimebox', {
+        items: [{ title: '会议', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z' }],
+      })
+
+      expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'createTimebox', {
+        title: '会议',
+        startTime: '2026-07-01T10:00:00Z',
+        endTime: '2026-07-01T11:00:00Z',
+      })
+    })
   })
 
   describe('submit - createSmartTimeboxes', () => {
