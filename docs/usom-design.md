@@ -954,16 +954,16 @@ interface TimeboxTemplate {
 
 **DB 落点**：`timebox_templates` 表（见 `docs/database-design.md` §7.8）。
 
-### 3.13 Itinerary（行程，[026]）
+### 3.13 Appointment（约定，[026]，[023.05] PR2 重命名自 Itinerary；目标词自 schedule 覆盖为 appointment——schedule/日程计划与 timebox 语义撞车）
 
-**对象意图**：用户对未来日历上一次性的事件安排——读书会、约饭、牙医、家长会等"钉死"承诺。与 Timebox 区别：Timebox 是今日可被 AI 重排的执行格；Itinerary 是对未来钉死的承诺，到日子由读时合并器纳入当日日程作"锁定时间格"，AI 编排器不可移动。
+**对象意图**：用户对未来日历上一次性的事件安排——读书会、约饭、牙医、家长会等"钉死"承诺。与 Timebox 区别：Timebox 是今日可被 AI 重排的执行格；Appointment 是对未来钉死的承诺，到日子由读时合并器纳入当日日程作"锁定时间格"，AI 编排器不可移动。
 
-**D2 reversal（Cycle 模式）**：状态全部存储（**不读时算**），`scheduled` / `in_progress` / `expired` 由状态机 transition 推进；终态 `cancelled` / `completed` 持久化（用于"未实施的计划"统计，spec §7.4 OQ-7）。时间驱动的 transition（`scheduled→in_progress` 当日到日触发；`scheduled/in_progress→expired` 过日触发）由 `reconcileItineraryStatuses()` 在页面 server component 加载时触发（**零 cron**）。
+**D2 reversal（Cycle 模式）**：状态全部存储（**不读时算**），`scheduled` / `in_progress` / `expired` 由状态机 transition 推进；终态 `cancelled` / `completed` 持久化（用于"未实施的计划"统计，spec §7.4 OQ-7）。时间驱动的 transition（`scheduled→in_progress` 当日到日触发；`scheduled/in_progress→expired` 过日触发）由 `reconcileAppointmentStatuses()` 在页面 server component 加载时触发（**零 cron**）。
 
 ```typescript
-interface Itinerary {
+interface Appointment {
   id:             USOM_ID
-  status:         ItineraryStatus         // 存储：5 态枚举（C 方案：D2 reversal 后改为 Cycle 模式）
+  status:         AppointmentStatus         // 存储：5 态枚举（C 方案：D2 reversal 后改为 Cycle 模式）
   title:          string                  // 活动事件名称
   detail:         string | null           // 活动事件详情
   startTime:      Timestamp               // 开始时间（UTC 存，展示层本地化）
@@ -979,7 +979,7 @@ interface Itinerary {
   schemaVersion:  number
 }
 
-type ItineraryStatus =
+type AppointmentStatus =
   | 'scheduled'   // initial state（SM null→scheduled）
   | 'in_progress' // 执行中（SM scheduled→in_progress，lazy reconcile 当日到日触发）
   | 'expired'     // 已过期（SM scheduled/in_progress→expired，lazy reconcile 过日触发；终态）
@@ -1001,16 +1001,18 @@ type ItineraryStatus =
                             └── cancelled (终态)
 ```
 
-- `scheduled → in_progress`：lazy reconcile，Itinerary.startTime 当日到日触发
+- `scheduled → in_progress`：lazy reconcile，Appointment.startTime 当日到日触发
 - `scheduled / in_progress → expired`：lazy reconcile，startTime + durationMin 跨日触发
 - `scheduled / in_progress → cancelled`：用户主动取消（spec §7.4：expired/completed 不可取消）
 - `[027] in_progress → completed`：timebox 打卡完成后由编排器联动触发（不在 [026] 范围）
 
-**与 Timebox 的边界**：Itinerary 不参与 AI 自动编排（OQ-4：AI 锁），scheduling-handler 只查 timeboxes。Itinerary 只在当日读时合并进 `/schedule`，作为锁定时间格插入。
+**与 Timebox 的边界**：Appointment 不参与 AI 自动编排（OQ-4：AI 锁），orchestration-handler 只查 timeboxes。Appointment 只在当日读时合并进 `/timeboxes`，作为锁定时间格插入。
 
-**DB 落点**：`itineraries` 表（见 `docs/database-design.md` §4.X，DDL 在 T2 迁移手写落地）。
+**DB 落点**：`appointments` 表（见 `docs/database-design.md` §4.X，DDL 在 T2 迁移手写落地）。
 
 **[026] A3 SHIP（2026_07_03）**：4 action（createItinerary/editItinerary/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile（零 cron）+ `<ItineraryFormFields>` 公共组件（D4 决议 A）+ 字段白名单（防绕过状态机直写 status/时间戳）+ ItineraryWorkspace 内联 Sheet drawer（T14 I-1 修复，取代 T12 hash 死链）。GrowthMenu 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。剩余 follow-up T15-T23，详见 CHANGELOG.md `## Itinerary 域（[026]）`。
+
+**[023.05] PR2（2026_07_05）**：Itinerary→Appointment 全层重命名 + itineraries→appointments 表 + 0033 rename 迁移，中文「行程」→「约定」。目标词自 design 原 schedule 覆盖（eng-review 期用户识别 schedule/日程计划 与 timebox 撞车）。schedule 命名空间由 PR1 释放后留空，appointment 不占用。
 
 ---
 
@@ -1235,7 +1237,7 @@ type ValidationResult =
 
 业务事实写入口按 manifest `field_metadata.<objectType>.<field>.mutation_mode` 把字段写入分流
 （[026] T23：field_metadata 已重构为 per-objectType 嵌套结构，一级 key 为 objectType，
-二级 key 为字段名；消除跨域字段名潜在冲突，如 timebox itinerary 与其它域同名字段）；
+二级 key 为字段名；消除跨域字段名潜在冲突，如 timebox appointment 与其它域同名字段）；
 见宪章 §III 业务事实写入口：
 
 | 分类 | 写入路径 |

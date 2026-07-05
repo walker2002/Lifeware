@@ -131,6 +131,38 @@
 - 无 DB 迁移（PR1 阶段 1 明确不碰 schema.ts/migrations）
 - 无 itinerary/Itinerary* 改动（PR2 阶段 2 范围）
 
+## [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2，WIP）
+
+> 2026_07_05 — **WIP**：Tier 2 docs 先行（Task 1/11 完成）。本 section 为 ship 时回填占位。
+
+### 设计覆盖决议（eng-review 期用户识别）
+
+- **目标词覆盖**：本 PR2 母 design doc 历史目标词为 `schedule`（中文「日程计划」），eng-review 期用户识别 `schedule` / 「日程计划」与 `timebox` 语义撞车——两者都含"日程"含义易混淆。
+- **覆盖后目标词**：`appointment`（中文「约定」）—— 指对未来钉死的一次性事件安排（读书会、约饭、牙医、家长会），与 timebox 的"今日可重排执行格"语义清晰分离。
+- **覆盖范围**：USOM（`Itinerary` → `Appointment`，type alias `ItineraryStatus` → `AppointmentStatus`，值 `scheduled` 保留 P3）+ DB（`itineraries` → `appointments` 表 + 0033 RENAME 迁移 + 2 INDEX）+ manifest（action/surface/component 全 appointment 系列）+ ~22 文件 git mv（`reconcile-itinerary*.ts` → `reconcile-appointment*.ts` 等）+ 中文「行程」→「约定」。
+- **schedule 命名空间**：PR1 阶段 1 已释放留空，appointment 不占用。
+- **母 design doc 不改**：仍写 schedule 是历史 SSOT，本 PR2 plan 为执行 SSOT。
+
+### 11-task 范围
+
+- T1 Tier 2 docs 先行（usom-design + database-design + F2 snapshot drift + 设计覆盖注）— 本 task
+- T2 DB schema + 0033 迁移（手写 SQL + journal idx=33）
+- T3 USOM 类型层（`Itinerary` → `Appointment`）
+- T4 数据 + reconcile 仓储层（`AppointmentRepository` + `reconcile-appointment*.ts`）
+- T5 nexus 层（orchestrator / state machine）
+- T6 server actions + F4 contract
+- T7 manifest.yaml（action/surface/component 全 appointment 系列）
+- T8 CNUI surfaces（git mv + PascalCase 文件名）
+- T9 components + pages + redirect（`/itineraries` → `/appointments`）
+- T10 测试同步 + F1/T1 回归
+- T11 全量验收（tsc / vitest / validate:manifest / validate:domain-structure / /browse E2E）
+
+### Ship 时回填
+
+- commit hash / diff stat（`git diff --stat 4d6e7ca..HEAD`）
+- 验证：tsc / vitest base=head / validate:manifest 0 errors / validate:domain-structure ✓ / /appointments HTTP 200
+- 任何 follow-up / defer
+
 ## [026] Itinerary 域
 
 > 2026_07_03 — A3 ship（14 commits：4 action + 5 态存储 + lazy reconcile + /schedule 锁定合并 + I-1 修复 + Tier 2 docs）。**[026] 全闭环 ship-ready**

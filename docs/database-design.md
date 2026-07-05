@@ -138,7 +138,7 @@ Nexus 组件 → Repository Interface → USOM 对象 ← Repository Layer ← D
 ├── habits                 ← 习惯
 ├── habit_logs             ← 习惯打卡记录（独立表）
 ├── timeboxes              ← 时间盒
-├── itineraries            ← 行程（[026]，Cycle 模式 5 态存储 + 4 transition 时间戳）
+├── appointments           ← 约定（[026]，[023.05] PR2 rename 自 itineraries，Cycle 模式 5 态存储 + 4 transition 时间戳）
 ├── task_execution_logs    ← 任务执行记录（新增 2026-05-28）
 ├── reviews                ← 复盘
 └── activity_archetypes    ← 活动原型（[023] A1：7 L1 + 30 L2，配置类不走 SM）
@@ -823,17 +823,17 @@ CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logg
 
 ---
 
-### 4.X itineraries（行程表，[026]）
+### 4.X appointments（约定表，[026]，[023.05] PR2 rename）
 
-对应 USOM `Itinerary`。
+对应 USOM `Appointment`。
 
 > **D2 reversal（Cycle 模式）**：状态全部存储，**不读时算**。`scheduled`/`in_progress`/`expired` 由 SM transition 推进（lazy reconcile，零 cron）；终态 `cancelled`/`completed` 持久化用于"未实施的计划"统计。详细 USOM 接口见 `docs/usom-design.md` §3.13。
 >
 > **DDL 实现在 T2 迁移（手写 SQL + psql + 登记 journal，idx=31）落地**；本节先登记列/索引契约供 Repository 与 server actions 引用。
 
 ```sql
--- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化）
-CREATE TABLE itineraries (
+-- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化；0033 RENAME 为 appointments）
+CREATE TABLE appointments (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references users(id) on delete cascade,
   schema_version  integer not null default 1,
@@ -858,17 +858,21 @@ CREATE TABLE itineraries (
 );
 
 -- 索引
-CREATE INDEX idx_itineraries_user_status ON itineraries(user_id, status);
-CREATE INDEX idx_itineraries_user_start  ON itineraries(user_id, start_time);
+CREATE INDEX idx_appointments_user_status_start ON appointments(user_id, status, start_time);
+CREATE INDEX idx_appointments_user_status       ON appointments(user_id, status);
 ```
 
 **设计要点**：
 - `end_time` 不存列：派生 = `start_time + duration_min * interval '1 minute'`，与 USOM 注释一致；调度查询用 `tstzrange` 表达式。
 - 4 时间戳 nullable：只在 transition 触发时盖；初始创建后仅 `created_at`/`updated_at` 有值。
-- 状态枚举与 USOM `ItineraryStatus` 5 态严格对齐；CHECK 约束由迁移 SQL 加。
+- 状态枚举与 USOM `AppointmentStatus` 5 态严格对齐；CHECK 约束由迁移 SQL 加。
 - `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
 
-**[026] A3 SHIP（2026_07_03）**：表 DDL 已通过 T2 迁移 0031 手写落地（dev DB lifeware_dev@localhost:5432，journal idx=31）。`ItineraryRepository` 5 方法（findById/save/updateFields/findByDateRange/findNeedingReconcile）+ 双 mutation service（timebox/itinerary 事件类型分离，D2 reversal 决议 A）+ lazy reconcile（`reconcileAndAdvanceItineraries` 页面 server component 加载时跑）。GrowthMenu 集成 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。详情见 CHANGELOG.md `## Itinerary 域（[026]）`。
+**[026] A3 SHIP（2026_07_03）**：表 DDL 已通过 T2 迁移 0031 手写落地（dev DB lifeware_dev@localhost:5432，journal idx=31）。`AppointmentRepository` 5 方法（findById/save/updateFields/findByDateRange/findNeedingReconcile）+ 双 mutation service（timebox/appointment 事件类型分离，D2 reversal 决议 A）+ lazy reconcile（`reconcileAndAdvanceAppointments` 页面 server component 加载时跑）。GrowthMenu 集成 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。详情见 CHANGELOG.md `## Itinerary 域（[026]）`。
+
+**[023.05] PR2（2026_07_05）**：0033_rename_itineraries_to_appointments.sql（RENAME TABLE + 2 INDEX，journal idx=33）+ 全层重命名。
+
+**[023.05] F2 snapshot drift acknowledge**：drizzle snapshot 停在 `0006_snapshot.json`，0007+ 全手写无 snapshot。本表 0033 RENAME 后 `schema.ts` 写 `pgTable('appointments')`，未来 `drizzle-kit generate` 会生成 `CREATE TABLE appointments`（表已存在）→ apply 失败。**决议**：维持手写迁移 convention，未来 appointments 表 schema 变更继续手写 SQL + 登记 journal；**不引入 `drizzle-kit up`**。
 
 ---
 
@@ -1645,12 +1649,12 @@ interface DerivedSignalsRepository {
 
 #### 部署 TZ 约束（[026] T20 codex #5 落地）
 
-`user_settings.timezone` 列存的是**用户级**偏好（默认 `'Asia/Shanghai'`），用于前端展示与个性化。但 **reconcile 调度（`reconcile-itinerary.ts` / `reconcile-itineraries.ts` 的 `localDayKey`）依赖宿主进程本地时区**，即 Next.js server runtime 的系统 TZ，而不是 user_settings.timezone。
+`user_settings.timezone` 列存的是**用户级**偏好（默认 `'Asia/Shanghai'`），用于前端展示与个性化。但 **reconcile 调度（`reconcile-appointment.ts` / `reconcile-appointments.ts` 的 `localDayKey`）依赖宿主进程本地时区**，即 Next.js server runtime 的系统 TZ，而不是 user_settings.timezone。
 
 这意味着：
-- **dev / staging / prod 三套环境的宿主 TZ 必须一致**（如都设为 `Asia/Shanghai` 或都设为 UTC），否则同一行程在不同环境的"今日 / 昨日"判定不一致。
+- **dev / staging / prod 三套环境的宿主 TZ 必须一致**（如都设为 `Asia/Shanghai` 或都设为 UTC），否则同一约定在不同环境的"今日 / 昨日"判定不一致。
 - **跨 TZ 部署**（如北京 dev + 弗吉尼亚 prod）会引入「同一日历日歧义」——同一时刻在两地分属不同 localDayKey，reconcile 推进节奏会偏移。
-- 单元测试已覆盖 TZ 边界（`reconcile-itinerary-tz.test.ts`），但运行时仍以 Node 进程 TZ 为准。
+- 单元测试已覆盖 TZ 边界（`reconcile-appointment-tz.test.ts`），但运行时仍以 Node 进程 TZ 为准。
 
 **当前 [026] 决策**：保持 dev/prod TZ 一致即可，不做 user_settings.timezone → reconcile TZ 的扩展（保留后续 [027] 行程与智能编排合并时再演进）。若需多 TZ 部署，须把 `localDayKey` 扩展为接收显式 IANA TZ 参数或 UTC 归一化（见 [026] OQ-6，defer 至 [027]）。
 
