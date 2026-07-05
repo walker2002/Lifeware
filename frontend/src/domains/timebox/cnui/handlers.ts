@@ -140,7 +140,17 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     // 若 intentFields.targetId 指向某条，则置顶
     if (action === 'logTimebox') {
       const todayBoxes = await getTodayTimeboxes()
-      const ended = todayBoxes.filter(t => t.status === 'ended')
+      // [023.07] #5 — dedupe by id：SM 重复推进（reconcile）或时区边界可能让
+      // getTodayTimeboxes() 返回同 id 副本，UI 会显示重复卡片 + submit 走两次导致
+      // 第二次 SM 拒绝返幽灵错误。按 id 保留首次出现项（显式 helper 版本以匹配本文件
+      // 其他 filter 的显式 predicate 风格）。
+      const seenIds = new Set<string>()
+      const ended = todayBoxes.filter(t => {
+        if (t.status !== 'ended') return false
+        if (seenIds.has(t.id)) return false
+        seenIds.add(t.id)
+        return true
+      })
       const targetId = (intentFields?.targetId as string | undefined) ?? null
       const items = ended.map(t => ({
         id: t.id,

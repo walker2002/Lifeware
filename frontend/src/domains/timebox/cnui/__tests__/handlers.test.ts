@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { timeboxCnuiHandler } from '../handlers'
+import { TimeboxRepository } from '@/domains/timebox/repository'
 import type { CnuiSurfaceOpenResult, CnuiSurfaceSubmitResult } from '@/nexus/ai-runtime/cnui/types'
 
 // [023-01+] mock submitDynamicIntent（让 submit 测试可控）
@@ -426,6 +427,46 @@ describe('timeboxCnuiHandler', () => {
       })
       expect(result.success).toBe(false)
       expect(result.error).toContain('未选择时间盒')
+    })
+  })
+
+  // [023.07] #5 — logTimebox open 分支必须 dedupe by id（SM 重复推进或时区边界可能让
+  // getTodayTimeboxes() 返回同 id 副本，导致 UI 重复卡片 + submit 幽灵错误）
+  describe('open - logTimebox（[023.07] #5 dedupe）', () => {
+    // 测试只需覆盖 status === 'ended' 走 dedupe 分支，对完整 Timebox USOM 字段无要求，
+    // 用 `as any` 避免污染 tsc 检查（保持测试聚焦行为）
+    it('重复 id 的 ended timebox 应被 dedupe（保留首次出现）', async () => {
+      // 覆写既有 mock 的 findByDateRange，返包含重复 id 的 ended 列表
+      const spy = vi.spyOn(TimeboxRepository.prototype, 'findByDateRange').mockResolvedValue([
+        { id: 'ended-1', title: '晨会', startTime: '2026-07-05T06:00:00Z', endTime: '2026-07-05T07:00:00Z', status: 'ended', taskIds: [], habitIds: [] },
+        { id: 'ended-2', title: '代码审查', startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z', status: 'ended', taskIds: [], habitIds: [] },
+        // 重复项：同 id 'ended-1'（SM reconcile 副本）
+        { id: 'ended-1', title: '晨会', startTime: '2026-07-05T06:00:00Z', endTime: '2026-07-05T07:00:00Z', status: 'ended', taskIds: [], habitIds: [] },
+      ] as any)
+
+      const result = await timeboxCnuiHandler.open('logTimebox', {})
+
+      const items = (result.dataSnapshot as { items: Array<{ id: string }> }).items
+      const ids = items.map(i => i.id)
+      // 核心断言：ended-1 只出现一次（dedupe 生效）
+      expect(ids.filter(id => id === 'ended-1')).toHaveLength(1)
+      // 总数 = 2（ended-1 + ended-2），不是 3
+      expect(items).toHaveLength(2)
+
+      spy.mockRestore()
+    })
+
+    it('无重复时保持原行为（ended 全保留）', async () => {
+      const spy = vi.spyOn(TimeboxRepository.prototype, 'findByDateRange').mockResolvedValue([
+        { id: 'ended-1', title: '晨会', startTime: '2026-07-05T06:00:00Z', endTime: '2026-07-05T07:00:00Z', status: 'ended', taskIds: [], habitIds: [] },
+        { id: 'ended-2', title: '代码审查', startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z', status: 'ended', taskIds: [], habitIds: [] },
+      ] as any)
+
+      const result = await timeboxCnuiHandler.open('logTimebox', {})
+      const items = (result.dataSnapshot as { items: Array<{ id: string }> }).items
+      expect(items).toHaveLength(2)
+
+      spy.mockRestore()
     })
   })
 })
