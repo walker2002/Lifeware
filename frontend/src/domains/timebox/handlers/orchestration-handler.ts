@@ -1,14 +1,20 @@
 /**
  * @file orchestration-handler
  * @brief 智能时间盒编排 Handler
- * 
+ *
  * Handler + Context Engine 双轨架构中的 Handler 组件
  * 接收 GenerationRequest（意图 + 组装好的上下文数据），产出 GenerationResult
- * 
+ *
  * 约束：
  * - 不直接访问 Repository
  * - 不写入状态、不触发事件
  * - 纯函数式：input → output
+ *
+ * [023.08] T3 fold: detectConflicts 现支持可选 rule-engine 集成（架构升级）。
+ *   - 构造接受可选 deps { ruleEngine, timeboxRepo, userId }
+ *   - 传 ruleEngine → 调 createRuleEngine().evaluate(intent, snapshot)
+ *   - 不传 → 走 [023.07] 谓词 fallback（向后兼容）
+ *   - rule-engine 抛错 → 走 fallback（不阻塞业务）
  */
 
 import type {
@@ -19,10 +25,15 @@ import type {
   ProposalSet,
   Warning,
   PresentationPayload,
+  ContextSnapshot,
 } from '@/usom/types/process'
+import type { StructuredIntent } from '@/usom/types/objects'
 import type { TaskSummary, HabitSummary, TimeboxSummary } from '@/usom/types/summaries'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { EnergyCurve } from '@/usom/types/primitives'
+import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
+import type { USOM_ID } from '@/usom/types/primitives'
+import { createRuleEngine, type RuleEngine } from '@/nexus/core/rule-engine'
 import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -85,7 +96,28 @@ const SOURCE_WEIGHT: Record<string, number> = {
 
 // ─── Handler 实现 ─────────────────────────────────────────────
 
+/**
+ * [023.08] T3: TimeboxOrchestrationHandler 可选 deps — 注入 rule-engine + repo + userId。
+ *
+ * - ruleEngine: 存在 → detectConflicts 走 rule-engine 评估（含 TimeOverlapRule）。
+ *   缺省 → 走 [023.07] 谓词 fallback（向后兼容测试 + 老调用点）。
+ * - timeboxRepo + userId: 配合 rule-engine 使用；无 ruleEngine 时无用。
+ *
+ * 注: deps 全 optional，构造签名兼容 `new TimeboxOrchestrationHandler()`。
+ */
+export interface TimeboxOrchestrationHandlerDeps {
+  ruleEngine?: RuleEngine
+  timeboxRepo?: ITimeboxRepository
+  userId?: USOM_ID
+}
+
 export class TimeboxOrchestrationHandler implements DomainHandler {
+  private readonly deps: TimeboxOrchestrationHandlerDeps
+
+  constructor(deps: TimeboxOrchestrationHandlerDeps = {}) {
+    this.deps = deps
+  }
+
   async handle(request: GenerationRequest): Promise<GenerationResult> {
     const date = this.resolveDate(request)
     const materials = this.collectMaterials(request.contexts)
@@ -96,7 +128,9 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     // warnings 携带 SCHEDULER_BOUND_EXCEEDED（detection in deep loop），与 detectConflicts 并列追加。
     // 顺序：bound warnings 在前，conflict warnings 在后。
     const { proposals, warnings: boundWarnings } = this.generateProposals(sorted, occupied, materials.energyCurve, date)
-    const conflictWarnings = this.detectConflicts(proposals, materials.existingTimeboxes)
+    // [023.08] T3 [F3 fold]: detectConflicts 现 async（rule-engine.evaluate 是异步），
+    // handle() 必须 await，否则 conflictWarnings 是 Promise<Warning[]> 与后续 spread 类型冲突。
+    const conflictWarnings = await this.detectConflicts(proposals, materials.existingTimeboxes)
     const presentation = this.renderMarkdown(proposals, date)
 
     return {
@@ -305,8 +339,96 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   }
 
   // ─── detectConflicts: 检测提案与已有 timebox 的时间重叠 ────
+  //
+  // [023.08] T3 升级：
+  //   - 现 async（rule-engine.evaluate 是 Promise）
+  //   - deps.ruleEngine 存在 → 走 rule-engine 评估（含 TimeOverlapRule，status-aware）
+  //   - deps.ruleEngine 缺省 → 走 [023.07] UTC 谓词 fallback（向后兼容）
+  //   - rule-engine.evaluate() 抛错 → fallback 谓词继续执行，业务不阻塞 [G11]
 
-  private detectConflicts(
+  private async detectConflicts(
+    proposals: GeneratedProposal[],
+    existingTimeboxes: TimeboxSummary[],
+  ): Promise<Warning[]> {
+    // [F9 fold]: existingTimeboxes 已在 contexts 一次性传入（context-engine pre-fetched），
+    // 透传 rule-engine 作为 snapshot context 字段。TimeOverlapRule 内部仍按 proposal 区间
+    // 调 timeboxRepo.findByDateRange 做精确 status-aware 查询（这是 rule-engine 设计意图）。
+    // 当前 handle() 调用上下文里 existingTimeboxes 就是 context-engine 提供的同日快照，
+    // 与 TimeOverlapRule 的 per-proposal 查询结果范围对齐。
+    const preFetchedOccupied = existingTimeboxes
+
+    if (this.deps.ruleEngine) {
+      return this.detectConflictsViaRuleEngine(proposals, preFetchedOccupied)
+    }
+
+    return this.detectConflictsViaPredicate(proposals, preFetchedOccupied)
+  }
+
+  /**
+   * 走 rule-engine 评估路径；evaluate() 抛错时回落到谓词（不阻塞）。
+   */
+  private async detectConflictsViaRuleEngine(
+    proposals: GeneratedProposal[],
+    existingTimeboxes: TimeboxSummary[],
+  ): Promise<Warning[]> {
+    const warnings: Warning[] = []
+
+    for (const proposal of proposals) {
+      const intent = this.proposalToIntent(proposal)
+      const snapshot: ContextSnapshot = {
+        // 占位 snapshotId — handler 评估 intent 时不需要 persistent snapshot id；
+        // rule-engine 仅读 snapshot 字段（如 upcomingTimeboxes / currentDate）。
+        snapshotId: '' as any,
+        userId: (this.deps.userId ?? 'unknown') as any,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'state_machine',
+        activeObjectives: [],
+        activeKeyResults: [],
+        activeTasks: [],
+        pendingHabits: [],
+        // [F9 fold]: 透传 batch pre-fetched existingTimeboxes 给 rule-engine 作 context。
+        upcomingTimeboxes: existingTimeboxes as any,
+        pendingIntentions: [],
+        currentTime: new Date().toISOString(),
+        currentDate: '2026-07-05',
+        dayOfWeek: 0,
+        timeOfDay: 'morning',
+        energyState: { inferredLevel: 5, calibratedLevel: null, activeLevel: 5, source: 'system' },
+        // [F9 fold] metadata 让下游 rule 知道 batch 预取已就绪（避免再查 DB）。
+        metadata: { batchPreFetched: true },
+      } as any
+
+      try {
+        const result = await this.deps.ruleEngine!.evaluate(intent, snapshot)
+        // 仅将 severity='confirm'（如 TimeOverlapRule 触发重叠）映射为 SCHEDULE_OVERLAP。
+        // severity='warning'（如 EndTimeAfterStartRule、StartTimeInFutureRule）属
+        // 字段完整性问题，不归 detectConflicts 负责，orchestrator 会另走 NeedConfirm
+        // 路径聚合（参见 ruleResultToValidation）。
+        for (const confirmMsg of result.confirmations) {
+          warnings.push({
+            code: 'SCHEDULE_OVERLAP',
+            message: `"${proposal.payload.title}" ${confirmMsg}`,
+            severity: 'warn',
+            affectedProposalIds: [proposal.id],
+          })
+        }
+      } catch {
+        // [G11] rule-engine 抛错（timeout / DB error）→ 走 fallback 谓词，业务不阻塞。
+        const fallback = this.detectConflictsViaPredicate([proposal], existingTimeboxes)
+        warnings.push(...fallback)
+      }
+    }
+
+    return warnings
+  }
+
+  /**
+   * [023.07] 谓词路径 — UTC interval arithmetic（向后兼容；无 deps 时使用）。
+   *
+   * 半开区间重叠: pStart < tEnd && pEnd > tStart。
+   * status-agnostic（不区分 planned/ended/...），因为这是 fallback 而非权威源。
+   */
+  private detectConflictsViaPredicate(
     proposals: GeneratedProposal[],
     existingTimeboxes: TimeboxSummary[],
   ): Warning[] {
@@ -323,7 +445,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         // [023.09] I-3 TZ fragility 治本：与 extractOccupiedSlots 同 — UTC arithmetic。
         // tStart/tEnd 单位 = UTC minute-of-day；与 pStart/pEnd 来自 formatTime(cursorHour, ..)
         // (UTC cursor, [023.07] 已统一) zone-consistent。message 用 UTC hour 字符串，
-        // 跨 TZ 一致；UI 期望 user-local 显示 留给 surface render layer (out-of-scope)。
+        // 跨 TZ 一致；UI 期望 user-local 显示留给 surface render layer (out-of-scope)。
         const tStart = tbStart.getUTCHours() * 60 + tbStart.getUTCMinutes()
         const tEnd = tbEnd.getUTCHours() * 60 + tbEnd.getUTCMinutes()
 
@@ -339,6 +461,48 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     }
 
     return warnings
+  }
+
+  /**
+   * [023.08] T3: proposal → StructuredIntent 转换。
+   * TimeOverlapRule 读 intent.fields.startTime/endTime（[023.04] 改读 endTime）。
+   *
+   *   - 若 startTime/endTime 已是 ISO (含 'T' / 'Z' / '+')，直接用
+   *   - 否则按 HH:MM 视作今日 UTC 时间，组合成 ISO
+   */
+  private proposalToIntent(proposal: GeneratedProposal): StructuredIntent {
+    const startTime = proposal.payload.startTime as string
+    const endTime = proposal.payload.endTime as string
+    return {
+      id: crypto.randomUUID() as any,
+      intentionId: '' as any,
+      targetDomain: 'timebox',
+      action: 'createTimebox',
+      fields: {
+        title: proposal.payload.title,
+        startTime: this.normalizeTimeField(startTime),
+        endTime: this.normalizeTimeField(endTime),
+      },
+      confidence: 1.0,
+      resolvedBy: 'template_form',
+      createdAt: new Date().toISOString() as any,
+    } as StructuredIntent
+  }
+
+  /**
+   * 把 HH:MM 转换为今日 UTC ISO；已是 ISO 格式则原样返回。
+   * TimeOverlapRule 内部用 Date.parse，HH:MM 会得到 NaN；统一转 ISO。
+   */
+  private normalizeTimeField(time: string): string {
+    if (!time) return time
+    // ISO 串：含 'T' 或 'Z' 或 '+' 时区偏移 → 已是 ISO
+    if (time.includes('T') || time.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(time)) {
+      return time
+    }
+    // HH:MM → today UTC ISO（与 orchestration cursor zone-consistent，[023.07] 统一 UTC）
+    const [h, m] = time.split(':').map(Number)
+    const today = new Date().toISOString().slice(0, 10)
+    return `${today}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
   }
 
   // ─── renderMarkdown: 将提案转为可读 Markdown ──────────────

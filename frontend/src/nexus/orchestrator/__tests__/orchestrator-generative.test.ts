@@ -164,7 +164,8 @@ describe('Orchestrator Generative Path', () => {
     expect(result.generativeResult).toBeDefined()
     expect(result.generativeResult!.proposalSet.label).toBe('test')
     expect(assembleContext).toHaveBeenCalled()
-    expect(findHandler).toHaveBeenCalledWith('timebox', 'createSmartTimeboxes')
+    // [023.08] T3 [F1 fold]: findHandler 现在接受 deps（timeboxRepo + userId）作为第 3 参数
+    expect(findHandler).toHaveBeenCalledWith('timebox', 'createSmartTimeboxes', expect.objectContaining({ userId: 'user1' }))
     expect(mockHandler.handle).toHaveBeenCalled()
   })
 
@@ -267,5 +268,69 @@ describe('Orchestrator Generative Path', () => {
     expect(cePhases).toContain('end')
     expect(hPhases).toContain('start')
     expect(hPhases).toContain('end')
+  })
+
+  // [023.08] T3 [G1]: orchestrator 注入 timeboxRepo + userId → findHandler 必须透传 deps，
+  // 否则 [F1 fold] 失效——timebox 域 handler 仍用 fallback 谓词，rule-engine 死代码。
+  // 这条测试同时守护两件事：
+  //   1. orchestrator.executeGenerativePath 调用 findHandler 时传第 3 参数 deps
+  //   2. deps 含 userId（与生成型路径的 userId 参数一致）
+  it('[023.08] T3 G1 orchestrator 注入 timeboxRepo 时 findHandler 透传 deps', async () => {
+    mockLoadManifest.mockReturnValue({
+      success: true,
+      manifest: {
+        id: 'timebox',
+        version: '1.0.0',
+        name: 'Timebox',
+        intent_triggers: [],
+        lifecycle: {},
+        field_metadata: {},
+        list_actions: [],
+        required_fields: {},
+        subscribed_events: [],
+        generation_actions: {
+          createSmartTimeboxes: {
+            description: 'test',
+            contexts: [{ id: 'existingTimeboxes', query: 'test', params: ['date'] }],
+          },
+        },
+      },
+    })
+
+    const mockHandler = {
+      handle: vi.fn().mockResolvedValue({
+        proposalSet: { id: 'ps1', label: 'test', proposals: [], tags: [] },
+        presentation: { type: 'markdown', content: '# test' },
+        warnings: [],
+      }),
+    }
+    vi.mocked(findHandler).mockResolvedValue(mockHandler as any)
+
+    // 注入 timeboxRepo — 模拟生产 caller app/actions/intent.ts
+    const mockTimeboxRepo = {
+      findByDateRange: vi.fn().mockResolvedValue([]),
+      findById: vi.fn().mockResolvedValue(null),
+      findRunning: vi.fn().mockResolvedValue([]),
+      findByStatus: vi.fn().mockResolvedValue([]),
+      findUpcoming: vi.fn().mockResolvedValue([]),
+      save: vi.fn(),
+      archive: vi.fn(),
+    }
+    const deps = { ...makeDeps(), timeboxRepo: mockTimeboxRepo as any }
+    const orchestrator = createOrchestrator(deps as any)
+    const intent = makeIntent('createSmartTimeboxes')
+
+    await orchestrator.executeIntent(intent, 'user1' as USOM_ID)
+
+    // [G1] 关键断言：findHandler 必须用 deps 调用——含 timeboxRepo 与 userId
+    // 这是 [F1 fold] 唯一生产路径；缺这步 → rule-engine 在生产是死代码（同 [023.07] TZ bug）
+    expect(findHandler).toHaveBeenCalledWith(
+      'timebox',
+      'createSmartTimeboxes',
+      expect.objectContaining({
+        timeboxRepo: mockTimeboxRepo,
+        userId: 'user1',
+      }),
+    )
   })
 })

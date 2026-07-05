@@ -24,6 +24,7 @@ import type { StructuredIntent } from '@/usom/types/objects'
 import type { Task } from '@/usom/types/objects'
 import type {
   ISystemEventRepository,
+  ITimeboxRepository,
 } from '@/usom/interfaces/irepository'
 import type { TraceStep, TraceComponent, TracePhase } from '@/nexus/infrastructure/trace-logger/trace-types'
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -209,6 +210,12 @@ export interface OrchestratorDeps {
   /** 通用仓储获取工厂 */
   getRepo: (domainId: string, objectType: string) => GenericRepo
   onTrace?: (step: TraceStep) => void
+  /**
+   * [023.08] T3 [F1 fold]: 可选 timebox 仓储 — 注入 timebox handler factory（rule-engine wire-up）。
+   * 有此字段 + userId → timebox 域 handler 在生成型路径中调 rule-engine（含 TimeOverlapRule）。
+   * 缺省 → timebox handler 走 [023.07] 谓词 fallback（向后兼容）。
+   */
+  timeboxRepo?: ITimeboxRepository
   /**
    * [025] D1：带字段 payload 的状态写（复用域业务事实写入口原子字段+状态写）。
    *
@@ -1095,7 +1102,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         const hStart = Date.now()
         trace(deps.onTrace, 'Handler', 'start', { input: { intentId: intent.id } })
 
-        const handler = await findHandler(intent.targetDomain, intent.action)
+        const handler = await findHandler(intent.targetDomain, intent.action, {
+          timeboxRepo: deps.timeboxRepo,
+          userId,
+        })
         if (!handler) {
           return { success: false, error: `生成型路径未找到 Handler: ${intent.targetDomain}/${intent.action}` }
         }
@@ -1185,7 +1195,10 @@ export function createOrchestrator(deps: OrchestratorDeps) {
 
       // 判定子路径
       let result: QueryResult
-      const handler = await findHandler(intent.targetDomain, intent.action)
+      const handler = await findHandler(intent.targetDomain, intent.action, {
+        timeboxRepo: deps.timeboxRepo,
+        userId,
+      })
 
       if (handler?.onQuery) {
         // Handler Path（复杂分析型查询）

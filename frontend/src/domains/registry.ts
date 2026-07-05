@@ -152,13 +152,32 @@ export function validateShortcutUniqueness(): void {
 validateShortcutUniqueness()
 
 // ─── Handler 查找（Generative Path）───────────────────────────
+//
+// [023.08] T3 [F1 fold]: handler 加载时按需注入 deps（timeboxRepo + userId），
+//   让 timebox 域能 wire rule-engine（TimeOverlapRule）做 overlap 检测。
+//   无 deps 时走向后兼容 fallback（createTimeboxHandlers() 无参）。
+//
+// deps 来源：调用 findHandler 时由 caller 提供；目前仅 orchestrator 注入。
+// 查找函数保留异步签名以兼容其他域 async load。
 
 type HandlerMap = Record<string, DomainHandler>
 
-async function loadHandlers(domainId: string): Promise<HandlerMap> {
+interface HandlerDeps {
+  timeboxRepo?: import('@/usom/interfaces/irepository').ITimeboxRepository
+  userId?: import('@/usom/types/primitives').USOM_ID
+}
+
+async function loadHandlers(domainId: string, deps?: HandlerDeps): Promise<HandlerMap> {
   switch (domainId) {
     case 'timebox': {
       const mod = await import('./timebox/handlers')
+      // [F1 fold]: 有 deps → 用 factory 注入；无 → 用向后兼容常量（保留原 behavior）
+      if (deps?.timeboxRepo && deps?.userId) {
+        return mod.createTimeboxHandlers({
+          timeboxRepo: deps.timeboxRepo,
+          userId: deps.userId,
+        }) as HandlerMap
+      }
       return mod.timeboxHandlers ?? {}
     }
     case 'habits': {
@@ -174,7 +193,17 @@ async function loadHandlers(domainId: string): Promise<HandlerMap> {
   }
 }
 
-export async function findHandler(domainId: string, action: string): Promise<DomainHandler | undefined> {
-  const handlers = await loadHandlers(domainId)
+/**
+ * 查找指定 (domainId, action) 的 handler。
+ *
+ * [023.08] T3 [F1 fold]: 可选 deps 透传给 timebox 域 factory；其他域忽略。
+ * orchestrator 必须传 deps（timeboxRepo + userId）才能 wire rule-engine。
+ */
+export async function findHandler(
+  domainId: string,
+  action: string,
+  deps?: HandlerDeps,
+): Promise<DomainHandler | undefined> {
+  const handlers = await loadHandlers(domainId, deps)
   return handlers[action]
 }

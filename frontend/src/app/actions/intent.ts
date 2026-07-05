@@ -314,6 +314,8 @@ async function executePipeline(
           };
         },
       },
+      // [023.08] T3 [F1 fold]: 注入 timeboxRepo + userId 让生成型路径 handler 用 rule-engine。
+      timeboxRepo,
       actionSurfaceEngine: (() => {
         const targetDomain = parseResult.intent?.targetDomain ?? 'timebox'
         const plugin = targetDomain === 'tasks' ? tasksPlugin
@@ -564,6 +566,8 @@ export async function transitionTimebox(
           };
         },
       },
+      // [023.08] T3 [F1 fold]: 注入 timeboxRepo + userId 让生成型路径 handler 用 rule-engine。
+      timeboxRepo,
       actionSurfaceEngine: createActionSurfaceEngine(timeboxPlugin),
       getRepo: (domainId: string, objectType: string) => {
         if (domainId === 'timebox') {
