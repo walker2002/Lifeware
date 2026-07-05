@@ -89,6 +89,13 @@ intent_triggers:
       - 智能编排
       - 自动安排今天
     keywords: [智能编排, smart, 自动安排, 智能时间盒]
+  # [023.10] T1.5: 撤销最近一次 batch 创建的时间盒 — 共享 create-smart-timebox
+  # surface handler（cnui/handlers.ts:459-481 按 action 分派到 revert 分支）。
+  # 不开新 cnui_surface key，复用 K 区块已有条目。
+  - action: revertSmartTimeboxes
+    description: 撤销最近一次 batch 创建的时间盒
+    response_type: cnui
+    cnui_surface: create-smart-timebox
   - action: adjustRemainingTimeboxes
     shortcut: /adjustTimeboxes
     description: 根据剩余任务重新编排时间盒
