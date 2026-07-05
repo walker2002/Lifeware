@@ -343,14 +343,16 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     if (action === 'createTimebox') {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const items = (fields.items as any[]) ?? []
+      const sourceTag = (fields._source as string | undefined) ?? ''
       // C3：逐条提交不回滚，收集 succeeded/failed 明细
-      const succeeded: string[] = []
+      const succeeded: { timeboxId: string; title: string }[] = []
       const failed: { title: string; error: string }[] = []
       for (const it of items) {
         try {
           // [023.08] T2: ISO 时间 convert — orchestration proposal 发 HH:MM + date,
           // server action 接收时显式 convert 为 ISO UTC,落库前规范化
           const normalized: Record<string, unknown> = { ...it }
+          delete (normalized as Record<string, unknown>)._source
           if (typeof it.startTime === 'string' && /^\d{2}:\d{2}$/.test(it.startTime) && typeof it.date === 'string') {
             normalized.startTime = hhmmToIso(it.startTime, it.date)
           }
@@ -358,13 +360,39 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             normalized.endTime = hhmmToIso(it.endTime, it.date)
           }
           const r = await submitDynamicIntent('timebox', 'createTimebox', normalized)
-          if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
-          else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+          if (r.success) {
+            const id = (r.object as any)?.id ?? ''
+            succeeded.push({ timeboxId: id, title: it.title ?? '未命名' })
+          } else {
+            failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+          }
         } catch (e) {
           // [023] A2.5 review fix: 异常路径仍走 C3 succeeded/failed，不破坏「不回滚」契约
           failed.push({ title: it.title ?? '未命名', error: e instanceof Error ? e.message : '创建失败' })
         }
       }
+
+      // [023.08] T5：_source === 'createSmartTimebox' → 把 succeeded 转 BatchProposalItem
+      //   喂给 recordBatchProposals，取代 T4 placeholder proposals:[] 占位。
+      //   batch 内建议每个 succeeded.timeboxId 都不为空（防御性 fallback 到标题 hash）
+      let batchId: string | undefined
+      if (sourceTag === 'createSmartTimebox' && succeeded.length > 0) {
+        try {
+          batchId = await recordBatchProposals({
+            sessionId: 'timebox-createSmartTimebox',
+            userId: MVP_USER_ID,
+            proposals: succeeded.map(s => ({
+              id: s.timeboxId || `proposal-${s.title}`,
+              timeboxId: s.timeboxId || undefined,
+              title: s.title,
+            })),
+          })
+        } catch (e) {
+          // [023.08] T5：recordBatchProposals 失败仅 warn，不阻断主流程返回 success
+          console.warn('[timeboxCnuiHandler] recordBatchProposals 失败（不影响主流程）:', e)
+        }
+      }
+
       return {
         success: failed.length === 0,
         // [023-01+] RC-B 修复：error 字符串拼接 failed[i].error（具体原因）+ title（兜底）
@@ -373,7 +401,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         error: failed.length
           ? `${failed.length} 条失败：${failed.map(f => `${f.title || '未命名'}（${f.error}）`).join('；')}`
           : undefined,
-        data: { count: succeeded.length, succeeded, failed },
+        data: {
+          count: succeeded.length,
+          succeeded: succeeded.map(s => s.timeboxId),
+          failed,
+          ...(batchId ? { batchId } : {}),
+        },
       }
     }
 
@@ -405,21 +438,15 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     }
 
     if (action === 'createSmartTimeboxes') {
-      // 这里应该调用 AI scheduling handler
-      // 暂时返回成功，实际实现需要调用 orchestration-handler
-      // [023.08] T4：AI 编排完成后写入 batch record（让 AI panel 显示「撤销刚才创建的 N 个时间盒」）。
-      //   proposals 占位（空数组即可记录 batchId；真实 proposals 由 orchestration-handler 写时间盒后注入）。
-      //   当前 orchestration-handler 未返回 proposals 故此处仅留 hook，等 orchestration 接上后再注入。
-      try {
-        await recordBatchProposals({
-          sessionId: `timebox-${action}`,
-          userId: MVP_USER_ID,
-          proposals: [],  // 占位：orchestration-handler 接上后填充实际 created timebox ids
-        })
-      } catch (e) {
-        console.warn('[timeboxCnuiHandler] recordBatchProposals 失败（不影响主流程）:', e)
-      }
-      return { success: true }
+      // [023.08] T5：原 T4 placeholder 移除。
+      //   原占位 proposals:[] 会让 getRevertableBatches 返 batchId 但 0 count，
+      //   「撤销刚才创建的 N 个时间盒」按钮永远显示 0。
+      //   真实 submit 路径在 createTimebox 分支：
+      //   当 fields._source === 'createSmartTimebox' 时，循环内逐条成功后调
+      //   recordBatchProposals({proposals: realTimeboxIds}) 取代空占位。
+      //   本分支保持存在仅为兼容旧 manifest / 直调场景 — 不会真正被 create-smart-timebox
+      //   surface 触达（surface 走 createTimebox action）。
+      return { success: false, error: '请通过 createTimebox (with _source=createSmartTimebox) 提交' }
     }
 
     // [023.08] T4 — revertSmartTimeboxes action：撤销最近一次 batch 创建
@@ -624,4 +651,6 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'delete-itinerary': timeboxCnuiHandler,
   // [023.04]：editTimeboxes 三合一（修改/取消/删除）
   'edit-timeboxes': timeboxCnuiHandler,
+  // [023.08] T5：createSmartTimeboxes 共用 timeboxCnuiHandler（按 action 分支，createSmartTimeboxes + revertSmartTimeboxes 双 action 均已实现）
+  'create-smart-timebox': timeboxCnuiHandler,
 }

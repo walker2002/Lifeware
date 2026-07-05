@@ -83,7 +83,7 @@ intent_triggers:
     shortcut: /smartTimeboxes
     description: AI 智能编排时间盒
     response_type: cnui
-    cnui_surface: timebox-list
+    cnui_surface: create-smart-timebox
     examples:
       - 帮我智能安排今天的时间盒
       - 智能编排
@@ -400,7 +400,7 @@ generation_actions:
         query: energy_curve
         params: []
     response_mode: cnui
-    cnui_surface_type: timebox-list
+    cnui_surface_type: create-smart-timebox
     session_enabled: true
   adjustRemainingTimeboxes:
     description: 根据已完成项目调整剩余时间盒
@@ -427,8 +427,10 @@ cascade_rules:
 
 # ─── 区块 K: cnui_surfaces ─────────────────────────────────────
 cnui_surfaces:
-  timebox-list:
-    description: 智能编排时间盒列表
+  # [023.08] T5 — AI 智能推荐 surface（proposals 接受/拒绝 + 撤销 batch）
+  #   替代原 timebox-list（[023.08] 前 generation_actions.cnui_surface_type=timebox-list 是初始占位）
+  create-smart-timebox:
+    description: AI 智能编排时间盒（proposals 接受/拒绝 + batch 撤销）
     handler: ./cnui/handlers
   create-timebox:
     description: 多条 timebox 草稿创建（AI 解析→左右翻页→逐条提交）

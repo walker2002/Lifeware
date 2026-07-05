@@ -16,6 +16,8 @@ import { LogTimebox } from '@/domains/timebox/cnui/surfaces/LogTimebox'
 import { AdjustTimeboxes } from '@/domains/timebox/cnui/surfaces/AdjustTimeboxes'
 // [023.04] T6 — editTimeboxes CNUI surface client 注册
 import { EditTimeboxes } from '@/domains/timebox/cnui/surfaces/EditTimeboxes'
+// [023.08] T5 — CreateSmartTimebox CNUI surface 客户端注册（[cnui-surface-dual-registration] memory: server + client 双注册）
+import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
 
 cnuiRegistry.register('habits', 'habit-action-panel', { component: HabitActionPanel })
 cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckinPanel })
@@ -26,6 +28,8 @@ cnuiRegistry.register('timebox', 'log-timebox', { component: LogTimebox })
 cnuiRegistry.register('timebox', 'adjust-timeboxes', { component: AdjustTimeboxes })
 // [023.04] T6 — editTimeboxes CNUI surface（client 双注册闭环，handler 已 server 注册）
 cnuiRegistry.register('timebox', 'edit-timeboxes', { component: EditTimeboxes })
+// [023.08] T5 — CreateSmartTimebox CNUI surface（client 双注册 + manifest K-block create-smart-timebox）
+cnuiRegistry.register('timebox', 'create-smart-timebox', { component: CreateSmartTimebox })
 
 // Tasks surfaces
 import { TaskCreationCard } from '@/domains/tasks/cnui/surfaces/TaskCreationCard'

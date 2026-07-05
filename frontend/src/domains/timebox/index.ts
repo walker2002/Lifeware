@@ -23,6 +23,8 @@ import { EditTimeboxes } from './cnui/surfaces/EditTimeboxes'
 import { CreateItinerary } from './cnui/surfaces/CreateItinerary'
 import { EditItinerary } from './cnui/surfaces/EditItinerary'
 import { DeleteItinerary } from './cnui/surfaces/DeleteItinerary'
+// [023.08] T5 — CreateSmartTimebox CNUI surface（AI 智能推荐 proposals + 接受/拒绝 + 撤销 batch）
+import { CreateSmartTimebox } from './cnui/surfaces/CreateSmartTimebox'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
@@ -52,6 +54,12 @@ cnuiRegistry.register('timebox', 'log-timebox', {
 // [023.04] T6 — editTimeboxes CNUI surface（集中编辑多 timebox，handler 已注册）
 cnuiRegistry.register('timebox', 'edit-timeboxes', {
   component: EditTimeboxes,
+  handlerModulePath,
+})
+
+// [023.08] T5 — CreateSmartTimebox CNUI surface 服务端注册（[cnui-surface-dual-registration] memory: server + client 双注册）
+cnuiRegistry.register('timebox', 'create-smart-timebox', {
+  component: CreateSmartTimebox,
   handlerModulePath,
 })
 
