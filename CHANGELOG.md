@@ -19,6 +19,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_05 — [023.05-2] PR2 阶段 2：§3.13 Itinerary → Appointment 全层重命名 + 设计覆盖注（schedule→appointment 因 timebox 语义撞车）+ 中文「行程」→「约定」+ `AppointmentStatus` 值 5 态保留 P3（scheduled/in_progress/expired/cancelled/completed）
 - 2026_07_04 — [023.04] §3.9 Timebox 末尾追加「时间盒修改/取消/删除意图统一入口」：`/editTimeboxes` shortcut 是修改/取消/删除三类意图的统一 CNUI 入口；`/cancelTimebox` shortcut 已弃用（提交 [023.04] 时从 manifest 删除），`cancelTimebox` 作为 SM action 仍保留用于 mutation service 内部触发状态推进
 - 2026_07_04 — [023-02 用户调整] 列表卡片 `MAX_VISIBLE_ROWS` 4→10；编辑器 grid 增列；TemplateEditForm 按 start 升序
 - 2026_07_04 — [023-02] §3.12 TimeboxTemplate 改写：`survivalSegments` + `subscribed*` 三数组 → `daysOfWeek` + `rows`(有序行列表)；A3 owner-check 改遍历 rows
@@ -34,6 +35,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_05 — [023.05-2] PR2 阶段 2：§4.X itineraries → appointments 表 RENAME（DDL 终态标注）+ 0033_rename_itineraries_to_appointments.sql（journal idx=33）+ .down.sql（F5 反向）+ F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal，不引入 `drizzle-kit up`）
 - 2026_07_04 — [023.04] §4.7 timeboxes 末尾追加「时间盒重叠规则」：CNUI 提交按两层校验（客户端 `assertNoInternalOverlap` + 服务端 `TimeOverlapRule` 改读 endTime + status-aware severity）；DB 层无唯一性约束，重叠允许但有提示用户确认
 - 2026_07_04 — [023-02] §7.8 timebox_templates 改写：survival_segments + 3 个 subscribed_* 列 → rows + days_of_week（迁移 0032）
 - 2026_07_03 — [026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段

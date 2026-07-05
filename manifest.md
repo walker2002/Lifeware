@@ -46,6 +46,8 @@ superpowers/plans/
   2026-06-24-020-rules-management-redesign.md         # [020] 去 C/L 范式重构实现计划（plan-eng-review CLEARED，RT1-RT9）
 
 # [026] Itinerary 域 — Plan 在 `.superpowers/sdd/task-026-T{1..14}-brief.md`（不在 docs/superpowers/plans/，因 [026] 实施时未走完整 /superpowers:writing-plans 流程；brief 在 .superpowers/sdd/ 维护）。设计 authority 在 CHANGELOG.md `## Itinerary 域（[026]）` 段 + docs/usom-design.md §3.13 + docs/database-design.md §4.X。完整 ship-ready：A3 (T1-T14) 14 commits 已 ship，剩余 P2/P3 follow-up T15-T23。
+
+# [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2）— Plan 在 `docs/superpowers/plans/2026-07-05-023-05-2-itinerary-to-appointment-rename.md`（11 task + C1 fix + T11 fixup 共 12 commits，ship-ready 2026-07-05）。设计覆盖：schedule→appointment（eng-review 用户识别 schedule 与 timebox 撞车）。Authority：plan SSOT + CHANGELOG.md `## [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2，ship-ready 2026_07_05）` + docs/usom-design.md §3.13 + docs/database-design.md §4.X。剩余 defer：[023.10] postship follow-up。
 ```
 
 ### 第三层：Claude 自动维护
