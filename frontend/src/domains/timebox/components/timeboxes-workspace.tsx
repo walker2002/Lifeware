@@ -24,13 +24,20 @@
  *
  * [023.06] T2：注入视图模式状态 dateMode，渲染 <DateNav> 切换日/周/月。
  * 范围拉取统一用 getDateRange(mode, date)，复用 T1 已抽出的纯函数。
- * 本任务**保持只渲染 <DayView>**（保守基线），T3 才接 WeekView/MonthView。
+ *
+ * [023.06] T3：events 渲染分支改为三向路由（DayView / WeekView / MonthView）。
+ * WeekView/MonthView 接收 TimeboxSummary[]，而 workspace 内部 state 是
+ * TimeboxesEvent[]（discriminated union），所以在 workspace 里过滤
+ * kind='timebox' 转 source 数组传入。itinerary 在周/月视图不渲染
+ * ——设计如此，时间盒域视图只显示 timebox，行程计划由 /itineraries 域承担。
  */
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { DayView } from './day-view'
+import { WeekView } from './week-view'
+import { MonthView } from './month-view'
 import { DateNav } from './date-nav'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
@@ -146,6 +153,20 @@ export function TimeboxesWorkspace() {
     setDateMode('day')
   }, [])
 
+  // [023.06] T3：WeekView/MonthView 的 props 是 TimeboxSummary[]；
+  // workspace 内部 state 是 TimeboxesEvent[]（discriminated union）。
+  // 在 workspace 里把 events 过滤 kind='timebox' 转 source 数组传——
+  // itinerary 在周/月视图不渲染（设计如此；时间盒域视图只显 timebox）。
+  const timeboxSources = useMemo(
+    () =>
+      events
+        .filter(
+          (e): e is Extract<TimeboxesEvent, { kind: 'timebox' }> => e.kind === 'timebox',
+        )
+        .map((e) => e.source),
+    [events],
+  )
+
   /** [023.03] T3：handleAction 包 try/catch + 处理 needs_confirm AlertDialog */
   const handleAction = useCallback(async (
     timeboxId: string,
@@ -217,21 +238,34 @@ export function TimeboxesWorkspace() {
             <div className="space-y-2">
               {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
             </div>
-          ) : events.length === 0 && dateMode === 'day' ? (
-            <EmptyState
-              icon={CalendarOff}
-              title="今天还没有时间盒"
-              description="创建一个时间盒，开始专注执行"
-              action={{ label: '新建一个', onClick: () => setDrawer({ mode: 'create' }) }}
-            />
+          ) : dateMode === 'day' ? (
+            events.length === 0 ? (
+              <EmptyState
+                icon={CalendarOff}
+                title="今天还没有时间盒"
+                description="创建一个时间盒，开始专注执行"
+                action={{ label: '新建一个', onClick: () => setDrawer({ mode: 'create' }) }}
+              />
+            ) : (
+              <DayView
+                events={events}
+                currentDate={currentDate}
+                onDateSelect={handleDateSelect}
+                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log')}
+                onEdit={handleEdit}
+              />
+            )
           ) : (
-            <DayView
-              events={events}
-              currentDate={currentDate}
-              onDateSelect={handleDateSelect}
-              onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log')}
-              onEdit={handleEdit}
-            />
+            // [023.06] T3 三向路由 — 周/月视图
+            timeboxSources.length === 0 ? (
+              <p className="py-8 text-center text-sm text-body/70">
+                该{dateMode === 'week' ? '周' : '月'}暂无时间盒
+              </p>
+            ) : dateMode === 'week' ? (
+              <WeekView timeboxes={timeboxSources} currentDate={currentDate} />
+            ) : (
+              <MonthView timeboxes={timeboxSources} currentDate={currentDate} />
+            )
           )}
         </div>
       </div>
