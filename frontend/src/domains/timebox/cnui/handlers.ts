@@ -446,7 +446,14 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       //   recordBatchProposals({proposals: realTimeboxIds}) 取代空占位。
       //   本分支保持存在仅为兼容旧 manifest / 直调场景 — 不会真正被 create-smart-timebox
       //   surface 触达（surface 走 createTimebox action）。
-      return { success: false, error: '请通过 createTimebox (with _source=createSmartTimebox) 提交' }
+      // [023.10] T5 — Codex #5 修订：保留 guard（不是死代码），改进 message。
+      //   旧 message 指错 API（"createTimebox" 单字面量），新 message 显 surface + 正确 intent，
+      //   避免下一个开发者找错 API。
+      return {
+        success: false,
+        error:
+          "createSmartTimeboxes intent 已弃用。改用 surface 'CreateSmartTimebox' + intent 'acceptProposals' + payload { items, date, _source: 'createSmartTimebox' }",
+      }
     }
 
     // [023.08] T4 — revertSmartTimeboxes action：撤销最近一次 batch 创建

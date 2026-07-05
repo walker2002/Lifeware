@@ -330,12 +330,15 @@ describe('timeboxCnuiHandler', () => {
   })
 
   describe('submit - createSmartTimeboxes', () => {
-    // [023.08] T5：直调 createSmartTimeboxes 已废弃 — surface 走 createTimebox (with _source) 路径
-    it('应返回错误（surface 走 createTimebox action）', async () => {
+    // [023.10] T5 — Codex #5 修订：guard 不是 dead code，保留并改进 message
+    //   旧 message: '请通过 createTimebox (with _source=createSmartTimebox) 提交'
+    //   新 message: 含 surface name + 显式 redirect（acceptProposals），避免下一个开发者找错 API
+    it('应返回明确 message（指明正确 surface/intent，含 CreateSmartTimebox + acceptProposals）', async () => {
       const result = await timeboxCnuiHandler.submit('createSmartTimeboxes', {})
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('createTimebox')
+      expect(result.error).toContain('CreateSmartTimebox')
+      expect(result.error).toContain('acceptProposals')
     })
   })
 
