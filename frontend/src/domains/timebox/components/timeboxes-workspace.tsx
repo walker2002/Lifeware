@@ -21,12 +21,17 @@
  * [026] codex D5 修复：loadDay **不**调 reconcileAndAdvanceItineraries
  * （避免 /timeboxes 翻日历页重推 N 次 SM）。reconcile 仅在 /itineraries
  * 触发。Trade-off：/timeboxes 可能显陈旧状态。可接受 MVP。
+ *
+ * [023.06] T2：注入视图模式状态 dateMode，渲染 <DateNav> 切换日/周/月。
+ * 范围拉取统一用 getDateRange(mode, date)，复用 T1 已抽出的纯函数。
+ * 本任务**保持只渲染 <DayView>**（保守基线），T3 才接 WeekView/MonthView。
  */
 
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
 import { DayView } from './day-view'
+import { DateNav } from './date-nav'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getItinerariesByRange } from '@/app/actions/intent'
@@ -91,7 +96,10 @@ interface ConfirmState {
 }
 
 export function TimeboxesWorkspace() {
-  const [date, setDate] = useState(() => new Date())
+  // [023.06] T2：视图模式 state + 当前浏览日期
+  const [dateMode, setDateMode] = useState<DateViewMode>('day')
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
+  const [dateLoadKey, setDateLoadKey] = useState(0) // 触发 reload（避免 compare 不全）
   const [events, setEvents] = useState<TimeboxesEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [drawer, setDrawer] = useState<DrawerState | null>(null)
@@ -99,11 +107,11 @@ export function TimeboxesWorkspace() {
   const [confirming, setConfirming] = useState<ConfirmState | null>(null)
   const [actionSubmitting, setActionSubmitting] = useState(false)
 
-  const loadDay = useCallback(async (d: Date) => {
+  // [023.06] T2：范围拉取（替代 loadDay，行为对齐 T1 getDateRange）
+  const loadRange = useCallback(async (mode: DateViewMode, d: Date) => {
     setLoading(true)
     try {
-      const start = new Date(d); start.setHours(0, 0, 0, 0)
-      const end = new Date(d); end.setHours(23, 59, 59, 999)
+      const { start, end } = getDateRange(mode, d)
       const [timeboxList, itineraryList] = await Promise.all([
         getTimeboxesByRange(start, end),
         getItinerariesByRange(start, end),
@@ -116,7 +124,27 @@ export function TimeboxesWorkspace() {
     }
   }, [])
 
-  useEffect(() => { loadDay(date) }, [date, loadDay])
+  useEffect(() => {
+    loadRange(dateMode, currentDate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMode, currentDate, dateLoadKey])
+
+  // [023.06] T2：DateNav 上 / 下导航（按当前 mode 步进日/周/月）
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    setCurrentDate(prev => navigateDate(dateMode, prev, direction))
+  }, [dateMode])
+
+  // [023.06] T2：DateNav 切换视图模式
+  const handleDateModeChange = useCallback((newMode: DateViewMode) => {
+    if (newMode === dateMode) return
+    setDateMode(newMode)
+  }, [dateMode])
+
+  // [023.06] T2：DayView mini-calendar 选日期 → 切回日视图并跳到该日
+  const handleDateSelect = useCallback((d: Date) => {
+    setCurrentDate(d)
+    setDateMode('day')
+  }, [])
 
   /** [023.03] T3：handleAction 包 try/catch + 处理 needs_confirm AlertDialog */
   const handleAction = useCallback(async (
@@ -128,7 +156,7 @@ export function TimeboxesWorkspace() {
     try {
       const r = await transitionTimebox(timeboxId, action, {}, confirmed)
       if (r.status === 'ok') {
-        await loadDay(date)
+        await loadRange(dateMode, currentDate)
         return
       }
       if (r.status === 'needs_confirm') {
@@ -149,7 +177,7 @@ export function TimeboxesWorkspace() {
     } finally {
       setActionSubmitting(false)
     }
-  }, [date, loadDay])
+  }, [dateMode, currentDate, loadRange])
 
   /** [023.03] T3：handleEdit 包 try/catch + 视觉强化（标题前缀在 Drawer 内已实现） */
   const handleEdit = useCallback(async (summary: TimeboxSummary) => {
@@ -172,7 +200,14 @@ export function TimeboxesWorkspace() {
       <div className="flex-1 flex flex-col min-h-0">
         {/* [023.03] UI 统一：去重标题。PageBanner 已在主页 context 显示"我的时间盒"，
             独立 /timeboxes 路由的 PageBanner 同样提供标题。本组件不再重复。 */}
-        <div className="flex items-center justify-end px-4 py-3 border-b border-hairline">
+        <div className="flex items-center justify-between gap-4 border-b border-hairline px-4 py-3">
+          {/* [023.06] T2：顶栏左侧 DateNav 视图模式切换 */}
+          <DateNav
+            mode={dateMode}
+            currentDate={currentDate}
+            onModeChange={handleDateModeChange}
+            onNavigate={handleNavigate}
+          />
           <Button size="sm" onClick={() => setDrawer({ mode: 'create' })}>
             <Plus className="size-4 mr-1" />新建时间盒
           </Button>
@@ -182,7 +217,7 @@ export function TimeboxesWorkspace() {
             <div className="space-y-2">
               {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
             </div>
-          ) : events.length === 0 ? (
+          ) : events.length === 0 && dateMode === 'day' ? (
             <EmptyState
               icon={CalendarOff}
               title="今天还没有时间盒"
@@ -192,7 +227,8 @@ export function TimeboxesWorkspace() {
           ) : (
             <DayView
               events={events}
-              currentDate={date}
+              currentDate={currentDate}
+              onDateSelect={handleDateSelect}
               onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log')}
               onEdit={handleEdit}
             />
@@ -205,9 +241,9 @@ export function TimeboxesWorkspace() {
         <TimeboxDrawer
           mode={drawer.mode}
           editTarget={drawer.editTarget}
-          date={date}
+          date={currentDate}
           onClose={() => setDrawer(null)}
-          onSaved={() => { setDrawer(null); loadDay(date) }}
+          onSaved={() => { setDrawer(null); loadRange(dateMode, currentDate) }}
         />
       )}
 
