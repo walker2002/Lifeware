@@ -1,20 +1,20 @@
 /**
- * @file itinerary mapper
- * @brief Itinerary USOM 对象 ↔ itineraries 表行映射（[026] D2 reversal）
+ * @file appointment mapper
+ * @brief Appointment USOM 对象 ↔ appointments 表行映射（[026] D2 reversal）
  *
  * 状态直接读 row.status（D2 reversal 取消占位）。在 ProgressAt/ExpiredAt/CompletedAt/CancelledAt
  * 与 status 推进匹配时盖（SM 层负责一致性）。
  */
 
-import type { Itinerary } from '@/usom/types/objects'
-import type { ItineraryStatus, USOM_ID } from '@/usom/types/primitives'
+import type { Appointment } from '@/usom/types/objects'
+import type { AppointmentStatus, USOM_ID } from '@/usom/types/primitives'
 
-type ItineraryRow = typeof import('@/lib/db/schema').itineraries.$inferSelect
+type AppointmentRow = typeof import('@/lib/db/schema').appointments.$inferSelect
 
-export function itineraryRowToUSOM(row: ItineraryRow): Itinerary {
+export function appointmentRowToUSOM(row: AppointmentRow): Appointment {
   return {
     id: row.id as USOM_ID,
-    status: row.status as ItineraryStatus,
+    status: row.status as AppointmentStatus,
     title: row.title,
     detail: row.detail,
     startTime: row.startTime.toISOString(),
@@ -31,7 +31,7 @@ export function itineraryRowToUSOM(row: ItineraryRow): Itinerary {
   }
 }
 
-export function itineraryUSOMToRow(it: Itinerary, userId: USOM_ID): ItineraryRow {
+export function appointmentUSOMToRow(it: Appointment, userId: USOM_ID): AppointmentRow {
   return {
     id: it.id as any,
     userId: userId as any,
@@ -48,5 +48,5 @@ export function itineraryUSOMToRow(it: Itinerary, userId: USOM_ID): ItineraryRow
     cancelledAt: it.cancelledAt ? new Date(it.cancelledAt) as any : null,
     createdAt: new Date(it.createdAt) as any,
     updatedAt: new Date(it.updatedAt) as any,
-  } as ItineraryRow
+  } as AppointmentRow
 }

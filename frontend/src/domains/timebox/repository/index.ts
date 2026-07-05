@@ -4,11 +4,11 @@
  *
  * 实现 ITimeboxRepository 接口，提供时间盒数据的数据库操作
  *
- * Itinerary 与 Timebox 同库同 namespace（[026]），共享通用 repo-adapter；
- * 这里 re-export ItineraryRepository 让 `@/domains/timebox/repository` 取得到。
+ * Appointment 与 Timebox 同库同 namespace（[026]），共享通用 repo-adapter；
+ * 这里 re-export AppointmentRepository 让 `@/domains/timebox/repository` 取得到。
  */
 
-export { ItineraryRepository } from './itinerary'
+export { AppointmentRepository } from './appointment'
 
 import { eq, and, gte, lte } from 'drizzle-orm'
 import { db, type DbClient } from '@/lib/db'

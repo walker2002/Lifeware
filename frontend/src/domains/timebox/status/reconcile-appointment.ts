@@ -1,8 +1,8 @@
 /**
- * @file reconcile-itinerary.ts
- * @brief 行程状态 lazy reconcile 纯函数（[026] D2 reversal 决策大脑）
+ * @file reconcile-appointment.ts
+ * @brief 约定状态 lazy reconcile 纯函数（[026] D2 reversal 决策大脑）
  *
- * 取代原 D2=C "deriveItineraryStatus 读时算"。新设计：状态全部存 DB，时间驱动的
+ * 取代原 D2=C "读时算 status" 派生方案。新设计：状态全部存 DB，时间驱动的
  * transition（scheduled → in_progress 到日、scheduled/in_progress → expired 过日）
  * 由本函数计算 transition 计划，调用方在页面 server component 加载时逐条
  * submitDynamicIntent 走 SM 写库。零 cron、零后台 job。
@@ -14,7 +14,7 @@
  * 统一治理（brief Step 1 原本写 action: 'markInProgress'，与 Step 3 实现的
  * kind: 'needsMarkInProgress' 矛盾，按 codex 修复）。
  */
-import type { Itinerary } from '@/usom/types/objects'
+import type { Appointment } from '@/usom/types/objects'
 
 /** 本地日历日整数键（年*10000+月*100+日），按调用方进程的本地时区归一化 */
 function localDayKey(d: Date): number {
@@ -23,11 +23,11 @@ function localDayKey(d: Date): number {
 
 /** ReconcileAction：建议调用方执行的 transition（kind 强调"需要做"） */
 export type ReconcileAction =
-  | { itineraryId: string; kind: 'needsMarkInProgress'; at: Date }
-  | { itineraryId: string; kind: 'needsMarkExpired'; at: Date }
+  | { appointmentId: string; kind: 'needsMarkInProgress'; at: Date }
+  | { appointmentId: string; kind: 'needsMarkExpired'; at: Date }
 
 /** 终态：不再 reconcile 推进 */
-const TERMINAL: ReadonlyArray<Itinerary['status']> = [
+const TERMINAL: ReadonlyArray<Appointment['status']> = [
   'expired',
   'cancelled',
   'completed',
@@ -42,18 +42,18 @@ const TERMINAL: ReadonlyArray<Itinerary['status']> = [
  * - nowDay === startDay（当日）→ scheduled → in_progress（in_progress 当日不变）
  * - nowDay > startDay（过日）→ scheduled 或 in_progress → expired
  *
- * @param itineraries 行程列表（已过滤 userId 等，仅当前用户可见数据）
+ * @param appointments 约定列表（已过滤 userId 等，仅当前用户可见数据）
  * @param now 当前时间（用于与 startTime 比较日界）
  * @returns transition 计划数组，由调用方逐条 submitDynamicIntent 落库
  */
-export function reconcileItineraryStatuses(
-  itineraries: ReadonlyArray<Itinerary>,
+export function reconcileAppointmentStatuses(
+  appointments: ReadonlyArray<Appointment>,
   now: Date,
 ): ReconcileAction[] {
   const nowDay = localDayKey(now)
   const actions: ReconcileAction[] = []
 
-  for (const it of itineraries) {
+  for (const it of appointments) {
     // 终态跳过（expired/cancelled/completed 不再推进）
     if ((TERMINAL as readonly string[]).includes(it.status)) continue
 
@@ -69,7 +69,7 @@ export function reconcileItineraryStatuses(
     if (nowDay === startDay) {
       if (it.status === 'scheduled') {
         actions.push({
-          itineraryId: it.id,
+          appointmentId: it.id,
           kind: 'needsMarkInProgress',
           at: now,
         })
@@ -81,7 +81,7 @@ export function reconcileItineraryStatuses(
     // 过日：scheduled → expired 或 in_progress → expired
     if (it.status === 'scheduled' || it.status === 'in_progress') {
       actions.push({
-        itineraryId: it.id,
+        appointmentId: it.id,
         kind: 'needsMarkExpired',
         at: now,
       })
