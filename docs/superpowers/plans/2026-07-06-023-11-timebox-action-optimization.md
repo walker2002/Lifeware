@@ -457,39 +457,41 @@ export interface ActivityArchetypeSeed {
 
 ```ts
   async seedDefaults(userId: USOM_ID, tx?: DbClient): Promise<number> {
-    const client = tx ?? db
-    const existing = await client
-      .select({ l1Category: s.activityArchetypes.l1Category, l2Name: s.activityArchetypes.l2Name,
-                synonyms: s.activityArchetypes.synonyms, isSystem: s.activityArchetypes.isSystem })
-      .from(s.activityArchetypes)
-      .where(eq(s.activityArchetypes.userId, userId))
-    const existingMap = new Map(existing.map((e) => [`${e.l1Category}::${e.l2Name}`, e]))
+    // [codex #2] 整个 seed+升级流程包事务，防中途崩溃留下"部分系统条目有 synonyms 部分没有"
+    const exec = async (client: DbClient) => {
+      const existing = await client
+        .select({ l1Category: s.activityArchetypes.l1Category, l2Name: s.activityArchetypes.l2Name,
+                  synonyms: s.activityArchetypes.synonyms, isSystem: s.activityArchetypes.isSystem })
+        .from(s.activityArchetypes)
+        .where(eq(s.activityArchetypes.userId, userId))
+      const existingMap = new Map(existing.map((e) => [`${e.l1Category}::${e.l2Name}`, e]))
 
-    let changes = 0
-    for (const seed of SEED_ACTIVITY_ARCHETYPES) {
-      const key = `${seed.l1Category}::${seed.l2Name}`
-      const row = existingMap.get(key)
-      if (!row) {
-        // 不存在 → INSERT（带 synonyms）
-        await client.insert(s.activityArchetypes).values({
-          userId, l1Category: seed.l1Category, l2Name: seed.l2Name,
-          energyCost: seed.energyCost, activityLabel: seed.activityLabel,
-          synonyms: seed.synonyms, isSystem: true,
-        })
-        changes++
-      } else if (row.isSystem && Array.isArray(row.synonyms) && row.synonyms.length === 0) {
-        // [023.11] 既有系统条目且 synonyms 为空 → 升级（不覆盖用户已维护的 / 用户自建条目）
-        await client.update(s.activityArchetypes)
-          .set({ synonyms: seed.synonyms })
-          .where(and(eq(s.activityArchetypes.userId, userId),
-                     eq(s.activityArchetypes.l1Category, seed.l1Category),
-                     eq(s.activityArchetypes.l2Name, seed.l2Name),
-                     eq(s.activityArchetypes.isSystem, true)))
-        changes++
+      let changes = 0
+      for (const seed of SEED_ACTIVITY_ARCHETYPES) {
+        const key = `${seed.l1Category}::${seed.l2Name}`
+        const row = existingMap.get(key)
+        if (!row) {
+          await client.insert(s.activityArchetypes).values({
+            userId, l1Category: seed.l1Category, l2Name: seed.l2Name,
+            energyCost: seed.energyCost, activityLabel: seed.activityLabel,
+            synonyms: seed.synonyms, isSystem: true,
+          })
+          changes++
+        } else if (row.isSystem && Array.isArray(row.synonyms) && row.synonyms.length === 0) {
+          // [023.11] 既有系统条目且 synonyms 为空 → 升级（不覆盖用户已维护的 / 用户自建条目）
+          await client.update(s.activityArchetypes)
+            .set({ synonyms: seed.synonyms })
+            .where(and(eq(s.activityArchetypes.userId, userId),
+                       eq(s.activityArchetypes.l1Category, seed.l1Category),
+                       eq(s.activityArchetypes.l2Name, seed.l2Name),
+                       eq(s.activityArchetypes.isSystem, true)))
+          changes++
+        }
+        // else: 已有 synonyms 或用户自建 → skip
       }
-      // else: 已有 synonyms 或用户自建 → skip
+      return changes
     }
-    return changes
+    return tx ? exec(tx) : db.transaction(exec)
   }
 ```
 
