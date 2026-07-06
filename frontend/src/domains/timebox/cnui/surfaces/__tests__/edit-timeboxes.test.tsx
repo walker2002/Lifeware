@@ -20,6 +20,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { useState } from 'react'
 import { EditTimeboxes } from '../EditTimeboxes'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 
@@ -258,5 +259,35 @@ describe('[023.04] T4 <EditTimeboxes>', () => {
     expect(payload.fields.notes).toBe('新备注')
     // taskIds 在 prefill 已为 ['t1'] → 应透传
     expect(payload.fields.taskIds).toEqual(['t1'])
+  })
+
+  // ---- [023.11] regression tests ----
+
+  /** [023.11] stateful Harness：onDataChange 回灌 dataModel，模拟 CnuiSurfaceWrapper 回环 */
+  function Harness({ items }: { items: TimeboxSummary[] }) {
+    const [dm, setDm] = useState<Record<string, unknown>>({ mode: 'selecting', items })
+    return (
+      <EditTimeboxes
+        surfaceType="edit-timeboxes"
+        dataModel={dm}
+        onDataChange={setDm}
+        onConfirm={vi.fn()}
+      />
+    )
+  }
+
+  it('[023.11] selecting 点击记录 → editing 表单带入原值（regression 空白页）', () => {
+    render(<Harness items={[tb('tb1', 'planned', '晨间深度工作')]} />)
+    fireEvent.click(screen.getByText('晨间深度工作').closest('button')!)
+    expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('晨间深度工作')
+  })
+
+  it('[023.11] 返回列表选另一条 → 表单刷新为新记录', () => {
+    render(<Harness items={[tb('tb1', 'planned', '第一条'), tb('tb2', 'planned', '第二条')]} />)
+    fireEvent.click(screen.getByText('第一条').closest('button')!)
+    expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('第一条')
+    fireEvent.click(screen.getByText('返回列表'))
+    fireEvent.click(screen.getByText('第二条').closest('button')!)
+    expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('第二条')
   })
 })

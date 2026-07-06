@@ -88,6 +88,22 @@ export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, is
     habitIds: prefill.habitIds ?? [],
   })
 
+  // [023.11] 选中记录切换时把 prefill 同步进 draft（原仅 useState 初值读 → 选后空白）
+  // 依赖 dataModel.selectedId（不是 prefill 引用）—— 切换记录才重置；用户编辑期间不覆盖
+  useEffect(() => {
+    setDraft({
+      title: prefill.title ?? '',
+      startTime: prefill.startTime ?? '',
+      endTime: prefill.endTime ?? '',
+      activityArchetypeId: prefill.activityArchetypeId,
+      notes: prefill.notes ?? '',
+      tags: prefill.tags ?? [],
+      taskIds: prefill.taskIds ?? [],
+      habitIds: prefill.habitIds ?? [],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataModel.selectedId])
+
   // [T-eng-2] AlertDialog 显示状态
   const [confirmOpen, setConfirmOpen] = useState(false)
   // [T-eng-2] 待确认的 payload（首次 onConfirm 调用被 AlertDialog 截下，确认后重提并加 confirmed=true）
