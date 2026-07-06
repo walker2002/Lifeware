@@ -31,6 +31,7 @@ function rowToArchetype(row: typeof s.activityArchetypes.$inferSelect): Activity
     l2Name: row.l2Name,
     energyCost: row.energyCost,
     activityLabel: row.activityLabel,
+    synonyms: row.synonyms ?? [],
     isSystem: row.isSystem,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -90,6 +91,7 @@ export class ActivityArchetypeRepository implements IActivityArchetypeRepository
           l2Name: input.l2Name,
           energyCost: input.energyCost,
           activityLabel: input.activityLabel,
+          synonyms: input.synonyms ?? [],
           isSystem: false,
         })
         .returning()
@@ -134,6 +136,10 @@ export class ActivityArchetypeRepository implements IActivityArchetypeRepository
       if (input.activityLabel !== undefined) {
         setData.activityLabel = input.activityLabel
         changedFields.push('activityLabel')
+      }
+      if (input.synonyms !== undefined) {
+        setData.synonyms = input.synonyms
+        changedFields.push('synonyms')
       }
 
       const [updated] = await client

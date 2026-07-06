@@ -1269,6 +1269,7 @@ Connector Layer 预留，MVP 不实现。
 | l2_name | text | NOT NULL | L2 二级名称 |
 | energy_cost | jsonb | NOT NULL | EnergyCost 4 维 `{physical,mental,emotional,creative}` |
 | activity_label | jsonb | NOT NULL DEFAULT '{}' | ActivityLabel 6 维 |
+| synonyms | jsonb | NOT NULL DEFAULT '[]' | 同义词/范围描述数组，用于标题匹配 |
 | is_system | boolean | NOT NULL DEFAULT false | 系统内置，不可删除 |
 | created_at | timestamptz | NOT NULL DEFAULT now() | 创建时间 |
 | updated_at | timestamptz | NOT NULL DEFAULT now() | 更新时间 |

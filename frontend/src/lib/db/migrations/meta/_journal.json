@@ -239,6 +239,13 @@
       "when": 1783249628888,
       "tag": "0033_rename_itineraries_to_appointments",
       "breakpoints": false
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783500000000,
+      "tag": "0034_023_11_archetype_synonyms",
+      "breakpoints": false
     }
   ]
 }

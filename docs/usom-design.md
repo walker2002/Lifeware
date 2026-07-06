@@ -848,6 +848,7 @@ export interface ActivityArchetype {
   l2Name:        string            // L2 二级名称（如"深度专注"）
   energyCost:    EnergyCost        // 4 维各 1-10（D8：在 Archetype 侧）
   activityLabel: ActivityLabel     // 6 维特征（T3：保留，仅配置表存储）
+  synonyms:      string[]          // 同义词/范围描述短语（用于标题→archetype 匹配；[] 表示未维护）
   isSystem:      boolean           // 系统内置（不可删除），默认 false
   createdAt:     Timestamp
   updatedAt:     Timestamp
