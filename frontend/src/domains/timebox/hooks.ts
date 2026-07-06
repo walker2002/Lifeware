@@ -21,6 +21,7 @@ import type { DomainManifest } from '@/domains/manifest-loader/schema'
 import { evaluateDomainRules } from '@/nexus/rules'
 import { resolveObjectType } from '@/nexus/orchestrator/lifecycle-configs'
 import { appointmentRuleRegistry, timeboxRuleRegistry } from './rules-registry'
+import { deriveTimeboxDisplayStatus } from './status/derive-display-status'
 
 /** 即将开始阈值（毫秒） */
 const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000
@@ -198,16 +199,59 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     const actions: ActionCandidate[] = []
     const now = new Date(snapshot.currentTime).getTime()
 
-    // [023.12] T7 (AM1) + T13 deferral:
-    // 原 3 个 currentTimebox 状态分支（overtime / running / ended）依赖
-    //   `snapshot.currentTimebox.status`——而 [023.12] status union 收敛后
-    //   此字段不再持久化（仅 'planned' | 'logged' | 'cancelled'）。
-    // 真实 currentTimebox 填充将由 [023.12] T13 接管：读时用
-    //   deriveTimeboxDisplayStatus（status/derive-display-status.ts）
-    //   派生 running/overtime，再决定 currentTimebox 候选。
-    // 本处 3 个分支全部 stub out（标 TODO 即可，T13 重写）：
-    // TODO(023.12 T13): 重建 currentTimebox 派生填充链 + 3 个 action tile
-    //   （overtime 95 / running 90 / ended 70），用 deriveTimeboxDisplayStatus 判定。
+    // [023.12] T13 (AM4) — currentTimebox 派生填充链已就位（见
+    //   orchestrator/index.ts deriveCurrentTimebox）；此处 onActionSurfaceRequest
+    //   读 `snapshot.currentTimebox`（由 orchestrator 派生填入），用
+    //   `deriveTimeboxDisplayStatus` 对 currentTimebox 自身再算一次，输出
+    //   3 个 action tile（weight: overtime 95 / running 90 / ended 70）。
+    //
+    //   语义映射（[023.12] T13 brief）：`ended` 在新 model 下不存在显式 status，
+    //   旧「ended」表示「时间窗已结束、尚未 log」——此态在新 model 读时派生为
+    //   `overtime`（now > endTime 且 status 仍 planned）。故此分支复用
+    //   `overtime` 派生，但用「记录执行」action 区别「超时提醒」（weight 70
+    //   而非 95，category=cue 而非 tile）。
+    //
+    //   currentTimebox 为 undefined（无 running）时跳过 3 个分支，进入下方
+    //   「即将开始」 upcoming 扫表。
+    if (snapshot.currentTimebox) {
+      const ct = snapshot.currentTimebox
+      const display = deriveTimeboxDisplayStatus(ct.status, ct.startTime, ct.endTime, new Date(snapshot.currentTime))
+      if (display === 'overtime') {
+        actions.push({
+          id: `action-${ct.id}-overtime` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒超时: ${ct.title}`,
+          actionType: 'start_timebox',
+          category: 'tile',
+          weight: 95,
+        })
+        // 「ended」语义：超时且尚未 log。同一 currentTimebox 派生态下，附加
+        // 一个 cue 类「记录执行」tile（weight 70）。
+        actions.push({
+          id: `action-${ct.id}-ended` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒结束，请记录执行结果`,
+          actionType: 'capture_intent',
+          category: 'cue',
+          weight: 70,
+        })
+        return { actions, category: 'tile', weight: 95 }
+      }
+      if (display === 'running') {
+        actions.push({
+          id: `action-${ct.id}-running` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒进行中: ${ct.title}`,
+          actionType: 'start_timebox',
+          category: 'tile',
+          weight: 90,
+        })
+        return { actions, category: 'tile', weight: 90 }
+      }
+    }
 
     for (const tb of snapshot.upcomingTimeboxes) {
       if (tb.status === 'planned') {

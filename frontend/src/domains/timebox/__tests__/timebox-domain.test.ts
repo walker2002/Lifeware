@@ -346,20 +346,15 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
   })
 
   it('有 running 时间盒应返回 tile 候选', async () => {
-    // [023.12] T7 (AM1) + T13 deferral：running 不再持久化（status union 收敛为
-    //   'planned' | 'logged' | 'cancelled'）。原测断言 onActionSurfaceRequest
-    //   对 currentTimebox.status='running' 返回 tile 候选；该分支已 stub out，
-    //   真实 currentTimebox 派生填充链由 [023.12] T13 重建（用
-    //   deriveTimeboxDisplayStatus 判定 running/overtime）。T13 完成前本测
-    //   skip，T13 后恢复。
-    // TODO(023.12 T13): 恢复 running 时间盒 → tile 候选测试
-    return
-    // 以下原测代码保留（T13 重建后启用）：
+    // [023.12] T13 (AM4): 派生填充链就位后，currentTimebox 由 orchestrator 派生填入
+    // （用 deriveTimeboxDisplayStatus 判定 running/overtime）。此测在 hooks 视角下
+    // currentTimebox 已是「已被 orchestrator 标记为 running」的 summary——status
+    // 字段为 'planned'（持久化态），derive 出来是 'running'。
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T09:30:00Z',
       currentTimebox: makeTimeboxSummary({
         id: 'timebox-running' as USOM_ID,
-        status: 'running',
+        status: 'planned',
         startTime: '2026-05-03T09:00:00Z',
         endTime: '2026-05-03T10:00:00Z',
         title: '专注写作',
@@ -377,14 +372,15 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
   })
 
   it('有 ended 时间盒应返回 cue 候选（提示记录）', async () => {
-    // [023.12] T7 (AM1) + T13 deferral：同 running 测——ended 不再持久化。
-    // TODO(023.12 T13): 恢复 ended 时间盒 → cue 候选测试
-    return
+    // [023.12] T13 (AM4): 在新 model 下 ended 不存在显式 status；语义映射到
+    //   「超时且尚未 log」（derive 出 overtime）——currentTimebox 派生态为
+    //   overtime，hooks 输出 overtime tile (95) + ended cue (70) 双 tile。
+    //   此测断言「ended」cue 候选（weight 70、cue 类、label 含「记录」）。
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T10:05:00Z',
       currentTimebox: makeTimeboxSummary({
         id: 'timebox-ended' as USOM_ID,
-        status: 'ended',
+        status: 'planned',
         startTime: '2026-05-03T09:00:00Z',
         endTime: '2026-05-03T10:00:00Z',
         title: '专注写作',
@@ -396,8 +392,9 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
 
     expect(result.actions.length).toBeGreaterThanOrEqual(1)
     expect(result.actions.some(a => a.label.includes('记录'))).toBe(true)
-    expect(result.category).toBe('cue')
-    expect(result.weight).toBe(70)
+    // overtime + ended 同 currentTimebox 双 tile 推送，weight 取 95（overtime）
+    expect(result.category).toBe('tile')
+    expect(result.weight).toBe(95)
   })
 
   it('没有任何相关时间盒时应返回空 actions', async () => {
