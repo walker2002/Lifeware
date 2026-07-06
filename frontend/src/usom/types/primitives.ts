@@ -233,6 +233,15 @@ export type TimeboxStatus = 'planned' | 'logged' | 'cancelled'
  * - completed：已完成（[027] SM →completed，timebox 打卡后；终态）
  */
 export type AppointmentStatus = 'scheduled' | 'cancelled' | 'completed'
+
+/**
+ * OKR 周期生命周期状态（[023.12]）
+ * - draft: 草稿（可编辑）
+ * - approved: 已批准（进行中）
+ * - finished: 已结束（待复盘）
+ * - reviewed: 已复盘（终态）
+ */
+export type CycleStatus = 'draft' | 'approved' | 'finished' | 'reviewed'
 /**
  * 完成状态
  * - completed: 已完成

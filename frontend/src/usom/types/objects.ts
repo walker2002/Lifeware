@@ -9,7 +9,7 @@ import type {
   Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   TaskStatus, HabitStatus,
-  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus, AppointmentStatus,
+  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus, AppointmentStatus, CycleStatus,
   ThreadStatus, AISessionStatus,
   ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
   SchedulingConstraint, TrackingMode,
@@ -151,7 +151,7 @@ export interface Cycle {
   cycleType: 'annual' | 'quarterly' | 'monthly' | 'semi_annual' | 'custom'
   name: string
   period: { start: DateOnly; end: DateOnly }
-  status: 'draft' | 'approved' | 'finished' | 'reviewed'
+  status: CycleStatus
   createdAt: Timestamp
   updatedAt: Timestamp
   approvedAt?: Timestamp
