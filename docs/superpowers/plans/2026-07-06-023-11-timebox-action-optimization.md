@@ -1168,3 +1168,21 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 | F10 LLM 位置匹配（Issue 1） | T6 |
 | Tier-2 docs 同步 | T3 |
 | 质量：vitest 零新增 / tsc 零新增 / validate:manifest 0 errors | 全任务 |
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | 未跑（普通多文件优化 + 字段扩展，非战略变更） |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found → folded | 2 新发现：seedDefaults 事务（folded 入 T4）/ createTimebox 路由（核实 timebox.ts:88-93 已证明，非新风险，不折）；另与 Claude 一致标 C5 |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 4 issues / 0 critical gaps，全 folded |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | 未跑（含轻量 UI：表单输入 + 按钮；已列入收尾 /browse 视觉验证） |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | 未跑 |
+
+- **CODEX:** codex outside voice 跑（read-only，5min 超时但推理落盘提取）。2 新发现——(1) `seedDefaults` 非事务（folded：T4 包 `db.transaction`，参 create/update 既有模式）；(2) createTimebox `activityArchetypeId` 端到端路由（核实 `timebox.ts:88-93` + `CREATE_TIMEBOX_FIELDS:40` 已显式处理，[023.04] 手选 archetype 已走通同路径，被动推断仅更早预填同字段 → 非新路由风险，不折）。
+- **CROSS-MODEL:** Claude 与 codex 在「反向包含短标题误匹配面」上独立一致（cross-model agreement），已折 C5（正向 0.9 / 反向 title≥3 字 0.75 / 正向优先）。codex 额外提的 routing 担忧经代码核实不成立（[023.08] 警惕模式，但本例已被现有 createTimebox action 覆盖）。
+- **VERDICT:** ENG CLEARED — 4 issues 全部折入 plan（Issue 1 LLM 位置匹配 → T6 / C5 反向包含置信分级 → T6 / 错误路径测试 → T7+T8+T9 / seedDefaults 事务 → T4），0 critical gaps，0 unresolved decisions。Scope 经一次有意识扩张（折入 synonyms 字段 T3-T5，含迁移 + Tier-2 docs）。ready to implement。
+
+NO UNRESOLVED DECISIONS
