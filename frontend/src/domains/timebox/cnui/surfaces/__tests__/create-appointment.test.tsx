@@ -145,4 +145,27 @@ describe('[026] T17 <CreateAppointment> 渲染稳定性', () => {
     )
     expect(screen.getByText('✅ 2 个约定已创建')).toBeInTheDocument()
   })
+
+  // [026.01] draft.activityArchetypeId 透传给 AppointmentFormFields → 渲染 archetype picker
+  it('draft 携带 activityArchetypeId → AppointmentFormFields 渲染 archetype picker', () => {
+    const draft: AppointmentDraftFields = {
+      id: 'd1',
+      title: '看牙医',
+      startTime: '2026-07-10T09:00:00.000Z',
+      durationMin: 30,
+      detail: '',
+      people: [],
+      activityArchetypeId: 'arch-123',
+    }
+    render(
+      <CreateAppointment
+        surfaceType="createAppointment"
+        dataModel={{ items: [draft], existing: [] }}
+        onDataChange={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    )
+    // AppointmentFormFields 嵌入 ArchetypePickerCard → 渲染「活动原型」标题 + AI 匹配按钮
+    expect(screen.getByRole('heading', { name: '活动原型', level: 3 })).toBeInTheDocument()
+  })
 })

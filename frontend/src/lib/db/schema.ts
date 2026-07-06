@@ -394,6 +394,8 @@ export const appointments = pgTable('appointments', {
   startTime:    timestamp('start_time', { withTimezone: true }).notNull(),
   durationMin:  integer('duration_min').notNull(),
   people:       jsonb('people').notNull().$type<string[]>().default([]),
+  // [026.01] archetype FK（nullable，archetype 删除时 appointment 保留）
+  activityArchetypeId: uuid('activity_archetype_id').references(() => activityArchetypes.id, { onDelete: 'set null' }),
   // [026] D2 reversal: 5 态全部存储（Cancelled 终态，expired/completed 终态）
   status:       text('status', { enum: ['scheduled', 'cancelled', 'completed'] }).notNull().default('scheduled'),
   // SM transition 时间戳（推进时盖）
@@ -406,6 +408,8 @@ export const appointments = pgTable('appointments', {
   index('idx_appointments_user_status_start').on(table.userId, table.status, table.startTime),
   // Page 列表：未取消 + 按 startTime 排序
   index('idx_appointments_user_status').on(table.userId, table.status),
+  // [026.01] archetype 反向查询索引
+  index('idx_appointments_archetype').on(table.activityArchetypeId),
 ])
 // 不存 endTime 列（endTime = startTime + durationMin 派生）
 // 不加 FK 到 timeboxes（D2=C 读时合并，约定不物化为 timebox 行）

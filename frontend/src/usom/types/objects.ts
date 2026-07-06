@@ -638,6 +638,8 @@ export interface Appointment {
   startTime:      Timestamp               // 开始时间（UTC 存，展示层本地化）
   durationMin:    number                  // 时长（分钟）；endTime = startTime + durationMin 派生
   people:         string[]                // 关系人（纯文本，D1=A）
+  /** [026.01] 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId） */
+  activityArchetypeId?: USOM_ID
   userId:         USOM_ID
   createdAt:      Timestamp
   updatedAt:      Timestamp

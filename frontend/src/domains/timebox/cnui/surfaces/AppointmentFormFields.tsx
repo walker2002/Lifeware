@@ -1,10 +1,10 @@
 /**
  * @file AppointmentFormFields
- * @brief [026][023.05] A2.x 约定 4 字段共享表单组件（D4 决议 A）
+ * @brief [026.01] 5 字段共享表单组件（4 字段 + archetype picker）
  *
  * CreateAppointment / EditAppointment 共用，避免 3 处重复字段定义 + 多端修正。
  * 字段：title (input) + startTime (datetime-local) + durationMin (number) +
- *       people (逗号分隔 input) + detail (textarea)
+ *       people (逗号分隔 input) + detail (textarea) + activityArchetypeId (picker)
  *
  * 不持有 react state 自行发请求；遵循 surface props 模式（onChange 回调）。
  */
@@ -12,9 +12,10 @@
 'use client'
 
 import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
+import { ArchetypePickerCard } from '@/components/archetype/archetype-picker-card'
 
 /**
- * 约定 draft 形态（与 ai-parser 的 AppointmentDraft 对齐，扩展 id/detail）。
+ * 约定 draft 形态（与 ai-parser 的 AppointmentDraft 对齐，扩展 id/detail/archetype）。
  * id 由 handler 在注入时分配（runtime 唯一标识）；detail 为可选详情文本。
  */
 export interface AppointmentDraftFields {
@@ -24,6 +25,8 @@ export interface AppointmentDraftFields {
   durationMin: number
   detail?: string | null
   people: string[]
+  /** [026.01] 关联 Activity Archetype（nullable；ArchetypePickerCard 渲染） */
+  activityArchetypeId?: string
 }
 
 export interface AppointmentFormFieldsProps {
@@ -34,7 +37,7 @@ export interface AppointmentFormFieldsProps {
 }
 
 /**
- * 4 字段表单（不含提交按钮 / 翻页 / 列表）。父组件负责 view/pagination/状态。
+ * 5 字段表单（不含提交按钮 / 翻页 / 列表）。父组件负责 view/pagination/状态。
  * id 前缀动态生成（避免多 surface 同时挂载时 label-for 冲突）。
  */
 export function AppointmentFormFields({ draft, onChange, disabled }: AppointmentFormFieldsProps) {
@@ -98,6 +101,14 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
           className="mt-0.5 w-full rounded border border-hairline bg-canvas px-2 py-1 text-sm text-ink disabled:opacity-50"
         />
       </div>
+
+      {/* [026.01] archetype picker 嵌入（对齐 CreateTimebox.tsx:107-117） */}
+      <ArchetypePickerCard
+        value={draft.activityArchetypeId}
+        onChange={(archetypeId) => onChange({ activityArchetypeId: archetypeId })}
+        enableAiMatch
+        title={draft.title}
+      />
     </div>
   )
 }

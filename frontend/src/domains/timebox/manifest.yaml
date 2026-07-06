@@ -216,6 +216,13 @@ field_metadata:
       label: 关系人
       required: false
       mutation_mode: ContentField
+    # [026.01] archetype FK 字段元数据（UUID 用 string type 标注，
+    # 贴近 domain-types.ts FieldMetadata.type 合法取值集合）
+    activityArchetypeId:
+      type: string
+      label: 活动原型
+      required: false
+      mutation_mode: ContentField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

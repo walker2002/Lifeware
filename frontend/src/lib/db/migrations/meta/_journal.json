@@ -253,6 +253,13 @@
       "when": 1783328535912,
       "tag": "0034_023_12_lifecycle_simplify",
       "breakpoints": false
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1751817600000,
+      "tag": "0035_026_01_appointment_activity_archetype",
+      "breakpoints": false
     }
   ]
 }

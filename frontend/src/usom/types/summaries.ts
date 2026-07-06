@@ -61,6 +61,8 @@ export interface AppointmentSummary {
   // 原 summary 仅 4 字段，编辑前需再 fetch；扩 2 字段 → 客户端编辑零延迟、零额外往返。
   detail?:   string | null
   people?:   string[]
+  /** [026.01] 编辑入口零延迟透传 archetype（与 detail/people 同性质） */
+  activityArchetypeId?: USOM_ID
 }
 
 export interface ObjectiveSummary {
