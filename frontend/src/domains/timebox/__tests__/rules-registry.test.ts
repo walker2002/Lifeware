@@ -188,10 +188,8 @@ describe('[020] R14 fail-CLOSED 行为', () => {
 })
 
 // [023.03] QA regression: status transition actions skip field validation
-// [023.12] T13-pre codex C3：startTimebox/endTimebox 已从 STATUS_TRANSITION_ACTIONS
-// 移除（dead actions）。
 describe('STATUS_TRANSITION_ACTIONS — 状态转换 action 跳过字段必含检查', () => {
-  const transitionActions = ['cancelTimebox', 'logTimebox']
+  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
 
   for (const action of transitionActions) {
     it(`${action} 仅有 objectId 字段也应当 Passed（字段从 DB 加载）`, async () => {

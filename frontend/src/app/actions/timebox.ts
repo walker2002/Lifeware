@@ -112,22 +112,18 @@ export async function createTimebox(
 }
 
 /**
- * 状态转换：cancel / log（走 SM transition）
- *
- * [023.12] T13-pre codex C2 修复：移除 'start' | 'end' — 新 lifecycle 仅登记
- * create/log/cancel/revert 4 action，'start'/'end' 不再对应任何 SM 转换。
- * 'revert' 由独立的 revertTimebox 函数承载（带 executionRecord 守卫 [AM7]），
- * 不走本函数。剩余合法 action：cancel / log。
- *
- * @param action - cancel | log
+ * 状态转换：start / end / cancel / log（走 SM transition）
+ * @param action - start | end | cancel | log
  */
 export async function transitionTimebox(
   timeboxId: string,
-  action: 'cancel' | 'log',
+  action: 'start' | 'end' | 'cancel' | 'log',
   payload: Record<string, unknown> = {},
   confirmed?: boolean,
 ): Promise<TimeboxActionResult> {
   const ACTION_TO_INTENT: Record<string, string> = {
+    start: 'startTimebox',
+    end: 'endTimebox',
     cancel: 'cancelTimebox',
     log: 'logTimebox',
   }

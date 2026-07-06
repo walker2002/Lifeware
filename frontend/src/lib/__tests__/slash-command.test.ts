@@ -149,10 +149,9 @@ describe('resolveSlashCommand', () => {
 //   场景：/createTime 拼写错误（注册的是 /createTimebox），不应静默落到习惯解析器
 describe('suggestShortcut', () => {
   // 真实注册的快捷方式子集（来自各域 manifest）
-  // [023.12] T13-pre codex C1：/startTimebox 已从 manifest 移除（dead intent_trigger）。
   const triggers = [
     '/createHabit', '/createTask', '/createThread', '/createTimebox',
-    '/logHabit', '/tasks', '/habits',
+    '/startTimebox', '/logHabit', '/tasks', '/habits',
   ].map((shortcut) => ({ shortcut }))
 
   it('唯一前缀匹配 → 返回该 shortcut（createTime → createTimebox）', () => {
@@ -176,8 +175,7 @@ describe('suggestShortcut', () => {
   })
 
   it('接受纯字符串数组形式', () => {
-    // [023.12] T13-pre codex C1：/startTimebox 已移除，换 /logTimebox 作为纯字符串数组 fixture。
-    expect(suggestShortcut('logTime', ['/logTimebox', '/logHabit'])).toBe('/logTimebox')
+    expect(suggestShortcut('startTime', ['/startTimebox', '/logHabit'])).toBe('/startTimebox')
   })
 
   it('接受 action 恰好等于某 shortcut 名（完整匹配也算前缀）', () => {

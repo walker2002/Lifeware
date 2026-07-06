@@ -110,7 +110,7 @@ describe('GrowthMenu — appointment actions（[026] T19 manifest SSOT 守护）
   })
 
   it('appointment action 与时间盒其他动作在 timebox group 下共同渲染（不被过滤）', () => {
-    // [026] T14 已确认 appointment 4 action 在 timebox group 下与 cancelTimebox/logTimebox 等
+    // [026] T14 已确认 appointment 4 action 在 timebox group 下与 startTimebox/endTimebox 等
     // 共存。本测试用含 appointment + 时间盒其他动作的合成数据，守护"不被未来代码过滤掉"。
     const mixedActions = [
       {
