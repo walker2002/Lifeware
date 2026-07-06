@@ -174,7 +174,8 @@ async function seed() {
     id: CYCLE_ID, userId: USER_ID, schemaVersion: 1,
     cycleType: 'quarterly', name: '2026 Q2 种子周期',
     periodStart: qStart, periodEnd: qEnd,
-    status: 'in_progress',
+    // [023.12] cycle status 5→4 态：in_progress 合并为 approved
+    status: 'approved',
     createdAt: daysAgo(30), updatedAt: now,
   })
 
@@ -374,11 +375,12 @@ async function seed() {
   })
   await upsert(s.timeboxes, {
     id: IDS.tbPlanning, userId: USER_ID, schemaVersion: 1,
-    status: 'ended', title: '晨间规划',
+    // [023.12] timebox status 6→3 态：ended 改 logged
+    status: 'logged', title: '晨间规划',
     startTime: todayAt(7), endTime: todayAt(7, 30),
     tags: ['规划'],
     createdAt: now, updatedAt: now,
-    startedAt: todayAt(7), endedAt: todayAt(7, 30),
+    // [023.12] 删 startedAt/endedAt（时间态改读时派生 + schema 已 drop 这 2 列）
   })
   console.log('  ✓ 时间盒 (4)')
 

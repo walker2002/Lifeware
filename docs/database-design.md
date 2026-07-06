@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_07_06 (refactor)**：[023.12] 三域生命周期语义重构 — `timeboxes.status` 枚举收窄 6→3 态（`planned | logged | cancelled`，删 `running | overtime | ended`）；`timeboxes` 表删除 3 个时间戳列 `started_at`/`ended_at`/`overtime_at`（drop CASCADE，TRUNCATE timeboxes 因数据可弃）。`cycles.status` 枚举收窄 5→4 态（`draft | approved | finished | reviewed`，删 `not_started | in_progress` 合并为 `approved`，`ended` 改名 `finished`）；`cycles.started_at` rename `approved_at`，`cycles.ended_at` rename `finished_at`（USOM 与 schema 同步，AM6）。`appointments.status` 枚举收窄 5→3 态（`scheduled | cancelled | completed`，删 `in_progress | expired` 改读时派生）；`appointments` 表删除 2 个时间戳列 `in_progress_at`/`expired_at`。三域各加 2 条 revert transition：timebox `logged|cancelled→planned`、appointment `cancelled|completed→scheduled`、cycle `reviewed→finished`（单步）。manifest `subscribed_events` 加 `TimeboxReverted`/`AppointmentReverted`/`CycleReverted`。`timeboxFieldMeta` 标记 deprecated（旧 3 个字段元数据不再被引用，保留以兼容历史数据）。**反向 [026] D2 reversal**：appointment 持久化模式从「lazy reconcile 写库」回到「读时派生」（理据见 design doc §与 [026] D2 reversal 的关系）。迁移 0034 落地（journal idx=34，down.sql 兜底）：`TRUNCATE timeboxes CASCADE` + `ALTER TABLE timeboxes DROP COLUMN IF EXISTS started_at/ended_at/overtime_at`；`ALTER TABLE cycles RENAME COLUMN started_at TO approved_at` + `RENAME COLUMN ended_at TO finished_at` + `TRUNCATE cycles CASCADE`；`TRUNCATE appointments CASCADE` + `DROP COLUMN IF EXISTS in_progress_at/expired_at`。CASCADE 影响：cycles TRUNCATE 级联清 `objectives`/`key_results`/`contributions`（数据可弃）；timeboxes TRUNCATE 级联清 `task_timeboxes`/`timebox_habits`（CASCADE 约束）。TRUNCATE CASCADE 链：timeboxes → task_timeboxes/timebox_habits/task_execution_logs.timebox_id SET NULL；cycles → objectives → key_results → contributions；appointments 无 FK 反向依赖。`memory_episodes.metadata` jsonb 软引用 timeboxId 留孤儿（无 FK，无读路径反向解析，[023.08] F4 决策）。USOM 文档同步（§3.5a/§3.9/§3.13 状态机收敛）。
 - **2026_07_03 (refactor)**：[026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod 一致或扩展 UTC 归一化，codex #5 落地）
 - **2026_07_02 (refactor)**：[022.01] Phase 3 — 移除 Objective/KR 独立状态 — `objectives` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_objectives_user_status` 索引；`key_results` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_key_results_user_status` 索引。状态权威迁移至 `cycles.status`（§4.0）。迁移：idx=30（待 Task 6 落地）。`findAll` 过滤逻辑变更：`ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`。`paused` 语义永久丢失（迁移有损可接受）
 - **2026_06_30 (refactor)**：[023] A3.2 UI 层接入 — `tasks.activity_archetype_id` / `habits.activity_archetype_id` 列说明补「UI 层已接入（CNUI 表单 + 详情只读）；FK ON DELETE SET NULL → 详情行整块不渲染（M3）」
@@ -299,6 +300,8 @@ CREATE INDEX idx_energy_logs_user_logged ON energy_logs(user_id, logged_at desc)
 
 ```sql
 -- §4.0 cycles（OKR 周期表，一级对象）
+-- v2 变更（2026-07-06, [023.12]）：status 5→4 态（删 not_started/in_progress，ended→finished）；
+--   started_at/ended_at rename 为 approved_at/finished_at（语义诚实）。
 CREATE TABLE cycles (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -307,12 +310,21 @@ CREATE TABLE cycles (
   name          text NOT NULL,
   period_start  date NOT NULL,
   period_end    date NOT NULL,
+<<<<<<< Updated upstream
   status        text NOT NULL,  -- [023.12] enum: draft | approved | finished | reviewed（原 5 值收敛 4 值）
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
   approved_at   timestamptz,    -- [023.12] 原 started_at 重命名（status 进入 approved 的时刻）
   finished_at   timestamptz,    -- [023.12] 原 ended_at 重命名（status 进入 finished 的时刻）
   reviewed_at   timestamptz,    -- 不变
+=======
+  status        text NOT NULL,  -- enum: draft | approved | finished | reviewed
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  approved_at   timestamptz,  -- [023.12] rename 自 started_at（语义=批准时间戳）
+  finished_at   timestamptz,  -- [023.12] rename 自 ended_at（语义=结束时间戳）
+  reviewed_at   timestamptz,
+>>>>>>> Stashed changes
   CONSTRAINT check_cycles_period_end_after_start CHECK (period_end > period_start)
 );
 CREATE INDEX idx_cycles_user_status ON cycles(user_id, status);
@@ -720,13 +732,19 @@ CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 > **[023.12] 新增可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
 
 ```sql
+-- v2 变更（2026-07-06, [023.12]）：status 6→3 态（删 running/overtime/ended 改读时派生）；删 3 个时间戳列。
 CREATE TABLE timeboxes (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null references users(id) on delete cascade,
   schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
+<<<<<<< Updated upstream
   status        text not null check (status in ('planned', 'logged', 'cancelled')),  -- [023.12] 6 值→3 值
+=======
+  -- [023.12] 状态枚举 6→3 态：running/overtime/ended 改读时派生（看 now vs start_time/end_time）
+  status        text not null check (status in ('planned', 'logged', 'cancelled')),
+>>>>>>> Stashed changes
   title         text not null,
   start_time    timestamptz not null,
   end_time      timestamptz not null,
@@ -750,7 +768,11 @@ CREATE TABLE timeboxes (
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
+<<<<<<< Updated upstream
   -- [023.12] 移除 started_at / overtime_at / ended_at 三列（时间派生态不持久化）
+=======
+  -- [023.12] 删 started_at/overtime_at/ended_at（时间态改读时派生 + schema 同步）
+>>>>>>> Stashed changes
   logged_at     timestamptz
 );
 
@@ -777,8 +799,9 @@ CNUI 提交时间盒时按两层校验：
    - 命中 → 提交按钮 disabled + 红字提示
 2. **服务端兜底**：`TimeOverlapRule`（`frontend/src/nexus/core/rule-engine/rules/timebox-overlap.ts`）
    - 读 `intent.fields.endTime`（[023] A2 OV#P1-#1 后 duration 已撤）
-   - 与 status ∈ {planned, running, overtime} 重叠 → severity=confirm
-   - 与 status ∈ {ended, cancelled, logged} 重叠 → pass（不阻断）
+   - [023.12] `activeStatuses` 收窄为 `['planned']`（`running`/`overtime` 不再持久化，只对 planned 区间做 SQL 重叠检查；显示态 running/overtime 由 derive 函数表达，不参与重叠判定）
+   - 与 `status = 'planned'` 且区间重叠 → severity=confirm
+   - 与 `status ∈ {cancelled, logged}` 重叠 → pass（不阻断）
 
 数据库层无唯一性约束；重叠允许但有提示用户确认。
 
@@ -836,22 +859,37 @@ CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logg
 > **DDL 实现在 T2 迁移（手写 SQL + psql + 登记 journal，idx=31）落地**；本节先登记列/索引契约供 Repository 与 server actions 引用。
 
 ```sql
+<<<<<<< Updated upstream
 -- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化；0033 RENAME 为 appointments；0034 删 2 个时间戳列）
+=======
+-- v2 变更（2026-07-06, [023.12]）：status 5→3 态（删 in_progress/expired 改读时派生）；删 2 个时间戳列（in_progress_at, expired_at）。
+>>>>>>> Stashed changes
 CREATE TABLE appointments (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references users(id) on delete cascade,
   schema_version  integer not null default 1,
 
   -- 核心业务字段
+<<<<<<< Updated upstream
   status          text not null check (status in ('scheduled', 'cancelled', 'completed')),  -- [023.12] 5 值→3 值
+=======
+  -- [023.12] 状态枚举 5→3 态：in_progress/expired 改读时派生（看 now 与 start_time 同日历日）
+  status          text not null check (status in ('scheduled', 'cancelled', 'completed')),
+>>>>>>> Stashed changes
   title           text not null,
   detail          text,                    -- 活动详情，可空
   start_time      timestamptz not null,    -- 开始时间（UTC 存）
   duration_min    integer not null,        -- 时长（分钟）；end_time = start_time + duration_min 派生
   people          text[] not null default '{}',  -- 关系人（纯文本，D1=A）
 
+<<<<<<< Updated upstream
   -- 2 个用户操作 transition 时间戳（[023.12] 移除 in_progress_at / expired_at 两个时间派生态时间戳）
   completed_at    timestamptz,             -- →completed 时盖（[023.12] 正式启用，[027] 由 timebox 打卡联动）
+=======
+  -- [023.12] 删 in_progress_at, expired_at（[023.12] 反转 [026] D2：派生代替持久化）
+  -- 2 个 transition 时间戳（用户操作触发盖戳）
+  completed_at    timestamptz,             -- [027] →completed 时盖
+>>>>>>> Stashed changes
   cancelled_at    timestamptz,             -- →cancelled 时盖
 
   -- 审计字段
@@ -866,8 +904,13 @@ CREATE INDEX idx_appointments_user_status       ON appointments(user_id, status)
 
 **设计要点**：
 - `end_time` 不存列：派生 = `start_time + duration_min * interval '1 minute'`，与 USOM 注释一致；调度查询用 `tstzrange` 表达式。
+<<<<<<< Updated upstream
 - 2 时间戳 nullable（[023.12] 收敛）：只在用户操作 transition 触发时盖（cancelled/completed）；初始创建后仅 `created_at`/`updated_at` 有值。`in_progress_at` / `expired_at` 已删除——这两态由 `derive-display-status` 派生显示。
 - 状态枚举与 USOM `AppointmentStatus` 3 值严格对齐；CHECK 约束由迁移 SQL 加。
+=======
+- 4 时间戳 nullable：只在 transition 触发时盖；初始创建后仅 `created_at`/`updated_at` 有值。
+- 状态枚举与 USOM `AppointmentStatus` 3 态严格对齐（[023.12] 收窄）；CHECK 约束由迁移 SQL 加。
+>>>>>>> Stashed changes
 - `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
 - **[023.12] 派生 in_progress/expired 的数据源**：`status='scheduled'` 行的 `start_time`（UTC 存，按本地时区换算日历日）由 `derive-display-status` 工具在读取时按 `now` 与 `start_time` 日历日关系派生。SQL 级"查过期约定"不再可能——单用户 MVP 可接受；报表/分析需求时再考虑物化视图。
 
