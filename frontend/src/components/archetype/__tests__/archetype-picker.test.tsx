@@ -148,4 +148,12 @@ describe('[023.11] ArchetypePicker「AI 匹配」按钮', () => {
     fireEvent.click(await screen.findByText('AI 匹配'))
     expect(await screen.findByText('未找匹配的活动原型')).toBeInTheDocument()
   })
+  it('[错误路径] loading 态显示「匹配中…」且按钮 disabled', async () => {
+    mockMatchArchetype.mockReturnValueOnce(new Promise(() => {})) // 永挂
+    render(<ArchetypePicker value={undefined} onChange={() => {}} enableAiMatch title="写代码" />)
+    fireEvent.click(await screen.findByText('AI 匹配'))
+    const btn = await screen.findByText('匹配中…')
+    expect(btn).toBeInTheDocument()
+    expect(btn.closest('button')).toBeDisabled()
+  })
 })
