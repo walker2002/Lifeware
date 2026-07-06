@@ -496,6 +496,10 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const logged = items.filter(i => i.state && i.state !== 'skipped')
       for (const it of items) {
         if (!it.state || it.state === 'skipped') continue
+        // [023.12] T7 (AM3) — 仅 planned 可打卡（避免对 logged/cancelled 行触发 SM 错误）
+        // open 路径已 filter t.status === 'ended'（L165），但批量场景下 user 可能在
+        // open 后修改时间窗口让某条进入终态，故加 server-side 守护。
+        if (it.status && it.status !== 'planned') continue
         try {
           const r = await submitDynamicIntent('timebox', 'logTimebox', {
             objectId: it.id,
@@ -593,6 +597,20 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         } catch (e) {
           // OV#8 守卫透传（service reject 必须出 surface error，不静默）
           return { success: false, error: e instanceof Error ? e.message : '删除失败' }
+        }
+      }
+
+      // [023.12] T7 (AM8)：op === 'revert' 分派到 revertTimebox server action
+      //   （Task 4 已建，含 executionRecord 守卫 + SM action 'revert'）。
+      //   适用场景：用户对已 logged/cancelled 的 timebox 走 edit 路径，期望
+      //   回到 planned 状态。SM 仅允许 from=logged/cancelled → to=planned。
+      if (op === 'revert') {
+        const { revertTimebox } = await import('@/app/actions/timebox')
+        try {
+          await revertTimebox(selectedId)
+          return { success: true, data: { id: selectedId } }
+        } catch (e) {
+          return { success: false, error: e instanceof Error ? e.message : '回退失败' }
         }
       }
 

@@ -1,10 +1,15 @@
 /**
  * @file timebox-overlap.ts
- * @brief [023.04] TimeOverlapRule — 改读 endTime + status-aware severity
+ * @brief [023.12] T7 TimeOverlapRule — 仅 planned 状态参与冲突检测
  *
  * 历史：duration 字段已撤（[023] A2 OV#P1-#1），改为读 intent.fields.endTime；
- *       与活跃（planned/running/overtime）已有时间盒重叠 → confirm；
- *       与终态（ended/cancelled/logged）重叠 → pass（不阻断）。
+ *       [023.04] 旧 status-aware 分级（planned/running/overtime → confirm；
+ *         ended/cancelled/logged → pass）—— 但 running/overtime/ended 在
+ *         [023.12] lifecycle 收敛后不再持久化（[023.12] T2 status union
+ *         = 'planned' | 'logged' | 'cancelled'）。
+ *       [023.12] T7 (AM9)：activeStatuses 收窄到 ['planned'] —— 唯一持久化
+ *         的"会占时间"状态。logged/cancelled 终态对规划新 timebox 不产生
+ *         冲突（与历史分级逻辑结论一致，但代码侧走最小集）。
  */
 
 import type { Rule, RuleResult } from '../evaluator'
@@ -51,12 +56,13 @@ function intervalsOverlap(
  * - timeboxRepo: 用于查询日期范围内的时间盒
  * - userId: 多租户过滤
  *
- * 评估逻辑（[023.04] 改读 endTime）：
+ * 评估逻辑（[023.12] T7 (AM9)）：
  * 1. 从 intent.fields 提取 startTime 和 endTime
  *    （[023] A2 OV#P1-#1 后 duration 已撤，由客户端把 duration 折成 endTime 上送）
  * 2. 查询 [startTime, endTime] 范围内已有时间盒
- * 3. 对每个 status ∈ {planned, running, overtime} 的活跃时间盒检查区间重叠
- * 4. 与活跃重叠 → confirm；与已结束/已取消/已记录 重叠 → pass（不阻断）
+ * 3. 对 status === 'planned' 的时间盒检查区间重叠（[023.12] status union
+ *    = 'planned' | 'logged' | 'cancelled' —— running/overtime/ended 不再持久化）
+ * 4. 与 planned 重叠 → confirm；与 logged/cancelled 重叠 → pass（不阻断）
  *
  * @param timeboxRepo - 时间盒仓库实例
  * @param userId      - 当前用户 ID
@@ -98,11 +104,12 @@ export function createTimeOverlapRule(
         userId,
       )
 
-      // [023.04]：status-aware 分级。
-      // 仅与活跃（planned/running/overtime）重叠 → confirm；
-      // 与已结束（ended/cancelled/logged）重叠 → pass。
-      // 原因：活跃时间盒是真的会撞；终态不再占时间，重复覆盖无副作用。
-      const activeStatuses = new Set(['planned', 'running', 'overtime'])
+      // [023.12] T7 (AM9)：activeStatuses 收窄到 ['planned']。
+      // 旧分级 [023.04]（planned/running/overtime vs ended/cancelled/logged）
+      // 已无意义——running/overtime/ended 在 [023.12] lifecycle 收敛后
+      // 不再持久化，read-time 派生显示（[023.12] T3 derive-display-status）。
+      // 结论不变：仅"会占时间"的状态 → confirm；终态 → pass。
+      const activeStatuses = new Set(['planned'])
       const overlappingTitles: string[] = []
       for (const tb of existingTimeboxes) {
         if (!activeStatuses.has(tb.status)) continue

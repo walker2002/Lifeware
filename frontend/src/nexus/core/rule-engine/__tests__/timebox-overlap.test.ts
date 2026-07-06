@@ -1,11 +1,14 @@
 /**
  * @file timebox-overlap.test
- * @brief [023.04] T1 timebox-overlap rule 改 endTime 单测
+ * @brief [023.04][023.12] T1 timebox-overlap rule 改 endTime 单测
  *
  * 修后行为（[023] A2 OV#P1-#1 后：duration 已撤，由 client 折成 endTime）：
  * - endTime 缺失 → pass（兼容）
- * - 与 planned/running/overtime 重叠 → confirm
- * - 与 ended/cancelled/logged 重叠 → pass（不阻断）
+ * - 与 planned 重叠 → confirm（[023.12] T7 (AM9) 收窄 activeStatuses）
+ * - 与 cancelled/logged 重叠 → pass（不阻断）
+ *
+ * [023.12] T7 (AM9) 修订：原 running/overtime 2 测改为 planned（status union
+ *   收敛后 running/overtime 不再持久化，读时派生显示，对应实际持久化是 planned）。
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -83,8 +86,11 @@ describe('[023.04] TimeOverlapRule — endTime-based', () => {
   })
 
   it('endTime 与 running timebox 重叠 → confirm', async () => {
+    // [023.12] T7 (AM9)：running 不再持久化，read-time 派生；DB 侧 status
+    //   始终是 planned。测用 planned 模拟「正在跑（planned 且 now ∈ [start,end])」
+    //   的时间盒——仍应触发 confirm（[planned] 永远参与冲突检测）。
     const rule = createTimeOverlapRule(mockRepo([
-      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '进行中', status: 'running' },
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '进行中', status: 'planned' },
     ]), userId as any)
     const r = await rule.evaluate(intent({
       startTime: '2026-07-04T09:30:00Z',
@@ -99,8 +105,9 @@ describe('[023.04] TimeOverlapRule — endTime-based', () => {
   })
 
   it('endTime 与 overtime timebox 重叠 → confirm', async () => {
+    // [023.12] T7 (AM9)：同 running 测 — overtime 不再持久化，DB 侧 status 是 planned。
     const rule = createTimeOverlapRule(mockRepo([
-      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '超时', status: 'overtime' },
+      { startTime: '2026-07-04T09:00:00Z', endTime: '2026-07-04T10:00:00Z', title: '超时', status: 'planned' },
     ]), userId as any)
     const r = await rule.evaluate(intent({
       startTime: '2026-07-04T09:30:00Z',

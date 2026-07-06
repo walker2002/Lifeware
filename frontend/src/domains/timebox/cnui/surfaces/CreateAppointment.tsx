@@ -1,9 +1,13 @@
 /**
  * @file CreateAppointment
- * @brief 创建约定 CNUI surface（[026][023.05]）
+ * @brief 创建约定 CNUI surface（[026][023.05][023.12]）
  *
- * 默认编辑表单（多记录翻页），可切"已有 {scheduled, in_progress} 约定列表"防重复
- * 录入（D2 reversal: 含 in_progress；in_progress 也可再编辑/删除）。
+ * 默认编辑表单（多记录翻页），可切"已有 scheduled 约定列表"防重复录入。
+ * [023.12] T7 (AM8)：原 list 中区分 in_progress/scheduled 的显示分支
+ *   已失效——in_progress 在新 status union（scheduled/cancelled/completed）
+ *   中不再持久化，读时由 status/derive-display-status.ts 派生。
+ *   本处 list 只显示由 AppointmentRepository.findActive 返回的 active
+ *   集合，UI 层不再做 in_progress 分支判断。
  * 4 字段复用 <AppointmentFormFields>（D4 决议 A）。
  */
 
@@ -62,7 +66,9 @@ export function CreateAppointment({ dataModel, onDataChange, onConfirm, onCancel
               <div key={e.id} className="rounded border border-hairline p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-ink truncate">{e.title}</span>
-                  <span className="text-body/70">{e.status === 'in_progress' ? '执行中' : '计划'}</span>
+                  {/* [023.12] T7 (AM8)：in_progress 已不持久化（read-time 派生），死分支移除。
+                      列表仅由 findActive 返回的 scheduled 状态，UI 一律显示「计划」。 */}
+                  <span className="text-body/70">计划</span>
                 </div>
                 <div className="text-body/70">{new Date(e.startTime).toLocaleString('zh-CN')}</div>
               </div>

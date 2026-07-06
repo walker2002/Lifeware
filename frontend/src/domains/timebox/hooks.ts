@@ -198,33 +198,16 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     const actions: ActionCandidate[] = []
     const now = new Date(snapshot.currentTime).getTime()
 
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'overtime') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-overtime` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `已超时: ${tb.title}`,
-        actionType: 'start_timebox',
-        category: 'tile',
-        weight: 95,
-      })
-      return { actions, category: 'tile', weight: 95 }
-    }
-
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'running') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-running` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `进行中: ${tb.title}`,
-        actionType: 'start_timebox',
-        category: 'tile',
-        weight: 90,
-      })
-      return { actions, category: 'tile', weight: 90 }
-    }
+    // [023.12] T7 (AM1) + T13 deferral:
+    // 原 3 个 currentTimebox 状态分支（overtime / running / ended）依赖
+    //   `snapshot.currentTimebox.status`——而 [023.12] status union 收敛后
+    //   此字段不再持久化（仅 'planned' | 'logged' | 'cancelled'）。
+    // 真实 currentTimebox 填充将由 [023.12] T13 接管：读时用
+    //   deriveTimeboxDisplayStatus（status/derive-display-status.ts）
+    //   派生 running/overtime，再决定 currentTimebox 候选。
+    // 本处 3 个分支全部 stub out（标 TODO 即可，T13 重写）：
+    // TODO(023.12 T13): 重建 currentTimebox 派生填充链 + 3 个 action tile
+    //   （overtime 95 / running 90 / ended 70），用 deriveTimeboxDisplayStatus 判定。
 
     for (const tb of snapshot.upcomingTimeboxes) {
       if (tb.status === 'planned') {
@@ -245,20 +228,6 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     }
     if (actions.length > 0) {
       return { actions, category: 'cue', weight: 80 }
-    }
-
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'ended') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-ended` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `记录执行结果: ${tb.title}`,
-        actionType: 'capture_intent',
-        category: 'cue',
-        weight: 70,
-      })
-      return { actions, category: 'cue', weight: 70 }
     }
 
     return { actions, category: 'cue', weight: 0 }
