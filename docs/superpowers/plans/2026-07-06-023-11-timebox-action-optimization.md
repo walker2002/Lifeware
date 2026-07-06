@@ -21,7 +21,7 @@
 - **CHANGELOG**：schema 变更 → 补 `[023.11]` 条目（覆盖 spec OQ-3 默认）。
 - **迁移手写**（[[project-drizzle-migrations-handwritten]]）：迁移是手写 SQL + `psql` 应用 + 登记 journal；`db:generate/migrate` 跑不通。下一个 idx=34。
 - **manifest 不增 surface / 不改 action 名**：不触发 C-1 四联审计。
-- **置信度常量**：`RULE_CONFIDENCE = 0.9`、`LLM_THRESHOLD = 0.7`。
+- **置信度常量**：`RULE_CONFIDENCE = 0.9`（正向包含）、`REVERSE_CONFIDENCE = 0.75`（反向包含，标题≥3 字）、`LLM_THRESHOLD = 0.7`。
 - **不在范围（defer）**：editTimeboxes 被动推断；用户自建 archetype 的 AI 辅助 synonyms 生成；editTimeboxes TOCTOU / batch failure UI / MVP_USER_ID 硬码。
 
 ---
@@ -648,7 +648,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
  * @brief [023.11] 活动原型匹配原语单测（规则含 synonyms + LLM 位置匹配）
  */
 import { describe, it, expect, vi } from 'vitest'
-import { matchArchetypesForTitles, RULE_CONFIDENCE, LLM_THRESHOLD } from '../archetype-matcher'
+import { matchArchetypesForTitles, RULE_CONFIDENCE, REVERSE_CONFIDENCE, LLM_THRESHOLD } from '../archetype-matcher'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 
@@ -688,6 +688,27 @@ describe('[023.11] archetype-matcher', () => {
   it('多 archetype 命中 → 取最长匹配串', async () => {
     const [r] = await matchArchetypesForTitles(['深度专注'], [arch('a1', '专注'), arch('a2', '深度专注')], mockRuntime('x'))
     expect(r?.archetypeId).toBe('a2')
+  })
+
+  it('[C5] 反向包含（title≥3 字，term 含 title）→ REVERSE_CONFIDENCE(0.75)', async () => {
+    // title '深度专注'(4字) 是 l2Name '深度专注工作' 的子串 → 反向包含
+    const [r] = await matchArchetypesForTitles(['深度专注'], [arch('a1', '深度专注工作')], mockRuntime('x'))
+    expect(r).toEqual({ archetypeId: 'a1', confidence: REVERSE_CONFIDENCE, source: 'rule' })
+  })
+
+  it('[C5] 2 字标题不触发反向包含 → 落 LLM（防泛词误匹配）', async () => {
+    // title '专注'(2字) 是 l2Name '深度专注' 的子串，但 <3 字 → 反向被挡 → 规则 null
+    const runtime = mockRuntime(JSON.stringify({ results: [{ archetypeId: 'a1', confidence: 0.8 }] }))
+    const [r] = await matchArchetypesForTitles(['专注'], [arch('a1', '深度专注')], runtime)
+    expect(r?.source).toBe('llm') // 规则未命中，LLM 兜底
+  })
+
+  it('[C5] 正向包含优先于反向（同时命中取正向高置信）', async () => {
+    // a1 l2Name='深度专注'(正向命中 title '深度专注')；a2 l2Name='深度专注工作'(反向命中)
+    const [r] = await matchArchetypesForTitles(['深度专注'],
+      [arch('a1', '深度专注'), arch('a2', '深度专注工作')], mockRuntime('x'))
+    expect(r?.archetypeId).toBe('a1')
+    expect(r?.confidence).toBe(RULE_CONFIDENCE)
   })
 
   it('规则未命中 → LLM 位置匹配命中（≥门槛）→ llm', async () => {
@@ -764,7 +785,8 @@ Run: `cd frontend && npx vitest run src/domains/timebox/lib/__tests__/archetype-
  *
  * 纯函数 —— DB/aiRuntime 由调用方注入（守 R-01，便于单测 mock）。
  *
- * 规则轮（本地）：标题归一化后判 l2Name 或任一 synonym 的双向子串包含；命中取最长匹配串。
+ * 规则轮（本地）：标题归一化后判 l2Name 或任一 synonym 的子串包含。
+ *   正向包含（title 含 term）→ 0.9；反向包含（term 含 title，title≥3 字）→ 0.75（[C5] 防短词误匹配）。正向优先。
  * LLM 兜底轮（仅对规则未命中的非空标题，批量一次）：注入 archetype 目录（含 synonyms），
  *   要求 results 按输入 titles 顺序返回（位置匹配，Issue 1），长度不等则整体降级 null。
  */
@@ -778,6 +800,8 @@ export interface ArchetypeMatch {
 }
 
 export const RULE_CONFIDENCE = 0.9
+/** [C5] 反向包含（term 含 title，title≥3 字）—— 较低置信，避免短标题过度自信误匹配 */
+export const REVERSE_CONFIDENCE = 0.75
 export const LLM_THRESHOLD = 0.7
 
 function normalizeTitle(title: string): string {
@@ -789,23 +813,33 @@ function normalizeTitle(title: string): string {
     .trim()
 }
 
-/** 规则轮：单标题在目录里找最长匹配串（l2Name 或任一 synonym 双向子串包含） */
+/**
+ * 规则轮：单标题在目录里找匹配。
+ * - 正向包含（title 含 term）→ RULE_CONFIDENCE(0.9)，取最长 term
+ * - 反向包含（term 含 title，且 title≥3 字）→ REVERSE_CONFIDENCE(0.75)，取最长 term
+ * - 正向优先于反向（正向更具体）；都不命中 → null（交 LLM 兜底）
+ * [C5] 反向要求 title≥3 字 + 降置信，挡住 2 字泛词（如"工作"/"运动"）误匹配。
+ */
 function ruleMatch(title: string, archetypes: ActivityArchetype[]): ArchetypeMatch | null {
   const norm = normalizeTitle(title)
   if (!norm) return null
-  const candidates = archetypes
-    .map((a) => {
-      const terms = [a.l2Name, ...(a.synonyms ?? [])]
-        .map((t) => t.trim().toLowerCase())
-        .filter((t) => t.length > 0)
-      if (terms.length === 0) return null
-      const matched = terms.find((t) => norm.includes(t) || (norm.length >= 2 && t.includes(norm)))
-      return matched ? { a: a, score: matched.length } : null
-    })
-    .filter((x): x is { a: ActivityArchetype; score: number } => x !== null)
-  if (candidates.length === 0) return null
-  candidates.sort((x, y) => y.score - x.score)
-  return { archetypeId: candidates[0].a.id, confidence: RULE_CONFIDENCE, source: 'rule' }
+  let bestForward: { a: ActivityArchetype; score: number } | null = null
+  let bestReverse: { a: ActivityArchetype; score: number } | null = null
+  for (const a of archetypes) {
+    const terms = [a.l2Name, ...(a.synonyms ?? [])]
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+    for (const t of terms) {
+      if (norm.includes(t)) {
+        if (!bestForward || t.length > bestForward.score) bestForward = { a, score: t.length }
+      } else if (norm.length >= 3 && t.includes(norm)) {
+        if (!bestReverse || t.length > bestReverse.score) bestReverse = { a, score: t.length }
+      }
+    }
+  }
+  if (bestForward) return { archetypeId: bestForward.a.id, confidence: RULE_CONFIDENCE, source: 'rule' }
+  if (bestReverse) return { archetypeId: bestReverse.a.id, confidence: REVERSE_CONFIDENCE, source: 'rule' }
+  return null
 }
 
 function parseLoose(raw: string): unknown {
@@ -875,7 +909,7 @@ export async function matchArchetypesForTitles(
 
 - [ ] **Step 4: 跑测试 + tsc**
 
-Run: `cd frontend && npx vitest run src/domains/timebox/lib/__tests__/archetype-matcher.test.ts` → 全 PASS（14 用例）
+Run: `cd frontend && npx vitest run src/domains/timebox/lib/__tests__/archetype-matcher.test.ts` → 全 PASS（17 用例）
 Run: `cd frontend && npx tsc --noEmit` → 零新增
 
 - [ ] **Step 5: Commit**
@@ -933,6 +967,12 @@ describe('[023.11] matchArchetypeForTitle', () => {
   it('空 title → { matched: false } 且不查 DB / 不调 matcher', async () => {
     expect(await matchArchetypeForTitle('   ')).toEqual({ matched: false })
     expect(mockMatch).not.toHaveBeenCalled()
+  })
+  it('[错误路径] repo.findByUser 抛错 → { matched: false }（catch 兜底）', async () => {
+    MockedRepo.mockImplementationOnce(function () {
+      return { findByUser: vi.fn().mockRejectedValue(new Error('db down')) } as unknown as InstanceType<typeof ActivityArchetypeRepository>
+    })
+    expect(await matchArchetypeForTitle('写代码')).toEqual({ matched: false })
   })
 })
 ```
@@ -1004,7 +1044,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 > - `showAiMatch = enableAiMatch && !readOnly && !!title?.trim()`；`aiMatchBtn`（"AI 匹配" / "匹配中…"）
 > - selected 与 !selected 两分支的按钮区各用 `<div className="flex shrink-0 items-center gap-2">` 包「更换/选择」+ `{aiMatchBtn}`
 > - 组件末尾 `{aiError && <p className="mt-1 text-xs text-error">未找匹配的活动原型</p>}`
-> - 5 测试：渲染 / 无 title 不显 / readOnly 不显 / 命中 onChange / 未命中显提示
+> - 7 测试：渲染 / 无 title 不显 / readOnly 不显 / 命中 onChange / 未命中显提示 / **[错误路径] loading 态显示"匹配中…"且禁用按钮**（mock `mockMatchArchetype.mockReturnValueOnce(new Promise(()=>{}))` 永挂，断言"匹配中…"出现 + 按钮 disabled）/ **[错误路径] action reject → aiError 显示「未找匹配的活动原型」**（`mockMatchArchetype.mockRejectedValueOnce(new Error('net'))`）
 
 - [ ] **Steps 1-5:** 写 5 失败测试 → 跑失败 → 实现 picker → 跑 PASS + tsc → commit `feat(023.11): ArchetypePicker 加「AI 匹配」按钮`
 
@@ -1023,6 +1063,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 > - parseTimeboxBatchIntentOnly：drafts map 后加 try/catch：`const archetypes = await new ActivityArchetypeRepository().findByUser(MVP_USER_ID); if (archetypes.length>0) { const matches = await matchArchetypesForTitles(drafts.map(d=>d.title), archetypes, aiRuntime); drafts.forEach((d,i)=>{ if(!d.activityArchetypeId && matches[i]) d.activityArchetypeId = matches[i]!.archetypeId }) }`
 > - `TimeboxBatchParseResult.drafts` 元素类型加 `activityArchetypeId?: string`
 > - 2 测试：命中带 id / 未命中 undefined（mock parseMultiTask 返固定 intent + mock matcher）
+> - **[错误路径] archetype repo 抛错 → try/catch degrade**：drafts 仍 success 返回、不带 archetypeId（`MockedRepo.mockImplementationOnce` 让 findByUser reject；断言 `r.success===true && r.drafts[0].activityArchetypeId===undefined`）
+> - **[错误路径] archetypes 为空 → 跳过 matcher**：repo 返 `[]`；断言 `mockMatchArchetypes` 未被调用、drafts 不带 archetypeId（覆盖 plan 的 `if (archetypes.length>0)` 短路）
 
 - [ ] **Steps 1-5:** 写 2 失败测试 → 失败 → 实现 → PASS + tsc → commit `feat(023.11): createTimebox 被动推断 archetype`
 
