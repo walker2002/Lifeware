@@ -246,6 +246,7 @@
 - **D3**: AI 匹配是 opt-in（不自动推断必填）—— 用户主动点「AI 匹配」触发；createTimebox 被动推断仅在 archetype 未填且 user 显式调用时生效
 - **D4**: seedDefaults 幂等升级 —— 旧 system archetype（无 synonyms）下次 seed 自动补齐；用户自定义 archetype 不被覆盖
 - **D5**: error 降级不抛 —— server action 出错一律 `{ matched: false }`，避免污染 CNUI 表单提交流程
+- **D6**: T6 test 16 偏差注记 —— plan 写 `'跑步'`（意图：测未命中 fallback LLM），但 `'跑步'` 是「有氧运动」的 synonym，会被规则命中、覆盖 LLM 路径。implementer 改用 `'散步'`（不属于任何 archetype 的 synonym）保留 LLM 兜底测试意图，逻辑与 plan 一致
 
 ### Verification
 
@@ -254,6 +255,12 @@
 - validate:manifest 0 errors
 - validate:domain-structure ✓
 - prod migrate 已跑通（含 0034 + down 双向幂等）
+
+### Prod Deploy（按顺序执行）
+
+1. `./prod.sh --migrate` —— 应用 0034（`ADD COLUMN IF NOT EXISTS` 幂等，可重跑）
+2. **必须**跑 `seedArchetypes` server action（或 `scripts/seed-prod.ts`）—— 给既有 30 条系统 archetype 补 `synonyms` 默认值。**注意**：migration 只加列（`synonyms` 默认 `'[]'`），**不会**回填已有 system archetype 的 synonym 数据；不跑此步则 prod matcher 只能命中 `l2Name` 完全相等 + `synonyms=[]` 之外的陌生标题，被静默降级为 LLM 兜底
+3. 验证：`SELECT l2_name, synonyms FROM activity_archetypes WHERE is_system = true ORDER BY l2_name LIMIT 5;` —— 应见非空数组（如 `["写代码", "编程", "coding"]`）
 
 ### Out of Scope (deferred to [023.11+])
 
