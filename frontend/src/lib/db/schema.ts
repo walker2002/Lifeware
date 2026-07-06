@@ -78,8 +78,10 @@ export const cycles = pgTable('cycles', {
   status: text('status', { enum: ['draft', 'approved', 'finished', 'reviewed'] }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  startedAt: timestamp('started_at', { withTimezone: true }),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
+  // [023.12] AM6 + AM2 drizzle bridge: TS 字段名 rename (startedAt→approvedAt, endedAt→finishedAt)
+  // 列名暂留 'started_at'/'ended_at'（T1b migration 0034 改 DB 列名对齐）
+  approvedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('ended_at', { withTimezone: true }),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
 }, (table) => [
   check('check_cycles_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
