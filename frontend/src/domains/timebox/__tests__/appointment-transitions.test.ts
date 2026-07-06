@@ -25,7 +25,7 @@ type AnyStatus = AppointmentStatus | null
 /** 缓存的 manifest（仅加载一次） */
 const manifestResult = loadDomainManifest('timebox')
 if (!manifestResult.success) {
-  throw new Error(`loadDomainManifest('timebox') failed: ${JSON.stringify(manifestResult.error)}`)
+  throw new Error(`loadDomainManifest('timebox') failed: ${JSON.stringify(manifestResult.errors)}`)
 }
 const appointmentLifecycle = manifestResult.manifest.lifecycle?.appointment
 if (!appointmentLifecycle) {

@@ -7,7 +7,7 @@
  * ActionView → 本组件。
  *
  * 与 /app/appointments/page.tsx（Next.js 页面路由）渲染同一 AppointmentWorkspace：
- * - 独立 route 走 server component（首屏直出，reconcileAndAdvanceAppointments + getAppointmentsByRange）
+ * - 独立 route 走 server component（首屏直出，getAppointmentsByRange 直出数据）
  * - 本组件走 client 懒加载 fetch（同 TimeboxTemplatesPage 范式），用于主框架内嵌
  *
  * 设计约束：SSOT 来自 manifest.yaml intent_triggers.viewAppointments（response_type: page）。

@@ -5,9 +5,9 @@
  * 手写 Next.js page route（不走 codegen）。h-screen 锚定视口，避免内层
  * overflow-y-auto 因缺高度天花板失效（参 app/timeboxes/page.tsx 同款约束）。
  *
- * [023.12] T5: 3 态收敛后，reconcile 改读时派生——不再在 server component 加载时
- * 调 reconcileAndAdvanceAppointments 写库。约定显示状态 badge（in_progress / expired）
- * 由客户端读 appointments + now 派生（deriveAppointmentDisplayStatus）。
+ * [023.12] T5: 3 态收敛后无 reconcile 写库路径——server component 仅调
+ * getAppointmentsByRange 加载数据；约定显示状态 badge（in_progress / expired）
+ * 由客户端读 appointments + now 派生（status/derive-display-status.ts）。
  */
 import { getAppointmentsByRange } from '@/app/actions/intent'
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
