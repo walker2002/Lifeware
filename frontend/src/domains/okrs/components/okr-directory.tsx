@@ -37,6 +37,7 @@ import {
   CycleApproveMenuItem,
   CycleEndMenuItem,
   CycleReviewMenuItem,
+  CycleRevertMenuItem,
 } from "./cycle-menu"
 import type { Cycle, Objective } from "@/usom/types/objects"
 
@@ -62,6 +63,8 @@ interface OKRDirectoryProps {
   onCycleEnded?: () => void
   /** [022.01] Task 5：复盘周期后回调（刷新 cycle 列表） */
   onCycleReviewed?: () => void
+  /** [023.12] T9：撤销复盘后回调（刷新 cycle 列表） */
+  onCycleReverted?: () => void
 }
 
 // [022.01] Task 4：顶部筛选 tabs 改为 Cycle 状态。
@@ -111,6 +114,7 @@ export function OKRDirectory({
   onCycleApproved,
   onCycleEnded,
   onCycleReviewed,
+  onCycleReverted,
 }: OKRDirectoryProps) {
   const handleCreateCycle = onCreateCycleClick ?? (() => {})
   const handleAddObjective = onAddObjectiveToCycle ?? (() => {})
@@ -221,6 +225,10 @@ export function OKRDirectory({
                     <CycleReviewMenuItem
                       cycle={cycle}
                       onReviewed={onCycleReviewed}
+                    />
+                    <CycleRevertMenuItem
+                      cycle={cycle}
+                      onReverted={onCycleReverted}
                     />
                     <DropdownMenuItem
                       disabled={hasObjectives}
