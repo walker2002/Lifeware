@@ -224,6 +224,46 @@
 - 2026_06_30 — A3.1 tasks/habits 接入 activity_archetype + 删 energyProfile
 - 2026_06_29 — A2 Timebox 域重写（timeboxes +3 列 + createTimeboxMutationService + /schedule 工作台 + 3 CNUI surface + /timebox-templates）
 
+## [023.11] Timebox action 优化（archetype 智能匹配）
+
+> 2026_07_06 — [023.10] T8 闭环 + 标题→archetype AI 匹配闭环 + editTimeboxes UX 收尾。Schema 变更：activity_archetypes 加 `synonyms jsonb` 列（迁移 0034 + down + journal idx=34）。
+
+### Scope
+
+- **Schema**: `activity_archetypes` 加 `synonyms jsonb NOT NULL DEFAULT '[]'`（迁移 `0034_023_11_archetype_synonyms.sql` + down，幂等 `ADD COLUMN IF NOT EXISTS`；journal idx=34）
+- **Seed**: 30 条系统 archetype 的 `synonyms` 默认值（覆盖工作/学习/健康/生活等典型活动；`seedDefaults` 升级为幂等 — 已存在 system archetype 补 `synonyms` 字段，不重复创建）
+- **Tier-2 文档**: `docs/database-design.md`（activity_archetypes 表新增列说明）+ `docs/usom-design.md`（ActivityArchetype USOM 类型加 `synonyms` 字段）
+- **archetype-matcher 原语**: `domains/timebox/lib/archetype-matcher.ts` —— 规则优先（l2Name + synonyms + l1Category 包含匹配，forward/reverse 双向置信度），未命中 fallback LLM 位置匹配（返回命中位置便于审计）
+- **`matchArchetypeForTitle` server action**: 包装 matcher + AI Runtime；返回 `{ matched, archetypeId?, position? }`，错误降级 `{ matched: false }`（不抛）
+- **ArchetypePicker「AI 匹配」按钮**: opt-in（`enableAiMatch` + `title` prop）；loading 态显示「匹配中…」+ 按钮 disabled；未命中/错误 → 「未找匹配的活动原型」红字
+- **createTimebox 被动推断**: 在 mutation service 中根据 title 调 matcher 推 archetype，未命中时不阻塞用户输入
+- **editTimeboxes UX 修复**: (1) manifest description 补全；(2) 双重标题去重（schema title + manifest title 二选一）；(3) 编辑页 `useEffect[selectedId]` 同步 prefill→draft，修复空白态
+
+### Decisions
+
+- **D1**: synonyms 用 `jsonb` 数组（非 text 逗号分隔）—— 保持 USOM 列表语义（与 environment/location 一致），便于 future GIN 索引
+- **D2**: matcher 规则优先 + LLM fallback —— 零 LLM 调用覆盖 80%+ 场景（l2Name 直接命中 + 同义词），LLM 只在标题完全陌生时介入；返回 `position` 便于审计
+- **D3**: AI 匹配是 opt-in（不自动推断必填）—— 用户主动点「AI 匹配」触发；createTimebox 被动推断仅在 archetype 未填且 user 显式调用时生效
+- **D4**: seedDefaults 幂等升级 —— 旧 system archetype（无 synonyms）下次 seed 自动补齐；用户自定义 archetype 不被覆盖
+- **D5**: error 降级不抛 —— server action 出错一律 `{ matched: false }`，避免污染 CNUI 表单提交流程
+
+### Verification
+
+- vitest base=head 失败集合 0 新增（同步命中/未命中/loading/错误 路径测试覆盖）
+- tsc 0 新增错误
+- validate:manifest 0 errors
+- validate:domain-structure ✓
+- prod migrate 已跑通（含 0034 + down 双向幂等）
+
+### Out of Scope (deferred to [023.11+])
+
+- R8 prod 命中率 gate — synonyms 实际匹配质量需真实用户流量验证
+- M-2 H4 SWR 缓存 — ArchetypePicker archetypes 仍每次挂载拉取
+- M-3+M-4 Minor polish — AI 匹配按钮文案/动效
+- I-1 synthesized action `update_timebox` 不在 manifest lifecycle（[023.04] 遗留）
+
+---
+
 ## [023.10] createSmartTimeBoxes 链路 post-ship defer cleanup
 
 > 2026_07_05 — **6 commits ship on feat/023-10-postship-defer-cleanup**: T1→T6; T7 验证 non-orphan (Codex #10 守门生效, 安全网救了一个潜在错删); T8 defer to [023.11] (useOrchestrationRecommendations hook 不存在)。
@@ -267,6 +307,31 @@
 - C2/C3 deploy-gate (real LLM provider / eval)
 - D1 F9 N+1 实际修复
 - D2 F4 abstraction leak 迁移
+
+### 遗留债（录入 `docs/tech-debt/`）
+
+2026-07-06 通过 `/record-tech-debt` skill 录入两批共 **13 条**([023.10] scope)：
+
+**第一批 8 条（🟠4 + 🟡4）**：
+
+- [[TD-001]] · 🟠 · `useOrchestrationRecommendations` hook 不存在 → T8 defer [023.11]（同源 Out of Scope 第 1 条）
+- [[TD-002]] · 🟠 · `logTimebox` 批失败处理不对称（Codex 7 PRE-EXISTING 债 4 defer 之一）
+- [[TD-003]] · 🟠 · `editTimeboxes` TOCTOU（Codex 7 PRE-EXISTING 债 4 defer 之一）
+- [[TD-004]] · 🟠 · R4 timebox/okrs 写入口债（[018] followup 历史遗留）
+- [[TD-005]] · 🟡 · `MVP_USER_ID` 硬码（Codex 7 PRE-EXISTING 债 4 defer 之一）
+- [[TD-006]] · 🟡 · orchestration N+1 sequential（Codex 7 PRE-EXISTING 债 4 defer 之一）
+- [[TD-007]] · 🟡 · Suspend action 完整 CNUI 回环未闭环（[018] Suspend ⑥ 未闭环）
+- [[TD-008]] · 🟡 · `lifecycle-configs require('@/...')` 多键域债（[025] Task3 同源一半）
+
+**第二批 5 条（🟢3 + ⚪2）**：
+
+- [[TD-009]] · 🟢 · `logTimebox` 重复 filter（Codex 7 PRE-EXISTING 债 4 defer 之一）
+- [[TD-010]] · 🟢 · I-1 synthesized action `update_timebox` 不在 manifest lifecycle（[023.04] plan-eng-review I-1）
+- [[TD-011]] · ⚪ · I-3 `_dayStart`/`_dayEnd` unused params（[023.04] plan-eng-review I-3）
+- [[TD-012]] · ⚪ · [023.05-1] PR1 Polish 3 Minor（PR1 polish follow-up 遗留）
+- [[TD-013]] · 🟢 · manifest validator K-component PascalCase 约束未文档化（[023] A2 pre-push hook 经验）
+
+**合并**：原第二批候选 #11「Suspend 完整 CNUI 回环⑥」与 [[TD-007]] 同源 → 合并,不再另建。
 
 ---
 
