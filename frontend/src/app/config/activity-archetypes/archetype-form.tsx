@@ -344,6 +344,9 @@ export function ArchetypeForm({
         <p className="text-xs text-muted-foreground">
           用于 AI 从标题自动匹配活动原型；填同义词与该原型覆盖的具体活动
         </p>
+        <p className="text-xs text-muted-foreground">
+          留空则下次运行 seed 可能会被默认值覆盖（系统内置条目）
+        </p>
       </div>
 
       {/* parallelizable */}

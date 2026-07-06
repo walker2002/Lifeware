@@ -1,3 +1,7 @@
+/**
+ * @file activity-archetype.test
+ * @brief [023.11] matchArchetypeForTitle server action 单测（命中/未命中/空 title/错误路径）
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/nexus/ai-runtime', () => ({ createAIRuntime: vi.fn(() => ({})) }))

@@ -47,7 +47,14 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
       const r = await matchArchetypeForTitle(t)
       if (r.matched && r.archetypeId) onChange?.(r.archetypeId)
       else setAiError(true)
-    } catch { setAiError(true) }
+    } catch (err) {
+      // [023.11] review fix: action reject 与 matched:false 是不同情形；先记日志便于排查
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.warn('[ArchetypePicker] ai match rejected', err)
+      }
+      setAiError(true)
+    }
     finally { setAiMatching(false) }
   }
   const showAiMatch = enableAiMatch && !readOnly && !!title?.trim()
