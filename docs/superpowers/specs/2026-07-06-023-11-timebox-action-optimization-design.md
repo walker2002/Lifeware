@@ -309,3 +309,76 @@ selecting 模式点选记录
 - **OQ-1**：manifest validator 对 description 是否有长度/字符约束？→ implementer pre-check（`npm run validate:manifest` 跑通即放行）。
 - **OQ-2**：LLM 匹配 prompt 的 system 文案与 few-shot 示例具体措辞 ——writing-plans / 实现阶段细化（不影响架构）。
 - **OQ-3**：[023.11] 是否在 CHANGELOG 留条目 ——plan 阶段决定（默认不留，参 [023.06]/[023.07] 同模式）。
+
+---
+
+## 10. [plan-eng-review] Scope 扩张决议：synonyms 字段折入（2026-07-06）
+
+**触发**：plan-eng-review 评审中，用户识别到 archetype 表 `l2Name` 过简（如"深度专注"），用户标题（如"写代码"）与其无子串交集 → **规则轮几乎空转、全落 LLM**。决议：把"archetype 同义词/范围字段"从 defer 折入 [023.11]，使规则轮真正生效、LLM catalog 信息更丰富。
+
+> 本节是对前文 §0-§9 的扩张。冲突时以本节为准（§6 文件清单、§7 治理、§8 defer 据此更新）。
+
+### 10.1 字段设计
+
+- **DB 列**：`activity_archetypes.synonyms jsonb NOT NULL DEFAULT '[]'::jsonb`（drizzle `.$type<string[]>()`，与 energyCost/activityLabel 同 jsonb 模式）。
+- **USOM 类型**：`ActivityArchetype.synonyms: string[]`（必填，DB 默认 `[]`）。
+- **语义**：`string[]` 既放**同义词**也放**范围描述短语**（如 深度专注 → `["写代码","编程","coding","技术研究","论文","深度工作"]`）。规则轮按子串命中任一项；LLM catalog 带上作为语义锚点。
+- **schemaVersion**：保持 1（新增可选/默认字段，向后兼容，不强制 bump）。
+
+### 10.2 迁移（idx=34，tag `0034_023_11_archetype_synonyms`）
+
+- `0034_023_11_archetype_synonyms.sql`：`ALTER TABLE activity_archetypes ADD COLUMN IF NOT EXISTS synonyms jsonb NOT NULL DEFAULT '[]'::jsonb;`（BEGIN/COMMIT + 设计文档头注，照 0032 模式）。
+- `0034_023_11_archetype_synonyms.down.sql`：`ALTER TABLE activity_archetypes DROP COLUMN IF EXISTS synonyms;`。
+- **登记 journal idx=34**（手写，参 [[project-drizzle-migrations-handwritten]]）。
+- **不做迁移内 backfill**：activity_archetypes 无 (user_id,l1,l2) UNIQUE 约束，迁移内 `UPDATE SET synonyms=(SELECT ...)` 触发 [[backfill-scalar-subquery-needs-unique-or-limit1]] 风险。**改由 `seedDefaults` 升级路径在 app 层幂等 UPDATE**（见 10.4）。
+- **prod**：migrate 后须重跑 seed（`seed-prod.ts` / `./prod.sh --migrate`）给既有系统条目补 synonyms。
+
+### 10.3 USOM / IRepo / mapper / Repository
+
+- `usom/activity-archetype/types.ts`：`ActivityArchetype` 加 `synonyms: string[]`。
+- `usom/interfaces/irepository.ts`：`CreateActivityArchetypeInput.synonyms?: string[]`；`UpdateActivityArchetypeInput.synonyms?: string[]`。
+- `repositories/activity-archetype.repository.ts`：
+  - `rowToArchetype`：`synonyms: row.synonyms ?? []`。
+  - `create`：`synonyms: input.synonyms ?? []`。
+  - `update`：`input.synonyms` 分支（加入 `changedFields` + audit 新旧值）。
+  - `seedDefaults`：升级路径（见 10.4）。
+
+### 10.4 seedDefaults 升级路径（幂等，不踩 unique 坑）
+
+```
+for each seed（含 synonyms 字段）:
+  if (l1,l2) 不存在 → INSERT（带 synonyms）
+  elif 既有行 is_system=true AND synonyms IS NULL OR synonyms = '[]' → UPDATE synonyms（升级既有系统条目）
+  else → skip（不动用户自建 / 已维护 synonyms 的条目）
+```
+
+`usom/seed/activity-archetypes.ts`：`ActivityArchetypeSeed` 加 `synonyms: string[]`，全部 30 条系统 archetype 补 synonyms 内容（见 plan §T4）。
+
+### 10.5 配置 UI
+
+`app/config/activity-archetypes/archetype-form.tsx`：加 `synonyms` textarea（逗号分隔，复用既有 `parseCommaList`/`joinCommaList`），create/update 提交时透传 `synonyms`。
+
+### 10.6 matcher 接入（spec §3.0 升级）
+
+- **规则轮**：候选判定改为 `title.includes(l2Name) || synonyms.some(s => title.includes(s))`；`title.length>=2` 时也判 `l2Name.includes(title) || synonyms.some(s => s.includes(title))`。命中取最长匹配串（最具体）。
+- **LLM 兜底轮**：catalog 每条带 `synonyms`。
+- **Issue 1 修复（位置匹配）**：prompt 要求 results **按输入 titles 顺序返回**，matcher 按下标 `results[i]` 对回（不再靠 `r.title===t`）。
+
+### 10.7 新增验收（追加到 §1）
+
+- **F6**：`activity_archetypes` 新增 `synonyms jsonb` 列；dev/prod 迁移 + down 可逆；journal idx=34。
+- **F7**：系统 30 条 archetype seed 全部带 synonyms；既有系统条目重跑 seed 后被升级（用户自建条目不动）。
+- **F8**：archetype 配置表单可编辑 synonyms；create/update 正确落库。
+- **F9**：matcher 规则轮命中 synonyms（如标题"写代码" → archetype"深度专注"经其 synonyms 命中，source=rule，零 LLM）。
+- **F10**：matcher LLM 兜底用位置匹配（Issue 1）。
+
+### 10.8 治理更新（覆盖 §7）
+
+- **有 DB 迁移 + USOM schema 变更** → **Tier-2 文档同步强制**（参 [[feedback_tier2-sync]]）：`docs/database-design.md`（activity_archetypes 表加 synonyms 列）+ `docs/usom-design.md` §3.11（ActivityArchetype 加 synonyms）**必须在代码合并前更新**。
+- **CHANGELOG**：schema 变更 → 补 `[023.11]` 条目（覆盖 OQ-3 的"默认不留"）。
+- 仍**无新 CNUI surface / 无新 action**（不触发 C-1 四联）。
+
+### 10.9 §8 defer 更新
+
+- 移除"archetype 表加 keywords 字段 defer"（已折入为 synonyms）。
+- 新 defer：用户自建 archetype 的 synonyms 推荐生成（AI 辅助填 synonyms）→ 后续。
