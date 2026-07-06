@@ -35,6 +35,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 import { DayView } from './day-view'
 import { WeekView } from './week-view'
 import { MonthView } from './month-view'
@@ -95,6 +96,11 @@ export function TimeboxesWorkspace() {
   const [revertableBatches, setRevertableBatches] = useState<Array<{ batchId: string; acceptedAt: number; count: number }>>([])
 
   // [023.06] T2：范围拉取（替代 loadDay，行为对齐 T1 getDateRange）
+  // [023.12] T14 fix: pathname 守卫 —— workspace 只在 /timeboxes（或含时间盒主区）挂载
+  //   拉取。其他路径下的 mount（如挂在共享 layout 时）是 HMR/Next devtools 副作用，
+  //   catch 静默 no-op，避免 [TimeboxesWorkspace] 加载失败 噪声日志误以为真错。
+  const pathname = usePathname()
+  const isWorkspaceRoute = pathname?.startsWith('/timeboxes') ?? false
   const loadRange = useCallback(async (mode: DateViewMode, d: Date) => {
     setLoading(true)
     try {
@@ -105,11 +111,14 @@ export function TimeboxesWorkspace() {
       ])
       setEvents(mergeEvents(timeboxList, appointmentList))
     } catch (e) {
-      console.error('[TimeboxesWorkspace] 加载失败', e)
+      // 仅在 workspace 路由下才报可见错误；非 workspace 路由（layout 误挂载）静默 no-op
+      if (isWorkspaceRoute) {
+        console.error('[TimeboxesWorkspace] 加载失败', e)
+      }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isWorkspaceRoute])
 
   useEffect(() => {
     loadRange(dateMode, currentDate)
@@ -349,8 +358,11 @@ export function TimeboxesWorkspace() {
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
+            // [023.12] T14 fix: 加载占位明确标 "加载中…"，避免与空卡片视觉混淆
+            //   原 h-16 bg-surface-card animate-pulse 在 /qa 截图里被误判为「空时间盒卡」。
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-body/70">
+              <div className="size-6 animate-spin rounded-full border-2 border-hairline border-t-primary" />
+              <span>加载中…</span>
             </div>
           ) : dateMode === 'day' ? (
             events.length === 0 ? (

@@ -36,6 +36,7 @@ vi.mock('@/app/actions/timebox', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => '/timeboxes',
 }))
 
 describe('[023.08] P0 fix — handleAiConfirm createTimebox routing', () => {
