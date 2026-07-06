@@ -77,10 +77,9 @@ ALTER TABLE appointments
   ADD COLUMN IF NOT EXISTS activity_archetype_id uuid
     REFERENCES activity_archetypes(id) ON DELETE SET NULL;
 
--- 索引：archetype 反向查询「哪些 appointment 用这个原型」
+-- 索引：archetype 反向查询「哪些 appointment 用这个原型」（普通索引，量级小）
 CREATE INDEX IF NOT EXISTS idx_appointments_archetype
-  ON appointments(activity_archetype_id)
-  WHERE activity_archetype_id IS NOT NULL;
+  ON appointments(activity_archetype_id);
 ```
 
 **journal**：`frontend/src/lib/db/migrations/meta/_journal.json` 登 idx=34：
@@ -221,9 +220,10 @@ appointment:
     label: 关系人
     required: false
     mutation_mode: ContentField
-  # [026.01] archetype FK 字段元数据
+  # [026.01] archetype FK 字段元数据（UUID 用 string type 标注，
+  # 贴近 domain-types.ts FieldMetadata.type 合法取值集合）
   activityArchetypeId:
-    type: archetype_ref
+    type: string
     label: 活动原型
     required: false
     mutation_mode: ContentField
@@ -261,8 +261,8 @@ export const appointments = pgTable('appointments', {
 }, (table) => [
   index('idx_appointments_user_status_start').on(table.userId, table.status, table.startTime),
   index('idx_appointments_user_status').on(table.userId, table.status),
-  // [026.01] archetype 反向查询索引（部分索引，仅非空值）
-  index('idx_appointments_archetype').on(table.activityArchetypeId).where(sql`${table.activityArchetypeId} IS NOT NULL`),
+  // [026.01] archetype 反向查询索引（普通索引，量级小无需 partial index）
+  index('idx_appointments_archetype').on(table.activityArchetypeId),
 ])
 ```
 
@@ -898,7 +898,7 @@ const APPOINTMENT_UPDATE_ALLOWED_FIELDS = new Set([
 | `cnui/surfaces/__tests__/create-appointment.test.tsx` | 已存在 | 加 archetype pickerCard 渲染 + AI 匹配按钮触发 + 翻页透传 |
 | `cnui/surfaces/__tests__/edit-appointment.test.tsx` | 已存在 | **重写**：双视图切换 + 分页（5 条/页）+ AI 解析注入 + 删除按钮 + AlertDialog |
 | `cnui/surfaces/__tests__/appointment-form-fields.test.tsx` | 已存在 | 加 archetype pickerCard 集成 + 5 字段渲染 |
-| `__tests__/appointment-repository.test.ts` | 检查存在性 | 加 archetype 字段读写 |
+| `__tests__/appointment.test.ts` | 已存在（repository 层） | 加 archetype 字段读写测试 |
 
 ### 7.2 类型检查
 
