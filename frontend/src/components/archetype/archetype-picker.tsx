@@ -106,7 +106,7 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="text-sm font-medium text-ink">{selected.l2Name}</div>
-            <div className="text-xs text-muted">
+            <div className="text-xs text-body">
               {selected.l1Category} · {selected.isSystem ? '系统内置' : '自定义'}
             </div>
             <div className="mt-1.5">
@@ -168,7 +168,7 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
               </button>
             ) : (
               <p className="flex items-center gap-1.5 p-3 text-xs text-body">
-                <Inbox className="size-3.5 text-muted" />
+                <Inbox className="size-3.5 text-body" />
                 暂无活动原型，请先到「活动原型配置」创建
               </p>
             )
@@ -186,7 +186,7 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
                 className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-hover-overlay"
               >
                 <span className="text-sm text-ink">{a.l2Name}</span>
-                <span className="text-xs text-muted">{a.l1Category}</span>
+                <span className="text-xs text-body">{a.l1Category}</span>
               </button>
             ))
           )}

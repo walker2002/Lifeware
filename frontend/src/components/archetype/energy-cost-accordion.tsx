@@ -46,7 +46,7 @@ export function EnergyCostAccordion({ value, readOnly, onChange }: EnergyCostAcc
       >
         <span className="flex items-center gap-2">
           <span>能量消耗（4 维）</span>
-          <span className="font-mono text-muted">{dims.join(' / ')}</span>
+          <span className="font-mono text-body">{dims.join(' / ')}</span>
         </span>
         <ChevronDown className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -77,7 +77,7 @@ export function EnergyCostAccordion({ value, readOnly, onChange }: EnergyCostAcc
                         className="h-6 w-10 rounded border border-hairline bg-canvas px-1 text-xs text-ink text-center"
                         aria-label={`${label} 分`}
                       />
-                      <span className="text-[10px] text-muted">/10</span>
+                      <span className="text-[10px] text-body">/10</span>
                     </>
                   )}
                 </div>

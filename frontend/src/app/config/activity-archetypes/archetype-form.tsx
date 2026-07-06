@@ -234,7 +234,7 @@ export function ArchetypeForm({
         <div className="grid grid-cols-4 gap-3">
           {(["physical", "mental", "emotional", "creative"] as const).map((dim) => (
             <div key={dim} className="space-y-1">
-              <Label htmlFor={`energy-${dim}`} className="text-xs text-muted-foreground">
+              <Label htmlFor={`energy-${dim}`} className="text-xs text-body">
                 {dim === "physical"
                   ? "体力"
                   : dim === "mental"
@@ -341,10 +341,10 @@ export function ArchetypeForm({
           placeholder="如：写代码, 编程, coding"
           rows={2}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-body">
           用于 AI 从标题自动匹配活动原型；填同义词与该原型覆盖的具体活动
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-body">
           留空则下次运行 seed 可能会被默认值覆盖（系统内置条目）
         </p>
       </div>
