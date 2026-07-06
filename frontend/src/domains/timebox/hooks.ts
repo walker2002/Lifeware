@@ -158,6 +158,30 @@ export function createTimeboxHooks(manifest: DomainManifest) {
           }],
         }
 
+      // [023.12] T13 (AM5) — TimeboxReverted / AppointmentReverted 回退事件
+      //   manifest lifecycle 4 态收敛新增（[023.12] T6）：logged/cancelled → planned
+      //   通过 SM action 'revert' 触发。回退是「撤销式」语义，无需强提示。
+      //   低 weight 占位建议，让 hooks 不静默落 default 分支（之前会丢事件）。
+      case 'TimeboxReverted':
+        return {
+          metrics,
+          suggestions: [{
+            actionType: 'start_timebox',
+            label: `时间盒已回退: ${title}`,
+            weight: 30,
+          }],
+        }
+
+      case 'AppointmentReverted':
+        return {
+          metrics,
+          suggestions: [{
+            actionType: 'start_timebox',
+            label: `约定已回退: ${title}`,
+            weight: 30,
+          }],
+        }
+
       case 'ExecutionLogged': {
         const sourceType = event.payload['sourceType'] as string
         if (sourceType === 'timebox') {

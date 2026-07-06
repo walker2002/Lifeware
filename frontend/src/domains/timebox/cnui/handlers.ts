@@ -161,8 +161,11 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       // 第二次 SM 拒绝返幽灵错误。按 id 保留首次出现项（显式 helper 版本以匹配本文件
       // 其他 filter 的显式 predicate 风格）。
       const seenIds = new Set<string>()
+      // [023.12] T13 (AM3) — 'ended' 不再是合法 TimeboxStatus（[023.12] T6 4 态收敛后）。
+      //   原 guard 防止对 'ended' 行重复 log；新 model 下 'planned' 之外的状态（logged/cancelled）
+      //   都是终态，不可 log，故等价改写为「仅 planned 列入」。
       const ended = todayBoxes.filter(t => {
-        if (t.status !== 'ended') return false
+        if (t.status !== 'planned') return false
         if (seenIds.has(t.id)) return false
         seenIds.add(t.id)
         return true

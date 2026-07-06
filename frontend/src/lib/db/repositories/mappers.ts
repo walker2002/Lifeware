@@ -884,7 +884,7 @@ type CycleRow = {
   id: string; cycleType: string; name: string;
   periodStart: string; periodEnd: string; status: string;
   createdAt: Date; updatedAt: Date;
-  startedAt: Date | null; endedAt: Date | null; reviewedAt: Date | null;
+  approvedAt: Date | null; finishedAt: Date | null; reviewedAt: Date | null;
 }
 
 export function cycleRowToUSOM(row: CycleRow): Cycle {
@@ -896,8 +896,8 @@ export function cycleRowToUSOM(row: CycleRow): Cycle {
     status: row.status as Cycle['status'],
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
-    startedAt: toISO(row.startedAt),
-    endedAt: toISO(row.endedAt),
+    approvedAt: toISO(row.approvedAt),
+    finishedAt: toISO(row.finishedAt),
     reviewedAt: toISO(row.reviewedAt),
   }
 }
@@ -913,8 +913,8 @@ export function cycleUSOMToRow(cycle: Cycle, userId: USOM_ID) {
     status: cycle.status,
     createdAt: toDate(cycle.createdAt)!,
     updatedAt: toDate(cycle.updatedAt)!,
-    startedAt: toDate(cycle.startedAt),
-    endedAt: toDate(cycle.endedAt),
+    approvedAt: toDate(cycle.approvedAt),
+    finishedAt: toDate(cycle.finishedAt),
     reviewedAt: toDate(cycle.reviewedAt),
   }
 }

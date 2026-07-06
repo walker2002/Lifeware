@@ -195,7 +195,7 @@ export type SystemEventType =
   | 'ThreadCreated' | 'ThreadPaused' | 'ThreadResumed' | 'ThreadCompleted' | 'ThreadArchived'
   | 'HabitCreated' | 'HabitActivated' | 'HabitSuspended' | 'HabitArchived' | 'HabitDeleted'
   | 'HabitLogged' | 'HabitSkipped' | 'HabitStreakMilestone'
-  | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged'
+  | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged' | 'TimeboxReverted'
   // [022.01] Phase 3: Objective 6 个状态事件移除（ObjectiveActivated/Paused/Resumed/Completed/Discarded/Archived）。
   // Obj/KR 不再有独立状态机，状态权威迁移至 Cycle.status。
   // [023.12] T6：Cycle 事件随 4 态收敛——
@@ -213,7 +213,7 @@ export type SystemEventType =
   | 'HabitFieldUpdated'
   | 'OkrFieldUpdated'
   | 'TimeboxFieldUpdated'
-  | 'AppointmentCreated' | 'AppointmentMarkedInProgress' | 'AppointmentMarkedExpired' | 'AppointmentCancelled' | 'AppointmentFieldUpdated' | 'AppointmentCompleted'
+  | 'AppointmentCreated' | 'AppointmentMarkedInProgress' | 'AppointmentMarkedExpired' | 'AppointmentCancelled' | 'AppointmentFieldUpdated' | 'AppointmentCompleted' | 'AppointmentReverted'
   | 'CycleCreated' | 'CycleApproved' | 'CycleFinished' | 'CycleReviewed' | 'CycleReverted'
   | 'OnEventDispatchFailed'
 

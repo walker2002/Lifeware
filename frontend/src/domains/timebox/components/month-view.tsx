@@ -36,11 +36,10 @@ interface MonthViewProps {
 const MAX_VISIBLE = 4
 
 /** 状态背景色映射（CSS 变量令牌，自动适配亮/暗色模式） */
+// [023.12] T13 (AM4) — 收窄为 3 键（planned/logged/cancelled）。running/overtime/ended
+//   不再是持久 status（[023.12] T6 4 态收敛），日历层不做 per-second 派生。
 const STATUS_BG: Record<TimeboxStatus, string> = {
   planned: "var(--status-planned-bg)",
-  running: "var(--status-running-bg)",
-  overtime: "var(--status-overtime-bg)",
-  ended: "var(--status-ended-bg)",
   cancelled: "var(--status-cancelled-bg)",
   logged: "var(--status-logged-bg)",
 }
@@ -198,11 +197,7 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
             backgroundColor: event.isMore
               ? "transparent"
               : STATUS_BG[event.status] ?? STATUS_BG.planned,
-            color: event.isMore
-              ? "var(--ink)"
-              : event.status === "running"
-                ? "#ffffff"
-                : "var(--ink)",
+            color: event.isMore ? "var(--ink)" : "var(--ink)",
             border: "none",
             borderLeft: event.isMore
               ? "none"
