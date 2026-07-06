@@ -14,6 +14,8 @@ import { ActivityArchetypeRepository } from "@/lib/db/repositories/activity-arch
 import type { CreateActivityArchetypeInput, UpdateActivityArchetypeInput } from "@/usom/interfaces/irepository";
 import type { ActivityArchetype } from "@/usom/activity-archetype/types";
 import type { USOM_ID } from "@/usom/types/primitives";
+import { createAIRuntime } from "@/nexus/ai-runtime";
+import { matchArchetypesForTitles } from "@/domains/timebox/lib/archetype-matcher";
 
 /** MVP 用户 ID（临时使用） */
 // [023] A2 QA hot-fix: 'use server' file 禁止 export const/string（Next.js: 只能 export async function）
@@ -116,5 +118,38 @@ export async function seedArchetypes(): Promise<ArchetypeActionResult<{ inserted
     return { success: true, data: { inserted } };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "导入默认词典失败" };
+  }
+}
+
+// ─── AI 匹配 ────────────────────────────────────────────────────────
+
+/**
+ * [023.11] 单标题 AI 匹配结果
+ */
+export interface ArchetypeMatchResult {
+  /** 是否命中 */
+  matched: boolean;
+  /** 命中的 Archetype ID */
+  archetypeId?: string;
+}
+
+/**
+ * [023.11] 单标题 AI 匹配（规则优先 + LLM 兜底），供 ArchetypePicker「AI 匹配」按钮调用
+ *
+ * @param title - 活动标题
+ * @returns 匹配结果
+ */
+export async function matchArchetypeForTitle(title: string): Promise<ArchetypeMatchResult> {
+  if (!title || !title.trim()) return { matched: false };
+  try {
+    const repo = new ActivityArchetypeRepository();
+    const archetypes = await repo.findByUser(MVP_USER_ID);
+    if (archetypes.length === 0) return { matched: false };
+    const aiRuntime = createAIRuntime();
+    const [hit] = await matchArchetypesForTitles([title.trim()], archetypes, aiRuntime);
+    if (!hit) return { matched: false };
+    return { matched: true, archetypeId: hit.archetypeId };
+  } catch {
+    return { matched: false };
   }
 }
