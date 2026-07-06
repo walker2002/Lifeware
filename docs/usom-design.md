@@ -335,15 +335,27 @@ interface StructuredIntent {
 
 **对象意图**：OKR 的周期归属对象，是 Objective 的权威时间容器。一个 Cycle 可承载多个 Objective；周期信息（类型 + 起止）由 Cycle 独占，Objective 经 `cycleId` 引用。
 
-**生命周期**：`Draft → NotStarted → InProgress → Ended → Reviewed`
+**生命周期**（持久态，[023.12] 2026-07-06 收敛）：`draft → approved → finished → reviewed`，外加回退 `reviewed → finished`。
+
+> **状态枚举收敛（[023.12] 2026-07-06）**：原 `not_started / in_progress` 折叠为 `approved`（语义合并：审批通过即代表进入活跃执行期）；原 `ended` 改名 `finished`（与「reviewer 复盘」区分）。SM action rename：`startCycle / planCycle → approve`（塌缩二选一分支，按 `now vs periodStart` 不再区分）；`endCycle → finish`；`review` 不变；**新增** `revert`（reviewed→finished）。guard ALLOWED map 同步重写。
 
 | 状态 | 语义 |
 |---|---|
-| `Draft` | 已创建但未排期，允许修改 |
-| `NotStarted` | 已排期，尚未到 `periodStart` |
-| `InProgress` | 当前时间在 `[periodStart, periodEnd]` 区间内 |
-| `Ended` | 已过 `periodEnd`，等待复盘 |
-| `Reviewed` | 已完成复盘，锁定 |
+| `draft` | 草稿，可任意编辑/可删（创建初始态） |
+| `approved` | 已审批进入执行期，KR 进度推进；原 `not_started` / `in_progress` 合并值 |
+| `finished` | 用户主动结束（原 `ended`，[023.12] 改名） |
+| `reviewed` | 复盘完成，锁 objective/KR 写路径（不锁 cycle 自身可回退） |
+
+**时间戳字段**：[023.12] `started_at` 重命名为 `approved_at`、`ended_at` 重命名为 `finished_at`（命名对齐 status 语义）；`reviewed_at` 不变。Migration 0034 RENAME 落地。
+
+**生命周期**（[023.12] 收敛 4 态）：`draft → approved → finished → reviewed`，外加回退 `reviewed → finished`。
+
+| 状态 | 语义 |
+|---|---|
+| `draft` | 已创建但未排期，允许修改 |
+| `approved` | 已审批进入执行期（原 `not_started` / `in_progress` 合并值） |
+| `finished` | 用户主动结束（原 `ended`，[023.12] 改名） |
+| `reviewed` | 已完成复盘，锁定 objective/KR 写路径 |
 
 ```typescript
 export interface Cycle {
@@ -351,11 +363,11 @@ export interface Cycle {
   cycleType:    'annual' | 'quarterly' | 'monthly' | 'semi_annual' | 'custom'
   name:         string
   period:       { start: DateOnly; end: DateOnly }   // Cycle 自身字段
-  status:       'draft' | 'not_started' | 'in_progress' | 'ended' | 'reviewed'
+  status:       'draft' | 'approved' | 'finished' | 'reviewed'  // [023.12] 收敛 4 态
   createdAt:    Timestamp
   updatedAt:    Timestamp
-  startedAt?:   Timestamp   // 状态进入 not_started 的时刻
-  endedAt?:     Timestamp   // 状态进入 ended 的时刻
+  approvedAt?:  Timestamp   // [023.12] 原 startedAt 重命名，状态进入 approved 的时刻
+  finishedAt?:  Timestamp   // [023.12] 原 endedAt 重命名，状态进入 finished 的时刻
   reviewedAt?:  Timestamp   // 状态进入 reviewed 的时刻
 }
 ```
@@ -391,7 +403,7 @@ export interface Contribution {
 **对象意图**：用户在某一时间段内希望达到的定性目标，是承上启下的战略连接节点。
 
 **生命周期**：状态权威已迁移至 `Cycle.status`。Objective 自身不再持有独立 status 字段，可编辑性由所属 Cycle 状态决定：
-- `draft` / `not_started` / `in_progress` / `ended` cycle → Objective 可字段编辑
+- `draft` / `approved` / `finished` cycle → Objective 可字段编辑
 - `reviewed` cycle → Objective 只读
 - 删除 Objective 仅限 `draft` cycle + 无 KR 关联守卫（assertEditable）
 
@@ -700,23 +712,28 @@ interface HabitLog {
 
 **对象意图**：一段被显式划分给特定任务/习惯的时间区间，是时间结构的最小执行单元。
 
-**生命周期**：`Planned → Running → Overtime → Ended → Logged`
+**生命周期**（持久态）：`Planned → Logged` / `Planned → Cancelled`，外加两条回退 `Logged/Cancelled → Planned`。
 
-> **状态枚举更新（2026-05-09）**：原 `Paused` 替换为 `Overtime`（超时运行），新增 `Cancelled`（取消）。设计理由：Timebox 本质是时间约束，超时比暂停更贴合语义。
+> **状态枚举收敛（[023.12] 2026-07-06）**：持久态只跟踪**用户行为状态**（planned / logged / cancelled）。原 `Running / Overtime / Ended` 不再持久化，由读时派生显示（见下方）。原 Paused→Overtime 转换历史已折叠（[023.12] 任务前历史）。SM action 名：`create / log / cancel / revert`（revert 为 [023.12] 新增，对应 `logged|cancelled → planned` 回退）。
 
 | 状态 | 语义 |
 |---|---|
-| `Planned` | 已安排，未到开始时间 |
-| `Running` | 计时中 |
-| `Overtime` | 超过预定结束时间，仍在运行 |
-| `Ended` | 时间到达结束点，等待记录 |
-| `Cancelled` | 已取消，不生成执行记录 |
-| `Logged` | 已记录完成情况，归档 |
+| `Planned` | 已安排，未到开始时间（持久态） |
+| `Logged` | 已记录完成情况，归档（持久态；填入 `executionRecord`） |
+| `Cancelled` | 已取消，不生成执行记录（持久态） |
+| `Running`（派生） | planned 且 `now ∈ [startTime, endTime]` |
+| `Overtime`（派生） | planned 且 `now > endTime` |
+
+**派生显示状态（不持久化，[023.12] 引入）**：`running` 与 `overtime` 不落 DB，由 `derive-display-status` 工具在读取时按 `now` vs `startTime/endTime` 计算，输出 badge 给 UI 展示。SM 路径只走 `planned / logged / cancelled` 三态 + 两条回退。
+
+**可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
+
+**事件清理（[023.12]）**：移除 `TimeboxStarted / TimeboxEnded / TimeboxOvertime` 事件（无消费方）；新增 `TimeboxReverted` 事件承载 revert 转换。manifest `subscribed_events` 同步。
 
 ```typescript
 interface Timebox {
   id:              USOM_ID
-  status:          TimeboxStatus
+  status:          TimeboxStatus              // 持久态三选一：planned | logged | cancelled
   title:           string
   startTime:       Timestamp
   endTime:         Timestamp
@@ -729,15 +746,13 @@ interface Timebox {
   activityArchetypeId?: USOM_ID
   createdAt:       Timestamp
   updatedAt:       Timestamp
-  startedAt?:      Timestamp
-  overtimeAt?:     Timestamp       // 进入超时状态的时间
-  endedAt?:        Timestamp
+  // [023.12] 移除 startedAt / endedAt / overtimeAt 三列（时间派生态不持久化）
   loggedAt?:       Timestamp
   executionRecord?: ExecutionRecord // 执行记录（Logged 时填入）
   notes?:          Notes
 }
 
-type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'
+type TimeboxStatus = 'planned' | 'logged' | 'cancelled'
 
 // 执行记录类型（2026-05-28 升级为跨 Domain 共享类型）
 type CompletionStatus = 'completed' | 'partially_completed' | 'not_completed'
@@ -954,16 +969,30 @@ interface TimeboxTemplate {
 
 **DB 落点**：`timebox_templates` 表（见 `docs/database-design.md` §7.8）。
 
-### 3.13 Appointment（约定，[026]，[023.05] PR2 重命名自 Itinerary；目标词自 schedule 覆盖为 appointment——schedule/日程计划与 timebox 语义撞车）
+### 3.13 Appointment（约定，[026]，[023.05] PR2 重命名自 Itinerary；[023.12] 反转 D2 reversal 回读时派生模式）
 
 **对象意图**：用户对未来日历上一次性的事件安排——读书会、约饭、牙医、家长会等"钉死"承诺。与 Timebox 区别：Timebox 是今日可被 AI 重排的执行格；Appointment 是对未来钉死的承诺，到日子由读时合并器纳入当日日程作"锁定时间格"，AI 编排器不可移动。
 
-**D2 reversal（Cycle 模式）**：状态全部存储（**不读时算**），`scheduled` / `in_progress` / `expired` 由状态机 transition 推进；终态 `cancelled` / `completed` 持久化（用于"未实施的计划"统计，spec §7.4 OQ-7）。时间驱动的 transition（`scheduled→in_progress` 当日到日触发；`scheduled/in_progress→expired` 过日触发）由 `reconcileAppointmentStatuses()` 在页面 server component 加载时触发（**零 cron**）。
+**生命周期**（[023.12] 2026-07-06 收敛持久态）：`scheduled → cancelled` / `scheduled → completed`，外加回退 `cancelled / completed → scheduled`。
+
+> **[023.12] D2 reversal 反转（与 [026] D2 reversal 的关系）**：[026] 原 D2 reversal 把 `scheduled / in_progress / expired` 三态全部存 DB、由 SM transition 推进（lazy reconcile 写库）。本轮 [023.12] 重新评估后**有意反转回读时派生模式**（同 timebox）。持久态收敛到 `scheduled / cancelled / completed` 三态；`in_progress / expired` 由 `derive-display-status` 工具读时按 `now` 与 `startTime` 日历日关系派生。理由：写入约束（不可删/不可改）由 SM 持久态单独 enforce 已足够；"未实施的计划"统计 = `status='scheduled' 且派生 expired`，派生函数足以回答。trade-off：[026] 的 lazy reconcile 路径（每页加载 N 条 submitDynamicIntent 写库）的写放大 + SM 往返成本被消除；代价是 `currentTimebox` / overlap rule 改应用层派生（见 plan T13、T7），SQL 级"查过期约定"不再可能——单用户 MVP 可接受。
+
+| 状态 | 语义 |
+|---|---|
+| `scheduled` | 已安排（初始态） |
+| `cancelled` | 用户取消（持久态终态） |
+| `completed` | 用户完成（[023.12] 正式启用，[027] 由 timebox 打卡联动） |
+| `in_progress`（派生） | scheduled 且 `now` 与 `startTime` 同日历日（按本地时区） |
+| `expired`（派生） | scheduled 且 `now` 日历日 > `startTime` 日历日 |
+
+**派生显示状态（不持久化，[023.12] 引入）**：`in_progress` / `expired` 由 `derive-display-status` 工具在读取时按 `now` 与 `startTime` 日历日关系派生（共享 timebox+appointment 同源）。`reconcile-appointment.ts`（singular）改造为 badge 派生函数（输入 `Appointment[] + now`，输出 `{appointmentId, badge: 'in_progress' | 'expired' | null}[]`），不再调 `submitDynamicIntent` 写库；`app/actions/reconcile-appointments.ts`（plural 写库入口）已删除 + `app/appointments/page.tsx` reconcile 调用同步清理。
+
+**取消/完成守卫（[023.12] OQ-1 降级）**：需求要求"有任务/习惯关联时不允许 cancel/complete"，但 schema 无 appointment↔task/habit junction → **本轮降级 TODO**，按钮先无条件放行，留 `// TODO [027]: appointment task/habit guard` 注释。
 
 ```typescript
 interface Appointment {
   id:             USOM_ID
-  status:         AppointmentStatus         // 存储：5 态枚举（C 方案：D2 reversal 后改为 Cycle 模式）
+  status:         AppointmentStatus         // [023.12] 持久态 3 值：scheduled | cancelled | completed
   title:          string                  // 活动事件名称
   detail:         string | null           // 活动事件详情
   startTime:      Timestamp               // 开始时间（UTC 存，展示层本地化）
@@ -972,8 +1001,7 @@ interface Appointment {
   userId:         USOM_ID
   createdAt:      Timestamp
   updatedAt:      Timestamp
-  inProgressAt:   Timestamp | null         // SM transition scheduled→in_progress 时盖
-  expiredAt:      Timestamp | null         // SM transition →expired 时盖
+  // [023.12] 移除 inProgressAt / expiredAt（时间派生态不持久化）
   completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
   cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
   schemaVersion:  number
@@ -981,38 +1009,40 @@ interface Appointment {
 
 type AppointmentStatus =
   | 'scheduled'   // initial state（SM null→scheduled）
-  | 'in_progress' // 执行中（SM scheduled→in_progress，lazy reconcile 当日到日触发）
-  | 'expired'     // 已过期（SM scheduled/in_progress→expired，lazy reconcile 过日触发；终态）
-  | 'cancelled'   // 用户取消（SM {scheduled,in_progress}→cancelled；终态；spec "已过期/已完成不能删除"）
-  | 'completed'   // 已完成（[027] SM →completed，timebox 打卡后；终态）
+  | 'cancelled'   // 用户取消（SM scheduled→cancelled；终态）
+  | 'completed'   // 已完成（SM scheduled→completed；[027] 启用）
 ```
 
-**状态机**（读时 reconcile + 用户操作触发）：
+**状态机**（[023.12] 收敛 + 派生显示）：
 
 ```
-                     ┌──────────── cancelled ────────────┐
-                     │                                   │
-                     ▼                                   │
-   null ──▶ scheduled ──▶ in_progress ──▶ [027]completed
-              │              │
-              │              │
-              └──▶ expired ◀─┘  (终态)
-                            ▲
-                            └── cancelled (终态)
+   null ──▶ scheduled ──▶ cancelled
+              │            ▲
+              │            │ revert
+              ▼            │
+           [derived]       │
+            badge:         │
+            in_progress     │
+            / expired       │
+              │            │
+              ▼            │
+           completed ──────┘ (revert)
 ```
 
-- `scheduled → in_progress`：lazy reconcile，Appointment.startTime 当日到日触发
-- `scheduled / in_progress → expired`：lazy reconcile，startTime + durationMin 跨日触发
-- `scheduled / in_progress → cancelled`：用户主动取消（spec §7.4：expired/completed 不可取消）
-- `[027] in_progress → completed`：timebox 打卡完成后由编排器联动触发（不在 [026] 范围）
+- `scheduled → cancelled`：用户主动取消
+- `scheduled → completed`：用户完成（[023.12] 正式启用；[027] 由 timebox 打卡联动）
+- `cancelled → scheduled` / `completed → scheduled`：`revert` action 回退（[023.12] 新增）
+- `in_progress` / `expired`：**不持久化**，由 `derive-display-status` 派生显示
 
 **与 Timebox 的边界**：Appointment 不参与 AI 自动编排（OQ-4：AI 锁），orchestration-handler 只查 timeboxes。Appointment 只在当日读时合并进 `/timeboxes`，作为锁定时间格插入。
 
-**DB 落点**：`appointments` 表（见 `docs/database-design.md` §4.X，DDL 在 T2 迁移手写落地）。
+**DB 落点**：`appointments` 表（见 `docs/database-design.md` §4.X）。[023.12] 0034 迁移删除 `in_progress_at` / `expired_at` 两列。
 
 **[026] A3 SHIP（2026_07_03）**：4 action（createItinerary/editItinerary/deleteItinerary 3 CNUI + viewItineraries 1 Page）+ 5 态存储 lifecycle + lazy reconcile（零 cron）+ `<ItineraryFormFields>` 公共组件（D4 决议 A）+ 字段白名单（防绕过状态机直写 status/时间戳）+ ItineraryWorkspace 内联 Sheet drawer（T14 I-1 修复，取代 T12 hash 死链）。GrowthMenu 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。剩余 follow-up T15-T23，详见 CHANGELOG.md `## Itinerary 域（[026]）`。
 
 **[023.05] PR2（2026_07_05）**：Itinerary→Appointment 全层重命名 + itineraries→appointments 表 + 0033 rename 迁移，中文「行程」→「约定」。目标词自 design 原 schedule 覆盖（eng-review 期用户识别 schedule/日程计划 与 timebox 撞车）。schedule 命名空间由 PR1 释放后留空，appointment 不占用。
+
+**[023.12] 反转（2026_07_06）**：appointment lifecycle 从 [026] 5 态存储 + lazy reconcile **反转回读时派生模式**（持久态 3 值 + 派生 in_progress/expired badge）。`reconcile-appointment.ts` 改造为纯派生函数；`reconcile-appointments.ts` plural 写库入口删除；migration 0034 删除 `in_progress_at` / `expired_at` 两列。详见 CHANGELOG.md `## [023.12]`。
 
 ---
 

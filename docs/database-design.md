@@ -293,6 +293,10 @@ CREATE INDEX idx_energy_logs_user_logged ON energy_logs(user_id, logged_at desc)
 
 对应 USOM `Cycle`。OKR 的周期归属对象，`objectives.cycle_id` 引用本表。周期本身独立于 Objective 存在，支持复用与跨周期对比。
 
+> **[023.12] 2026-07-06 状态枚举收敛**：`status` enum 从 5 值 `draft | not_started | in_progress | ended | reviewed` 收敛为 4 值 `draft | approved | finished | reviewed`（`not_started` / `in_progress` 合并为 `approved`，`ended` 改名 `finished`）。时间戳字段重命名：`started_at → approved_at`、`ended_at → finished_at`（`reviewed_at` 不变）。Migration 0034 RENAME + 状态值随 TRUNCATE 清旧值后由 `schema.ts` `enum: [...]` 在 app 层约束（status 列是 TEXT，无 PG enum type）。
+>
+> **[023.12] TRUNCATE 说明**：cycles 表生产库无正式数据 → 0034 直接 `TRUNCATE cycles CASCADE` 清旧值（含 `not_started` / `in_progress` / `ended` 旧 status 行），`objectives` / `key_results` 表行一并清空（FK CASCADE 链）。
+
 ```sql
 -- §4.0 cycles（OKR 周期表，一级对象）
 CREATE TABLE cycles (
@@ -303,12 +307,12 @@ CREATE TABLE cycles (
   name          text NOT NULL,
   period_start  date NOT NULL,
   period_end    date NOT NULL,
-  status        text NOT NULL,  -- enum: draft | not_started | in_progress | ended | reviewed
+  status        text NOT NULL,  -- [023.12] enum: draft | approved | finished | reviewed（原 5 值收敛 4 值）
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
-  started_at    timestamptz,
-  ended_at      timestamptz,
-  reviewed_at   timestamptz,
+  approved_at   timestamptz,    -- [023.12] 原 started_at 重命名（status 进入 approved 的时刻）
+  finished_at   timestamptz,    -- [023.12] 原 ended_at 重命名（status 进入 finished 的时刻）
+  reviewed_at   timestamptz,    -- 不变
   CONSTRAINT check_cycles_period_end_after_start CHECK (period_end > period_start)
 );
 CREATE INDEX idx_cycles_user_status ON cycles(user_id, status);
@@ -711,7 +715,9 @@ CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 
 对应 USOM `Timebox`。
 
-> **状态枚举更新（2026-05-09）**：原 `paused` 替换为 `overtime`（超时运行），新增 `cancelled`（取消）。生命周期：`Planned → Running → Overtime → Ended → Logged`，或 `Running/Planned → Cancelled`。
+> **[023.12] 2026-07-06 状态枚举收敛 + 字段清理**：状态 enum 从 6 值 `planned | running | overtime | ended | cancelled | logged` 收敛为 3 值 `planned | logged | cancelled`（`running` / `overtime` / `ended` 时间派生态不持久化，由 `derive-display-status` 工具读时派生显示）。3 个时间戳列 `started_at` / `overtime_at` / `ended_at` 删除（migration 0034 `DROP COLUMN IF EXISTS`，TRUNCATE 清旧值后由 `schema.ts` `enum: [...]` 在 app 层约束 status 合法值；status 列是 TEXT，无 PG enum type）。
+>
+> **[023.12] 新增可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
 
 ```sql
 CREATE TABLE timeboxes (
@@ -720,7 +726,7 @@ CREATE TABLE timeboxes (
   schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
-  status        text not null check (status in ('planned', 'running', 'overtime', 'ended', 'cancelled', 'logged')),
+  status        text not null check (status in ('planned', 'logged', 'cancelled')),  -- [023.12] 6 值→3 值
   title         text not null,
   start_time    timestamptz not null,
   end_time      timestamptz not null,
@@ -744,9 +750,7 @@ CREATE TABLE timeboxes (
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
-  started_at    timestamptz,
-  overtime_at   timestamptz,  -- 进入超时状态的时间
-  ended_at      timestamptz,
+  -- [023.12] 移除 started_at / overtime_at / ended_at 三列（时间派生态不持久化）
   logged_at     timestamptz
 );
 
@@ -823,33 +827,31 @@ CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logg
 
 ---
 
-### 4.X appointments（约定表，[026]，[023.05] PR2 rename）
+### 4.X appointments（约定表，[026]，[023.05] PR2 rename，[023.12] 反转 D2 reversal）
 
 对应 USOM `Appointment`。
 
-> **D2 reversal（Cycle 模式）**：状态全部存储，**不读时算**。`scheduled`/`in_progress`/`expired` 由 SM transition 推进（lazy reconcile，零 cron）；终态 `cancelled`/`completed` 持久化用于"未实施的计划"统计。详细 USOM 接口见 `docs/usom-design.md` §3.13。
+> **[023.12] 2026-07-06 反转 D2 reversal 回读时派生模式**（与 [026] D2 reversal 关系详见 `docs/usom-design.md` §3.13）：状态 enum 从 5 值 `scheduled | in_progress | expired | cancelled | completed` 收敛为 3 值 `scheduled | cancelled | completed`（`in_progress` / `expired` 不持久化，由 `derive-display-status` 读时派生）。2 个时间戳列 `in_progress_at` / `expired_at` 删除（migration 0034 `DROP COLUMN IF EXISTS`，TRUNCATE 清旧值后由 `schema.ts` `enum: [...]` 在 app 层约束；status 列是 TEXT，无 PG enum type）。
 >
 > **DDL 实现在 T2 迁移（手写 SQL + psql + 登记 journal，idx=31）落地**；本节先登记列/索引契约供 Repository 与 server actions 引用。
 
 ```sql
--- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化；0033 RENAME 为 appointments）
+-- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化；0033 RENAME 为 appointments；0034 删 2 个时间戳列）
 CREATE TABLE appointments (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references users(id) on delete cascade,
   schema_version  integer not null default 1,
 
   -- 核心业务字段
-  status          text not null check (status in ('scheduled', 'in_progress', 'expired', 'cancelled', 'completed')),
+  status          text not null check (status in ('scheduled', 'cancelled', 'completed')),  -- [023.12] 5 值→3 值
   title           text not null,
   detail          text,                    -- 活动详情，可空
   start_time      timestamptz not null,    -- 开始时间（UTC 存）
   duration_min    integer not null,        -- 时长（分钟）；end_time = start_time + duration_min 派生
   people          text[] not null default '{}',  -- 关系人（纯文本，D1=A）
 
-  -- 4 个 transition 时间戳（lazy reconcile + 用户操作触发盖戳）
-  in_progress_at  timestamptz,             -- scheduled→in_progress 时盖
-  expired_at      timestamptz,             -- scheduled/in_progress→expired 时盖
-  completed_at    timestamptz,             -- [027] →completed 时盖
+  -- 2 个用户操作 transition 时间戳（[023.12] 移除 in_progress_at / expired_at 两个时间派生态时间戳）
+  completed_at    timestamptz,             -- →completed 时盖（[023.12] 正式启用，[027] 由 timebox 打卡联动）
   cancelled_at    timestamptz,             -- →cancelled 时盖
 
   -- 审计字段
@@ -864,15 +866,55 @@ CREATE INDEX idx_appointments_user_status       ON appointments(user_id, status)
 
 **设计要点**：
 - `end_time` 不存列：派生 = `start_time + duration_min * interval '1 minute'`，与 USOM 注释一致；调度查询用 `tstzrange` 表达式。
-- 4 时间戳 nullable：只在 transition 触发时盖；初始创建后仅 `created_at`/`updated_at` 有值。
-- 状态枚举与 USOM `AppointmentStatus` 5 态严格对齐；CHECK 约束由迁移 SQL 加。
+- 2 时间戳 nullable（[023.12] 收敛）：只在用户操作 transition 触发时盖（cancelled/completed）；初始创建后仅 `created_at`/`updated_at` 有值。`in_progress_at` / `expired_at` 已删除——这两态由 `derive-display-status` 派生显示。
+- 状态枚举与 USOM `AppointmentStatus` 3 值严格对齐；CHECK 约束由迁移 SQL 加。
 - `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
+- **[023.12] 派生 in_progress/expired 的数据源**：`status='scheduled'` 行的 `start_time`（UTC 存，按本地时区换算日历日）由 `derive-display-status` 工具在读取时按 `now` 与 `start_time` 日历日关系派生。SQL 级"查过期约定"不再可能——单用户 MVP 可接受；报表/分析需求时再考虑物化视图。
 
 **[026] A3 SHIP（2026_07_03）**：表 DDL 已通过 T2 迁移 0031 手写落地（dev DB lifeware_dev@localhost:5432，journal idx=31）。`AppointmentRepository` 5 方法（findById/save/updateFields/findByDateRange/findNeedingReconcile）+ 双 mutation service（timebox/appointment 事件类型分离，D2 reversal 决议 A）+ lazy reconcile（`reconcileAndAdvanceAppointments` 页面 server component 加载时跑）。GrowthMenu 集成 4 intent_trigger 自动归 timebox 组（registry 自动分组，零代码改动）。详情见 CHANGELOG.md `## Itinerary 域（[026]）`。
 
 **[023.05] PR2（2026_07_05）**：0033_rename_itineraries_to_appointments.sql（RENAME TABLE + 2 INDEX，journal idx=33）+ 全层重命名。
 
+**[023.12] 反转（2026_07_06）**：appointment lifecycle 从 [026] 5 态存储 + lazy reconcile 反转回读时派生模式（持久态 3 值 + 派生 in_progress/expired badge）。`reconcile-appointment.ts` 改造为纯派生函数；`reconcile-appointments.ts` plural 写库入口删除；migration 0034 删除 `in_progress_at` / `expired_at` 两列。详见 CHANGELOG.md `## [023.12]`。
+
 **[023.05] F2 snapshot drift acknowledge**：drizzle snapshot 停在 `0006_snapshot.json`，0007+ 全手写无 snapshot。本表 0033 RENAME 后 `schema.ts` 写 `pgTable('appointments')`，未来 `drizzle-kit generate` 会生成 `CREATE TABLE appointments`（表已存在）→ apply 失败。**决议**：维持手写迁移 convention，未来 appointments 表 schema 变更继续手写 SQL + 登记 journal；**不引入 `drizzle-kit up`**。
+
+### 迁移 0034 — 三域 lifecycle 简化（[023.12] 2026-07-06）
+
+**目的**：[023.12] 把三域（timebox / cycle / appointment）持久态收敛到「只跟踪用户行为」——移除时间派生态相关列（timebox 3 列 + appointment 2 列）+ cycle 2 列重命名（语义对齐 status）。数据可弃（生产库无正式数据），TRUNCATE 清旧值（含旧 status 值）+ DROP COLUMN 废弃列 + RENAME cycle 时间戳列。**零 DDL on status**（status 列是 plain TEXT，无 PG enum type ——schema.ts 实际 `text('status', { enum: [...] })` 仅 app 层 union 约束，无 `pgEnum`）。`schema.ts` 改 `enum: [...]` 数组在 app 层承接 status 合法值集合。
+
+**journal 登记**：idx=34（手写迁移规范 `[[project-drizzle-migrations-handwritten]]`）。文件：`frontend/src/lib/db/migrations/0034_023_12_lifecycle_simplify.sql` + `.down.sql`（反向重建废弃列，prod 不需要，dev 回滚兜底）。
+
+```sql
+-- 0034_023_12_lifecycle_simplify.sql 摘要
+
+-- timeboxes: TRUNCATE 清旧值（含 running/overtime/ended 旧 status 行）+ DROP 3 个时间戳列
+TRUNCATE timeboxes CASCADE;
+ALTER TABLE timeboxes DROP COLUMN IF EXISTS started_at;
+ALTER TABLE timeboxes DROP COLUMN IF EXISTS ended_at;
+ALTER TABLE timeboxes DROP COLUMN IF EXISTS overtime_at;
+
+-- cycles: status 列保留 TEXT（无废弃列），仅 TRUNCATE 清旧值 + RENAME 2 个时间戳列
+TRUNCATE cycles CASCADE;
+ALTER TABLE cycles RENAME COLUMN started_at TO approved_at;
+ALTER TABLE cycles RENAME COLUMN ended_at   TO finished_at;
+
+-- appointments: TRUNCATE 清旧值（含 in_progress/expired 旧 status 行）+ DROP 2 个时间戳列
+TRUNCATE appointments CASCADE;
+ALTER TABLE appointments DROP COLUMN IF EXISTS in_progress_at;
+ALTER TABLE appointments DROP COLUMN IF EXISTS expired_at;
+```
+
+**CASCADE 影响**（schema FK 核对）：
+- `TRUNCATE timeboxes CASCADE` → 清空 `task_timeboxes`（CASCADE junction）、`timebox_habits`（CASCADE junction）；`task_execution_logs.timebox_id` SET NULL（行留，列置空）。
+- `TRUNCATE cycles CASCADE` → 清空 `objectives`（`cycleId` 虽 RESTRICT，但 TRUNCATE CASCADE 绕过 restrict 校验仍清空）→ 级联清空 `key_results`（FK to objectives CASCADE）。
+- `TRUNCATE appointments CASCADE` → 无 FK 反向依赖（schema grep 0 hits），CASCADE 实际 no-op。
+- `memory_episodes.metadata` jsonb 软引用：[023.08] F4 batch undo 通过 EpisodeRepository 把 timeboxId 写入 memory_episodes.metadata，TRUNCATE timeboxes 不动该表 → 留孤儿软引用。决议：接受孤儿（无 FK、无读路径反向解析 timeboxId，undo 已 ship 的 batch 仅作审计痕迹）。
+
+**status 列合法值集合（[023.12] 收敛后，由 `schema.ts` `enum: [...]` 在 app 层约束）**：
+- `timeboxes.status` ∈ {`planned`, `logged`, `cancelled`}
+- `cycles.status` ∈ {`draft`, `approved`, `finished`, `reviewed`}
+- `appointments.status` ∈ {`scheduled`, `cancelled`, `completed`}
 
 ---
 
