@@ -48,6 +48,7 @@ import type { CnuiSurfaceHandler } from '@/nexus/ai-runtime/cnui/types';
 import { recordActivity } from './activity-recorder';
 import { createHabitsMutationService } from '@/app/actions/habits/mutation-service';
 import { createTasksMutationService } from '@/app/actions/tasks/mutation-service';
+import { matchArchetypesForTitles } from '@/domains/timebox/lib/archetype-matcher';
 
 // ─── CNUI Handlers 注册 ───────────────────────────────────────────
 
@@ -1217,7 +1218,7 @@ export async function parseHabitIntentOnly(rawInput: string): Promise<HabitParse
  */
 export interface TimeboxBatchParseResult {
   success: boolean
-  drafts?: Array<{ title: string; startTime: string; endTime: string; duration?: number }>
+  drafts?: Array<{ title: string; startTime: string; endTime: string; duration?: number; activityArchetypeId?: string }>
   error?: string
 }
 
@@ -1231,7 +1232,7 @@ export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<Tim
       return { success: false, error: parseResult.error ?? '未识别到有效的时间盒任务' }
     }
 
-    const drafts = parseResult.intents.map((intent) => {
+    const drafts: NonNullable<TimeboxBatchParseResult['drafts']> = parseResult.intents.map((intent) => {
       const f = intent.fields as Record<string, unknown>
       return {
         title: String(f.title ?? ''),
@@ -1240,6 +1241,28 @@ export async function parseTimeboxBatchIntentOnly(rawInput: string): Promise<Tim
         duration: typeof f.duration === 'number' ? f.duration : undefined,
       }
     })
+
+    // [023.11] 被动推断 archetype（仅 createTimebox 提取路径）。
+    //   规则优先 + LLM 兜底（matchArchetypesForTitles）；字段为空才填
+    //   （parseMultiTask 当前不产出 archetype，天然满足"字段为空"前提）。
+    //   推断失败必须 degrade gracefully，不阻断创建流程。
+    try {
+      const archetypes = await new ActivityArchetypeRepository().findByUser(MVP_USER_ID)
+      if (archetypes.length > 0) {
+        const matches = await matchArchetypesForTitles(
+          drafts.map((d) => d.title),
+          archetypes,
+          aiRuntime,
+        )
+        drafts.forEach((d, i) => {
+          if (!d.activityArchetypeId && matches[i]) {
+            d.activityArchetypeId = matches[i]!.archetypeId
+          }
+        })
+      }
+    } catch {
+      // archetype 推断失败不阻断创建（drafts 不带 archetypeId，用户可手选/用 AI 按钮）
+    }
 
     return { success: true, drafts }
   } catch (err) {

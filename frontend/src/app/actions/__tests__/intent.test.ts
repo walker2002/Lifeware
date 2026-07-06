@@ -11,11 +11,25 @@ vi.mock('@/nexus/ai-runtime', () => ({
   createAIRuntime: vi.fn(() => ({})),
 }))
 
+// [023.11] archetype 推断依赖（默认 findByUser 返 [] → 跳过 matcher）
+vi.mock('@/lib/db/repositories/activity-archetype.repository', () => ({
+  ActivityArchetypeRepository: vi.fn().mockImplementation(() => ({
+    findByUser: vi.fn().mockResolvedValue([]),
+  })),
+}))
+
+vi.mock('@/domains/timebox/lib/archetype-matcher', () => ({
+  matchArchetypesForTitles: vi.fn(),
+}))
+
 import { parseHabitIntentOnly, parseTimeboxBatchIntentOnly, getActionResponse, resolveShortcut } from '../intent'
 import { parseHabitWithAI, parseMultiTask } from '@/nexus/core/intent-engine/ai-parser'
+import { matchArchetypesForTitles } from '@/domains/timebox/lib/archetype-matcher'
+import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
 
 const mockParseHabitWithAI = vi.mocked(parseHabitWithAI)
 const mockParseMultiTask = vi.mocked(parseMultiTask)
+const mockMatchArchetypes = vi.mocked(matchArchetypesForTitles)
 
 describe('parseHabitIntentOnly', () => {
   beforeEach(() => {
@@ -211,5 +225,95 @@ describe('resolveShortcut（[023-01+ v2] /cmd [payload] 须能解析出 domain/a
     const r = await resolveShortcut('/createTimebox 上午完成OKR计划')
     expect(r?.domainId).toBe('timebox')
     expect(r?.action).toBe('createTimebox')
+  })
+})
+
+// [023.11] parseTimeboxBatchIntentOnly 被动推断 archetype
+//   createTimebox dry-run 后再过 archetype-matcher 填 activityArchetypeId
+//   （仅字段为空时填；degrade gracefully）
+describe('[023.11] parseTimeboxBatchIntentOnly 被动推断 archetype', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 复位顶层 module mock（vi.clearAllMocks 会清调用记录但保留实现；
+    // mockImplementationOnce 一次性覆盖需要重新挂回默认实现以保证独立性）
+    vi.mocked(ActivityArchetypeRepository).mockImplementation(function () {
+      return { findByUser: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof ActivityArchetypeRepository>
+    })
+  })
+
+  it('matcher 命中 → drafts 带 activityArchetypeId', async () => {
+    mockParseMultiTask.mockResolvedValueOnce({
+      success: true,
+      intents: [
+        {
+          id: 'i1', intentionId: 't', targetDomain: 'timebox', action: 'create_timebox',
+          fields: { title: '深度专注写作', startTime: '2026-07-06T14:00:00+08:00', duration: 60, endTime: '2026-07-06T15:00:00+08:00' },
+          confidence: 0.9, resolvedBy: 'ai', createdAt: '',
+        },
+      ],
+    })
+    vi.mocked(ActivityArchetypeRepository).mockImplementationOnce(function () {
+      return { findByUser: vi.fn().mockResolvedValue([{ id: 'a1' }, { id: 'a2' }]) } as unknown as InstanceType<typeof ActivityArchetypeRepository>
+    })
+    mockMatchArchetypes.mockResolvedValueOnce([{ archetypeId: 'a1', confidence: 0.9, source: 'rule' }])
+    const r = await parseTimeboxBatchIntentOnly('下午深度专注写作')
+    expect(r.success).toBe(true)
+    expect(r.drafts![0].activityArchetypeId).toBe('a1')
+  })
+
+  it('matcher 未命中 → activityArchetypeId undefined', async () => {
+    mockParseMultiTask.mockResolvedValueOnce({
+      success: true,
+      intents: [
+        {
+          id: 'i1', intentionId: 't', targetDomain: 'timebox', action: 'create_timebox',
+          fields: { title: '未知活动', startTime: '2026-07-06T14:00:00+08:00', duration: 60, endTime: '2026-07-06T15:00:00+08:00' },
+          confidence: 0.9, resolvedBy: 'ai', createdAt: '',
+        },
+      ],
+    })
+    vi.mocked(ActivityArchetypeRepository).mockImplementationOnce(function () {
+      return { findByUser: vi.fn().mockResolvedValue([{ id: 'a1' }]) } as unknown as InstanceType<typeof ActivityArchetypeRepository>
+    })
+    mockMatchArchetypes.mockResolvedValueOnce([null])
+    const r = await parseTimeboxBatchIntentOnly('未知活动')
+    expect(r.drafts![0].activityArchetypeId).toBeUndefined()
+  })
+
+  it('[错误路径] archetype repo 抛错 → degrade：drafts 仍 success 不带 archetypeId', async () => {
+    // 改为 reject：findByUser 抛错
+    vi.mocked(ActivityArchetypeRepository).mockImplementationOnce(function () {
+      return { findByUser: vi.fn().mockRejectedValue(new Error('db down')) } as unknown as InstanceType<typeof ActivityArchetypeRepository>
+    })
+    mockParseMultiTask.mockResolvedValueOnce({
+      success: true,
+      intents: [
+        {
+          id: 'i1', intentionId: 't', targetDomain: 'timebox', action: 'create_timebox',
+          fields: { title: '写代码', startTime: '2026-07-06T14:00:00+08:00', duration: 60, endTime: '2026-07-06T15:00:00+08:00' },
+          confidence: 0.9, resolvedBy: 'ai', createdAt: '',
+        },
+      ],
+    })
+    const r = await parseTimeboxBatchIntentOnly('写代码')
+    expect(r.success).toBe(true)
+    expect(r.drafts![0].activityArchetypeId).toBeUndefined()
+  })
+
+  it('[错误路径] archetypes 为空 → 跳过 matcher', async () => {
+    mockParseMultiTask.mockResolvedValueOnce({
+      success: true,
+      intents: [
+        {
+          id: 'i1', intentionId: 't', targetDomain: 'timebox', action: 'create_timebox',
+          fields: { title: '写代码', startTime: '2026-07-06T14:00:00+08:00', duration: 60, endTime: '2026-07-06T15:00:00+08:00' },
+          confidence: 0.9, resolvedBy: 'ai', createdAt: '',
+        },
+      ],
+    })
+    // default mock: findByUser returns []
+    const r = await parseTimeboxBatchIntentOnly('写代码')
+    expect(r.drafts![0].activityArchetypeId).toBeUndefined()
+    expect(mockMatchArchetypes).not.toHaveBeenCalled()
   })
 })

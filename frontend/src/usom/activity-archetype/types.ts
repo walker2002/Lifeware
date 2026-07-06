@@ -77,6 +77,8 @@ export interface ActivityArchetype {
   energyCost: EnergyCost
   /** 6 维执行特征 */
   activityLabel: ActivityLabel
+  /** 同义词/范围描述短语（用于标题→archetype 匹配；[] 表示未维护） */
+  synonyms: string[]
   /** 系统内置（不可删除） */
   isSystem: boolean
   createdAt: Timestamp

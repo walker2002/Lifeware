@@ -848,6 +848,7 @@ export interface ActivityArchetype {
   l2Name:        string            // L2 二级名称（如"深度专注"）
   energyCost:    EnergyCost        // 4 维各 1-10（D8：在 Archetype 侧）
   activityLabel: ActivityLabel     // 6 维特征（T3：保留，仅配置表存储）
+  synonyms:      string[]          // 同义词/范围描述短语（用于标题→archetype 匹配；[] 表示未维护）
   isSystem:      boolean           // 系统内置（不可删除），默认 false
   createdAt:     Timestamp
   updatedAt:     Timestamp
@@ -1955,8 +1956,9 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_07_05*
+*文档版本：2026_07_06*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
 
+*变更：[023.11] (2026_07_06) — §3.11 ActivityArchetype 加 `synonyms: string[]` 字段（jsonb 列于 activity_archetypes；用于标题→archetype 匹配；空=未维护）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §3.13 Itinerary→Appointment 全层重命名 + 设计覆盖注（schedule→appointment 因 timebox 语义撞车）+ 中文「行程」→「约定」*

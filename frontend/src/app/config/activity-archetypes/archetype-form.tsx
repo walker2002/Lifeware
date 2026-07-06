@@ -99,6 +99,7 @@ export function ArchetypeForm({
   // textarea 中间态（逗号分隔）
   const [envText, setEnvText] = useState<string>(joinCommaList(archetype?.activityLabel.environment));
   const [locText, setLocText] = useState<string>(joinCommaList(archetype?.activityLabel.location));
+  const [synonymsText, setSynonymsText] = useState<string>(joinCommaList(archetype?.synonyms));
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export function ArchetypeForm({
     setLabel(archetype?.activityLabel ?? DEFAULT_LABEL);
     setEnvText(joinCommaList(archetype?.activityLabel.environment));
     setLocText(joinCommaList(archetype?.activityLabel.location));
+    setSynonymsText(joinCommaList(archetype?.synonyms));
     setError(null);
   }, [archetype, l1Categories]);
 
@@ -160,6 +162,7 @@ export function ArchetypeForm({
           l2Name: l2Name.trim(),
           energyCost: energy,
           activityLabel: finalLabel,
+          synonyms: parseCommaList(synonymsText),   // [023.11]
         });
         if (!r.success) {
           setError(r.error ?? "更新失败");
@@ -171,6 +174,7 @@ export function ArchetypeForm({
           l2Name: l2Name.trim(),
           energyCost: energy,
           activityLabel: finalLabel,
+          synonyms: parseCommaList(synonymsText),   // [023.11]
         });
         if (!r.success) {
           setError(r.error ?? "创建失败");
@@ -230,7 +234,7 @@ export function ArchetypeForm({
         <div className="grid grid-cols-4 gap-3">
           {(["physical", "mental", "emotional", "creative"] as const).map((dim) => (
             <div key={dim} className="space-y-1">
-              <Label htmlFor={`energy-${dim}`} className="text-xs text-muted-foreground">
+              <Label htmlFor={`energy-${dim}`} className="text-xs text-body">
                 {dim === "physical"
                   ? "体力"
                   : dim === "mental"
@@ -325,6 +329,24 @@ export function ArchetypeForm({
             rows={2}
           />
         </div>
+      </div>
+
+      {/* [023.11] synonyms（同义词/范围描述） */}
+      <div className="space-y-2">
+        <Label htmlFor="synonyms">同义词/范围（逗号分隔）</Label>
+        <Textarea
+          id="synonyms"
+          value={synonymsText}
+          onChange={(e) => setSynonymsText(e.target.value)}
+          placeholder="如：写代码, 编程, coding"
+          rows={2}
+        />
+        <p className="text-xs text-body">
+          用于 AI 从标题自动匹配活动原型；填同义词与该原型覆盖的具体活动
+        </p>
+        <p className="text-xs text-body">
+          留空则下次运行 seed 可能会被默认值覆盖（系统内置条目）
+        </p>
       </div>
 
       {/* parallelizable */}

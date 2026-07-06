@@ -1269,6 +1269,8 @@ export interface CreateActivityArchetypeInput {
   energyCost: EnergyCost
   /** 6 维执行特征 */
   activityLabel: ActivityLabel
+  /** [023.11] 同义词/范围描述（可选，默认 []） */
+  synonyms?: string[]
 }
 
 /** 更新 Activity Archetype 输入 */
@@ -1281,6 +1283,8 @@ export interface UpdateActivityArchetypeInput {
   energyCost?: EnergyCost
   /** 6 维执行特征（可选） */
   activityLabel?: ActivityLabel
+  /** [023.11] 同义词/范围描述 */
+  synonyms?: string[]
 }
 
 /**

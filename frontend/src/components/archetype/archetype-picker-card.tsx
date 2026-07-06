@@ -15,13 +15,17 @@ interface ArchetypePickerCardProps {
   value?: string
   /** 选中变更 */
   onChange?: (archetypeId: string | undefined, archetype?: ActivityArchetype) => void
+  /** [023.11] 启用「AI 匹配」按钮（与 CNUI 表面 EditTimeboxes/CreateTimebox 一致） */
+  enableAiMatch?: boolean
+  /** [023.11] 当前标题（AI 匹配依据；enableAiMatch=true 时必传） */
+  title?: string
 }
 
-export function ArchetypePickerCard({ value, onChange }: ArchetypePickerCardProps) {
+export function ArchetypePickerCard({ value, onChange, enableAiMatch, title }: ArchetypePickerCardProps) {
   return (
     <div className="rounded-md bg-surface-card p-5">
       <h3 className="mb-2 text-sm font-medium text-ink">活动原型</h3>
-      <ArchetypePicker value={value} onChange={onChange} />
+      <ArchetypePicker value={value} onChange={onChange} enableAiMatch={enableAiMatch} title={title} />
     </div>
   )
 }

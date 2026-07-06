@@ -714,6 +714,8 @@ export const activityArchetypes = pgTable('activity_archetypes', {
   l2Name: text('l2_name').notNull(),
   energyCost: jsonb('energy_cost').$type<EnergyCost>().notNull(),
   activityLabel: jsonb('activity_label').$type<ActivityLabel>().notNull(),
+  /** [023.11] 同义词/范围描述（用于标题→archetype 匹配） */
+  synonyms: jsonb('synonyms').$type<string[]>().notNull().default([]),
   isSystem: boolean('is_system').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

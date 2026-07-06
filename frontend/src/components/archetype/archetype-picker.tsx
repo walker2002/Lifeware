@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Inbox } from 'lucide-react'
-import { getArchetypes } from '@/app/actions/activity-archetype'
+import { getArchetypes, matchArchetypeForTitle } from '@/app/actions/activity-archetype'
 import { EnergyCostAccordion } from './energy-cost-accordion'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
@@ -22,14 +22,49 @@ interface ArchetypePickerProps {
   onChange?: (archetypeId: string | undefined, archetype?: ActivityArchetype) => void
   /** 只读模式：隐藏按钮与下拉，仅展示选中态 */
   readOnly?: boolean
+  /** [023.11] 启用「AI 匹配」按钮 */
+  enableAiMatch?: boolean
+  /** [023.11] 当前标题 */
+  title?: string
 }
 
-export function ArchetypePicker({ value, onChange, readOnly = false }: ArchetypePickerProps) {
+export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMatch, title }: ArchetypePickerProps) {
   const [archetypes, setArchetypes] = useState<ActivityArchetype[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   // [023] M-1: 区分 "无 archetype"（空态）vs "加载失败"（error 态）。失败时给用户 retry 入口。
   const [loadError, setLoadError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
+  // [023.11] AI 匹配按钮状态
+  const [aiMatching, setAiMatching] = useState(false)
+  const [aiError, setAiError] = useState(false)
+  // title 变更时清除上一次的错误提示，避免历史错误残留误导用户
+  useEffect(() => { setAiError(false) }, [title])
+  const runAiMatch = async () => {
+    const t = (title ?? '').trim()
+    if (!t) return
+    setAiMatching(true); setAiError(false)
+    try {
+      const r = await matchArchetypeForTitle(t)
+      if (r.matched && r.archetypeId) onChange?.(r.archetypeId)
+      else setAiError(true)
+    } catch (err) {
+      // [023.11] review fix: action reject 与 matched:false 是不同情形；先记日志便于排查
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.warn('[ArchetypePicker] ai match rejected', err)
+      }
+      setAiError(true)
+    }
+    finally { setAiMatching(false) }
+  }
+  const showAiMatch = enableAiMatch && !readOnly && !!title?.trim()
+  const aiMatchBtn = showAiMatch ? (
+    <button type="button" onClick={runAiMatch} disabled={aiMatching}
+      aria-label="AI 匹配活动原型"
+      className="shrink-0 text-xs text-primary disabled:opacity-50">
+      {aiMatching ? '匹配中…' : 'AI 匹配'}
+    </button>
+  ) : null
 
   // [H4 /autoplan] archetypes 只在挂载时拉一次（不再随 [value] 重拉）。
   // selected 由 archetypes + value 派生（useMemo），消除「选后闪一下未选择再回填」的抖动。
@@ -71,7 +106,7 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="text-sm font-medium text-ink">{selected.l2Name}</div>
-            <div className="text-xs text-muted">
+            <div className="text-xs text-body">
               {selected.l1Category} · {selected.isSystem ? '系统内置' : '自定义'}
             </div>
             <div className="mt-1.5">
@@ -79,32 +114,38 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
             </div>
           </div>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => setPickerOpen(o => !o)}
-              aria-haspopup="listbox"
-              aria-expanded={pickerOpen}
-              aria-label="更换活动原型"
-              className="shrink-0 text-xs text-primary"
-            >
-              更换
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(o => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={pickerOpen}
+                aria-label="更换活动原型"
+                className="text-xs text-primary"
+              >
+                更换
+              </button>
+              {aiMatchBtn}
+            </div>
           )}
         </div>
       ) : (
         <div className="flex items-center justify-between">
           <p className="text-xs text-body">未选择（可选）</p>
           {!readOnly && (
-            <button
-              type="button"
-              onClick={() => setPickerOpen(o => !o)}
-              aria-haspopup="listbox"
-              aria-expanded={pickerOpen}
-              aria-label="选择活动原型"
-              className="text-xs text-primary"
-            >
-              选择
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(o => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={pickerOpen}
+                aria-label="选择活动原型"
+                className="text-xs text-primary"
+              >
+                选择
+              </button>
+              {aiMatchBtn}
+            </div>
           )}
         </div>
       )}
@@ -127,7 +168,7 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
               </button>
             ) : (
               <p className="flex items-center gap-1.5 p-3 text-xs text-body">
-                <Inbox className="size-3.5 text-muted" />
+                <Inbox className="size-3.5 text-body" />
                 暂无活动原型，请先到「活动原型配置」创建
               </p>
             )
@@ -145,12 +186,13 @@ export function ArchetypePicker({ value, onChange, readOnly = false }: Archetype
                 className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-hover-overlay"
               >
                 <span className="text-sm text-ink">{a.l2Name}</span>
-                <span className="text-xs text-muted">{a.l1Category}</span>
+                <span className="text-xs text-body">{a.l1Category}</span>
               </button>
             ))
           )}
         </div>
       )}
+      {aiError && <p className="mt-1 text-xs text-error">未找匹配的活动原型</p>}
     </div>
   )
 }

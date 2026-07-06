@@ -203,6 +203,8 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
             <ArchetypePickerCard
               value={activityArchetypeId}
               onChange={id => setActivityArchetypeId(id)}
+              enableAiMatch
+              title={title}
             />
 
             <div>
