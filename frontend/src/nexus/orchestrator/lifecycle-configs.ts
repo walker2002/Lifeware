@@ -194,18 +194,16 @@ export function getTransitionFromManifest(
 
 /** @deprecated 使用 getLifecycleFromManifest('timebox', 'timebox') 替代 */
 export const timeboxLifecycle: LifecycleDefinition = {
-  states: ['planned', 'running', 'overtime', 'ended', 'cancelled', 'logged'],
+  states: ['planned', 'logged', 'cancelled'],
   initial_state: 'planned',
   transitions: [
     { from: null, to: 'planned', trigger: 'intent', action: 'create', event_type: 'TimeboxCreated' },
-    { from: 'planned', to: 'running', trigger: 'intent', action: 'start', event_type: 'TimeboxStarted' },
-    { from: 'running', to: 'ended', trigger: 'intent', action: 'end', event_type: 'TimeboxEnded' },
-    { from: 'running', to: 'overtime', trigger: 'time', action: 'overtime', event_type: 'TimeboxOvertime' },
-    { from: 'overtime', to: 'ended', trigger: 'intent', action: 'end', event_type: 'TimeboxEnded' },
+    { from: 'planned', to: 'logged', trigger: 'intent', action: 'log', event_type: 'TimeboxLogged' },
     { from: 'planned', to: 'cancelled', trigger: 'intent', action: 'cancel', event_type: 'TimeboxCancelled' },
-    { from: 'ended', to: 'logged', trigger: 'intent', action: 'log', event_type: 'TimeboxLogged' },
+    { from: 'logged', to: 'planned', trigger: 'intent', action: 'revert', event_type: 'TimeboxReverted' },
+    { from: 'cancelled', to: 'planned', trigger: 'intent', action: 'revert', event_type: 'TimeboxReverted' },
   ],
-  terminal_states: ['cancelled', 'logged'],
+  terminal_states: [],
 }
 
 /** @deprecated 从 manifest.field_metadata 中 type=lifecycle_timestamp 字段获取 */

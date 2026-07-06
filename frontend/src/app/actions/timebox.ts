@@ -145,6 +145,44 @@ export async function transitionTimebox(
 }
 
 /**
+ * 回退：{logged, cancelled} → planned（[023.12] T4）
+ *
+ * 走 Nexus：submitDynamicIntent('timebox', 'revertTimebox', { id }) →
+ * Orchestrator → resolveObjectType('timebox', 'revertTimebox') → 'timebox' →
+ * SM revert transition → 状态='planned'。
+ * buildActionMap 把 `revertTimebox` 拆成 SM action `revert`（与 manifest
+ * lifecycle.transitions.action 一致）。
+ *
+ * [AM7] executionRecord 守卫：logged 状态下 executionRecord 必有值（archive
+ * 路径写入），直接 revert 会让已记录的执行结果「悬空」。守卫语义：若
+ * executionRecord != null，抛错「请先清理执行记录再回退」——强制调用方先
+ * 显式清记录。cancelled 状态 executionRecord 恒为 null，可直接 revert。
+ *
+ * 设计决策（[023.12] plan-eng-review 用户表决 B）：
+ * - 不做自动 executionRecord 清空（避免「回退悄悄丢数据」的隐式行为）
+ * - UI 层（T8）接 toast 弹窗提示用户先到 EditTimeboxes 清记录再 revert
+ *
+ * @param timeboxId - 目标时间盒 ID
+ */
+export async function revertTimebox(
+  timeboxId: string,
+): Promise<TimeboxActionResult> {
+  // [AM7] ownership + executionRecord 守卫
+  const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
+  if (tb.executionRecord != null) {
+    throw new Error('请先清理执行记录再回退')
+  }
+  // 走 SM revert transition；cancelled→planned / logged(已守卫清空)→planned
+  const result = await submitDynamicIntent('timebox', 'revertTimebox', { objectId: timeboxId })
+  if (!result.success) {
+    // SM 兜底：极端 case（数据库与 SM 不一致）下抛错
+    throw new Error(result.error ?? '回退时间盒失败')
+  }
+  return { status: 'ok', timebox: result.object as Timebox }
+}
+
+/**
  * 字段更新（编辑标题/时间/archetype）— 直调 mutation service 字段写（habits 直调范式）
  *
  * [023] A2 关键修正（OV-T2）：字段写**不走** submitDynamicIntent——manifest 无
