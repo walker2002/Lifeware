@@ -125,7 +125,7 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 
 ```
 1. 所有网页浏览均使用 gstack 中的/browse 功能，绝不要使用 mcp__claude-in-chrome__*工具。
-2. 主要规划skill包括: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /autoplan, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse, /connect-chrome, /qa
+2. 主要规划skill包括: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /autoplan, /review(项目内实际入口 /pre-land-review，详见 .claude/skills/pre-land-review/SHADOW-NOTES.md), /ship, /land-and-deploy, /canary, /benchmark, /browse, /connect-chrome, /qa
 ```
 
 
@@ -174,11 +174,12 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 3. gstack: `/autoplan` 或 `/plan-eng-review`（评审上一步的 spec/plan → 追加 GSTACK REVIEW REPORT）
 4. `/superpowers:subagent-driven-dev+TDD`
 5. gstack: `/browse+/qa`
-6. gstack: `/review`
+6. gstack: `/pre-land-review`（Claude Code 内置 `/review` shadow 了 gstack 版，本地 shadow 见 `.claude/skills/pre-land-review/`）
 7. 人工验证 + `/superpowers:systematic-debugging`
-8. `/lifeware-neat`
-9. `/superpowers:finishing-a-development-branch`
-10. 如果需要部署生产环境，继续 `/ship → /land-and-deploy → /canary`
+8. `/record-tech-debt` (如果发现遗留问题)
+9. `/lifeware-neat`
+10. `/superpowers:finishing-a-development-branch`
+11. 如果需要部署生产环境，继续 `/ship → /land-and-deploy → /canary`
 
 
 
