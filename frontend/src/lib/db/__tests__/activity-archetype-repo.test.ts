@@ -105,4 +105,39 @@ describe('ActivityArchetypeRepository — [023.11] synonyms 字段集成测试',
     expect(updateLog).toBeDefined()
     expect(updateLog?.changedFields).toContain('synonyms')
   })
+
+  it('[023.11] seedDefaults 给新用户插入带 synonyms 的系统条目', async () => {
+    const NEW_USER_ID = '11111111-1111-1111-1111-111111111111' as const
+    // 确保新用户存在
+    await db.insert(s.users).values({ id: NEW_USER_ID, email: 'newuser@example.com' }).onConflictDoNothing()
+    // 清理该用户可能存在的旧数据
+    await db.delete(s.activityArchetypes).where(eq(s.activityArchetypes.userId, NEW_USER_ID))
+
+    const n = await repo.seedDefaults(NEW_USER_ID)
+    expect(n).toBeGreaterThan(0)
+    const all = await repo.findByUser(NEW_USER_ID)
+    const deep = all.find(a => a.l2Name === '深度专注')
+    expect(deep?.synonyms).toContain('写代码')
+  })
+
+  it('[023.11] seedDefaults 升级既有空 synonyms 的系统条目（幂等）', async () => {
+    const NEW_USER_ID = '22222222-2222-2222-2222-222222222222' as const
+    // 确保新用户存在
+    await db.insert(s.users).values({ id: NEW_USER_ID, email: 'newuser2@example.com' }).onConflictDoNothing()
+    // 清理该用户可能存在的旧数据
+    await db.delete(s.activityArchetypes).where(eq(s.activityArchetypes.userId, NEW_USER_ID))
+
+    await repo.seedDefaults(NEW_USER_ID)
+    // 模拟既有条目被清空 synonyms（如迁移后状态）
+    // 将系统条目的 synonyms 清空
+    await db.update(s.activityArchetypes)
+      .set({ synonyms: [] })
+      .where(and(eq(s.activityArchetypes.userId, NEW_USER_ID), eq(s.activityArchetypes.isSystem, true)))
+    const n2 = await repo.seedDefaults(NEW_USER_ID)
+    expect(n2).toBeGreaterThan(0) // 应该升级所有空 synonyms 的系统条目
+
+    // 第三次运行应该幂等（无变更）
+    const n3 = await repo.seedDefaults(NEW_USER_ID)
+    expect(n3).toBe(0) // 已全填，三次 seed 无变更
+  })
 })
