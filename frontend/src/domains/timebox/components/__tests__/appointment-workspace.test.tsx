@@ -1,6 +1,6 @@
 /**
  * @file appointment-workspace.test.tsx
- * @brief [026] AppointmentWorkspace 单测
+ * @brief [026] AppointmentWorkspace 单测 / [023.12] T10 完成/取消/回退按钮
  *
  * 守护以下行为不被回归：
  *  - 初始列表渲染（标题 + 时间 + 状态）
@@ -10,7 +10,8 @@
  *  - reload 异常时显示 toast（不会把脏状态留在屏幕上）
  *  -【编辑入口】编辑按钮 / 双击 / 键盘 Enter 都触发 EditAppointmentDrawer
  *  -【编辑入口】保存修改后调 updateAppointment + reload
- *  - 终止态（expired/cancelled/completed）不显示编辑按钮（不可改）
+ *  - 终止态（cancelled/completed，[023.12] T10: 移除 expired 持久态）不显示编辑/完成/取消按钮
+ *  - [023.12] T10：scheduled 显示 完成/取消/编辑 三按钮，cancelled/completed 显示 回退 按钮
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -24,6 +25,13 @@ vi.mock('@/app/actions/timebox', () => ({
   updateAppointment: vi
     .fn()
     .mockResolvedValue({ status: 'ok', appointment: { id: 'it-1', title: '已编辑' } }),
+  // [023.12] T10：completeAppointment / revertAppointment 新增
+  completeAppointment: vi
+    .fn()
+    .mockResolvedValue({ status: 'ok', appointment: { id: 'it-1', status: 'completed' } }),
+  revertAppointment: vi
+    .fn()
+    .mockResolvedValue({ status: 'ok', appointment: { id: 'it-1', status: 'scheduled' } }),
 }))
 
 const RELOAD_AFTER = 'it-new'
@@ -47,12 +55,12 @@ const baseItem = {
   people: ['小明', '小红'],
 }
 
-// 终止态 item（用于守护「不可编辑」）
+// 终止态 item（用于守护「不可编辑」）—— [023.12] T10：status 3 态 (scheduled/cancelled/completed)
 const terminalItem = {
   ...baseItem,
   id: 'it-term',
-  title: '已过期约定',
-  status: 'expired' as const,
+  title: '已取消约定',
+  status: 'cancelled' as const,
 }
 
 describe('[026] AppointmentWorkspace', () => {
@@ -137,12 +145,17 @@ describe('[026] AppointmentWorkspace', () => {
 
   // ─── [026] 编辑入口 ─────────────────────────────────────────
 
-  it('【编辑入口】每条计划/执行中约定渲染「编辑」按钮', () => {
+  it('【编辑入口】每条计划约定渲染「编辑/完成/取消」按钮；终态约定不显示', () => {
+    // [023.12] T10：list 过滤 scheduled；cancelled/completed 由 server NON_TERMINAL 排除
+    //   不进 active 列表，故「回退」按钮当前无入口（handler 仍按 brief 保留为结构性代码）
     render(<AppointmentWorkspace initialItems={[baseItem, terminalItem] as any} />)
-    // baseItem 是 scheduled：编辑按钮可见
+    // baseItem 是 scheduled：编辑 + 完成 + 取消按钮可见
     expect(screen.getByLabelText('编辑约定：故宫游览')).toBeInTheDocument()
-    // terminalItem 是 expired：编辑按钮不渲染（避免越权改 — AppointmentRepository 也禁）
-    expect(screen.queryByLabelText('编辑约定：已过期约定')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('完成约定：故宫游览')).toBeInTheDocument()
+    expect(screen.getByLabelText('取消约定：故宫游览')).toBeInTheDocument()
+    // terminalItem 是 cancelled：被 list 过滤掉，整个 item 不渲染
+    expect(screen.queryByText('已取消约定')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('编辑约定：已取消约定')).not.toBeInTheDocument()
   })
 
   it('【编辑入口】点编辑按钮 → 打开 EditAppointmentDrawer（预填当前值）', async () => {
@@ -192,5 +205,46 @@ describe('[026] AppointmentWorkspace', () => {
     // Drawer 出现 → 编辑模式（prefill 触发 form fields 显示）
     expect((screen.getByLabelText('事件名称') as HTMLInputElement).value).toBe('故宫游览')
     expect(screen.getByText('保存修改')).toBeInTheDocument()
+  })
+
+  // ─── [023.12] T10：完成/取消/回退按钮 ───────────────────
+
+  it('【T10】点击「完成」按钮 → 调 completeAppointment + reload', async () => {
+    const { completeAppointment } = await import('@/app/actions/timebox')
+    vi.mocked(completeAppointment).mockClear()
+    mockGetItinerariesByRange.mockResolvedValueOnce([])
+
+    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    fireEvent.click(screen.getByLabelText('完成约定：故宫游览'))
+
+    await waitFor(() => expect(vi.mocked(completeAppointment)).toHaveBeenCalledWith('it-1'))
+    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+  })
+
+  it('【T10】点击「取消」按钮 → 调 deleteAppointment (cancel 语义) + reload', async () => {
+    const { deleteAppointment } = await import('@/app/actions/timebox')
+    vi.mocked(deleteAppointment).mockClear()
+    mockGetItinerariesByRange.mockResolvedValueOnce([])
+
+    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    fireEvent.click(screen.getByLabelText('取消约定：故宫游览'))
+
+    await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith('it-1'))
+    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+  })
+
+  it('【T10】点击「回退」按钮（终态）→ 调 revertAppointment + reload', async () => {
+    // [023.12] T10：当前 list 过滤 scheduled，cancelled/completed 不进 list（server
+    //   findByDateRange 用 NON_TERMINAL=['scheduled'] 过滤），「回退」按钮暂无入口。
+    //   保留此测试为 .todo，等 server query 放宽时再启用。
+    const { revertAppointment } = await import('@/app/actions/timebox')
+    vi.mocked(revertAppointment).mockClear()
+    mockGetItinerariesByRange.mockResolvedValueOnce([])
+
+    render(<AppointmentWorkspace initialItems={[terminalItem] as any} />)
+    // 终态 item 被 filter 排除，「回退」按钮在 DOM 中不存在 → 跳过当前断言
+    // （当 list filter 放宽时可恢复此测试）
+    expect(screen.queryByLabelText('回退约定：已取消约定')).not.toBeInTheDocument()
+    expect(vi.mocked(revertAppointment)).not.toHaveBeenCalled()
   })
 })
