@@ -202,8 +202,10 @@ describe('StartTimeInFutureRule', () => {
 })
 
 // [023.03] QA regression: status transition actions skip FieldCompletenessRule
+// [023.12] T13-pre codex C3：startTimebox/endTimebox 已从 STATUS_TRANSITION_ACTIONS
+// 移除（dead actions）。仅保留新 lifecycle 合法 transition action。
 describe('FieldCompletenessRule — 状态转换 action 跳过字段检查', () => {
-  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
+  const transitionActions = ['cancelTimebox', 'logTimebox']
 
   for (const action of transitionActions) {
     it(`${action} 仅有 objectId 字段应当 pass（字段从 DB 加载）`, () => {

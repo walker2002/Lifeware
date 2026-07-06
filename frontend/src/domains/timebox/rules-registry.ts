@@ -89,15 +89,16 @@ const endTimeFormat: RealtimeCheck = (value) => {
  * 状态转换 action（不含 createTimebox/editTimebox / createAppointment/editAppointment）：
  * title/startTime/endTime 从 DB 行加载（不是 form 提交），submit 端字段必含检查应跳过。
  *
- * 包含 startTimebox / endTimebox / cancelTimebox / logTimebox + 约定
- * cancelAppointment / startAppointment / completeAppointment / expireAppointment —
- * 这些 action 在 submitDynamicIntent 时 fields 仅有 { objectId }，跑字段必含
- * 校验会被错判 Rejected，阻塞 SM transition（[023.03] QA 发现：点开始无反应）。
+ * 包含 cancelTimebox / logTimebox + 约定 cancelAppointment / completeAppointment /
+ * revertAppointment — 这些 action 在 submitDynamicIntent 时 fields 仅有
+ * { objectId }，跑字段必含校验会被错判 Rejected，阻塞 SM transition。
  */
+// [023.12] T13-pre codex C3：与 core/rule-engine/rules/timebox.ts 同源对齐。
+// 删 'startTimebox'/'endTimebox'/'overtimeTimebox'/'startAppointment'/
+// 'expireAppointment'（dead actions），加 'revertAppointment'（[023.12] T5 新增）。
 const STATUS_TRANSITION_ACTIONS = new Set([
-  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox',
-  'overtimeTimebox',
-  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
+  'cancelTimebox', 'logTimebox',
+  'cancelAppointment', 'completeAppointment', 'revertAppointment',
 ])
 
 const timeboxFieldsValid: SubmitCheck = async (intent: StructuredIntent) => {

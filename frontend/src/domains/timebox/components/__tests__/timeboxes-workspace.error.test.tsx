@@ -60,7 +60,7 @@ describe('[023.03] T3 — handleAction 错误反馈', () => {
     transitionTimeboxMock.mockResolvedValue({
       status: 'needs_confirm',
       message: '当前已有运行中的时间盒，是否确认开始新的？',
-      confirmAction: 'startTimebox',
+      confirmAction: 'cancelTimebox',
       confirmFields: {},
     })
     render(<TimeboxesWorkspace />)

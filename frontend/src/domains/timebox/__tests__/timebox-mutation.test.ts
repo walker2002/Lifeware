@@ -56,11 +56,12 @@ describe('[023] A2 timebox server actions', () => {
     expect((r as any).message).toBe('时间重叠')
   })
 
-  it('transitionTimebox start → startTimebox intent（走 submitDynamicIntent）', async () => {
-    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-1', status: 'running' } })
-    const r = await transitionTimebox('tb-1', 'start')
+  it('transitionTimebox cancel → cancelTimebox intent（走 submitDynamicIntent）', async () => {
+    // [023.12] T13-pre codex C2：start/end 已从 union 移除，本用例改用 cancel。
+    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-1', status: 'cancelled' } })
+    const r = await transitionTimebox('tb-1', 'cancel')
     expect(r.status).toBe('ok')
-    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'startTimebox', expect.objectContaining({ objectId: 'tb-1' }), undefined)
+    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'cancelTimebox', expect.objectContaining({ objectId: 'tb-1' }), undefined)
   })
 
   it('updateTimebox 字段写 → 直调 mutation service.execute（不经 submitDynamicIntent）', async () => {

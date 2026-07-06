@@ -156,9 +156,11 @@ export function TimeboxesWorkspace() {
    *   '请先清理执行记录再回退'，catch 内 toast.error 提示）
    * - 'delete' 走 deleteTimebox（仅 planned 可用；其他状态 throw）
    */
+  // [023.12] T13-pre codex C2：从 union 移除 'start' | 'end'（dead actions，
+  // T8 UI 已撤按钮，遗留仅为类型签名残留）。
   const handleAction = useCallback(async (
     timeboxId: string,
-    action: 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog',
+    action: 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog',
   ) => {
     setActionSubmitting(true)
     try {
@@ -176,7 +178,8 @@ export function TimeboxesWorkspace() {
         await loadRange(dateMode, currentDate)
         return
       }
-      // [023.03] T3 旧路径：start/end/cancel/log 走 transitionTimebox + needs_confirm
+      // [023.12] T13-pre codex C2：旧 start/end/cancel/log 路径，删 start/end 后
+      // 仅剩 cancel/log 走 transitionTimebox + needs_confirm。
       if (action === 'viewLog') {
         // viewLog 是只读跳转，workspace 端不处理（由父级面板接管）
         return
@@ -365,7 +368,8 @@ export function TimeboxesWorkspace() {
                 events={events}
                 currentDate={currentDate}
                 onDateSelect={handleDateSelect}
-                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog')}
+                // [023.12] T13-pre codex C2：删 'start' | 'end'（dead）。
+                onAction={(id, action) => handleAction(id, action as 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog')}
                 onEdit={handleEdit}
               />
             )

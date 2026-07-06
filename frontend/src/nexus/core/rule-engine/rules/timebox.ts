@@ -48,9 +48,13 @@ const REQUIRED_FIELDS = ['title', 'startTime', 'endTime']
  * [023.03] QA fix: status transition 应当 pass（字段从 DB 加载，submit 端不会
  * 携带），否则核心规则仍会误判 warning → orchestrator 聚合成 NeedConfirm。
  */
+// [023.12] T13-pre codex C3：删 'startTimebox'/'endTimebox'/'overtimeTimebox'/
+// 'startAppointment'/'expireAppointment'（dead actions，lifecycle 区块 B 已不
+// 登记对应转换）。appointment 侧 add 'revertAppointment'（[023.12] T5 取代
+// 原 markInProgress/markExpired 的新 revert action）。
 const STATUS_TRANSITION_ACTIONS = new Set([
-  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox', 'overtimeTimebox',
-  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
+  'cancelTimebox', 'logTimebox',
+  'cancelAppointment', 'completeAppointment', 'revertAppointment',
 ])
 
 export const FieldCompletenessRule: Rule = {

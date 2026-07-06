@@ -37,20 +37,13 @@ intent_triggers:
       - 删除下午的会议
       - 帮我看一下今天的时间盒
     keywords: [修改时间盒, 改时间盒, 改时间, 调整时间盒, 取消时间盒, 删除时间盒]
-  - action: startTimebox
-    shortcut: /startTimebox
-    description: 开始执行一个时间盒
-    examples:
-      - 开始这个时间盒
-      - 启动专注时间
-    keywords: [开始, 启动, start]
-  - action: endTimebox
-    shortcut: /endTimebox
-    description: 结束当前时间盒
-    examples:
-      - 结束时间盒
-      - 完成这个专注时段
-    keywords: [结束, 完成, end]
+  # [023.12] T13-pre codex C1 修复：startTimebox / endTimebox intent_trigger 已移除。
+  # 理由：lifecycle 区块 B 仅登记 create/log/cancel/revert 4 action，'start'/'end'
+  # 已不在 SM 转换表。原 intent_trigger 是「开始/结束」AI 快捷入口；T8 UI 已撤
+  # 按钮（显示状态 running/overtime 由 status/derive-display-status.ts 派生，不
+  # 需显式 action）。submitExecutionIntent 仍接受「开始/结束」中文意图，但会因
+  # buildActionMap 找不到映射而走 fallback，TODO 待 [024] 统一收口（与本轮 dead-
+  # code 修复无关，列为 pre-existing）。
   - action: logTimebox
     shortcut: /logTimebox
     description: 记录时间盒的执行结果
