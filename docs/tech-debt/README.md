@@ -1,6 +1,6 @@
 ---
 title: 技术债务跟踪
-last_updated: 2026-07-06
+last_updated: 2026-07-07
 ---
 
 # 技术债务跟踪（Tech Debt Ledger）
@@ -46,6 +46,9 @@ last_updated: 2026-07-06
 | TD-011 | I-3 assertNoInternalOverlap _dayStart/_dayEnd unused params | ⚪ | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-012 | [023.05-1] PR1 Polish 3 Minor(测试文案残留旧词) | ⚪ | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-013 | manifest validator K-component PascalCase 约束未文档化 | 🟢 | infra | [023.10] | 暂未指派 |
+| TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
+| TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
+| TD-018 | [023.12] pre-existing 写入口连锁债：tasks/hooks.ts 死 action + 2 测试 fixture | 🟡 | cross-domain | [023.12] | 暂未指派 |
 
 ### 🛠 修复中
 
@@ -86,6 +89,7 @@ last_updated: 2026-07-06
 - [[TD-010]] · I-1 synthesized action update_timebox · 🟢 Low
 - [[TD-011]] · I-3 _dayStart/_dayEnd unused params · ⚪ Trivial
 - [[TD-012]] · [023.05-1] PR1 Polish 3 Minor · ⚪ Trivial
+- [[TD-017]] · [023.12] 生产代码漏跟 status 收窄（timebox.ts + intent.ts） · 🔴 Critical
 
 ### `lifeware-appointments`
 
@@ -95,6 +99,8 @@ last_updated: 2026-07-06
 
 - [[TD-004]] · R4 timebox/okrs 写入口债 · 🟠 High
 - [[TD-008]] · lifecycle-configs require 多键域债 · 🟡 Medium
+- [[TD-016]] · [023.12] 测试 fixture 漏改：3 域 status 收窄后 9 错 · 🟠 High
+- [[TD-018]] · [023.12] pre-existing 写入口连锁债：hooks + adapter test · 🟡 Medium
 
 ### `infra`
 
@@ -107,7 +113,7 @@ last_updated: 2026-07-06
 
 ### 🔴 Critical（必须本季度修复）
 
-*(暂无)*
+- [[TD-017]] · [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 错 → [023.13]
 
 ### 🟠 High（本年内修复）
 
@@ -115,6 +121,7 @@ last_updated: 2026-07-06
 - [[TD-002]] · logTimebox 批失败不对称
 - [[TD-003]] · editTimeboxes TOCTOU
 - [[TD-004]] · R4 timebox/okrs 写入口债
+- [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
 
 ### 🟡 Medium（下次大重构顺手解决）
 
@@ -122,6 +129,7 @@ last_updated: 2026-07-06
 - [[TD-006]] · orchestration N+1 sequential
 - [[TD-007]] · Suspend CNUI 回环未闭环
 - [[TD-008]] · lifecycle-configs require 多键域债
+- [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
 
 ### 🟢 Low（有精力再说）
 
@@ -161,7 +169,8 @@ last_updated: 2026-07-06
 | 第 1 批(🟠🟠) | 2026-07-06 | TD-001 ~ TD-008(8 条) | `/record-tech-debt` 手动调起,录 [023.10] post-ship defer cleanup 候选 |
 | 第 2 批(🟢⚪) | 2026-07-06 | TD-009 ~ TD-013(5 条,#11 合并到 TD-007) | 同次手动调起续录 |
 | 第 3 批(🟢🟢) | 2026-07-06 | TD-014 ~ TD-015(2 条) | 手动调起,录 /review 冲突调查时发现的 2 条工具链债 |
+| 第 4 批(🔴🟠🟡) | 2026-07-07 | TD-016 ~ TD-018(3 条,簇合并) | `[023.12]` ship-then-polish 7 错分簇合并为 3 TD（test fixture / production code / pre-existing chain） |
 
 ---
 
-**最后更新**: 2026-07-06 · 共 15 条 · 🔴0 / 🟠4 / 🟡4 / 🟢5 / ⚪2
+**最后更新**: 2026-07-07 · 共 18 条 · 🔴1 / 🟠5 / 🟡5 / 🟢5 / ⚪2

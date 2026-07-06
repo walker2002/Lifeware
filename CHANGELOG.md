@@ -76,6 +76,12 @@
 - 「SQL 级查过期约定/COUNT 运行中时间盒」能力：派生模式无法 SQL 查询；单用户 MVP 接受；报表/分析需求时再考虑物化视图
 - drizzle snapshot 重置（沿用 F2 convention）
 
+### 遗留债 →
+
+- [[TD-016]] · 🟠 · `cross-domain` · 测试 fixture 漏改（status 收窄与字段删除后,3 处 test fixture 未同步,tsc 累计 9 错）→ [023.13] 收口
+- [[TD-017]] · 🔴 · `lifeware-timebox` · 生产代码漏跟 status 收窄（timebox.ts:262 + intent.ts:126-128 仍读被删字段与死状态）→ [023.13] 收口
+- [[TD-018]] · 🟡 · `cross-domain` · pre-existing 写入口连锁债（tasks/hooks.ts 死 action + generic-repo-adapter 死 repo 引用,[018] G3 + [019.1] 退役 Adapter 连锁未清完）→ [023.13] 收口
+
 ---
 
 ## 项目宪章（.specify/memory/constitution.md）
