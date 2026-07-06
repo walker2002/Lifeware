@@ -198,7 +198,8 @@ export type SystemEventType =
   | 'TimeboxCreated' | 'TimeboxStarted' | 'TimeboxOvertime' | 'TimeboxEnded' | 'TimeboxCancelled' | 'TimeboxLogged'
   // [022.01] Phase 3: Objective 6 个状态事件移除（ObjectiveActivated/Paused/Resumed/Completed/Discarded/Archived）。
   // Obj/KR 不再有独立状态机，状态权威迁移至 Cycle.status。
-  // CycleCreated/Planned/Started/Ended/Reviewed 保留。
+  // [023.12] T6：Cycle 事件随 4 态收敛——
+  // 删 CyclePlanned / CycleStarted / CycleEnded，加 CycleApproved / CycleFinished / CycleReverted。
   | 'ObjectiveCreated'
   | 'KeyResultUpdated' | 'KeyResultProgressUpdated'
   | 'ReviewCreated' | 'ReviewCompleted'
@@ -213,7 +214,7 @@ export type SystemEventType =
   | 'OkrFieldUpdated'
   | 'TimeboxFieldUpdated'
   | 'AppointmentCreated' | 'AppointmentMarkedInProgress' | 'AppointmentMarkedExpired' | 'AppointmentCancelled' | 'AppointmentFieldUpdated' | 'AppointmentCompleted'
-  | 'CycleCreated' | 'CyclePlanned' | 'CycleStarted' | 'CycleEnded' | 'CycleReviewed'
+  | 'CycleCreated' | 'CycleApproved' | 'CycleFinished' | 'CycleReviewed' | 'CycleReverted'
   | 'OnEventDispatchFailed'
 
 export interface SystemEvent {

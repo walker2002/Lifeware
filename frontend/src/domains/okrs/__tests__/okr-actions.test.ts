@@ -10,6 +10,9 @@
  * 客户端仅传 {cycleType,name,periodStart,periodEnd}，server 构造 id/timestamps，
  * SM 强制 status='draft'。自然键 (periodStart, periodEnd) 幂等。
  *
+ * [023.12] T6：fixture status in_progress→approved（[AM6] 同步），
+ * getActiveCycles 期望 approved。
+ *
  * 不测试走 Orchestrator 的复杂 actions（createObjective 等）——
  * 那些路径由 cross-domain-event.test / hook 集成测试覆盖，本文件
  * 只锁住「Server Action 直连 repo」这条最简写路径不被回归破坏。
@@ -24,6 +27,7 @@ import {
   createCycle,
   getObjectives,
   getObjectiveById,
+  createObjective,
 } from '@/app/actions/okr'
 
 /** MVP 用户 ID（与 actions/okr.ts 内部 const 一致） */
@@ -33,7 +37,8 @@ describe('app/actions/okr.ts Server Actions', () => {
   let testCycleId: string
 
   beforeAll(async () => {
-    // 准备：确保至少存在一个 in_progress 周期供 getActiveCycles 返回
+    // 准备：确保至少存在一个 approved 周期供 getActiveCycles 返回
+    // [023.12] T6：原 in_progress→approved（[AM6] 同步）
     const periodStart = '2026-07-01'
     const periodEnd = '2026-09-30'
     const existing = await db.select().from(s.cycles)
@@ -54,7 +59,8 @@ describe('app/actions/okr.ts Server Actions', () => {
         name: '2026-Q3-actions-test',
         periodStart,
         periodEnd,
-        status: 'in_progress',
+        // [023.12] T6：in_progress→approved
+        status: 'approved',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -78,14 +84,15 @@ describe('app/actions/okr.ts Server Actions', () => {
 
   // ─── getActiveCycles ────────────────────────────────────────
 
-  it('getActiveCycles 返回 success 且仅含 in_progress 周期', async () => {
+  it('getActiveCycles 返回 success 且仅含 approved 周期', async () => {
+    // [023.12] T6：in_progress→approved
     const result = await getActiveCycles()
     expect(result.success).toBe(true)
     expect(result.data).toBeDefined()
     expect(Array.isArray(result.data)).toBe(true)
-    // 所有返回项 status 均为 in_progress
+    // 所有返回项 status 均为 approved
     for (const c of result.data!) {
-      expect(c.status).toBe('in_progress')
+      expect(c.status).toBe('approved')
     }
     // 至少含本次测试用的周期
     expect(result.data!.some((c) => c.id === testCycleId)).toBe(true)
@@ -225,25 +232,27 @@ describe('app/actions/okr.ts Server Actions', () => {
     ))
   })
 
-  it('createObjective in_progress cycle → 成功（assertEditable 守卫通过）', async () => {
-    // 准备：建 in_progress cycle
-    const inProgressStart = '2028-01-01'
-    const inProgressEnd = '2028-03-31'
-    const ipCycleId = crypto.randomUUID()
+  it('createObjective approved cycle → 成功（assertEditable 守卫通过）', async () => {
+    // 准备：建 approved cycle
+    // [023.12] T6：in_progress→approved
+    const approvedStart = '2028-01-01'
+    const approvedEnd = '2028-03-31'
+    const apCycleId = crypto.randomUUID()
     await db.insert(s.cycles).values({
-      id: ipCycleId,
+      id: apCycleId,
       userId: MVP_USER_ID,
       cycleType: 'quarterly',
-      name: '2028-Q1-actions-inprogress-guard',
-      periodStart: inProgressStart,
-      periodEnd: inProgressEnd,
-      status: 'in_progress',
+      name: '2028-Q1-actions-approved-guard',
+      periodStart: approvedStart,
+      periodEnd: approvedEnd,
+      // [023.12] T6：in_progress→approved
+      status: 'approved',
       createdAt: new Date(),
       updatedAt: new Date(),
     })
 
     const result = await createObjective({
-      cycleId: ipCycleId,
+      cycleId: apCycleId,
       title: 'P3-守卫-应成功',
     })
     expect(result.success).toBe(true)
@@ -260,7 +269,7 @@ describe('app/actions/okr.ts Server Actions', () => {
     }
     await db.delete(s.cycles).where(and(
       eq(s.cycles.userId, MVP_USER_ID),
-      eq(s.cycles.id, ipCycleId),
+      eq(s.cycles.id, apCycleId),
     ))
   })
 

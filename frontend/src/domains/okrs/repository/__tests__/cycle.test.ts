@@ -1,17 +1,18 @@
 /**
  * @file cycle.test
- * @brief [022.01] Cycle 仓储 + adapter 测试
+ * @brief [022.01] + [023.12] T6 Cycle 仓储 + adapter 测试
  *
  * Phase 1（adapter.cycle.create 幂等与降级防护）+ Phase 2 Task 1
  * （CycleRepository.updateStatus + adapter 接线）：
  * 1. adapter.cycle.create 不再抛 "不支持通过 GenericRepo 创建" 错误
- * 2. 同自然键已有 in_progress cycle 时，create 不覆写其 status（前置 SELECT 短路）
+ * 2. 同自然键已有 approved cycle 时，create 不覆写其 status（前置 SELECT 短路）
+ *    [023.12] T6：in_progress→approved（[AM6] 同步）
  * 3. 自然键不存在时，create 构造 draft cycle 并 save
- * 4. CycleRepository.updateStatus：draft → in_progress
- * 5. CycleRepository.updateStatus：in_progress → ended
- * 6. CycleRepository.updateStatus：ended → reviewed
- * 7. CycleRepository.updateStatus：draft → not_started（无时间戳字段变更）
- * 8. CycleRepository.updateStatus：not_started → in_progress（设置 startedAt=now）
+ * 4. CycleRepository.updateStatus：draft → approved
+ * 5. CycleRepository.updateStatus：approved → finished
+ * 6. CycleRepository.updateStatus：finished → reviewed
+ * 7. CycleRepository.updateStatus：reviewed → finished（[T6] revert 一致性：保留 approvedAt/finishedAt）
+ * 8. CycleRepository.updateStatus：draft → draft（无时间戳字段变更）
  * 9. CycleRepository.updateStatus：对象不存在时抛错
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -65,10 +66,11 @@ describe('[022.01] adapter.cycle.create', () => {
     expect(result.id).toBeDefined()
   })
 
-  it('同自然键已有 in_progress cycle 时，create 不覆写其 status（返回已有行）', async () => {
+  it('同自然键已有 approved cycle 时，create 不覆写其 status（返回已有行）', async () => {
+    // [023.12] T6：原 in_progress→approved
     const existingCycle = {
       id: 'existing-id',
-      status: 'in_progress',
+      status: 'approved',
       cycleType: 'quarterly',
       name: '2026 Q3',
       period: { start: '2026-07-01', end: '2026-09-30' },
@@ -120,10 +122,11 @@ describe('[022.01] adapter.cycle.create', () => {
 })
 
 /**
- * [022.01] Phase 2 Task 1：CycleRepository.updateStatus 状态转换测试
+ * [022.01] Phase 2 Task 1 + [023.12] T6：CycleRepository.updateStatus 状态转换测试
  *
  * 验证 updateStatus 正确设置 status + 对应时间戳。
  * 用 mock tx 对象记录 UPDATE 调用参数，避免依赖 PG。
+ * [T6] 4 态收敛：draft/approved/finished/reviewed。
  */
 describe('[022.01] CycleRepository.updateStatus', () => {
   // mock tx 对象：记录 UPDATE 调用参数
@@ -145,7 +148,7 @@ describe('[022.01] CycleRepository.updateStatus', () => {
     }
   }
 
-  it('draft → in_progress：设置 status=in_progress + startedAt=now', async () => {
+  it('draft → approved：设置 status=approved + approvedAt=now（[T6] 原 startedAt）', async () => {
     const repo = new CycleRepository()
     const tx = mockTx()
 
@@ -161,33 +164,36 @@ describe('[022.01] CycleRepository.updateStatus', () => {
       updatedAt: '2026-06-01T00:00:00.000Z',
     })
 
-    const result = await repo.updateStatus('c-1', 'in_progress', MVP_USER_ID, tx as any)
+    const result = await repo.updateStatus('c-1', 'approved', MVP_USER_ID, tx as any)
 
     // called findById
     expect(repo.findById).toHaveBeenCalledWith('c-1', MVP_USER_ID, tx)
 
-    // UPDATE set 含 status + startedAt
+    // UPDATE set 含 status + approvedAt（[T6] AM6）
     expect(tx.updates.length).toBe(1)
-    expect(tx.updates[0].set.status).toBe('in_progress')
-    expect(tx.updates[0].set.startedAt).toBeInstanceOf(Date)
-    expect(tx.updates[0].set.endedAt).toBeUndefined()
+    expect(tx.updates[0].set.status).toBe('approved')
+    expect(tx.updates[0].set.approvedAt).toBeInstanceOf(Date)
+    expect(tx.updates[0].set.finishedAt).toBeUndefined()
     expect(tx.updates[0].set.reviewedAt).toBeUndefined()
+    // [T6] 旧字段名不再使用
+    expect(tx.updates[0].set.startedAt).toBeUndefined()
+    expect(tx.updates[0].set.endedAt).toBeUndefined()
 
-    // 返回的对象含新 status + startedAt
-    expect(result.status).toBe('in_progress')
-    expect(result.startedAt).toBeDefined()
+    // 返回的对象含新 status + approvedAt
+    expect(result.status).toBe('approved')
+    expect(result.approvedAt).toBeDefined()
 
     // restore
     repo.findById = origFindById
   })
 
-  it('in_progress → ended：设置 status=ended + endedAt=now', async () => {
+  it('approved → finished：设置 status=finished + finishedAt=now（[T6] 原 endedAt）', async () => {
     const repo = new CycleRepository()
     const origFindById = repo.findById
     repo.findById = vi.fn().mockResolvedValue({
       id: 'c-1',
-      status: 'in_progress',
-      startedAt: '2026-07-01T00:00:00.000Z',
+      status: 'approved',
+      approvedAt: '2026-07-01T00:00:00.000Z',
       cycleType: 'quarterly',
       name: '2026 Q3',
       period: { start: '2026-07-01', end: '2026-09-30' },
@@ -196,25 +202,28 @@ describe('[022.01] CycleRepository.updateStatus', () => {
     })
 
     const tx = mockTx()
-    const result = await repo.updateStatus('c-1', 'ended', MVP_USER_ID, tx as any)
+    const result = await repo.updateStatus('c-1', 'finished', MVP_USER_ID, tx as any)
 
-    expect(tx.updates[0].set.status).toBe('ended')
-    expect(tx.updates[0].set.endedAt).toBeInstanceOf(Date)
+    expect(tx.updates[0].set.status).toBe('finished')
+    expect(tx.updates[0].set.finishedAt).toBeInstanceOf(Date)
+    expect(tx.updates[0].set.approvedAt).toBeUndefined()
+    expect(tx.updates[0].set.reviewedAt).toBeUndefined()
     expect(tx.updates[0].set.startedAt).toBeUndefined()
-    expect(result.status).toBe('ended')
-    expect(result.endedAt).toBeDefined()
+    expect(tx.updates[0].set.endedAt).toBeUndefined()
+    expect(result.status).toBe('finished')
+    expect(result.finishedAt).toBeDefined()
 
     repo.findById = origFindById
   })
 
-  it('ended → reviewed：设置 status=reviewed + reviewedAt=now', async () => {
+  it('finished → reviewed：设置 status=reviewed + reviewedAt=now', async () => {
     const repo = new CycleRepository()
     const origFindById = repo.findById
     repo.findById = vi.fn().mockResolvedValue({
       id: 'c-1',
-      status: 'ended',
-      startedAt: '2026-07-01T00:00:00.000Z',
-      endedAt: '2026-09-30T00:00:00.000Z',
+      status: 'finished',
+      approvedAt: '2026-07-01T00:00:00.000Z',
+      finishedAt: '2026-09-30T00:00:00.000Z',
       cycleType: 'quarterly',
       name: '2026 Q3',
       period: { start: '2026-07-01', end: '2026-09-30' },
@@ -227,13 +236,53 @@ describe('[022.01] CycleRepository.updateStatus', () => {
 
     expect(tx.updates[0].set.status).toBe('reviewed')
     expect(tx.updates[0].set.reviewedAt).toBeInstanceOf(Date)
+    expect(tx.updates[0].set.approvedAt).toBeUndefined()
+    expect(tx.updates[0].set.finishedAt).toBeUndefined()
     expect(result.status).toBe('reviewed')
     expect(result.reviewedAt).toBeDefined()
 
     repo.findById = origFindById
   })
 
-  it('draft → not_started：设置 status=not_started，无时间戳字段变更', async () => {
+  it('reviewed → finished（revert，[T6] AM10）：无时间戳字段变更（仅 status + updatedAt）', async () => {
+    // [023.12] T6 新增：[AM10] 一致性约束——
+    // reviewed→finished 是一致性回退，复盘证据（reviewedAt）和历史时间戳
+    // （approvedAt/finishedAt）必须保留，不允许被覆盖。
+    const repo = new CycleRepository()
+    const origFindById = repo.findById
+    repo.findById = vi.fn().mockResolvedValue({
+      id: 'c-1',
+      status: 'reviewed',
+      approvedAt: '2026-07-01T00:00:00.000Z',
+      finishedAt: '2026-09-30T00:00:00.000Z',
+      reviewedAt: '2026-10-05T00:00:00.000Z',
+      cycleType: 'quarterly',
+      name: '2026 Q3',
+      period: { start: '2026-07-01', end: '2026-09-30' },
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const tx = mockTx()
+    const result = await repo.updateStatus('c-1', 'finished', MVP_USER_ID, tx as any)
+
+    // UPDATE set 仅含 status + updatedAt；不修改任何 *At 时间戳
+    expect(tx.updates.length).toBe(1)
+    expect(tx.updates[0].set.status).toBe('finished')
+    expect(tx.updates[0].set.approvedAt).toBeUndefined()
+    expect(tx.updates[0].set.finishedAt).toBeUndefined()
+    expect(tx.updates[0].set.reviewedAt).toBeUndefined()
+
+    // 返回的对象 status 回到 finished；*At 时间戳保持 findById 返回原值
+    expect(result.status).toBe('finished')
+    expect(result.reviewedAt).toBe('2026-10-05T00:00:00.000Z')
+
+    repo.findById = origFindById
+  })
+
+  it('draft → draft（test fixture 状态保持）：无时间戳字段变更（仅 status + updatedAt）', async () => {
+    // [023.12] T6：替代原 draft → not_started——测试 SET 行为而非具体 to 值。
+    // draft cycle 状态写不触发任何 *At 字段，仅 updatedAt。
     const repo = new CycleRepository()
     const origFindById = repo.findById
     repo.findById = vi.fn().mockResolvedValue({
@@ -247,46 +296,17 @@ describe('[022.01] CycleRepository.updateStatus', () => {
     })
 
     const tx = mockTx()
-    const result = await repo.updateStatus('c-1', 'not_started', MVP_USER_ID, tx as any)
+    const result = await repo.updateStatus('c-1', 'draft', MVP_USER_ID, tx as any)
 
-    // UPDATE set 含 status,但无 startedAt/endedAt/reviewedAt 时间戳字段
+    // UPDATE set 仅含 status + updatedAt；不触发任何 *At 字段
     expect(tx.updates.length).toBe(1)
-    expect(tx.updates[0].set.status).toBe('not_started')
-    expect(tx.updates[0].set.startedAt).toBeUndefined()
-    expect(tx.updates[0].set.endedAt).toBeUndefined()
+    expect(tx.updates[0].set.status).toBe('draft')
+    expect(tx.updates[0].set.approvedAt).toBeUndefined()
+    expect(tx.updates[0].set.finishedAt).toBeUndefined()
     expect(tx.updates[0].set.reviewedAt).toBeUndefined()
 
-    // 返回的对象仅含新 status
-    expect(result.status).toBe('not_started')
-
-    repo.findById = origFindById
-  })
-
-  it('not_started → in_progress：设置 status=in_progress + startedAt=now', async () => {
-    const repo = new CycleRepository()
-    const origFindById = repo.findById
-    repo.findById = vi.fn().mockResolvedValue({
-      id: 'c-1',
-      status: 'not_started',
-      cycleType: 'quarterly',
-      name: '2026 Q3',
-      period: { start: '2026-07-01', end: '2026-09-30' },
-      createdAt: '2026-06-01T00:00:00.000Z',
-      updatedAt: '2026-06-01T00:00:00.000Z',
-    })
-
-    const tx = mockTx()
-    const result = await repo.updateStatus('c-1', 'in_progress', MVP_USER_ID, tx as any)
-
-    // UPDATE set 含 status + startedAt,无 endedAt
-    expect(tx.updates.length).toBe(1)
-    expect(tx.updates[0].set.status).toBe('in_progress')
-    expect(tx.updates[0].set.startedAt).toBeInstanceOf(Date)
-    expect(tx.updates[0].set.endedAt).toBeUndefined()
-
-    // 返回的对象含新 status + startedAt
-    expect(result.status).toBe('in_progress')
-    expect(result.startedAt).toBeDefined()
+    // 返回的对象 status 保持 draft
+    expect(result.status).toBe('draft')
 
     repo.findById = origFindById
   })
@@ -297,7 +317,7 @@ describe('[022.01] CycleRepository.updateStatus', () => {
     repo.findById = vi.fn().mockResolvedValue(null)
 
     await expect(
-      repo.updateStatus('c-nonexistent', 'in_progress', MVP_USER_ID),
+      repo.updateStatus('c-nonexistent', 'approved', MVP_USER_ID),
     ).rejects.toThrow('Cycle c-nonexistent not found')
 
     repo.findById = origFindById

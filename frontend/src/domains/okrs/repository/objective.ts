@@ -92,13 +92,15 @@ export class ObjectiveRepository implements IObjectiveRepository {
   }
 
   async findActive(userId: USOM_ID): Promise<Objective[]> {
-    // [022.01] Phase 3: status 列已删除，改为按 cycle.status='in_progress' 过滤
+    // [023.12] T6：cycle.status 由 5 态收敛为 4 态，
+    // 「活跃周期」语义从 in_progress 改为 approved（[AM6] 同步）。
+    // 旧 not_started/in_progress/ended/reviewed → 新 approved/finished/reviewed。
     const rows = await this.findObjRows(
       and(
         eq(s.objectives.userId, userId),
         isNull(s.objectives.discardedAt),
         isNull(s.objectives.archivedAt),
-        eq(s.cycles.status, 'in_progress'),
+        eq(s.cycles.status, 'approved'),
       ),
     )
     const krByObj = await this.batchKeyResultIds(rows.map((r) => r.id))

@@ -4,6 +4,7 @@
  *
  * [022] 1A-T4：Cycle 仓储 save→findById 回环、findByUserAndStatus 过滤。
  * 依赖真实 PostgreSQL（容器 lifeware-postgres-1）。
+ * [023.12] T6：fixture status in_progress→approved（[AM6] 同步）。
  */
 import { describe, it, expect } from 'vitest'
 import { CycleRepository } from '../repository/cycle'
@@ -14,12 +15,13 @@ const MVP_USER_ID = '00000000-0000-0000-0000-000000000001' as const
 describe('CycleRepository', () => {
   it('save 后 findById 能取回，且 name/cycleType/period 正确', async () => {
     const repo = new CycleRepository()
+    // [023.12] T6：in_progress→approved
     const cycle = {
       id: crypto.randomUUID(),
       cycleType: 'quarterly' as const,
       name: '2026-Q2',
       period: { start: '2026-04-01', end: '2026-06-30' },
-      status: 'in_progress' as const,
+      status: 'approved' as const,
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
@@ -33,7 +35,8 @@ describe('CycleRepository', () => {
 
   it('findByUserAndStatus 按状态过滤', async () => {
     const repo = new CycleRepository()
-    const list = await repo.findByUserAndStatus('in_progress', MVP_USER_ID as any)
-    expect(list.every((c) => c.status === 'in_progress')).toBe(true)
+    // [023.12] T6：in_progress→approved
+    const list = await repo.findByUserAndStatus('approved', MVP_USER_ID as any)
+    expect(list.every((c) => c.status === 'approved')).toBe(true)
   })
 })

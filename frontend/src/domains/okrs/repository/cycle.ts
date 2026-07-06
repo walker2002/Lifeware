@@ -63,8 +63,12 @@ export class CycleRepository {
   async save(cycle: Cycle, userId: USOM_ID, tx: DbClient = db): Promise<Cycle> {
     const row = cycleUSOMToRow(cycle, userId)
     // [022.01] iter 3 修复：onConflictDoUpdate 的 SET 子句必须排除生命周期字段
-    // (status/startedAt/endedAt/reviewedAt)，避免同自然键已有 in_progress cycle 被
+    // (status/startedAt/endedAt/reviewedAt)，避免同自然键已有 approved cycle 被
     // adapter.create 构造的 draft 降级。仅更新 name/cycleType/updatedAt 等可写字段。
+    // [023.12] T6 AM6 备注：USOM TS 字段已 rename（startedAt→approvedAt, endedAt→finishedAt），
+    // 但 cycleUSOMToRow（mappers.ts:916-917）尚未迁移——AM1 不在 T6 scope。
+    // 故排除仍按 mapper 实际 key（startedAt/endedAt），效果一致（drizzle 列名是 'started_at'/'ended_at'，
+    // 与 T6 的逻辑无冲突，T1b 才动 DB 列名）。
     const {
       id: _id,
       createdAt: _createdAt,
@@ -135,19 +139,21 @@ export class CycleRepository {
   }
 
   /**
-   * 更新周期状态（[022.01] Phase 2：供 SM 状态转换持久化使用）。
+   * 更新周期状态（[022.01] Phase 2 + [023.12] T6 AM6：供 SM 状态转换持久化使用）。
    *
    * CycleRepository.save 的 onConflictDoUpdate SET 排除了 status 等生命周期字段
    * （Phase 1 iter 3 防降级），因此状态更新必须走独立的 UPDATE 路径。
    *
-   * 时间戳规则（按 manifest cycle lifecycle transitions）：
-   * - in_progress → startedAt = now
-   * - ended → endedAt = now（保留已有 startedAt）
-   * - reviewed → reviewedAt = now（保留已有 startedAt/endedAt）
-   * - draft/not_started → 无特殊时间戳（仅 updatedAt）
+   * 时间戳规则（[023.12] T6：跟随 manifest cycle lifecycle transitions）：
+   * - approved → approvedAt = now（[AM6] 原 startedAt 改名；DB 列暂留 started_at，T1b 改）
+   * - finished → finishedAt = now（[AM6] 原 endedAt 改名；DB 列暂留 ended_at，T1b 改）
+   * - reviewed → reviewedAt = now（保留已有 approvedAt/finishedAt）
+   * - reviewed → finished（revert, [AM10]）：不覆写 approvedAt/finishedAt，
+   *   仅 updatedAt——复盘证据（reviewedAt）保留，周期可再次走 finish→review
+   * - draft → 无特殊时间戳（仅 updatedAt）
    *
    * @param id - 周期 ID
-   * @param status - 目标状态（draft | not_started | in_progress | ended | reviewed）
+   * @param status - 目标状态（draft | approved | finished | reviewed）
    * @param userId - 用户 ID（多租户 T-02）
    * @param tx - 可选事务句柄
    * @returns 更新后的完整 Cycle
@@ -166,8 +172,14 @@ export class CycleRepository {
       status,
       updatedAt: now,
     }
-    if (status === 'in_progress') updates.startedAt = now
-    if (status === 'ended') updates.endedAt = now
+    // [023.12] T6 AM6：TS 字段名已 rename（approvedAt/finishedAt/reviewedAt）。
+    // 下面 3 行是 T6 唯一允许写 approvedAt/finishedAt 的入口——
+    // adapter.cycle 的 status 字段更新只此一处（save 已排除生命周期字段）。
+    // [AM10] reviewed→finished（revert）例外：不写 finishedAt——
+    // 保留首次 finished 的时间戳（[AM10] 一致性证据），允许再次 finish→review。
+    const isRevert = existing.status === 'reviewed' && status === 'finished'
+    if (status === 'approved') updates.approvedAt = now
+    if (status === 'finished' && !isRevert) updates.finishedAt = now
     if (status === 'reviewed') updates.reviewedAt = now
 
     await tx.update(s.cycles)
@@ -178,8 +190,9 @@ export class CycleRepository {
       ...existing,
       status,
       updatedAt: now.toISOString() as Timestamp,
-      ...(status === 'in_progress' && { startedAt: now.toISOString() as Timestamp }),
-      ...(status === 'ended' && { endedAt: now.toISOString() as Timestamp }),
+      // [AM10] revert 路径不返回新 finishedAt——保留原值
+      ...(status === 'approved' && { approvedAt: now.toISOString() as Timestamp }),
+      ...(status === 'finished' && !isRevert && { finishedAt: now.toISOString() as Timestamp }),
       ...(status === 'reviewed' && { reviewedAt: now.toISOString() as Timestamp }),
     }
   }

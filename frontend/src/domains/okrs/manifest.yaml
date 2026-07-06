@@ -41,16 +41,21 @@ lifecycle:
       - { from: null, to: draft, trigger: intent, action: create, event_type: KeyResultUpdated }
     terminal_states: [draft]
   cycle:
-    states: [draft, not_started, in_progress, ended, reviewed]
+    # [023.12] T6 收敛 4 态：draft/approved/finished/reviewed。
+    # plan/start/end 三个旧动作整体退役（not_started 状态移除——
+    # "周期未到开始日期"产品行为删，简化为"已批准即活跃"）。
+    states: [draft, approved, finished, reviewed]
     initial_state: draft
     transitions:
-      - { from: null, to: draft, trigger: intent, action: create, event_type: CycleCreated }
-      - { from: draft, to: not_started, trigger: intent, action: plan, event_type: CyclePlanned }
-      - { from: draft, to: in_progress, trigger: intent, action: start, event_type: CycleStarted }
-      - { from: not_started, to: in_progress, trigger: intent, action: start, event_type: CycleStarted }
-      - { from: in_progress, to: ended, trigger: intent, action: end, event_type: CycleEnded }
-      - { from: ended, to: reviewed, trigger: intent, action: review, event_type: CycleReviewed }
-    terminal_states: [reviewed]
+      - { from: null,      to: draft,     trigger: intent, action: create, event_type: CycleCreated }
+      - { from: draft,     to: approved,  trigger: intent, action: approve, event_type: CycleApproved }
+      - { from: approved,  to: finished,  trigger: intent, action: finish,  event_type: CycleFinished }
+      - { from: finished,  to: reviewed,  trigger: intent, action: review,  event_type: CycleReviewed }
+      # [023.12] T6 AM10：revert 一步回退（reviewed→finished），不复位 reviewedAt
+      # ——保留复盘证据。timebox/appointment revert to-initial；cycle 是反例。
+      - { from: reviewed,  to: finished,  trigger: intent, action: revert,  event_type: CycleReverted }
+    # 无终态：reviewed 可经 revert 回 finished，二次可重新走 finish→review。
+    terminal_states: []
 
 # ─── 区块 C: field_metadata ──────────────────────────────────────
 # [022.01] Phase 3：移除 status 字段元数据（Objective/KR 不再含 status）。
@@ -103,6 +108,8 @@ required_fields:
 
 # ─── 区块 F: subscribed_events ───────────────────────────────────
 # [022.01] Phase 3：移除 Objective 状态事件（6 个），Cycle 状态事件保留。
+# [023.12] T6：Cycle 事件随 lifecycle 收敛——删 CyclePlanned/CycleStarted，
+# CycleEnded→CycleFinished，加 CycleApproved/CycleReverted。
 subscribed_events:
   - ObjectiveCreated
   - KeyResultUpdated
@@ -111,10 +118,10 @@ subscribed_events:
   - HabitLogged
   - OkrFieldUpdated
   - CycleCreated
-  - CyclePlanned
-  - CycleStarted
-  - CycleEnded
+  - CycleApproved
+  - CycleFinished
   - CycleReviewed
+  - CycleReverted
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
 view_routes:

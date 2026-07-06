@@ -2,15 +2,17 @@
  * @file okr-directory
  * @brief OKR 工作台左侧目录（周期-目标二级树 + ⋯ 菜单 + 折叠/展开）
  *
- * 重构要点（[024] G1 + [024.1] T1 + [022.01] T4 + [022.01] T5）：
+ * 重构要点（[024] G1 + [024.1] T1 + [022.01] T4 + [022.01] T5 + [023.12] T6）：
  *  - 顶层节点由 Cycle 驱动（不再是按 objective.period 派生的字符串分组）
  *  - 每个 cycle 下挂载 objectives.filter(o => o.cycleId === cycle.id)
  *  - 顶部筛选 tabs：[022.01] Task 4 改为 Cycle 状态（draft/not_started/in_progress/ended/reviewed）；
+ *    [023.12] T6 收敛 4 态（draft/approved/finished/reviewed）。
  *    筛选作用于 parent cycle 状态，voice D8：非匹配 cycle 不渲染（解决 (0) 空卡问题）
- *  - 周期 ⋯：[022.01] Task 5 集成 审核通过(draft) / 添加目标 / 结束周期(in_progress) / 复盘(ended) / 删除周期（有目标时禁用）
+ *  - 周期 ⋯：[022.01] Task 5 集成 审核通过(draft) / 添加目标 / 结束周期(in_progress→approved) / 复盘(ended→finished→reviewed) / 删除周期（有目标时禁用）；
+ *    [023.12] T6：endCycle 改名为 finishCycle（T9 同步菜单项文案）
  *  - 目标 ⋯：[022.01] Phase 3 简化为仅「删除目标」（设置 discardedAt）；
  *    pause/resume/complete/archive 语义由 cycle 级操作承载
- *  - 周期折叠：[022.01] Phase 3 改为「cycle.status === 'in_progress'」展开，其余收起（不再依赖 objective.status）
+ *  - 周期折叠：[023.12] T6 由「cycle.status === 'in_progress'」改为「cycle.status === 'approved'」
  *
  * @remarks
  *  - 移除了 getPeriodGroupKey（旧实现用 objective.period 派生分组键；现在以 cycle 为权威）
@@ -63,14 +65,13 @@ interface OKRDirectoryProps {
 }
 
 // [022.01] Task 4：顶部筛选 tabs 改为 Cycle 状态。
-// 筛选作用于 objective 所属 cycle 的状态，而非 objective 自身状态
-// （voice D8：非匹配 cycle 不应显示为 (0) 空卡）。
+// [023.12] T6：4 态收敛——删 not_started/in_progress/ended 三项，
+// 改用 approved/finished。「已批准」即「进行中」（产品：批准即活跃，无"未开始"中间态）。
 const CYCLE_STATUS_TABS: { key: CycleFilter; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "draft", label: "草稿" },
-  { key: "not_started", label: "未开始" },
-  { key: "in_progress", label: "进行中" },
-  { key: "ended", label: "已结束" },
+  { key: "approved", label: "进行中" },
+  { key: "finished", label: "已结束" },
   { key: "reviewed", label: "已复盘" },
 ]
 
@@ -116,12 +117,13 @@ export function OKRDirectory({
   const handleDeleteCycle = onDeleteCycle ?? (() => {})
   const handleDeleteObjective = onDeleteObjective ?? (() => {})
 
-  // [022.01] Task 5：周期折叠。
-  // MVP：进行中的周期默认展开，其余收起（不在依赖 objective.status）
+  // [022.01] Task 5 + [023.12] T6：周期折叠。
+  // MVP：已批准（approved）的周期默认展开，其余收起（不在依赖 objective.status）
+  // [T6]：in_progress→approved（[AM6] 同步）
   const [collapsedCycleIds, setCollapsedCycleIds] = useState<Set<string>>(() => {
     const collapsed = new Set<string>()
     for (const cycle of cycles) {
-      const hasActive = cycle.status === "in_progress"
+      const hasActive = cycle.status === "approved"
       if (!hasActive) collapsed.add(cycle.id)
     }
     return collapsed
