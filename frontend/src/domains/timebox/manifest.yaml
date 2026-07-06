@@ -26,7 +26,7 @@ intent_triggers:
   # 仅从 intent_triggers 移除 AI/shortcut 入口。
   - action: editTimeboxes
     shortcut: /editTimeboxes
-    description: 修改/取消/删除当日时间盒（CNUI 三合一入口）
+    description: 修改/删除时间盒
     response_type: cnui
     cnui_surface: edit-timeboxes
     examples:

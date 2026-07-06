@@ -103,7 +103,8 @@ describe('[023.04] T4 <EditTimeboxes>', () => {
 
   it('case 2: selecting items>0 → 列表渲染 + 点击 item 进 editing', () => {
     render(<EditTimeboxes {...makeProps({ items: [tb('tb1', 'planned'), tb('tb2', 'running')] })} />)
-    expect(screen.getByText('请选择要操作的时间盒')).toBeInTheDocument()
+    expect(screen.queryByText('请选择要操作的时间盒')).not.toBeInTheDocument()
+    expect(screen.getByText('Ttb1')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Ttb1').closest('button')!)
     expect(screen.getByText(/编辑时间盒/)).toBeInTheDocument()
   })
@@ -176,7 +177,8 @@ describe('[023.04] T4 <EditTimeboxes>', () => {
       status: 'planned',
     })} />)
     fireEvent.click(screen.getByText('返回列表'))
-    expect(screen.getByText('请选择要操作的时间盒')).toBeInTheDocument()
+    expect(screen.getByText('Ttb1')).toBeInTheDocument()
+    expect(screen.queryByText('返回列表')).not.toBeInTheDocument()
   })
 
   // ---- eng-review fold-in 3 case ----

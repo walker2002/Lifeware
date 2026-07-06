@@ -121,8 +121,6 @@ export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, is
             <div className="mt-1 text-error">原因：{parseReason}</div>
           </div>
         )}
-
-        <div className="mb-2"><span className="text-sm font-medium text-ink">请选择要操作的时间盒</span></div>
         {items.length === 0
           ? <p className="py-8 text-center text-sm text-body/70">未匹配到当日时间盒</p>
           : <div className="space-y-1 max-h-72 overflow-y-auto">
