@@ -1,8 +1,8 @@
 /**
  * @file reconcile-appointment-tz.test.ts
- * @brief reconcileAppointmentStatuses 跨 TZ 边界单元测试（[026] T20 codex #5）
+ * @brief deriveAppointmentBadges 跨 TZ 边界单元测试（[023.12] T5 改造 + [026] T20 codex #5）
  *
- * 守护 [026] OQ-6 风险：「同一日历日歧义」—— reconcile-appointment.ts 用
+ * 守护 [026] OQ-6 风险：「同一日历日歧义」—— derive-display-status.ts 用
  * `localDayKey(getFullYear/getMonth/getDate)` 按宿主 TZ 计算日界，跨 TZ 部署
  * 会让同一时刻在不同环境归入不同日。本测试用 Node 20+ 的 `process.env.TZ`
  * 运行时切换（不必重启进程）覆盖多 TZ 边界，验证 localDayKey 在每个 TZ 下
@@ -19,9 +19,12 @@
  * 注：vitest 4.x 的 `vi.useFakeTimers().setSystemTime()` 对 Date TZ 行为有效，
  * 但本测试聚焦「进程 TZ」切换（不改 Date 系统时间），因为 localDayKey 内部用
  * `Date#getDate/getMonth/getFullYear` 直接读 OS TZ。
+ *
+ * [023.12] T5 改造：原 reconcileAppointmentStatuses 写库路径已删，本文件改断言
+ * deriveAppointmentBadges 返回值——同一份 TZ 测试，断言对象从 SM 行动改为 badge。
  */
 import { describe, it, expect, afterEach } from 'vitest'
-import { reconcileAppointmentStatuses } from '../reconcile-appointment'
+import { deriveAppointmentBadges } from '../reconcile-appointment'
 import type { Appointment } from '@/usom/types/objects'
 import type { AppointmentStatus } from '@/usom/types/primitives'
 
@@ -56,70 +59,70 @@ const base = (overrides: Partial<Appointment> = {}): Appointment => ({
   userId: 'u',
   createdAt: '2026-07-01T00:00:00.000Z',
   updatedAt: '2026-07-01T00:00:00.000Z',
-  inProgressAt: null,
-  expiredAt: null,
   completedAt: null,
   cancelledAt: null,
   schemaVersion: 1,
   ...overrides,
 })
 
-describe('reconcileAppointmentStatuses — 跨 TZ 边界（[026] T20 codex #5）', () => {
-  it('TZ=Asia/Shanghai (UTC+8)：约定日=2026-07-15 本地，当日 scheduled → needsMarkInProgress', () => {
+describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026] T20 codex #5）', () => {
+  it('TZ=Asia/Shanghai (UTC+8)：约定日=2026-07-15 本地，当日 scheduled → badge=in_progress', () => {
     process.env.TZ = 'Asia/Shanghai'
     // 验证 TZ 切换生效（调试期守护）
     expect(new Date(2026, 6, 15).getDate()).toBe(15)
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15), // now = 2026-07-15 本地正午
     )
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkInProgress', at: localNoon(2026, 6, 15) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: 'in_progress' },
     ])
   })
 
-  it('TZ=Asia/Shanghai (UTC+8)：now=次日 2026-07-16 → scheduled 约定 → needsMarkExpired', () => {
+  it('TZ=Asia/Shanghai (UTC+8)：now=次日 2026-07-16 → scheduled 约定 → badge=expired', () => {
     process.env.TZ = 'Asia/Shanghai'
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 16),
     )
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkExpired', at: localNoon(2026, 6, 16) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: 'expired' },
     ])
   })
 
-  it('TZ=Asia/Shanghai (UTC+8)：now=前一日 2026-07-10 → scheduled 约定 → 跳过（未来）', () => {
+  it('TZ=Asia/Shanghai (UTC+8)：now=前一日 2026-07-10 → scheduled 约定 → badge=null（未来）', () => {
     process.env.TZ = 'Asia/Shanghai'
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 10),
     )
-    expect(actions).toEqual([])
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: null },
+    ])
   })
 
   it('TZ=Pacific/Auckland (UTC+12)：约定日=2026-07-15 本地 → 当日判定一致', () => {
     process.env.TZ = 'Pacific/Auckland'
     // TZ 切换后 Date 立即按新 TZ 解释
     expect(new Date(2026, 6, 15).getDate()).toBe(15)
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15),
     )
     // 关键对称性：Auckland 当日与 Shanghai 当日得到同样结果（约定 + now 都是本地正午）
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkInProgress', at: localNoon(2026, 6, 15) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: 'in_progress' },
     ])
   })
 
-  it('TZ=Pacific/Auckland (UTC+12)：now=次日 2026-07-16 → needsMarkExpired', () => {
+  it('TZ=Pacific/Auckland (UTC+12)：now=次日 2026-07-16 → badge=expired', () => {
     process.env.TZ = 'Pacific/Auckland'
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 16),
     )
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkExpired', at: localNoon(2026, 6, 16) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: 'expired' },
     ])
   })
 
@@ -128,24 +131,24 @@ describe('reconcileAppointmentStatuses — 跨 TZ 边界（[026] T20 codex #5）
     // 进程 TZ 这一假设的 TZ 不变性"，即：只要 fixture 用本地正午，判定在任意 TZ 都一致。
     process.env.TZ = 'America/New_York'
     expect(new Date(2026, 6, 15).getDate()).toBe(15)
-    const actions = reconcileAppointmentStatuses(
+    const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15),
     )
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkInProgress', at: localNoon(2026, 6, 15) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: 'in_progress' },
     ])
   })
 
-  it('TZ=UTC：边界状态 in_progress 过日 → needsMarkExpired（与既有测试对称）', () => {
-    // 守护：localDayKey 在 UTC 下与 Shanghai/Auckland 同等日界判定
+  it('TZ=UTC：边界状态 cancelled 当日 → badge=null（终态不派生，与既有测试对称）', () => {
+    // 守护：localDayKey 在 UTC 下与 Shanghai/Auckland 同等日界判定，且终态 badge=null
     process.env.TZ = 'UTC'
-    const actions = reconcileAppointmentStatuses(
-      [base({ status: 'in_progress' })],
+    const badges = deriveAppointmentBadges(
+      [base({ status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' })],
       localNoon(2026, 6, 16),
     )
-    expect(actions).toEqual([
-      { appointmentId: 'i1', kind: 'needsMarkExpired', at: localNoon(2026, 6, 16) },
+    expect(badges).toEqual([
+      { appointmentId: 'i1', badge: null },
     ])
   })
 })

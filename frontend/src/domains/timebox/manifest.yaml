@@ -154,55 +154,21 @@ lifecycle:
       - { from: logged,    to: planned,   trigger: intent, action: revert, event_type: TimeboxReverted }
       - { from: cancelled, to: planned,   trigger: intent, action: revert, event_type: TimeboxReverted }
     terminal_states: []
-  # [026] A1.5 + [023.05] PR2 阶段 2: D2 reversal — 约定=独立对象读时算状态（按日历日，零 cron）。
-  # 5 态全部存储，SM 驱动全部 transition。
+  # [023.12] T5: 3 态收敛（去掉 in_progress/expired 持久化——读时由
+  # status/derive-display-status.ts 派生显示状态）。SM 仅驱动 create/cancel/complete/revert
+  # 4 个动作；状态字段持久化：scheduled / cancelled / completed。
   appointment:
-    # [026] D2 reversal: 5 态全部存储，SM 驱动全部 transition
-    states: [scheduled, in_progress, expired, cancelled, completed]
+    states: [scheduled, cancelled, completed]
     initial_state: scheduled
     transitions:
-      - from: null
-        to: scheduled
-        trigger: intent
-        action: create
-        event_type: AppointmentCreated
-      # 时间驱动：lazy reconcile 在 startTime 日历日=今日 触发（仅 from scheduled）
-      - from: scheduled
-        to: in_progress
-        trigger: intent
-        action: markInProgress
-        event_type: AppointmentMarkedInProgress
-      # 时间驱动：lazy reconcile 在今日日历日>startTime 日历日 触发（from {scheduled, in_progress}）
-      - from: scheduled
-        to: expired
-        trigger: intent
-        action: markExpired
-        event_type: AppointmentMarkedExpired
-      - from: in_progress
-        to: expired
-        trigger: intent
-        action: markExpired
-        event_type: AppointmentMarkedExpired
-      # 用户取消：spec + 用户 "计划/执行状态可以任意修改、删除"（cancel from {scheduled, in_progress}）
-      # 终态 expired/cancelled/completed 不可删（SM 拒绝；spec "已过期/已完成不能删除"）
-      - from: scheduled
-        to: cancelled
-        trigger: intent
-        action: cancel
-        event_type: AppointmentCancelled
-      - from: in_progress
-        to: cancelled
-        trigger: intent
-        action: cancel
-        event_type: AppointmentCancelled
-      # [027] 后补：completed（timebox 打卡后）
-      # - from: scheduled,   to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
-      # - from: in_progress, to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
-      # - from: expired,     to: completed, trigger: intent, action: markCompleted, event_type: ItineraryCompleted
-    terminal_states: [expired, cancelled, completed]
-    # 注：markInProgress / markExpired 的 trigger 在 manifest 里写 `intent`，
-    # 实际调用方是 reconcileItineraryStatuses()（在页面 server component 加载时跑，
-    # 逐条 submitDynamicIntent）。无 cron、无后台 job。
+      - { from: null,       to: scheduled, trigger: intent, action: create,   event_type: AppointmentCreated }
+      - { from: scheduled,  to: cancelled, trigger: intent, action: cancel,   event_type: AppointmentCancelled }
+      - { from: scheduled,  to: completed, trigger: intent, action: complete, event_type: AppointmentCompleted }
+      - { from: cancelled,  to: scheduled, trigger: intent, action: revert,   event_type: AppointmentReverted }
+      - { from: completed,  to: scheduled, trigger: intent, action: revert,   event_type: AppointmentReverted }
+    terminal_states: []
+    # 注：in_progress/expired 不再持久化——读时用 status/reconcile-appointment.ts 派生显示。
+    # markInProgress / markExpired server actions 已删，cancel/complete/revert 由 SM 守门。
 
 # ─── 区块 C: field_metadata（[026] T23：per-objectType 嵌套）
 # 一级 key 为 objectType（timebox / itinerary），二级 key 为字段名。

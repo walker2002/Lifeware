@@ -1,10 +1,14 @@
 /**
  * @file appointment repository
- * @brief Appointment CRUD + range/reconcile/status update（[026] D2 reversal）
+ * @brief Appointment CRUD + range + 状态推进（[023.12] T5 3 态收敛）
  *
- * D2 reversal 后：所有 5 态存 DB；updateStatus 完整支持 markInProgress/markExpired/cancel；
- * findNeedingReconcile 供 reconcileAppointmentStatuses 配合用（实际 reconcile 在内存里用，
- * 这里只取候选行）。
+ * [023.12] T5 后：3 态持久化（scheduled / cancelled / completed）。in_progress / expired
+ * 不落库——读时由 status/derive-display-status.ts 派生显示。
+ *
+ * 状态推进接口：
+ * - cancel: scheduled → cancelled（用户主动）
+ * - complete: scheduled → completed（用户主动）
+ * - revert: {cancelled, completed} → scheduled（用户主动）
  *
  * 多租户 T-02：所有查询/写入必带 userId 过滤。
  * 写入口经 mutation service 调用本 repo，不在调用点直接 new repo 写。
@@ -17,8 +21,8 @@ import type { Appointment } from '@/usom/types/objects'
 import type { AppointmentStatus, USOM_ID, Timestamp } from '@/usom/types/primitives'
 import { appointmentRowToUSOM, appointmentUSOMToRow } from './mappers/appointment'
 
-/** 非终态集合：reconcile 候选 + 列表视图 + 范围查询统一使用。 */
-const NON_TERMINAL: AppointmentStatus[] = ['scheduled', 'in_progress']
+/** 非终态集合：3 态收敛后仅 scheduled 一态（cancelled/completed 终态） */
+const NON_TERMINAL: AppointmentStatus[] = ['scheduled']
 
 export class AppointmentRepository {
   async findById(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<Appointment | null> {
@@ -50,7 +54,7 @@ export class AppointmentRepository {
     return updated
   }
 
-  /** 软删：盖 cancelledAt + status='cancelled'（D2 reversal）。从 {scheduled, in_progress} 取消。 */
+  /** 软删：盖 cancelledAt + status='cancelled'。从 scheduled 取消。 */
   async cancel(id: USOM_ID, userId: USOM_ID, tx: DbClient = db): Promise<void> {
     const now = new Date()
     await tx.update(s.appointments)
@@ -58,17 +62,30 @@ export class AppointmentRepository {
       .where(and(eq(s.appointments.id, id as any), eq(s.appointments.userId, userId as any)))
   }
 
-  /** D2 reversal: markInProgress 盖 inProgressAt + status='in_progress'（从 scheduled） */
-  async markInProgress(id: USOM_ID, userId: USOM_ID, at: Date, tx: DbClient = db): Promise<void> {
+  /**
+   * [023.12] T5: scheduled → completed
+   * （取代原 markInProgress / markExpired 写库路径——in_progress/expired 改读时派生）
+   */
+  async complete(id: USOM_ID, userId: USOM_ID, at: Date = new Date(), tx: DbClient = db): Promise<void> {
     await tx.update(s.appointments)
-      .set({ status: 'in_progress', inProgressAt: at, updatedAt: at })
+      .set({ status: 'completed', completedAt: at, updatedAt: at })
       .where(and(eq(s.appointments.id, id as any), eq(s.appointments.userId, userId as any)))
   }
 
-  /** D2 reversal: markExpired 盖 expiredAt + status='expired'（从 {scheduled, in_progress}） */
-  async markExpired(id: USOM_ID, userId: USOM_ID, at: Date, tx: DbClient = db): Promise<void> {
+  /**
+   * [023.12] T5: {cancelled, completed} → scheduled
+   * SM 守门：本函数无状态校验——上层 server action 走 SM transition，
+   * 非 from {cancelled, completed} 的 revert 会被 SM 拒。
+   */
+  async revert(id: USOM_ID, userId: USOM_ID, at: Date = new Date(), tx: DbClient = db): Promise<void> {
     await tx.update(s.appointments)
-      .set({ status: 'expired', expiredAt: at, updatedAt: at })
+      .set({
+        status: 'scheduled',
+        // 回退：清掉 cancelledAt / completedAt 痕迹，让行回到「刚 create 完」的可视态
+        cancelledAt: null,
+        completedAt: null,
+        updatedAt: at,
+      })
       .where(and(eq(s.appointments.id, id as any), eq(s.appointments.userId, userId as any)))
   }
 
@@ -85,10 +102,10 @@ export class AppointmentRepository {
   }
 
   /**
-   * findNeedingReconcile：D2 reversal reconcile 的 DB 候选行查询
-   * 选 userId 全部 status ∈ {scheduled, in_progress} 的非终态约定，
-   * 内存里 reconcileAppointmentStatuses 决定是否真的需要推进。
-   * 用 idx_appointments_user_status_start 索引。
+   * findNeedingReconcile：[023.12] T5 后——派生为「所有非终态」，由调用方按 startTime
+   * 派生显示状态（in_progress/expired），不再依赖「写回 in_progress/expired 状态」。
+   * 保留方法名兼容 page.tsx 等调用方（[023.12] T5 删了写库 helper，但 T13 仍会调
+   * 这条 read 路径派生 badges）。
    */
   async findNeedingReconcile(userId: USOM_ID, tx: DbClient = db): Promise<Appointment[]> {
     const rows = await tx.select().from(s.appointments)

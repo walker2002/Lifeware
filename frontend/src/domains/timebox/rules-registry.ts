@@ -226,11 +226,13 @@ const appointmentFieldsValid: SubmitCheck = async (
   ctx,
 ) => {
   // [026] P0-1 修复（issue #1 阻断 reconcile / mark / delete 路径）：
-  //   submit 规则对所有 action 都校验字段会把 mark* / delete* 阻断（这些 action 只传
-  //   {objectId, at}，缺 title/startTime/durationMin → reject）。故仅在 createAppointment
-  //   / editAppointment 时校验字段；其他 action（markInProgressAppointment /
-  //   markExpiredAppointment / deleteAppointment）立即通过，由 SM 独立把关终态/转移检查。
+  //   submit 规则对所有 action 都校验字段会把 mark* / delete* / complete* / revert* 阻断
+  //   （这些 action 只传 {objectId}，缺 title/startTime/durationMin → reject）。故仅在
+  //   createAppointment / editAppointment 时校验字段；其他 action（completeAppointment /
+  //   revertAppointment / cancelAppointment / deleteAppointment）立即通过，由 SM 独立把关
+  //   终态/转移检查。
   // [023.05] PR2 T9: action 名 itinerary→appointment
+  // [023.12] T5: 取代原 markInProgressAppointment / markExpiredAppointment
   if (intent.action !== 'createAppointment' && intent.action !== 'editAppointment') {
     return validationPassed()
   }

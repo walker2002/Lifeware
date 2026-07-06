@@ -5,8 +5,9 @@
  * 将 ITimeboxRepository / IAppointmentRepository 适配为通用 GenericRepo 接口，
  * 使 Timebox 域（含 [026] 约定）可使用通用状态机（GenericStateMachine）处理所有状态转换。
  *
- * [026] 决议 A：adapter 接受 timeboxRepo + appointmentRepo，map 加 appointment 键。
- * updateStatus 按 status 分派到 cancel / markInProgress / markExpired。
+ * [023.12] T5: appointment 收敛到 3 态（scheduled / cancelled / completed）。
+ * in_progress / expired 不持久化——读时由 derive-display-status.ts 派生。
+ * adapter updateStatus 派发到 cancel / complete / revert 三条路径。
  */
 
 import type { GenericRepo } from '@/nexus/core/state-machine'
@@ -16,7 +17,7 @@ import type { DbClient } from '@/lib/db'
 /**
  * Timebox 域 GenericRepo 适配器工厂参数。
  * @property timeboxRepo - 时间盒仓储实例
- * @property appointmentRepo - 约定仓储实例（[026] D2 reversal）
+ * @property appointmentRepo - 约定仓储实例（[023.12] T5 3 态收敛）
  */
 interface TimeboxRepoPair {
   timeboxRepo: {
@@ -30,8 +31,8 @@ interface TimeboxRepoPair {
     save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
     updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
     cancel(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<void>
-    markInProgress(id: USOM_ID, userId: USOM_ID, at: Date, tx?: DbClient): Promise<void>
-    markExpired(id: USOM_ID, userId: USOM_ID, at: Date, tx?: DbClient): Promise<void>
+    complete(id: USOM_ID, userId: USOM_ID, at: Date, tx?: DbClient): Promise<void>
+    revert(id: USOM_ID, userId: USOM_ID, at: Date, tx?: DbClient): Promise<void>
   }
 }
 
@@ -69,7 +70,8 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
         return repos.timeboxRepo.updateFields(id, fields, userId, tx)
       },
     },
-    // [026] D2 reversal: 约定独立 GenericRepo 键，updateStatus 完整支持 5 态（4 active + completed 占位）
+    // [023.12] T5: 约定独立 GenericRepo 键，updateStatus 派发到 3 态路径
+    // （cancel / complete / revert）。in_progress / expired 不再持久化——读时派生。
     appointment: {
       async findById(id, userId, tx) {
         return repos.appointmentRepo.findById(id, userId, tx)
@@ -81,10 +83,11 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
-        // [026] D2 reversal: 5 态存储，create 时 status=scheduled（DB default），时间戳全 null
+        // [023.12] T5: create 时 status=scheduled（DB default），completedAt/cancelledAt 全 null
+        // （inProgressAt/expiredAt 列 T1b drop；这里不引用）
         const obj = {
           id, ...fields, status: 'scheduled',
-          inProgressAt: null, expiredAt: null, completedAt: null, cancelledAt: null,
+          completedAt: null, cancelledAt: null,
           createdAt: now, updatedAt: now,
         }
         await repos.appointmentRepo.save(obj, userId, tx)
@@ -94,19 +97,17 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
         const existing = await repos.appointmentRepo.findById(id, userId, tx)
         if (!existing) throw new Error('约定不存在')
         const now = new Date()
-        // [026] D2 reversal: status transition + 对应时间戳同时盖
+        // [023.12] T5: 3 态派发。SM 已在调用方做合法性校验（manifest lifecycle 锁死
+        // 合法 from→to），此处仅负责「state step 写库」。
         if (toStatus === 'cancelled') {
           await repos.appointmentRepo.cancel(id, userId, tx)
-        } else if (toStatus === 'in_progress') {
-          await repos.appointmentRepo.markInProgress(id, userId, now, tx)
-        } else if (toStatus === 'expired') {
-          await repos.appointmentRepo.markExpired(id, userId, now, tx)
-        } else if (toStatus === 'scheduled' || toStatus === 'completed') {
-          // scheduled：理论上不可回到 scheduled（终态不可逆），但 SM 守卫应在此之前拒绝
-          // completed：[027] 实现；这里仅占位
-          throw new Error(`appointment updateStatus 暂不支持 → ${toStatus}（[027] 加 completed 路径）`)
+        } else if (toStatus === 'completed') {
+          await repos.appointmentRepo.complete(id, userId, now, tx)
+        } else if (toStatus === 'scheduled') {
+          // revert：{cancelled, completed} → scheduled
+          await repos.appointmentRepo.revert(id, userId, now, tx)
         } else {
-          throw new Error(`未知的 appointment 状态: ${toStatus}`)
+          throw new Error(`未知的 appointment 状态: ${toStatus}（[023.12] T5 收敛到 3 态）`)
         }
         return await repos.appointmentRepo.findById(id, userId, tx) ?? existing
       },

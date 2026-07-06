@@ -1,9 +1,14 @@
 /**
  * @file appointment repository test
- * @brief AppointmentRepository 集成测试（[026] A1.4，D2 reversal: 5 态存储）
+ * @brief AppointmentRepository 集成测试（[023.12] T5: 3 态收敛）
  *
  * 对接真实 Docker PostgreSQL，验证 AppointmentRepository 的 CRUD +
- * updateStatus 完整 5 态路径 + findNeedingReconcile 候选过滤 + findByDateRange 范围查询。
+ * cancel / complete / revert 三条 SM transition 路径 + findNeedingReconcile +
+ * findByDateRange 范围查询。
+ *
+ * [023.12] T5 改造：原 D2 reversal 5 态存储改为 3 态（scheduled / cancelled /
+ * completed）。in_progress / expired 不持久化——读时由 derive-display-status.ts
+ * 派生。本文件覆盖完整 3 态生命周期。
  *
  * 测试用户隔离：固定 userId ...001（与 T4 brief 一致），beforeEach 清理该用户约定。
  */
@@ -24,12 +29,13 @@ const baseIt = (overrides: Partial<any> = {}): any => ({
   title: 't', detail: null,
   startTime: future, durationMin: 60, people: [],
   userId: USER,
-  inProgressAt: null, expiredAt: null, completedAt: null, cancelledAt: null,
+  // [023.12] T5: 不再有 inProgressAt/expiredAt；completedAt/cancelledAt 仅在终态有值
+  completedAt: null, cancelledAt: null,
   createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z',
   schemaVersion: 1, ...overrides,
 })
 
-describe('AppointmentRepository（D2 reversal: 5 态存储）', () => {
+describe('AppointmentRepository（[023.12] T5: 3 态收敛）', () => {
   beforeEach(async () => { await db.delete(s.appointments).where(eq(s.appointments.userId, USER)) })
 
   it('save → findById 往返保持 status=scheduled', async () => {
@@ -42,36 +48,17 @@ describe('AppointmentRepository（D2 reversal: 5 态存储）', () => {
     expect(got?.people).toEqual([])
   })
 
-  it('save → findById 往返保持 in_progress + inProgressAt', async () => {
+  it('save → findById 往返保持 completed + completedAt', async () => {
+    // [023.12] T5: completed 仍是合法 status，但仅由 complete() 写
     const repo = new AppointmentRepository()
-    const it = baseIt({ status: 'in_progress', inProgressAt: '2026-07-15T10:00:00.000Z' })
+    const it = baseIt({ status: 'completed', completedAt: '2026-07-15T10:00:00.000Z' })
     await repo.save(it, USER)
     const got = await repo.findById(it.id, USER)
-    expect(got?.status).toBe('in_progress')
-    expect(got?.inProgressAt).toBe('2026-07-15T10:00:00.000Z')
+    expect(got?.status).toBe('completed')
+    expect(got?.completedAt).toBe('2026-07-15T10:00:00.000Z')
   })
 
-  it('markInProgress 盖 status + inProgressAt', async () => {
-    const repo = new AppointmentRepository()
-    const id = crypto.randomUUID() as any
-    await repo.save(baseIt({ id }), USER)
-    await repo.markInProgress(id, USER, new Date('2026-07-15T10:00:00.000Z'))
-    const got = await repo.findById(id, USER)
-    expect(got?.status).toBe('in_progress')
-    expect(got?.inProgressAt).toBe('2026-07-15T10:00:00.000Z')
-  })
-
-  it('markExpired 盖 status + expiredAt', async () => {
-    const repo = new AppointmentRepository()
-    const id = crypto.randomUUID() as any
-    await repo.save(baseIt({ id, startTime: past }), USER)
-    await repo.markExpired(id, USER, new Date('2026-07-16T00:00:00.000Z'))
-    const got = await repo.findById(id, USER)
-    expect(got?.status).toBe('expired')
-    expect(got?.expiredAt).toBe('2026-07-16T00:00:00.000Z')
-  })
-
-  it('cancel 盖 status + cancelledAt', async () => {
+  it('cancel 盖 status=cancelled + cancelledAt', async () => {
     const repo = new AppointmentRepository()
     const id = crypto.randomUUID() as any
     await repo.save(baseIt({ id }), USER)
@@ -81,14 +68,56 @@ describe('AppointmentRepository（D2 reversal: 5 态存储）', () => {
     expect(got?.cancelledAt).not.toBeNull()
   })
 
-  it('findNeedingReconcile 只返非终态', async () => {
+  // [023.12] T5 新增：complete 路径
+  it('complete 盖 status=completed + completedAt', async () => {
+    const repo = new AppointmentRepository()
+    const id = crypto.randomUUID() as any
+    await repo.save(baseIt({ id }), USER)
+    await repo.complete(id, USER, new Date('2026-07-15T10:00:00.000Z'))
+    const got = await repo.findById(id, USER)
+    expect(got?.status).toBe('completed')
+    expect(got?.completedAt).toBe('2026-07-15T10:00:00.000Z')
+  })
+
+  // [023.12] T5 新增：revert 路径
+  it('revert 从 cancelled 回 scheduled + 清 cancelledAt', async () => {
+    const repo = new AppointmentRepository()
+    const id = crypto.randomUUID() as any
+    await repo.save(baseIt({ id }), USER)
+    await repo.cancel(id, USER)
+    let got = await repo.findById(id, USER)
+    expect(got?.status).toBe('cancelled')
+    expect(got?.cancelledAt).not.toBeNull()
+
+    await repo.revert(id, USER, new Date('2026-07-15T11:00:00.000Z'))
+    got = await repo.findById(id, USER)
+    expect(got?.status).toBe('scheduled')
+    expect(got?.cancelledAt).toBeNull()
+  })
+
+  it('revert 从 completed 回 scheduled + 清 completedAt', async () => {
+    const repo = new AppointmentRepository()
+    const id = crypto.randomUUID() as any
+    await repo.save(baseIt({ id }), USER)
+    await repo.complete(id, USER, new Date('2026-07-15T10:00:00.000Z'))
+    let got = await repo.findById(id, USER)
+    expect(got?.status).toBe('completed')
+    expect(got?.completedAt).not.toBeNull()
+
+    await repo.revert(id, USER, new Date('2026-07-15T11:00:00.000Z'))
+    got = await repo.findById(id, USER)
+    expect(got?.status).toBe('scheduled')
+    expect(got?.completedAt).toBeNull()
+  })
+
+  it('findNeedingReconcile 只返非终态（3 态收敛后 = 仅 scheduled）', async () => {
     const repo = new AppointmentRepository()
     const idA = crypto.randomUUID() as any
     const idB = crypto.randomUUID() as any
     const idC = crypto.randomUUID() as any
     await repo.save(baseIt({ id: idA, status: 'scheduled' }), USER)
     await repo.save(baseIt({ id: idB, status: 'cancelled', cancelledAt: '2026-07-14T00:00:00.000Z' }), USER)
-    await repo.save(baseIt({ id: idC, status: 'expired', expiredAt: '2026-07-14T00:00:00.000Z' }), USER)
+    await repo.save(baseIt({ id: idC, status: 'completed', completedAt: '2026-07-14T00:00:00.000Z' }), USER)
     const list = await repo.findNeedingReconcile(USER)
     const ids = list.map(i => i.id)
     expect(ids).toContain(idA)
