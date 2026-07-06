@@ -37,20 +37,6 @@ intent_triggers:
       - 删除下午的会议
       - 帮我看一下今天的时间盒
     keywords: [修改时间盒, 改时间盒, 改时间, 调整时间盒, 取消时间盒, 删除时间盒]
-  - action: startTimebox
-    shortcut: /startTimebox
-    description: 开始执行一个时间盒
-    examples:
-      - 开始这个时间盒
-      - 启动专注时间
-    keywords: [开始, 启动, start]
-  - action: endTimebox
-    shortcut: /endTimebox
-    description: 结束当前时间盒
-    examples:
-      - 结束时间盒
-      - 完成这个专注时段
-    keywords: [结束, 完成, end]
   - action: logTimebox
     shortcut: /logTimebox
     description: 记录时间盒的执行结果
