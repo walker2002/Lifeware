@@ -6,13 +6,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ArchetypePicker } from '../archetype-picker'
 import { ArchetypePickerCard } from '../archetype-picker-card'
-import { getArchetypes } from '@/app/actions/activity-archetype'
+import { getArchetypes, matchArchetypeForTitle } from '@/app/actions/activity-archetype'
 
 vi.mock('@/app/actions/activity-archetype', () => ({
   getArchetypes: vi.fn(),
+  matchArchetypeForTitle: vi.fn(),
 }))
 
 const mockGetArchetypes = vi.mocked(getArchetypes)
+const mockMatchArchetype = vi.mocked(matchArchetypeForTitle)
 
 const successData = [
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,6 +23,7 @@ const successData = [
 
 beforeEach(() => {
   mockGetArchetypes.mockReset()
+  mockMatchArchetype.mockReset()
   mockGetArchetypes.mockResolvedValue({ success: true, data: successData })
 })
 
@@ -108,5 +111,41 @@ describe('[023] A3.2 ArchetypePickerCard 带盒版', () => {
     const { container } = render(<ArchetypePickerCard value={undefined} onChange={() => {}} />)
     expect(screen.getByText('活动原型')).toBeInTheDocument()
     expect(container.querySelector('.bg-surface-card')).toBeInTheDocument()
+  })
+})
+
+describe('[023.11] ArchetypePicker「AI 匹配」按钮', () => {
+  it('enableAiMatch + title + 可写 → 渲染「AI 匹配」按钮', async () => {
+    render(<ArchetypePicker value={undefined} onChange={() => {}} enableAiMatch title="写代码" />)
+    expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
+  })
+  it('无 title → 不渲染「AI 匹配」', async () => {
+    render(<ArchetypePicker value={undefined} onChange={() => {}} enableAiMatch title="" />)
+    await screen.findByText('选择')
+    expect(screen.queryByText('AI 匹配')).not.toBeInTheDocument()
+  })
+  it('readOnly → 不渲染「AI 匹配」', async () => {
+    render(<ArchetypePicker value="a1" readOnly onChange={() => {}} enableAiMatch title="写代码" />)
+    await screen.findByText('深度专注')
+    expect(screen.queryByText('AI 匹配')).not.toBeInTheDocument()
+  })
+  it('点击命中 → onChange(archetypeId)', async () => {
+    mockMatchArchetype.mockResolvedValueOnce({ matched: true, archetypeId: 'a1' })
+    const onChange = vi.fn()
+    render(<ArchetypePicker value={undefined} onChange={onChange} enableAiMatch title="写代码" />)
+    fireEvent.click(await screen.findByText('AI 匹配'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('a1'))
+  })
+  it('点击未命中 → 显示「未找匹配的活动原型」', async () => {
+    mockMatchArchetype.mockResolvedValueOnce({ matched: false })
+    render(<ArchetypePicker value={undefined} onChange={() => {}} enableAiMatch title="未知活动" />)
+    fireEvent.click(await screen.findByText('AI 匹配'))
+    expect(await screen.findByText('未找匹配的活动原型')).toBeInTheDocument()
+  })
+  it('[错误路径] action reject → 显示「未找匹配的活动原型」', async () => {
+    mockMatchArchetype.mockRejectedValueOnce(new Error('net'))
+    render(<ArchetypePicker value={undefined} onChange={() => {}} enableAiMatch title="写代码" />)
+    fireEvent.click(await screen.findByText('AI 匹配'))
+    expect(await screen.findByText('未找匹配的活动原型')).toBeInTheDocument()
   })
 })
