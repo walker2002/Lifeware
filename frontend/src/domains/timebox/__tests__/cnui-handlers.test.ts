@@ -111,15 +111,17 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
     ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-log' } })
   })
 
-  it('open 返回当日 ended timebox 列表（过滤非 ended）', async () => {
-    // [023] A2.7：open 调用 getTodayTimeboxes() 然后 filter status==='ended'
+  it('open 返回当日 planned timebox 列表（过滤终态 logged/cancelled）', async () => {
+    // [023.12] T13 (AM3) — logTimebox filter 改 t.status !== 'planned'：
+    //   新 model 下 'planned' 是唯一可 log 状态（'logged'/'cancelled' 是终态）。
+    //   历史 'ended' 已废（4 态收敛）。
     vi.doMock('@/domains/timebox/repository', () => ({
       TimeboxRepository: class {
         findByDateRange() {
           return [
-            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'ended', taskIds: [] },
-            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'planned', taskIds: [] },
-            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'ended', taskIds: [] },
+            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'planned', taskIds: [] },
+            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'logged', taskIds: [] },
+            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'planned', taskIds: [] },
           ]
         }
       },
@@ -137,9 +139,9 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
       TimeboxRepository: class {
         findByDateRange() {
           return [
-            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'ended', taskIds: [] },
-            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'ended', taskIds: [] },
-            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'ended', taskIds: [] },
+            { id: 'tb-1', title: '写作', startTime: '09:00', endTime: '10:00', status: 'planned', taskIds: [] },
+            { id: 'tb-2', title: '会议', startTime: '10:00', endTime: '11:00', status: 'planned', taskIds: [] },
+            { id: 'tb-3', title: '做PPT', startTime: '11:00', endTime: '12:00', status: 'planned', taskIds: [] },
           ]
         }
       },

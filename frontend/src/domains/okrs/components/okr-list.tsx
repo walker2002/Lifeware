@@ -65,6 +65,11 @@ export function OKRList() {
     return (
       <div className="max-w-2xl mx-auto p-4">
         <h2 className="text-lg font-semibold mb-4">创建新 OKR</h2>
+        {/* [023.12] T9 review fix：cycleStatus 未传——
+            TODO: 父层未持有 presetCycleId（form 自行收集 cycleId），需重写
+            OKRForm 加内联 cycle picker + 即时查 hook.cycles 派生 status 才能闭环。
+            当前 OKRForm 的周期字段已迁出（[024] G1），本路径下 cycleId 始终空，
+            validate() 必失败——此 call site 实际为死路径，重构需另起 task。 */}
         <OKRForm
           onSubmit={async (fields: OKRFormFields) => {
             setIsCreating(true)
@@ -109,9 +114,19 @@ export function OKRList() {
       )}
 
       <div className="space-y-2">
-        {filtered.map(obj => (
-          <ObjectiveCard key={obj.id} objective={obj} onClick={id => setDetailId(id)} />
-        ))}
+        {filtered.map(obj => {
+          // [023.12] T9 review fix：父组件透传 cycleStatus 以激活 reviewed 锁定。
+          // hook.cycles 已在 C1 修复中加载（line 47-49），此处复用做派生。
+          const cycleStatus = hook.cycles.find(c => c.id === obj.cycleId)?.status
+          return (
+            <ObjectiveCard
+              key={obj.id}
+              objective={obj}
+              onClick={id => setDetailId(id)}
+              cycleStatus={cycleStatus}
+            />
+          )
+        })}
       </div>
     </div>
   )

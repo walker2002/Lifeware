@@ -30,7 +30,7 @@ function makeObjective(cycleId: string) {
   } as any
 }
 
-describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
+describe('ObjectiveRepository join cycles（[022] 1A-T6 + [023.12] T6）', () => {
   it('findById 经 join cycle 返回非空派生 period', async () => {
     const cycleRepo = new CycleRepository()
     const cycle = {
@@ -38,7 +38,8 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       cycleType: 'quarterly' as const,
       name: '2026-Q2',
       period: { start: '2026-04-01', end: '2026-06-30' },
-      status: 'in_progress' as const,
+      // [023.12] T6：in_progress→approved
+      status: 'approved' as const,
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
@@ -64,7 +65,8 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       cycleType: 'annual' as const,
       name: '2026',
       period: { start: '2026-01-01', end: '2026-12-31' },
-      status: 'in_progress' as const,
+      // [023.12] T6：in_progress→approved
+      status: 'approved' as const,
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }
@@ -88,7 +90,8 @@ describe('ObjectiveRepository join cycles（[022] 1A-T6）', () => {
       cycleType: 'quarterly' as const,
       name: '2026-Q3',
       period: { start: '2026-07-01', end: '2026-09-30' },
-      status: 'in_progress' as const,
+      // [023.12] T6：in_progress→approved
+      status: 'approved' as const,
       createdAt: new Date().toISOString() as any,
       updatedAt: new Date().toISOString() as any,
     }

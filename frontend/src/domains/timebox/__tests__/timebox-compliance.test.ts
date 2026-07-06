@@ -43,26 +43,22 @@ describe('T003: Timebox manifest.yaml 六区块完整性', () => {
     expect(manifestContent).toContain('timebox:')
   })
 
-  it('lifecycle.transitions 应包含 create/start/end/overtime/cancel/log', () => {
+  it('lifecycle.transitions 应包含 create/log/cancel/revert（[023.12] T4 3 态收敛表）', () => {
     expect(manifestContent).toMatch(/action:\s*create/)
-    expect(manifestContent).toMatch(/action:\s*start/)
-    expect(manifestContent).toMatch(/action:\s*end/)
-    expect(manifestContent).toMatch(/action:\s*overtime/)
-    expect(manifestContent).toMatch(/action:\s*cancel/)
     expect(manifestContent).toMatch(/action:\s*log/)
+    expect(manifestContent).toMatch(/action:\s*cancel/)
+    expect(manifestContent).toMatch(/action:\s*revert/)
   })
 
-  it('lifecycle.states 应包含所有 timebox 状态', () => {
+  it('lifecycle.states 应包含所有 timebox 状态（[023.12] T4 收敛为 3 态）', () => {
     // 从 states 列表中提取验证
     const statesMatch = manifestContent.match(/states:\s*\[([^\]]+)\]/)
     expect(statesMatch).not.toBeNull()
     const states = statesMatch![1]
     expect(states).toContain('planned')
-    expect(states).toContain('running')
-    expect(states).toContain('ended')
-    expect(states).toContain('overtime')
-    expect(states).toContain('cancelled')
     expect(states).toContain('logged')
+    expect(states).toContain('cancelled')
+    // 旧态 running/ended/overtime 已退役（[023.12] T3 derive-display-status 读时派生）
   })
 })
 
@@ -94,9 +90,9 @@ describe('T004: Timebox hooks.ts 纯函数验证', () => {
 })
 
 describe('T005: Timebox transitions 一致性', () => {
-  it('transitions.ts 应导出 timeboxTransitions 数组', () => {
+  it('transitions.ts 应导出 timeboxTransitions 数组（[023.12] T4 5 条 = 1 create + 1 log + 1 cancel + 2 revert）', () => {
     expect(Array.isArray(timeboxTransitions)).toBe(true)
-    expect(timeboxTransitions.length).toBe(7)
+    expect(timeboxTransitions.length).toBe(5)
   })
 
   it('应包含 create 转换 (null → planned)', () => {
@@ -107,18 +103,15 @@ describe('T005: Timebox transitions 一致性', () => {
     expect(create!.eventType).toBe('TimeboxCreated')
   })
 
-  it('应包含 start 转换 (planned → running)', () => {
-    const start = timeboxTransitions.find(t => t.action === 'start')
-    expect(start).toBeDefined()
-    expect(start!.from).toBe('planned')
-    expect(start!.to).toBe('running')
-  })
-
-  it('应包含 overtime 转换 (running → overtime)', () => {
-    const overtime = timeboxTransitions.find(t => t.action === 'overtime')
-    expect(overtime).toBeDefined()
-    expect(overtime!.from).toBe('running')
-    expect(overtime!.to).toBe('overtime')
+  it('应包含 revert 转换 (logged → planned + cancelled → planned)', () => {
+    const revertFromLogged = timeboxTransitions.find(t => t.action === 'revert' && t.from === 'logged')
+    const revertFromCancelled = timeboxTransitions.find(t => t.action === 'revert' && t.from === 'cancelled')
+    expect(revertFromLogged).toBeDefined()
+    expect(revertFromLogged!.to).toBe('planned')
+    expect(revertFromLogged!.eventType).toBe('TimeboxReverted')
+    expect(revertFromCancelled).toBeDefined()
+    expect(revertFromCancelled!.to).toBe('planned')
+    expect(revertFromCancelled!.eventType).toBe('TimeboxReverted')
   })
 })
 

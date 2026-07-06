@@ -1,13 +1,14 @@
 /**
  * @file delete-appointment.test.tsx
- * @brief [026] T17 P2 CNUI DeleteAppointment surface 渲染测试
+ * @brief [026] T17 P2 CNUI DeleteAppointment surface 渲染测试 / [023.12] T10 收敛 in_progress
  *
  * 守护 3 个分支：
- * - items=0 → "暂无计划/执行中的约定（过期/已完成不可删）" 空态
+ * - items=0 → "暂无计划中的约定（已完成不可删）" 空态
  * - items>0 → 多选 toggle（点 item 切勾选）
  * - 提交 → 调 onConfirm({ ...dataModel, selectedIds })
  *
  * 不依赖 DB（纯 RTL 渲染 + onConfirm spy）。
+ * [023.12] T10 (AM8)：in_progress 已不持久化，列表项恒显示「计划」。
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -17,16 +18,16 @@ import { DeleteAppointment } from '../DeleteAppointment'
 
 interface DeleteItem { id: string; title: string; startTime: string; status: string }
 
-/** 构造 items（2 条） */
+/** 构造 items（2 条）—— [023.12] T10：in_progress 移除，list 仅 scheduled */
 function makeItems(): DeleteItem[] {
   return [
     { id: 'i1', title: '看牙医', startTime: '2026-07-10T09:00:00.000Z', status: 'scheduled' },
-    { id: 'i2', title: '买菜', startTime: '2026-07-10T14:00:00.000Z', status: 'in_progress' },
+    { id: 'i2', title: '买菜', startTime: '2026-07-10T14:00:00.000Z', status: 'scheduled' },
   ]
 }
 
 describe('[026] T17 <DeleteAppointment> 渲染稳定性', () => {
-  it('items.length=0 渲染「暂无计划/执行中的约定（过期/已完成不可删）」空态', () => {
+  it('items.length=0 渲染「暂无计划中的约定（已完成不可删）」空态', () => {
     render(
       <DeleteAppointment
         surfaceType="deleteAppointment"
@@ -35,7 +36,7 @@ describe('[026] T17 <DeleteAppointment> 渲染稳定性', () => {
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('暂无计划/执行中的约定（过期/已完成不可删）')).toBeInTheDocument()
+    expect(screen.getByText('暂无计划中的约定（已完成不可删）')).toBeInTheDocument()
   })
 
   it('items>0 渲染列表（标题 + 状态标签）', () => {
@@ -47,11 +48,11 @@ describe('[026] T17 <DeleteAppointment> 渲染稳定性', () => {
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('选择要删除的约定（仅计划/执行中，可多选）')).toBeInTheDocument()
+    expect(screen.getByText('选择要删除的约定（仅计划，可多选）')).toBeInTheDocument()
     expect(screen.getByText('看牙医')).toBeInTheDocument()
     expect(screen.getByText('买菜')).toBeInTheDocument()
-    expect(screen.getByText('计划')).toBeInTheDocument()
-    expect(screen.getByText('执行中')).toBeInTheDocument()
+    // [023.12] T10：2 条都显示「计划」（in_progress 已不持久化）
+    expect(screen.getAllByText('计划').length).toBe(2)
   })
 
   it('未选任何 item → 删除按钮 disabled（selected.size=0）', () => {

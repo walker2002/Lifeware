@@ -1,11 +1,11 @@
 /**
  * @file appointment-workspace
- * @brief 约定管理 Workspace（[026] A3 D2 reversal + T14 I-1 修复 / [023.05] PR2 T9 itinerary→appointment）
+ * @brief 约定管理 Workspace（[026] A3 D2 reversal + T14 I-1 修复 / [023.05] PR2 T9 itinerary→appointment / [023.12] T10 按钮化）
  *
  * server component 加载时已调 reconcileAndAdvanceAppointments 推进非终态约定；
  * 此处纯客户端渲染 + 多选删除 + 内联「新建约定」Drawer。
  *
- * 列表筛 {scheduled, in_progress}（已过期/已完成/已取消不显示）：
+ * 列表筛 {scheduled}（已过期/已完成/已取消不显示）：
  *   - getAppointmentsByRange 服务端已按 AppointmentRepository.findActiveByRange
  *     过滤（终态排除），client 再 filter 保险（双层防御）。
  *   - server/client 双层是 [026] D2 reversal 的明示约定（brief §Step 2 注释）。
@@ -15,7 +15,17 @@
  *     流水线（submitDynamicIntent → Orchestrator → RuleEngine → SM）。
  *   - 新建约定走内联 CreateAppointmentDrawer → createAppointment server action
  *     （同 TimeboxDrawer 范式，[026] T14 I-1 修复）。
+ *   - 完成 / 取消 / 回退走 [023.12] T5 server actions：completeAppointment /
+ *     deleteAppointment / revertAppointment，调用后 reload() 重拉（与 delete
+ *     模式同源）。
  *   - workspace 不直调 repo —— R-01 仓储隔离 + T-02 多租户透传。
+ *
+ * [023.12] T10 按钮化：
+ *   - 派生 badge（执行中/已过期/计划）来自 deriveAppointmentDisplayStatus
+ *     （T3 纯函数）；per-minute 刷新 now（无需每秒——约定按日历日算）。
+ *   - OQ-1：当前无 appointment↔task/habit junction（design OQ-1 决定），
+ *     取消/完成按钮无条件放行；`// TODO [027]: appointment task/habit guard`
+ *     标注于 handler 上 + 按钮 title tooltip。
  *
  * [026] T14 I-1 修复：原 hash trigger `window.location.hash = 'createAppointment'`
  *   死链（standalone page 不在 chat 流，useIntentHandler 不监听 hash，且 surface
@@ -24,7 +34,7 @@
  */
 'use client'
 
-import { useState, useCallback, useTransition } from 'react'
+import { useState, useCallback, useTransition, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/empty-state'
 import {
@@ -44,16 +54,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, CalendarOff, Trash2, Loader2, Pencil } from 'lucide-react'
+import { Plus, CalendarOff, Trash2, Loader2, Pencil, Check, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   deleteAppointment,
   createAppointment,
   updateAppointment,
+  completeAppointment,
+  revertAppointment,
   type CreateAppointmentInput,
 } from '@/app/actions/timebox'
 import { getAppointmentsByRange } from '@/app/actions/intent'
 import { AppointmentFormFields, type AppointmentDraftFields } from '@/domains/timebox/cnui/surfaces/AppointmentFormFields'
+import { deriveAppointmentDisplayStatus } from '@/domains/timebox/status/derive-display-status'
 import type { AppointmentSummary } from '@/usom/types/summaries'
 
 /** 新建约定 Drawer 默认草稿（明日 9:00 + 1h，与 A2.5 handler 空 draft 同形） */
@@ -83,8 +96,20 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
   //   改用显式 reload() 客户端重拉，覆盖两种入口（独立 page + GrowthMenu ActionView）。
   const [, startReload] = useTransition()
 
-  // 列表筛 {scheduled, in_progress}（D2 reversal: server 已 filter，client 也再 filter 保险）
-  const active = items.filter(i => i.status === 'scheduled' || i.status === 'in_progress')
+  // [023.12] T10：now state（per-minute 刷新）。deriveAppointmentDisplayStatus 按日历日算
+  //  （localDayKey）——分钟粒度足够，不需要 timebox-card 那种 per-second。
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    setNow(new Date())
+    const timer = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 列表筛 {scheduled}（D2 reversal: server 已 filter，client 也再 filter 保险）
+  //   [023.12] T10：in_progress 已不持久化（status 3 态: scheduled/cancelled/completed）。
+  //   终态 cancelled/completed 当前不进列表（server `findByDateRange` 用 NON_TERMINAL
+  //   过滤为 `['scheduled']`）—— 回退按钮仅在终态 item 出现时渲染（结构性，暂未触达）。
+  const active = items.filter(i => i.status === 'scheduled')
   // 按 startTime 升序（最近未来在前）；Date 转毫秒可比较，TSO 兼容任意时区
   const sorted = [...active].sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
@@ -133,6 +158,62 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
     reload()
   }
 
+  // [023.12] T10：完成/取消/回退三个动作。
+  //   调 [023.12] T5 server actions（submitDynamicIntent → Orchestrator → SM）：
+  //     - completeAppointment：scheduled → completed
+  //     - deleteAppointment（cancel 语义）：scheduled → cancelled
+  //     - revertAppointment：{cancelled, completed} → scheduled
+  //   OQ-1：当前无 appointment↔task/habit junction（design OQ-1 决定），
+  //     取消/完成无条件放行；guard 留 [027]（junction 落地时一起做）。
+  // TODO [027]: appointment task/habit guard
+  const handleComplete = useCallback(async (id: string) => {
+    try {
+      // TODO [027]: appointment task/habit guard
+      const r = await completeAppointment(id as any)
+      if (r.status === 'ok') {
+        toast.success('约定已完成')
+        reload()
+      } else {
+        toast.error(r.message ?? '完成失败')
+      }
+    } catch (e) {
+      console.error('[AppointmentWorkspace] completeAppointment failed', id, e)
+      toast.error(e instanceof Error ? e.message : '完成失败，请重试')
+    }
+  }, [reload])
+
+  // TODO [027]: appointment task/habit guard
+  const handleCancel = useCallback(async (id: string) => {
+    try {
+      // TODO [027]: appointment task/habit guard
+      const r = await deleteAppointment(id as any)
+      if (r.status === 'ok') {
+        toast.success('约定已取消')
+        reload()
+      } else {
+        toast.error(r.message ?? '取消失败')
+      }
+    } catch (e) {
+      console.error('[AppointmentWorkspace] deleteAppointment (cancel) failed', id, e)
+      toast.error(e instanceof Error ? e.message : '取消失败，请重试')
+    }
+  }, [reload])
+
+  const handleRevert = useCallback(async (id: string) => {
+    try {
+      const r = await revertAppointment(id as any)
+      if (r.status === 'ok') {
+        toast.success('约定已回退')
+        reload()
+      } else {
+        toast.error(r.message ?? '回退失败')
+      }
+    } catch (e) {
+      console.error('[AppointmentWorkspace] revertAppointment failed', id, e)
+      toast.error(e instanceof Error ? e.message : '回退失败，请重试')
+    }
+  }, [reload])
+
   // [026] 编辑入口：从列表项触发 → 设 editingTarget（不切 selected，避免与多选态打架）。
   const openEditor = (it: AppointmentSummary) => {
     setSelected(new Set())
@@ -177,7 +258,22 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
               {sorted.map(it => {
                 const checked = selected.has(it.id)
                 // 终止态不可编辑（避免越权改，已设计如此——AppointmentRepository 端也禁）
-                const editable = it.status === 'scheduled' || it.status === 'in_progress'
+                //   [023.12] T10：in_progress 不再持久化（status 3 态: scheduled/cancelled/completed）。
+                const editable = it.status === 'scheduled'
+                // [023.12] T10：派生 badge（执行中/已过期/计划）—— 替代原 in_progress 字面量分支
+                const displayStatus = deriveAppointmentDisplayStatus(it.status, it.startTime, now)
+                const statusLabel =
+                  displayStatus === 'in_progress'
+                    ? '执行中'
+                    : displayStatus === 'expired'
+                      ? '已过期'
+                      : '计划'
+                const statusClass =
+                  displayStatus === 'in_progress'
+                    ? 'text-primary'
+                    : displayStatus === 'expired'
+                      ? 'text-error'
+                      : 'text-body/70'
                 return (
                   <div
                     key={it.id}
@@ -198,8 +294,8 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-ink truncate flex-1">{it.title}</span>
-                      <span className="text-xs text-body/70 shrink-0">
-                        {it.status === 'in_progress' ? '执行中' : '计划'}
+                      <span className={`text-xs shrink-0 ${statusClass}`}>
+                        {statusLabel}
                       </span>
                       {editable && (
                         <Button
@@ -213,6 +309,54 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
                           className="text-body/70 hover:text-ink"
                         >
                           <Pencil />
+                        </Button>
+                      )}
+                      {/* [023.12] T10：完成按钮（scheduled only）—— OQ-1 TODO: appointment task/habit guard */}
+                      {editable && (
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={`完成约定：${it.title}`}
+                          title="标记为已完成（[027] 后续接入 task/habit 关联守卫）"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleComplete(it.id)
+                          }}
+                          className="text-body/70 hover:text-success"
+                        >
+                          <Check />
+                        </Button>
+                      )}
+                      {/* [023.12] T10：取消按钮（scheduled only）—— OQ-1 TODO: appointment task/habit guard */}
+                      {editable && (
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={`取消约定：${it.title}`}
+                          title="取消此约定（[027] 后续接入 task/habit 关联守卫）"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleCancel(it.id)
+                          }}
+                          className="text-body/70 hover:text-error"
+                        >
+                          <CalendarOff />
+                        </Button>
+                      )}
+                      {/* [023.12] T10：回退按钮（cancelled/completed only）—— 清掉终态时间戳 */}
+                      {(it.status === 'cancelled' || it.status === 'completed') && (
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={`回退约定：${it.title}`}
+                          title="回退到计划状态（清空完成/取消时间戳）"
+                          onClick={e => {
+                            e.stopPropagation()
+                            handleRevert(it.id)
+                          }}
+                          className="text-body/70 hover:text-ink"
+                        >
+                          <RotateCcw />
                         </Button>
                       )}
                     </div>

@@ -21,6 +21,7 @@ import type { DomainManifest } from '@/domains/manifest-loader/schema'
 import { evaluateDomainRules } from '@/nexus/rules'
 import { resolveObjectType } from '@/nexus/orchestrator/lifecycle-configs'
 import { appointmentRuleRegistry, timeboxRuleRegistry } from './rules-registry'
+import { deriveTimeboxDisplayStatus } from './status/derive-display-status'
 
 /** 即将开始阈值（毫秒） */
 const UPCOMING_THRESHOLD_MS = 15 * 60 * 1000
@@ -157,6 +158,30 @@ export function createTimeboxHooks(manifest: DomainManifest) {
           }],
         }
 
+      // [023.12] T13 (AM5) — TimeboxReverted / AppointmentReverted 回退事件
+      //   manifest lifecycle 4 态收敛新增（[023.12] T6）：logged/cancelled → planned
+      //   通过 SM action 'revert' 触发。回退是「撤销式」语义，无需强提示。
+      //   低 weight 占位建议，让 hooks 不静默落 default 分支（之前会丢事件）。
+      case 'TimeboxReverted':
+        return {
+          metrics,
+          suggestions: [{
+            actionType: 'start_timebox',
+            label: `时间盒已回退: ${title}`,
+            weight: 30,
+          }],
+        }
+
+      case 'AppointmentReverted':
+        return {
+          metrics,
+          suggestions: [{
+            actionType: 'start_timebox',
+            label: `约定已回退: ${title}`,
+            weight: 30,
+          }],
+        }
+
       case 'ExecutionLogged': {
         const sourceType = event.payload['sourceType'] as string
         if (sourceType === 'timebox') {
@@ -198,32 +223,58 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     const actions: ActionCandidate[] = []
     const now = new Date(snapshot.currentTime).getTime()
 
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'overtime') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-overtime` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `已超时: ${tb.title}`,
-        actionType: 'start_timebox',
-        category: 'tile',
-        weight: 95,
-      })
-      return { actions, category: 'tile', weight: 95 }
-    }
-
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'running') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-running` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `进行中: ${tb.title}`,
-        actionType: 'start_timebox',
-        category: 'tile',
-        weight: 90,
-      })
-      return { actions, category: 'tile', weight: 90 }
+    // [023.12] T13 (AM4) — currentTimebox 派生填充链已就位（见
+    //   orchestrator/index.ts deriveCurrentTimebox）；此处 onActionSurfaceRequest
+    //   读 `snapshot.currentTimebox`（由 orchestrator 派生填入），用
+    //   `deriveTimeboxDisplayStatus` 对 currentTimebox 自身再算一次，输出
+    //   3 个 action tile（weight: overtime 95 / running 90 / ended 70）。
+    //
+    //   语义映射（[023.12] T13 brief）：`ended` 在新 model 下不存在显式 status，
+    //   旧「ended」表示「时间窗已结束、尚未 log」——此态在新 model 读时派生为
+    //   `overtime`（now > endTime 且 status 仍 planned）。故此分支复用
+    //   `overtime` 派生，但用「记录执行」action 区别「超时提醒」（weight 70
+    //   而非 95，category=cue 而非 tile）。
+    //
+    //   currentTimebox 为 undefined（无 running）时跳过 3 个分支，进入下方
+    //   「即将开始」 upcoming 扫表。
+    if (snapshot.currentTimebox) {
+      const ct = snapshot.currentTimebox
+      const display = deriveTimeboxDisplayStatus(ct.status, ct.startTime, ct.endTime, new Date(snapshot.currentTime))
+      if (display === 'overtime') {
+        actions.push({
+          id: `action-${ct.id}-overtime` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒超时: ${ct.title}`,
+          actionType: 'start_timebox',
+          category: 'tile',
+          weight: 95,
+        })
+        // 「ended」语义：超时且尚未 log。同一 currentTimebox 派生态下，附加
+        // 一个 cue 类「记录执行」tile（weight 70）。
+        actions.push({
+          id: `action-${ct.id}-ended` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒结束，请记录执行结果`,
+          actionType: 'capture_intent',
+          category: 'cue',
+          weight: 70,
+        })
+        return { actions, category: 'tile', weight: 95 }
+      }
+      if (display === 'running') {
+        actions.push({
+          id: `action-${ct.id}-running` as USOM_ID,
+          sourceObjectId: ct.id,
+          sourceObjectType: 'timebox',
+          label: `时间盒进行中: ${ct.title}`,
+          actionType: 'start_timebox',
+          category: 'tile',
+          weight: 90,
+        })
+        return { actions, category: 'tile', weight: 90 }
+      }
     }
 
     for (const tb of snapshot.upcomingTimeboxes) {
@@ -245,20 +296,6 @@ export function createTimeboxHooks(manifest: DomainManifest) {
     }
     if (actions.length > 0) {
       return { actions, category: 'cue', weight: 80 }
-    }
-
-    if (snapshot.currentTimebox && snapshot.currentTimebox.status === 'ended') {
-      const tb = snapshot.currentTimebox
-      actions.push({
-        id: `action-${tb.id}-ended` as USOM_ID,
-        sourceObjectId: tb.id,
-        sourceObjectType: 'timebox',
-        label: `记录执行结果: ${tb.title}`,
-        actionType: 'capture_intent',
-        category: 'cue',
-        weight: 70,
-      })
-      return { actions, category: 'cue', weight: 70 }
     }
 
     return { actions, category: 'cue', weight: 0 }

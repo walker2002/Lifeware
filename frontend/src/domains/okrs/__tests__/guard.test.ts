@@ -1,11 +1,12 @@
 /**
  * @file guard.test
- * @brief [022.01] Phase 2: assertEditable 权限矩阵测试
+ * @brief [022.01] Phase 2 + [023.12] T6: assertEditable 权限矩阵测试
  *
- * 覆盖设计 spec §C 全部 5 个 Cycle 状态 × 6 种操作类型的允许/拒绝矩阵。
+ * 覆盖设计 spec §C 全部 4 个 Cycle 状态（[T6] 5→4 收敛）× 6 种操作类型的允许/拒绝矩阵。
  * delete_cycle 在 draft 状态的「无目标」前置条件不测（由 okr.ts:deleteCycle 独立负责）。
  *
  * [022.01] Phase 3：补充 checkCycleEditable 单元测试（assertEditable 的布尔版兄弟函数）。
+ * [023.12] T6：fixture 由 not_started/in_progress/ended → approved/finished（4 态）。
  */
 import { describe, it, expect } from 'vitest'
 import { assertEditable, checkCycleEditable } from '../guard'
@@ -38,33 +39,26 @@ describe('[022.01] assertEditable 权限矩阵', () => {
     }
   })
 
-  // ─── not_started ───
-  it('not_started：禁止改/删 cycle，允许改 obj/kr，禁止删 obj/kr', () => {
-    const cycle = makeCycle('not_started')
-    expect(() => assertEditable(cycle, 'edit_cycle')).toThrow('not_started')
-    expect(() => assertEditable(cycle, 'delete_cycle')).toThrow('not_started')
+  // ─── approved ───
+  // [023.12] T6：替代原 not_started/in_progress——「已批准即活跃」，权限矩阵相同。
+  it('approved：禁止改/删 cycle，允许改 obj/kr，禁止删 obj/kr', () => {
+    const cycle = makeCycle('approved')
+    expect(() => assertEditable(cycle, 'edit_cycle')).toThrow('approved')
+    expect(() => assertEditable(cycle, 'delete_cycle')).toThrow('approved')
     expect(() => assertEditable(cycle, 'edit_objective')).not.toThrow()
-    expect(() => assertEditable(cycle, 'delete_objective')).toThrow('not_started')
+    expect(() => assertEditable(cycle, 'delete_objective')).toThrow('approved')
     expect(() => assertEditable(cycle, 'edit_kr')).not.toThrow()
-    expect(() => assertEditable(cycle, 'delete_kr')).toThrow('not_started')
+    expect(() => assertEditable(cycle, 'delete_kr')).toThrow('approved')
   })
 
-  // ─── in_progress ───
-  it('in_progress：与 not_started 相同', () => {
-    const cycle = makeCycle('in_progress')
-    expect(() => assertEditable(cycle, 'edit_cycle')).toThrow('in_progress')
-    expect(() => assertEditable(cycle, 'delete_cycle')).toThrow('in_progress')
+  // ─── finished ───
+  // [023.12] T6：替代原 ended——已结束但未复盘，权限矩阵与 approved 相同。
+  it('finished：与 approved 相同（仍可编辑 obj/kr）', () => {
+    const cycle = makeCycle('finished')
+    expect(() => assertEditable(cycle, 'edit_cycle')).toThrow('finished')
+    expect(() => assertEditable(cycle, 'delete_cycle')).toThrow('finished')
     expect(() => assertEditable(cycle, 'edit_objective')).not.toThrow()
-    expect(() => assertEditable(cycle, 'delete_objective')).toThrow('in_progress')
-  })
-
-  // ─── ended ───
-  it('ended：与 not_started 相同（仍可编辑 obj/kr）', () => {
-    const cycle = makeCycle('ended')
-    expect(() => assertEditable(cycle, 'edit_cycle')).toThrow('ended')
-    expect(() => assertEditable(cycle, 'delete_cycle')).toThrow('ended')
-    expect(() => assertEditable(cycle, 'edit_objective')).not.toThrow()
-    expect(() => assertEditable(cycle, 'delete_objective')).toThrow('ended')
+    expect(() => assertEditable(cycle, 'delete_objective')).toThrow('finished')
   })
 
   // ─── reviewed ───
@@ -81,14 +75,15 @@ describe('[022.01] assertEditable 权限矩阵', () => {
  * [022.01] Phase 3：checkCycleEditable 单元测试
  *
  * 验证乐观检查函数：返回 boolean，不抛错；null cycle 视为不可编辑。
+ * [023.12] T6：fixture rename（in_progress→approved）。
  */
 describe('[022.01] checkCycleEditable', () => {
   it('valid cycle status → passes', () => {
     // draft + edit_objective → 返回 true（不抛错）
     const cycle = makeCycle('draft')
     expect(checkCycleEditable(cycle, 'edit_objective')).toBe(true)
-    // in_progress + edit_kr → 返回 true
-    expect(checkCycleEditable(makeCycle('in_progress'), 'edit_kr')).toBe(true)
+    // [T6] approved + edit_kr → 返回 true
+    expect(checkCycleEditable(makeCycle('approved'), 'edit_kr')).toBe(true)
   })
 
   it('reviewed cycle → returns false', () => {

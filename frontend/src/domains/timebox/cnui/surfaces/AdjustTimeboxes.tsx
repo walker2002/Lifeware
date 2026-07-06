@@ -1,11 +1,13 @@
 /**
  * @file adjust-timeboxes
- * @brief 调整时间盒 CNUI surface（[023] A2，[019.1] 手写范式）
+ * @brief 调整时间盒 CNUI surface（[023] A2，[019.1] 手写范式，[023.12] T7 (AM8)）
  *
  * AI 助手解析多条 timebox 草稿后展示：按时间序列列当日 timebox，左右切换当前
  * 编辑项，可改 title/startTime/endTime，或勾选「取消此时间盒」。提交时仅
  * 发送有改动的字段（diff 通过 `_origTitle/_origStart/_origEnd` 初始快照比对）。
- * running/ended/logged 状态禁止取消（UI 用 cancellable flag 屏蔽 checkbox）。
+ * [023.12] T7 (AM8)：cancellable 由「排除 running/ended/logged/cancelled」
+ *   改为「cur.status === 'planned'」——新 status union（planned/logged/cancelled）
+ *   中只有 planned 可取消，logged/cancelled 已是终态。
  */
 
 'use client'
@@ -46,7 +48,10 @@ export function AdjustTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, 
   if (items.length === 0) return <p className="py-8 text-center text-sm text-body/70">今日无时间盒可调整</p>
 
   const cur = items[Math.min(page, items.length - 1)]
-  const cancellable = !['running', 'ended', 'logged', 'cancelled'].includes(cur.status)
+  // [023.12] T7 (AM8)：原 `!['running', 'ended', 'logged', 'cancelled'].includes(cur.status)`
+  //   死值检查收敛为 `cur.status === 'planned'`——新 status union
+  //   （planned/logged/cancelled）中仅 planned 可取消。
+  const cancellable = cur.status === 'planned'
   const update = (patch: Partial<AdjustItem>) => {
     const next = items.map((it) => it.id === cur.id ? { ...it, ...patch } : it)
     onDataChange({ ...dataModel, items: next })

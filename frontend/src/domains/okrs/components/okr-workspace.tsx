@@ -9,8 +9,10 @@
  * [022.01] Task 5：传入 onCycleApproved/onCycleEnded/onCycleReviewed 回调触发 refresh。
  * Phase 3 进一步清理：删除 onChangeObjectiveStatus/handleStatusChange/handleActivate 回调；
  * handleDelete 改为直接设 discardedAt。
- * [022.01] C1 修复：移除 OKRPanel 的 cycleStatus 透传（dead code）—
+ * [022.01] C1 修复：原 cycleStatus 透传为 dead code（OKRPanel 不消费）—
  *   本路径 OKRWorkspace → OKRPanel → KRProgress 不渲染 ContributionPanel。
+ * [023.12] T9 review fix：恢复 cycleStatus 透传——OKRForm 编辑/创建入口
+ *   需父周期 status 才能激活 reviewed 锁定（OKRPanel 内部不持有 hook.cycles）。
  */
 
 "use client"
@@ -287,6 +289,13 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
             /** [024] G1 presetCycleId：仅在 create 模式透传 selectedCycleId */
             presetCycleId={mode === "create" ? selectedCycleId ?? undefined : undefined}
             onImportTrigger={() => setImportOpen(true)}
+            /** [023.12] T9 review fix：父层从 hook.cycles 派生周期 status 透传至 OKRPanel
+                —create 模式按 selectedCycleId，edit/detail 模式按 detailData.cycleId。 */
+            cycleStatus={
+              mode === "create"
+                ? (selectedCycleId ? hook.cycles.find(c => c.id === selectedCycleId)?.status : undefined)
+                : (detailData?.cycleId ? hook.cycles.find(c => c.id === detailData.cycleId)?.status : undefined)
+            }
           />
         )}
       </div>

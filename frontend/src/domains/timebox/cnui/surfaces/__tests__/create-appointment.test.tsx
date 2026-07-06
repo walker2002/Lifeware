@@ -7,6 +7,10 @@
  * - drafts=2 → 翻页 UI（page indicator + 翻页按钮）
  * - view='list' → existing 列表渲染
  *
+ * [023.12] T7 (AM8) 修订：list 视图不再区分 in_progress/scheduled 显示
+ *   ——in_progress 在新 status union（scheduled/cancelled/completed）中
+ *   不再持久化，UI 一律显示「计划」。fixture 中 in_progress 改为 scheduled。
+ *
  * 不依赖 DB（纯 RTL 渲染 + onConfirm/onDataChange spy）。
  */
 
@@ -29,7 +33,8 @@ function makeDrafts(n: 1 | 2 = 1): AppointmentDraftFields[] {
 function makeExisting() {
   return [
     { id: 'e1', title: '晨会', startTime: '2026-07-10T08:00:00.000Z', status: 'scheduled' },
-    { id: 'e2', title: '送机', startTime: '2026-07-10T18:00:00.000Z', status: 'in_progress' },
+    // [023.12] T7 (AM8)：in_progress 已不持久化，fixture 改 scheduled。
+    { id: 'e2', title: '送机', startTime: '2026-07-10T18:00:00.000Z', status: 'scheduled' },
   ]
 }
 
@@ -94,9 +99,9 @@ describe('[026] T17 <CreateAppointment> 渲染稳定性', () => {
     // list 视图渲染 existing 两条
     expect(screen.getByText('晨会')).toBeInTheDocument()
     expect(screen.getByText('送机')).toBeInTheDocument()
-    // status 标签：计划 / 执行中
-    expect(screen.getByText('计划')).toBeInTheDocument()
-    expect(screen.getByText('执行中')).toBeInTheDocument()
+    // [023.12] T7 (AM8) 修订：list 仅显示 scheduled 状态，UI 一律「计划」。
+    //   旧测断言「计划」+「执行中」2 标签，现已收敛为 2 行同标。
+    expect(screen.getAllByText('计划')).toHaveLength(2)
   })
 
   it('existing.length=0 切到 list 视图渲染「暂无计划/执行中的约定」', () => {

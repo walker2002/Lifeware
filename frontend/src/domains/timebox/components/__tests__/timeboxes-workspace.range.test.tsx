@@ -53,7 +53,7 @@ vi.mock('@/app/actions/timebox', () => ({
 }))
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/timeboxes' }))
 
 describe('[023.06] TimeboxesWorkspace 视图模式切换器', () => {
   it('默认渲染三个 mode 按钮（日/周/月）', async () => {

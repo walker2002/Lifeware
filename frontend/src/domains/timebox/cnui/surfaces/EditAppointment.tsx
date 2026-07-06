@@ -1,10 +1,12 @@
 /**
  * @file EditAppointment
- * @brief 修改约定 CNUI surface（[026][023.05] D2 reversal）
+ * @brief 修改约定 CNUI surface（[026][023.05] D2 reversal / [023.12] T10 清理 in_progress 引用）
  *
- * 默认 {scheduled, in_progress} 列表（用户可改计划/执行），选中切编辑表单。
+ * 默认 {scheduled} 列表（用户可改计划），选中切编辑表单。
  * 4 字段复用 <AppointmentFormFields>（D4 决议 A）。
- * 终态 expired/cancelled/completed 不在列表（不可改，UI 自然隐藏）。
+ * 终态 cancelled/completed 不在列表（不可改，UI 自然隐藏）。
+ * [023.12] T10 (AM8)：in_progress 不再持久化，list 仅由 findActive 返回的 scheduled，
+ * 列表项「执行中/计划」分支删除（恒为 scheduled → 「计划」）。
  */
 
 'use client'
@@ -43,7 +45,7 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
     return (
       <>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">编辑约定（{selected.status === 'in_progress' ? '执行中' : '计划'}）</span>
+          <span className="text-sm font-medium text-ink">编辑约定（计划）</span>
           <button type="button" onClick={back} className="text-xs text-body/70 underline">返回列表</button>
         </div>
         <AppointmentFormFields draft={draft} onChange={update} />
@@ -62,9 +64,9 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
 
   return (
     <>
-      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要修改的约定（仅计划/执行中）</span></div>
+      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要修改的约定（仅计划）</span></div>
       {items.length === 0
-        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的约定</p>
+        ? <p className="py-8 text-center text-sm text-body/70">暂无计划中的约定</p>
         : <div className="space-y-1 max-h-72 overflow-y-auto">
             {items.map(it => (
               <button key={it.id} type="button"
@@ -72,7 +74,7 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
                 className="w-full text-left rounded-md border border-hairline bg-canvas p-2 hover:bg-hover-overlay">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-ink truncate">{it.title}</span>
-                  <span className="text-xs text-body/70">{it.status === 'in_progress' ? '执行中' : '计划'}</span>
+                  <span className="text-xs text-body/70">计划</span>
                 </div>
                 <div className="text-xs text-body/70">{new Date(it.startTime).toLocaleString('zh-CN')} · {it.durationMin}分</div>
               </button>

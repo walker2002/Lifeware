@@ -1,9 +1,12 @@
 /**
  * @file appointment mapper
- * @brief Appointment USOM 对象 ↔ appointments 表行映射（[026] D2 reversal）
+ * @brief Appointment USOM 对象 ↔ appointments 表行映射（[023.12] T5 3 态收敛）
  *
- * 状态直接读 row.status（D2 reversal 取消占位）。在 ProgressAt/ExpiredAt/CompletedAt/CancelledAt
- * 与 status 推进匹配时盖（SM 层负责一致性）。
+ * [023.12] T5: 3 态持久化（scheduled / cancelled / completed）。
+ * inProgressAt / expiredAt 列在 T1b drop（schema 残留列待迁移清理），USOM Appointment
+ * 类型不含这俩字段（T2 已收窄）。这里不映射这俩字段。
+ *
+ * 状态直接读 row.status（覆盖式 SM transition 推 status + 对应时间戳）。
  */
 
 import type { Appointment } from '@/usom/types/objects'
@@ -23,8 +26,6 @@ export function appointmentRowToUSOM(row: AppointmentRow): Appointment {
     userId: row.userId as USOM_ID,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    inProgressAt: row.inProgressAt ? row.inProgressAt.toISOString() : null,
-    expiredAt: row.expiredAt ? row.expiredAt.toISOString() : null,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
     schemaVersion: row.schemaVersion,
@@ -42,8 +43,6 @@ export function appointmentUSOMToRow(it: Appointment, userId: USOM_ID): Appointm
     durationMin: it.durationMin,
     people: it.people as any,
     status: it.status,
-    inProgressAt: it.inProgressAt ? new Date(it.inProgressAt) as any : null,
-    expiredAt: it.expiredAt ? new Date(it.expiredAt) as any : null,
     completedAt: it.completedAt ? new Date(it.completedAt) as any : null,
     cancelledAt: it.cancelledAt ? new Date(it.cancelledAt) as any : null,
     createdAt: new Date(it.createdAt) as any,

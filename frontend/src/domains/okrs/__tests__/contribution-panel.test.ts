@@ -92,12 +92,13 @@ describe("ContributionPanel — 关联/解除关联状态", () => {
 })
 
 // [022.01] Phase 3：cycleStatus 决定 ContributionPanel 编辑权限
-describe("ContributionPanel — isEditable（[022.01] Phase 3 cycleStatus 守卫）", () => {
+// [023.12] T6：cycleStatus 4 态收敛——fixture 由 not_started/in_progress/ended
+// 改为 approved/finished。"reviewed" 仍为唯一不可编辑状态。
+describe("ContributionPanel — isEditable（[022.01] Phase 3 + [023.12] T6 cycleStatus 守卫）", () => {
   it('cycleStatus !== "reviewed" → 可编辑', () => {
     expect(isContributionEditable("draft")).toBe(true)
-    expect(isContributionEditable("not_started")).toBe(true)
-    expect(isContributionEditable("in_progress")).toBe(true)
-    expect(isContributionEditable("ended")).toBe(true)
+    expect(isContributionEditable("approved")).toBe(true)
+    expect(isContributionEditable("finished")).toBe(true)
   })
 
   it('cycleStatus === "reviewed" → 不可编辑', () => {

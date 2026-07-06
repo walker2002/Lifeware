@@ -1,92 +1,76 @@
 /**
  * @file reconcile-appointment.ts
- * @brief 约定状态 lazy reconcile 纯函数（[026] D2 reversal 决策大脑）
+ * @brief 约定显示状态派生（[023.12] T5 改造：纯函数 badge 派生）
  *
- * 取代原 D2=C "读时算 status" 派生方案。新设计：状态全部存 DB，时间驱动的
- * transition（scheduled → in_progress 到日、scheduled/in_progress → expired 过日）
- * 由本函数计算 transition 计划，调用方在页面 server component 加载时逐条
- * submitDynamicIntent 走 SM 写库。零 cron、零后台 job。
+ * [023.12] T5 决策大脑：3 态持久化后，in_progress / expired 不再落库——读时由本函数
+ * 派生显示状态 badge。取代 [026] D2 reversal 时的「reconcileAppointmentStatuses
+ * 返回 write 行动 → 逐条 submitDynamicIntent」写库路径。
  *
- * 纯函数：不 IO、不写库。按日历日（localDayKey：年*10000+月*100+日）比较，
- * 与 /timeboxes loadDay 日界对齐（T8 + T13 用）。
+ * 纯函数：不 IO、不写库。按日历日（localDayKey：年*10000+月*100+日）比较。
+ * T3 derive-display-status.ts 提供 per-appointment 派生，本文件包 list 批量 + 命名收敛。
  *
- * 设计抉择：判别字段命名 kind，前缀 needs（"需要做"而非"动作本身"）——codex D6
- * 统一治理（brief Step 1 原本写 action: 'markInProgress'，与 Step 3 实现的
- * kind: 'needsMarkInProgress' 矛盾，按 codex 修复）。
+ * 设计：原 `reconcileAppointmentStatuses` 返回 ReconcileAction 写库行动——
+ * 现改造为返回 AppointmentBadge 列表（badge 是 UI 展示需要的，不是 DB 状态）。
+ * 命名迁移：`reconcileAppointmentStatuses` 保留作 deprecated alias，指向
+ * `deriveAppointmentBadges`；T10 UI 接新名，旧名仅供遗留调用方（罕见）。
  */
-import type { Appointment } from '@/usom/types/objects'
 
-/** 本地日历日整数键（年*10000+月*100+日），按调用方进程的本地时区归一化 */
+import type { Appointment } from '@/usom/types/objects'
+import { deriveAppointmentDisplayStatus } from './derive-display-status'
+
+/** 本地日历日整数键（年*10000+月*100+日），与 derive-display-status.ts 保持一致 */
 function localDayKey(d: Date): number {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()
 }
 
-/** ReconcileAction：建议调用方执行的 transition（kind 强调"需要做"） */
-export type ReconcileAction =
-  | { appointmentId: string; kind: 'needsMarkInProgress'; at: Date }
-  | { appointmentId: string; kind: 'needsMarkExpired'; at: Date }
-
-/** 终态：不再 reconcile 推进 */
-const TERMINAL: ReadonlyArray<Appointment['status']> = [
-  'expired',
-  'cancelled',
-  'completed',
-]
+/**
+ * 约定显示状态 badge：T5 后仅在内存派生；不持久化
+ * - 'in_progress'：约定日 == 今日（scheduled）
+ * - 'expired'：约定日 < 今日（scheduled）
+ * - null：未来约定 / 非 scheduled 状态
+ */
+export type AppointmentBadge = {
+  appointmentId: string
+  badge: 'in_progress' | 'expired' | null
+}
 
 /**
- * 计算所有需要推进的 transition（按日历日驱动）。
+ * 批量派生 badge 列表。
  *
- * 规则：
- * - 终态（expired/cancelled/completed）→ 跳过
- * - nowDay < startDay（未来）→ 跳过（scheduled 不变；in_progress 不可能发生在未来）
- * - nowDay === startDay（当日）→ scheduled → in_progress（in_progress 当日不变）
- * - nowDay > startDay（过日）→ scheduled 或 in_progress → expired
- *
- * @param appointments 约定列表（已过滤 userId 等，仅当前用户可见数据）
- * @param now 当前时间（用于与 startTime 比较日界）
- * @returns transition 计划数组，由调用方逐条 submitDynamicIntent 落库
+ * @param appointments - 约定列表（已过滤 userId）
+ * @param now - 当前时间
+ * @returns 每条约定一个 badge
  */
-export function reconcileAppointmentStatuses(
+export function deriveAppointmentBadges(
   appointments: ReadonlyArray<Appointment>,
   now: Date,
-): ReconcileAction[] {
-  const nowDay = localDayKey(now)
-  const actions: ReconcileAction[] = []
+): AppointmentBadge[] {
+  return appointments.map(a => ({
+    appointmentId: a.id as string,
+    badge: deriveAppointmentDisplayStatus(a.status, a.startTime, now),
+  }))
+}
 
-  for (const it of appointments) {
-    // 终态跳过（expired/cancelled/completed 不再推进）
-    if ((TERMINAL as readonly string[]).includes(it.status)) continue
+/**
+ * 找 badge=expired 的所有约定 ID（UI 列表「过期未处理」过滤用）
+ */
+export function findExpiredAppointmentIds(
+  appointments: ReadonlyArray<Appointment>,
+  now: Date,
+): string[] {
+  return deriveAppointmentBadges(appointments, now)
+    .filter(b => b.badge === 'expired')
+    .map(b => b.appointmentId)
+}
 
-    const startDay = localDayKey(new Date(it.startTime))
-
-    // 未来：scheduled 不变（in_progress 不可能发生在未来）
-    if (nowDay < startDay) {
-      // scheduled 留在 scheduled，in_progress 是不可能的（除非数据脏），跳过
-      continue
-    }
-
-    // 当日：scheduled → in_progress
-    if (nowDay === startDay) {
-      if (it.status === 'scheduled') {
-        actions.push({
-          appointmentId: it.id,
-          kind: 'needsMarkInProgress',
-          at: now,
-        })
-      }
-      // in_progress 当日不变
-      continue
-    }
-
-    // 过日：scheduled → expired 或 in_progress → expired
-    if (it.status === 'scheduled' || it.status === 'in_progress') {
-      actions.push({
-        appointmentId: it.id,
-        kind: 'needsMarkExpired',
-        at: now,
-      })
-    }
-  }
-
-  return actions
+/**
+ * 找 badge=in_progress 的所有约定 ID（UI 列表「今日执行中」过滤用）
+ */
+export function findInProgressAppointmentIds(
+  appointments: ReadonlyArray<Appointment>,
+  now: Date,
+): string[] {
+  return deriveAppointmentBadges(appointments, now)
+    .filter(b => b.badge === 'in_progress')
+    .map(b => b.appointmentId)
 }

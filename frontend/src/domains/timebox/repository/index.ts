@@ -124,6 +124,30 @@ export class TimeboxRepository implements ITimeboxRepository {
       .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
   }
 
+  /**
+   * 回退：{logged, cancelled} → planned（[023.12] T4）
+   *
+   * 软重置：仅盖 status='planned' + updatedAt=now，不动 executionRecord /
+   * startedAt / loggedAt 等历史字段——回退 = 「撤销 SM 转换」而非「清空数据」。
+   * 若调用方要彻底回退（如 AM7 守卫想清 executionRecord），由调用点显式
+   * 在 revert 前清空（这里不耦合 AM7 业务决策，保持仓储纯粹）。
+   *
+   * 多租户 T-02：where 必含 userId。
+   *
+   * @param id - 时间盒 ID
+   * @param userId - 用户 ID
+   * @param tx - 可选事务句柄
+   */
+  async revertTransition(
+    id: USOM_ID,
+    userId: USOM_ID,
+    tx: DbClient = db,
+  ): Promise<void> {
+    await tx.update(s.timeboxes)
+      .set({ status: 'planned', updatedAt: new Date() })
+      .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+  }
+
   private async loadWithJunctions(rows: any[]): Promise<Timebox[]> {
     const results: Timebox[] = []
     for (const row of rows) {

@@ -35,12 +35,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 import { DayView } from './day-view'
 import { WeekView } from './week-view'
 import { MonthView } from './month-view'
 import { DateNav } from './date-nav'
 import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
-import { transitionTimebox, getTimeboxById } from '@/app/actions/timebox'
+import { transitionTimebox, getTimeboxById, revertTimebox, deleteTimebox } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getAppointmentsByRange } from '@/app/actions/intent'
 import { mergeEvents, type TimeboxesEvent } from './timeboxes-event'
 import { Button } from '@/components/ui/button'
@@ -95,6 +96,11 @@ export function TimeboxesWorkspace() {
   const [revertableBatches, setRevertableBatches] = useState<Array<{ batchId: string; acceptedAt: number; count: number }>>([])
 
   // [023.06] T2：范围拉取（替代 loadDay，行为对齐 T1 getDateRange）
+  // [023.12] T14 fix: pathname 守卫 —— workspace 只在 /timeboxes（或含时间盒主区）挂载
+  //   拉取。其他路径下的 mount（如挂在共享 layout 时）是 HMR/Next devtools 副作用，
+  //   catch 静默 no-op，避免 [TimeboxesWorkspace] 加载失败 噪声日志误以为真错。
+  const pathname = usePathname()
+  const isWorkspaceRoute = pathname?.startsWith('/timeboxes') ?? false
   const loadRange = useCallback(async (mode: DateViewMode, d: Date) => {
     setLoading(true)
     try {
@@ -105,11 +111,14 @@ export function TimeboxesWorkspace() {
       ])
       setEvents(mergeEvents(timeboxList, appointmentList))
     } catch (e) {
-      console.error('[TimeboxesWorkspace] 加载失败', e)
+      // 仅在 workspace 路由下才报可见错误；非 workspace 路由（layout 误挂载）静默 no-op
+      if (isWorkspaceRoute) {
+        console.error('[TimeboxesWorkspace] 加载失败', e)
+      }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isWorkspaceRoute])
 
   useEffect(() => {
     loadRange(dateMode, currentDate)
@@ -147,15 +156,41 @@ export function TimeboxesWorkspace() {
     [events],
   )
 
-  /** [023.03] T3：handleAction 包 try/catch + 处理 needs_confirm AlertDialog */
+  /**
+   * [023.03] T3 / [023.12] T8：handleAction 包 try/catch + 处理 needs_confirm AlertDialog
+   *
+   * [023.12] T8 扩展：
+   * - 新增 'revert' / 'delete' 动作（取代旧 start/end 流程）
+   * - 'revert' 走 revertTimebox（[AM7] executionRecord 守卫：守卫命中会 throw
+   *   '请先清理执行记录再回退'，catch 内 toast.error 提示）
+   * - 'delete' 走 deleteTimebox（仅 planned 可用；其他状态 throw）
+   */
   const handleAction = useCallback(async (
     timeboxId: string,
-    action: 'start' | 'end' | 'cancel' | 'log',
-    confirmed = false,
+    action: 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog',
   ) => {
     setActionSubmitting(true)
     try {
-      const r = await transitionTimebox(timeboxId, action, {}, confirmed)
+      if (action === 'revert') {
+        // [023.12] T8 [AM7]：revertTimebox 抛错 → toast 提示
+        await revertTimebox(timeboxId)
+        toast.success('已回退为已规划')
+        await loadRange(dateMode, currentDate)
+        return
+      }
+      if (action === 'delete') {
+        // [023.12] T8：deleteTimebox 仅 planned 可用（其他状态 SM/守卫会 throw）
+        await deleteTimebox(timeboxId)
+        toast.success('已删除时间盒')
+        await loadRange(dateMode, currentDate)
+        return
+      }
+      // [023.03] T3 旧路径：start/end/cancel/log 走 transitionTimebox + needs_confirm
+      if (action === 'viewLog') {
+        // viewLog 是只读跳转，workspace 端不处理（由父级面板接管）
+        return
+      }
+      const r = await transitionTimebox(timeboxId, action, {}, false)
       if (r.status === 'ok') {
         await loadRange(dateMode, currentDate)
         return
@@ -165,7 +200,8 @@ export function TimeboxesWorkspace() {
           message: r.message,
           action: async () => {
             // 二次确认：用 confirmed=true 再调一次；二次调用 SM 应当返回 ok，不再开 confirm
-            await handleAction(timeboxId, action, true)
+            await transitionTimebox(timeboxId, action, {}, true)
+            await loadRange(dateMode, currentDate)
           },
         })
         return
@@ -174,6 +210,7 @@ export function TimeboxesWorkspace() {
       toast.error('操作未完成')
     } catch (e) {
       console.error('[TimeboxesWorkspace.handleAction] failed', e)
+      // [023.12] T8 [AM7]：revertTimebox 守卫错误信息透传
       toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setActionSubmitting(false)
@@ -321,8 +358,11 @@ export function TimeboxesWorkspace() {
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map(i => <div key={i} className="h-16 rounded-md bg-surface-card animate-pulse" />)}
+            // [023.12] T14 fix: 加载占位明确标 "加载中…"，避免与空卡片视觉混淆
+            //   原 h-16 bg-surface-card animate-pulse 在 /qa 截图里被误判为「空时间盒卡」。
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-body/70">
+              <div className="size-6 animate-spin rounded-full border-2 border-hairline border-t-primary" />
+              <span>加载中…</span>
             </div>
           ) : dateMode === 'day' ? (
             events.length === 0 ? (
@@ -337,7 +377,7 @@ export function TimeboxesWorkspace() {
                 events={events}
                 currentDate={currentDate}
                 onDateSelect={handleDateSelect}
-                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log')}
+                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog')}
                 onEdit={handleEdit}
               />
             )

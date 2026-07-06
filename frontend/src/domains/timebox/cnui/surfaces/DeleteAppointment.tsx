@@ -1,9 +1,11 @@
 /**
  * @file DeleteAppointment
- * @brief 删除约定 CNUI surface（[026][023.05] D2 reversal）
+ * @brief 删除约定 CNUI surface（[026][023.05] D2 reversal / [023.12] T10 清理 in_progress 引用）
  *
- * 列表筛 {scheduled, in_progress}（expired/cancelled/completed 不可删，UI 自然隐藏）。
- * 多选 → executeIntent(cancel)。SM 守卫 enforce from {scheduled, in_progress}。
+ * 列表筛 {scheduled}（cancelled/completed 不可删，UI 自然隐藏）。
+ * 多选 → executeIntent(cancel)。SM 守卫 enforce from {scheduled}。
+ * [023.12] T10 (AM8)：in_progress 不再持久化，list 仅由 findActive 返回的 scheduled，
+ * 列表项「执行中/计划」分支删除（恒为 scheduled → 「计划」）。
  */
 
 'use client'
@@ -38,9 +40,9 @@ export function DeleteAppointment({ dataModel, onConfirm, onCancel, isLoading, i
 
   return (
     <>
-      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要删除的约定（仅计划/执行中，可多选）</span></div>
+      <div className="mb-2"><span className="text-sm font-medium text-ink">选择要删除的约定（仅计划，可多选）</span></div>
       {items.length === 0
-        ? <p className="py-8 text-center text-sm text-body/70">暂无计划/执行中的约定（过期/已完成不可删）</p>
+        ? <p className="py-8 text-center text-sm text-body/70">暂无计划中的约定（已完成不可删）</p>
         : <div className="space-y-1 max-h-72 overflow-y-auto">
             {items.map(it => {
               const checked = selected.has(it.id)
@@ -54,7 +56,7 @@ export function DeleteAppointment({ dataModel, onConfirm, onCancel, isLoading, i
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-ink truncate">{it.title}</span>
-                        <span className="text-xs text-body/70">{it.status === 'in_progress' ? '执行中' : '计划'}</span>
+                        <span className="text-xs text-body/70">计划</span>
                       </div>
                       <div className="text-xs text-body/70">{new Date(it.startTime).toLocaleString('zh-CN')}</div>
                     </div>

@@ -8,6 +8,76 @@
 
 ---
 
+## [023.12] 三域生命周期语义重构（2026-07-06）
+
+> 2026_07_06 — **ship-ready**：14/15 task 完成（T1a / T1b / T2 / T3 / T4 / T5 / T6 / T7 / T8 / T9 / T10 / T13 / T14 + T11 docs 本任务），T12 验证门待跑。T11 docs 同步 + T9 fix wire cycleStatus at 5 call sites（reviewed lock EFFECTIVE）。**核心思路**：把 timebox / cycle / appointment 三域持久态收敛到「只跟踪用户行为」——时间态一律读时派生显示。
+
+### 决策
+
+- **D1** appointment 时间态（in_progress / expired）读时派生显示，与 timebox running/overtime 同模式（`derive-display-status` 共享工具）
+- **D2** appointment 回退 cancelled/completed → scheduled（对称 timebox logged/cancelled → planned）
+- **D3** 方案 A（单分支三域同 ship）+ status 是 TEXT 无 PG enum（迁移零类型 DDL）
+- **D4** `currentTimebox` 保留：orchestrator 扫描 planned timeboxes，用 T3 `derive-display-status` 填充第一个 running（codex #3 from plan-eng-review）
+- **D5** `process.env.TZ='Asia/Shanghai'` 在 `next.config.ts:3`（T14，根因修复 `localDayKey` 在容器化部署时的时区脆弱性）
+- **D6** cycle 列 rename：`started_at → approved_at`、`ended_at → finished_at`（reviewed_at 不变；语义对齐 status 收敛；AM6，T1b）
+- **D7** timebox revert 守卫：若 `executionRecord != null` 抛「请先清理执行记录再回退」（AM7，T4）——等价于 logged → planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled → planned 可直接回退
+- **D8** appointment task/habit cancel/complete guard 降级 TODO（OQ-1，无 junction 存在；留 `// TODO [027]: appointment task/habit guard`，属后续 ticket）
+- **🔁 反转 [026] D2 reversal（关键决议，codex #1）**：本轮**有意反转**[026] 推出的「appointment 5 态存储 + lazy reconcile 写库」模式，**退回读时派生模式**。理据："D2 reversal 的派生模式无法 enforce 写入约束 + 无成本"——本轮经重新评估后认为写入约束可由 SM 持久态单独 enforce（cancelled/completed/scheduled 终态已足够 enforce 不可删/不可改），时间态派生足以回答"未实施计划"统计。代价已被接受：`currentTimebox` / overlap rule 改应用层派生（plan T13、T7），SQL 级"查过期约定"不再可能（单用户 MVP 可接受）。详见 design doc `docs/superpowers/specs/2026-07-06-023-12-lifecycle-simplify-design.md` §「与 [026] D2 reversal 的关系」。
+
+### 改动
+
+- **三域 manifest lifecycle 重写**：`domains/timebox/manifest.yaml`（timebox + appointment 两对象 block B + block D list_actions + block F subscribed_events 删 TimeboxStarted/Ended/Overtime 加 TimeboxReverted/CycleReverted/AppointmentReverted）+ `domains/okrs/manifest.yaml`（cycle block B + action rename）
+- **status union 收敛（schema.ts `enum: [...]` 数组改写）**：
+  - `timeboxes.status`：6 值 `{planned, running, overtime, ended, cancelled, logged}` → **3 值** `{planned, logged, cancelled}`
+  - `cycles.status`：5 值 `{draft, not_started, in_progress, ended, reviewed}` → **4 值** `{draft, approved, finished, reviewed}`（`not_started` / `in_progress` 合并为 `approved`；`ended` 改名 `finished`）
+  - `appointments.status`：5 值 `{scheduled, in_progress, expired, cancelled, completed}` → **3 值** `{scheduled, cancelled, completed}`（`in_progress` / `expired` 不持久化）
+- **5 个时间戳列 drop（migration 0034）**：`timeboxes.started_at` / `timeboxes.ended_at` / `timeboxes.overtime_at` + `appointments.in_progress_at` / `appointments.expired_at`；**2 个 cycle 列 rename**：`cycles.started_at → approved_at`、`cycles.ended_at → finished_at`（`reviewed_at` 不变）
+- **cycle 2 列 rename**：`cycles.started_at → approved_at`、`cycles.ended_at → finished_at`（reviewed_at 不变；语义对齐 status 收敛；AM6，T1b）
+- **cycle SM action rename**：`startCycle / planCycle` 二选一分支塌缩为单一 `approve`；`endCycle → finish`；`review` 不变；**新增 `revert`**（reviewed → finished）
+- **cycle guard ALLOWED map 重写**：5 key → 4 key（`draft/approved/finished` 各自 `{edit_objective, edit_kr}`，`reviewed = {}` 锁 objective 写）
+- **派生显示工具**：`derive-display-status.ts`（timebox+appointment 共享；TDD 9 cases）
+- **reconcile-appointments plural 写库入口删除** + singular `reconcile-appointment.ts` 改造为 badge 派生函数（输入 `Appointment[] + now`，输出 `{appointmentId, badge: 'in_progress' | 'expired' | null}[]`）
+- **currentTimebox 派生填充**（AM4，T13）：orchestrator 扫描 planned timeboxes，用 `derive-display-status` 填充第一个 running（保留字段语义）
+- **三页 UI 操作按钮重做**：
+  - `/timeboxes`：删除 / 打卡 / 回退（state-gated），无 开始/结束；running/overtime 派生显示
+  - `/okrs`：编辑/审批/结束/复盘/回退/删除（guarded）；tabs 4 态；reviewed cycle 锁定 objective 写
+  - `/appointments`：编辑/取消/完成/回退（guarded）；in_progress/expired 派生 badge；无 reconcile 写库
+- **process.env.TZ='Asia/Shanghai'** 写入 `next.config.ts:3`（T14，根因修复 `localDayKey` 在容器化部署时的时区脆弱性）
+- **migration 0034_023_12_lifecycle_simplify.sql**：TRUNCATE timeboxes/cycles/appointments CASCADE + DROP 5 时间戳列 + RENAME cycle 2 时间戳列 + journal idx=34。`.down.sql` 反向重建废弃列（prod 不需要，dev 回滚兜底）
+- **CI 校验**：`npm run validate:manifest` = 0 errors / `npm run validate:domain-structure` ✓
+- **Tier 2 docs 同步（本任务）**：`docs/usom-design.md`（§3.5a cycle + §3.9 timebox + §3.13 appointment 三段状态机更新 + 派生显示说明） + `docs/database-design.md`（§4.0 cycles + §4.7 timeboxes + §4.X appointments 三表 status 合法值表 + 删除/重命名列标注 + 迁移 0034 摘要）
+
+### 验证
+
+- vitest base=head：**零新增 regression**（47 baseline FAIL 均为 pre-existing DB-auth，无本轮相关失败）
+- tsc 92→92：**零新增 error**（92 pre-existing ship-then-polish；本轮 T1a/T2/T3/T4/T5/T6/T7/T8/T9/T10/T13/T14 净增 0 错）
+- `npm run validate:manifest`：**0 errors**（2 WARN + 2 INFO pre-existing）
+- `npm run validate:domain-structure`：✓ pass
+- migration 0034：dev DB 跑通（TRUNCATE 3 表 + DROP 5 列 + RENAME 2 cycle 列），journal idx=34
+- /browse 三页视觉验证：T12 待跑（`/timeboxes` `/okrs` `/appointments` 操作按钮 state-gated + 派生 badge 显示）
+- pre-push hooks 全过：validate:manifest 0 errors + validate:domain-structure ✓
+
+### 范围
+
+- ~30 文件（manifest 重写 + schema + USOM 类型 + SM/lifecycle + guard + 仓储 + rules + CNUI + UI + actions + 测试同步 + docs）
+- 14 impl commit + 1 docs commit (T11)
+- 无 PG enum 重建、无破坏性 schema 变更（仅 DROP 5 个 nullable 时间戳列 + RENAME 2 cycle 列 + status enum 数组在 app 层 pivot）
+
+### 设计 authority
+
+- Design: `docs/superpowers/specs/2026-07-06-023-12-lifecycle-simplify-design.md`（APPROVED by /office-hours）
+- Plan: `docs/superpowers/plans/2026-07-06-023-12-lifecycle-simplify.md`
+- review 链：plan-eng-review GSTACK REVIEW REPORT + whole-branch review
+
+### 后续 defer（不在本轮）
+
+- OQ-1 留下的 `// TODO [027]: appointment task/habit guard`（schema 无 junction 基础，留后续 ticket）
+- OQ-5 能量维度宪章缺口（constitution amendment 议题，与本轮无关）
+- 「SQL 级查过期约定/COUNT 运行中时间盒」能力：派生模式无法 SQL 查询；单用户 MVP 接受；报表/分析需求时再考虑物化视图
+- drizzle snapshot 重置（沿用 F2 convention）
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
@@ -19,6 +89,7 @@
 
 ## USOM 详细设计（docs/usom-design.md）
 
+- 2026_07_06 — [023.12] §3.5a Cycle 状态机收敛：5 态 → 4 态（`not_started` / `in_progress` 合并为 `approved`，`ended` 改名 `finished`）；SM action rename（`startCycle/planCycle` 塌缩为 `approve`，`endCycle → finish`，**新增 `revert`**）；guard ALLOWED map 重写；时间戳字段重命名（`startedAt → approvedAt`、`endedAt → finishedAt`，`reviewedAt` 不变）。§3.9 Timebox 状态枚举收敛：6 值 → 3 值（`running` / `overtime` / `ended` 派生显示，不持久化）；新增 `TimeboxReverted` 事件；移除 3 个时间戳列（`startedAt` / `overtimeAt` / `endedAt`）。§3.13 Appointment **反转 [026] D2 reversal**：5 态 → 3 值（`in_progress` / `expired` 派生显示，不持久化）；新增 `AppointmentReverted` 事件；移除 2 个时间戳列（`inProgressAt` / `expiredAt`）。OQ-1 降级 TODO：appointment task/habit cancel/complete guard 留 `// TODO [027]: appointment task/habit guard`
 - 2026_07_05 — [023.05-2] PR2 阶段 2：§3.13 Itinerary → Appointment 全层重命名 + 设计覆盖注（schedule→appointment 因 timebox 语义撞车）+ 中文「行程」→「约定」+ `AppointmentStatus` 值 5 态保留 P3（scheduled/in_progress/expired/cancelled/completed）
 - 2026_07_04 — [023.04] §3.9 Timebox 末尾追加「时间盒修改/取消/删除意图统一入口」：`/editTimeboxes` shortcut 是修改/取消/删除三类意图的统一 CNUI 入口；`/cancelTimebox` shortcut 已弃用（提交 [023.04] 时从 manifest 删除），`cancelTimebox` 作为 SM action 仍保留用于 mutation service 内部触发状态推进
 - 2026_07_04 — [023-02 用户调整] 列表卡片 `MAX_VISIBLE_ROWS` 4→10；编辑器 grid 增列；TemplateEditForm 按 start 升序
@@ -35,6 +106,7 @@
 
 ## 数据库设计（docs/database-design.md）
 
+- 2026_07_06 — [023.12] §4.0 cycles 表 status enum 5 值→4 值（draft | approved | finished | reviewed）+ 时间戳列 RENAME（`started_at → approved_at`、`ended_at → finished_at`）；§4.7 timeboxes 表 status enum 6 值→3 值（planned | logged | cancelled）+ 移除 3 个时间戳列（`started_at` / `overtime_at` / `ended_at`）；§4.X appointments 表 status enum 5 值→3 值（scheduled | cancelled | completed）+ 移除 2 个时间戳列（`in_progress_at` / `expired_at`）+ **反转 [026] D2 reversal** 注释（in_progress/expired 由 `derive-display-status` 派生显示）。新增「迁移 0034」摘要小节（journal idx=34，TRUNCATE 3 表 + DROP 5 列 + RENAME 2 cycle 列；零 PG enum DDL；status 列是 plain TEXT，schema.ts `enum: [...]` 在 app 层约束合法值）
 - 2026_07_05 — [023.05-2] PR2 阶段 2：§4.X itineraries → appointments 表 RENAME（DDL 终态标注）+ 0033_rename_itineraries_to_appointments.sql（journal idx=33）+ .down.sql（F5 反向）+ F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal，不引入 `drizzle-kit up`）
 - 2026_07_04 — [023.04] §4.7 timeboxes 末尾追加「时间盒重叠规则」：CNUI 提交按两层校验（客户端 `assertNoInternalOverlap` + 服务端 `TimeOverlapRule` 改读 endTime + status-aware severity）；DB 层无唯一性约束，重叠允许但有提示用户确认
 - 2026_07_04 — [023-02] §7.8 timebox_templates 改写：survival_segments + 3 个 subscribed_* 列 → rows + days_of_week（迁移 0032）

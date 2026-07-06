@@ -9,7 +9,7 @@ import type {
   Priority, EnergyLevel, PeriodType, EnergyScore, EnergySource,
   Chronotype, EnergyCurvePoint, EnergySensitivity,
   TaskStatus, HabitStatus,
-  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus, AppointmentStatus,
+  CompletionStatus, TimeboxStatus, ReviewStatus, IntentionStatus, AppointmentStatus, CycleStatus,
   ThreadStatus, AISessionStatus,
   ClarityLevel, ComplexityTag, DecompositionLevel, CaptureMode,
   SchedulingConstraint, TrackingMode,
@@ -139,11 +139,11 @@ export interface StructuredIntent {
  * @property cycleType - 周期类型（年度/季度/月度/半年/自定义）
  * @property name - 周期名称
  * @property period - 周期起止区间（Cycle 自身字段，独占周期信息）
- * @property status - 周期生命周期状态（draft/not_started/in_progress/ended/reviewed）
+ * @property status - 周期生命周期状态（draft/approved/finished/reviewed）
  * @property createdAt - 创建时间
  * @property updatedAt - 更新时间
- * @property startedAt - 进入 in_progress 的时间
- * @property endedAt - 进入 ended 的时间
+ * @property approvedAt - 进入 approved 的时间（[023.12] AM6: 原 startedAt 改名，列名暂留 started_at，T1b 改 DB）
+ * @property finishedAt - 进入 finished 的时间（[023.12] AM6: 原 endedAt 改名，列名暂留 ended_at，T1b 改 DB）
  * @property reviewedAt - 进入 reviewed 的时间
  */
 export interface Cycle {
@@ -151,11 +151,11 @@ export interface Cycle {
   cycleType: 'annual' | 'quarterly' | 'monthly' | 'semi_annual' | 'custom'
   name: string
   period: { start: DateOnly; end: DateOnly }
-  status: 'draft' | 'not_started' | 'in_progress' | 'ended' | 'reviewed'
+  status: CycleStatus
   createdAt: Timestamp
   updatedAt: Timestamp
-  startedAt?: Timestamp
-  endedAt?: Timestamp
+  approvedAt?: Timestamp
+  finishedAt?: Timestamp
   reviewedAt?: Timestamp
 }
 
@@ -614,9 +614,6 @@ export interface Timebox {
   activityArchetypeId?: USOM_ID
   createdAt: Timestamp
   updatedAt: Timestamp
-  startedAt?: Timestamp
-  overtimeAt?: Timestamp
-  endedAt?: Timestamp
   loggedAt?: Timestamp
   executionRecord?: ExecutionRecord
   notes?: Notes
@@ -644,8 +641,6 @@ export interface Appointment {
   userId:         USOM_ID
   createdAt:      Timestamp
   updatedAt:      Timestamp
-  inProgressAt:   Timestamp | null         // SM transition scheduled→in_progress 时盖
-  expiredAt:      Timestamp | null         // SM transition →expired 时盖
   completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
   cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
   schemaVersion:  number

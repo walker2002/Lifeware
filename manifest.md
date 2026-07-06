@@ -48,6 +48,8 @@ superpowers/plans/
 # [026] Itinerary 域 — Plan 在 `.superpowers/sdd/task-026-T{1..14}-brief.md`（不在 docs/superpowers/plans/，因 [026] 实施时未走完整 /superpowers:writing-plans 流程；brief 在 .superpowers/sdd/ 维护）。设计 authority 在 CHANGELOG.md `## Itinerary 域（[026]）` 段 + docs/usom-design.md §3.13 + docs/database-design.md §4.X。完整 ship-ready：A3 (T1-T14) 14 commits 已 ship，剩余 P2/P3 follow-up T15-T23。
 
 # [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2）— Plan 在 `docs/superpowers/plans/2026-07-05-023-05-2-itinerary-to-appointment-rename.md`（11 task + C1 fix + T11 fixup 共 12 commits，ship-ready 2026-07-05）。设计覆盖：schedule→appointment（eng-review 用户识别 schedule 与 timebox 撞车）。Authority：plan SSOT + CHANGELOG.md `## [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2，ship-ready 2026_07_05）` + docs/usom-design.md §3.13 + docs/database-design.md §4.X。剩余 defer：[023.10] postship follow-up。
+
+# [023.12] 三域生命周期语义重构（timebox / OKR cycle / appointment）— Design `docs/superpowers/specs/2026-07-06-023-12-lifecycle-simplify-design.md`（APPROVED by /office-hours）+ Plan `docs/superpowers/plans/2026-07-06-023-12-lifecycle-simplify.md`（plan-eng-review 21 findings 全折入，14 task + T9 fix + T11 docs + T12 待跑）。Authority：CHANGELOG.md `## [023.12] 三域生命周期语义重构（2026-07-06）` + docs/usom-design.md §3.5a/§3.9/§3.13 + docs/database-design.md §4.0/§4.7/§4.X + 迁移 0034 摘要。**关键决议**：反转 [026] D2 reversal（appointment 持久态 5 值→3 值，in_progress/expired 派生显示；不再 lazy reconcile 写库）。
 ```
 
 ### 第三层：Claude 自动维护

@@ -75,11 +75,13 @@ export const cycles = pgTable('cycles', {
   name: text('name').notNull(),
   periodStart: date('period_start').notNull(),
   periodEnd: date('period_end').notNull(),
-  status: text('status', { enum: ['draft', 'not_started', 'in_progress', 'ended', 'reviewed'] }).notNull(),
+  status: text('status', { enum: ['draft', 'approved', 'finished', 'reviewed'] }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  startedAt: timestamp('started_at', { withTimezone: true }),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
+  // [023.12] AM6 + AM2: TS 字段名 rename (startedAt→approvedAt, endedAt→finishedAt)
+  // T1b migration 0034 已同步 rename DB 列名 approved_at / finished_at
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
 }, (table) => [
   check('check_cycles_period_end_after_start', sql`${table.periodEnd} > ${table.periodStart}`),
@@ -354,7 +356,7 @@ export const timeboxes = pgTable('timeboxes', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
 
-  status: text('status', { enum: ['planned', 'running', 'overtime', 'ended', 'cancelled', 'logged'] }).notNull(),
+  status: text('status', { enum: ['planned', 'logged', 'cancelled'] }).notNull(),
   title: text('title').notNull(),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
   endTime: timestamp('end_time', { withTimezone: true }).notNull(),
@@ -374,9 +376,6 @@ export const timeboxes = pgTable('timeboxes', {
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  startedAt: timestamp('started_at', { withTimezone: true }),
-  overtimeAt: timestamp('overtime_at', { withTimezone: true }),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
   loggedAt: timestamp('logged_at', { withTimezone: true }),
 }, (table) => [
   check('check_timeboxes_end_after_start', sql`${table.endTime} > ${table.startTime}`),
@@ -396,10 +395,8 @@ export const appointments = pgTable('appointments', {
   durationMin:  integer('duration_min').notNull(),
   people:       jsonb('people').notNull().$type<string[]>().default([]),
   // [026] D2 reversal: 5 态全部存储（Cancelled 终态，expired/completed 终态）
-  status:       text('status', { enum: ['scheduled', 'in_progress', 'expired', 'cancelled', 'completed'] }).notNull().default('scheduled'),
+  status:       text('status', { enum: ['scheduled', 'cancelled', 'completed'] }).notNull().default('scheduled'),
   // SM transition 时间戳（推进时盖）
-  inProgressAt: timestamp('in_progress_at', { withTimezone: true }),
-  expiredAt:    timestamp('expired_at', { withTimezone: true }),
   completedAt:  timestamp('completed_at', { withTimezone: true }),
   cancelledAt:  timestamp('cancelled_at', { withTimezone: true }),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

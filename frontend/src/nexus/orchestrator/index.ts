@@ -22,6 +22,8 @@ import type {
 } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { Task } from '@/usom/types/objects'
+import type { Timebox } from '@/usom/types/objects'
+import type { TimeboxSummary } from '@/usom/types/summaries'
 import type {
   ISystemEventRepository,
   ITimeboxRepository,
@@ -46,6 +48,7 @@ import { createAISessionManager } from '@/nexus/ai-runtime/session'
 import type { QueryResultEntry } from '@/nexus/ai-runtime/session'
 import { TaskRepository } from '@/domains/tasks/repository/task'
 import { ThreadRepository } from '@/domains/tasks/repository/thread'
+import { deriveTimeboxDisplayStatus } from '@/domains/timebox/status/derive-display-status'
 
 /**
  * 意图引擎接口
@@ -270,18 +273,91 @@ function createStubSnapshot(userId: USOM_ID): ContextSnapshot {
 }
 
 /**
+ * [023.12] T13 (AM4) — 把 `Timebox` 转成 `TimeboxSummary` 供 `currentTimebox` 字段写入。
+ *
+ * 派生填充链只关心 startTime / endTime / status / title / id 五个字段；
+ * 其它 summary 字段（taskIds / habitIds / archetypeName / 各种时间戳）留空。
+ *
+ * @param tb - Timebox 全对象
+ * @returns TimeboxSummary（缺省字段省略）
+ */
+function timeboxToSummaryForCurrent(tb: Timebox): TimeboxSummary {
+  return {
+    id: tb.id,
+    title: tb.title,
+    status: tb.status,
+    startTime: tb.startTime,
+    endTime: tb.endTime,
+    taskIds: tb.taskIds ?? [],
+    habitIds: tb.habitIds ?? [],
+  }
+}
+
+/**
+ * [023.12] T13 (AM4) — 派生填充 currentTimebox。
+ *
+ * 读时算：扫 user 所有 `planned` 时间盒，用 `deriveTimeboxDisplayStatus`
+ * 判定当前是否 running。**取第一个** running（按 startTime 升序，tied
+ * by id；这是有意选择：用户视角「时间重叠的多个 planned 同时进入 running」
+ * 是异常，UI 用 first 即可）。
+ *
+ * - 无 timeboxRepo / 查询失败 → 返回 `undefined`（静默空，plan §R9 接受）
+ * - 无 running → `undefined`
+ * - 找到 running → 第一个的 TimeboxSummary
+ *
+ * @param snapshot - 上下文快照（取 now 来自 snapshot.currentTime）
+ * @param timeboxRepo - 可选仓储；undefined 时跳过填充
+ * @returns 派生出的 currentTimebox 或 undefined
+ */
+export async function deriveCurrentTimebox(
+  snapshot: ContextSnapshot,
+  timeboxRepo?: ITimeboxRepository,
+): Promise<TimeboxSummary | undefined> {
+  if (!timeboxRepo) return undefined
+  const now = new Date(snapshot.currentTime)
+  try {
+    const planned = await timeboxRepo.findByStatus('planned', snapshot.userId)
+    if (!planned || planned.length === 0) return undefined
+    // 排序：startTime asc，id asc（稳定 tiebreak）
+    const sorted = [...planned].sort((a, b) => {
+      const aStart = new Date(a.startTime).getTime()
+      const bStart = new Date(b.startTime).getTime()
+      if (aStart !== bStart) return aStart - bStart
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
+    for (const tb of sorted) {
+      const display = deriveTimeboxDisplayStatus(tb.status, tb.startTime, tb.endTime, now)
+      if (display === 'running') {
+        return timeboxToSummaryForCurrent(tb)
+      }
+    }
+    return undefined
+  } catch (err) {
+    // [023.12] T13: try/catch 兜底空（plan §R9），避免阻塞主路径
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[orchestrator] deriveCurrentTimebox failed:', err)
+    }
+    return undefined
+  }
+}
+
+/**
  * 将上下文快照转换为 USOM 快照格式
  * @param snapshot - 上下文快照
+ * @param currentTimebox - 派生填充的 currentTimebox（[023.12] T13 AM4：来自 deriveCurrentTimebox）
  * @returns USOM 快照对象
  */
-function toUSOMSnapshot(snapshot: ContextSnapshot): USOMSnapshot {
+function toUSOMSnapshot(
+  snapshot: ContextSnapshot,
+  currentTimebox?: TimeboxSummary,
+): USOMSnapshot {
   return {
     userId: snapshot.userId,
     activeObjectives: snapshot.activeObjectives,
     activeKeyResults: snapshot.activeKeyResults,
     activeTasks: snapshot.activeTasks,
     pendingHabits: snapshot.pendingHabits,
-    currentTimebox: snapshot.currentTimebox,
+    currentTimebox: currentTimebox ?? snapshot.currentTimebox,
     upcomingTimeboxes: snapshot.upcomingTimeboxes,
     pendingIntentions: snapshot.pendingIntentions,
     currentTime: snapshot.currentTime,
@@ -737,7 +813,9 @@ export function createOrchestrator(deps: OrchestratorDeps) {
       confirmed?: boolean,
     ): Promise<OrchestratorResult> {
       const snapshot = createStubSnapshot(userId)
-      const usomSnapshot = toUSOMSnapshot(snapshot)
+      // [023.12] T13 (AM4): 派生填充 currentTimebox（先扫 planned timeboxes→derive running → first）
+      const currentTimebox = await deriveCurrentTimebox(snapshot, deps.timeboxRepo)
+      const usomSnapshot = toUSOMSnapshot(snapshot, currentTimebox)
       // [025] 级联拆分计划：在 NeedConfirm 块中赋值，在 SM 执行后消费
       let cascadeSplitPlan: CascadePreview | undefined
       const domainId = intent.targetDomain

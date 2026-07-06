@@ -6,11 +6,12 @@
  * 保留原子写 + cascade check。返回 TimeboxActionResult 判别联合，
  * needs_confirm 由客户端弹窗（参 CascadeConfirmDialog）二次确认后重提 confirmed=true。
  *
- * [026] 约定（appointment）server actions 5 个加在末尾：
+ * [023.12] T5: 约定（appointment）server actions：
  * - createAppointment / updateAppointment / deleteAppointment
- * - markInProgressAppointment / markExpiredAppointment
+ * - completeAppointment / revertAppointment（取代原 markInProgress / markExpired）
  * 写入口经 submitDynamicIntent（intention 流水线）或
  * createAppointmentMutationService()（字段直写）。返回 AppointmentActionResult 判别联合。
+ * in_progress / expired 状态不再持久化——读时由 status/derive-display-status.ts 派生。
  */
 
 'use server'
@@ -140,6 +141,44 @@ export async function transitionTimebox(
       }
     }
     throw new Error(result.error ?? `${action} 失败`)
+  }
+  return { status: 'ok', timebox: result.object as Timebox }
+}
+
+/**
+ * 回退：{logged, cancelled} → planned（[023.12] T4）
+ *
+ * 走 Nexus：submitDynamicIntent('timebox', 'revertTimebox', { id }) →
+ * Orchestrator → resolveObjectType('timebox', 'revertTimebox') → 'timebox' →
+ * SM revert transition → 状态='planned'。
+ * buildActionMap 把 `revertTimebox` 拆成 SM action `revert`（与 manifest
+ * lifecycle.transitions.action 一致）。
+ *
+ * [AM7] executionRecord 守卫：logged 状态下 executionRecord 必有值（archive
+ * 路径写入），直接 revert 会让已记录的执行结果「悬空」。守卫语义：若
+ * executionRecord != null，抛错「请先清理执行记录再回退」——强制调用方先
+ * 显式清记录。cancelled 状态 executionRecord 恒为 null，可直接 revert。
+ *
+ * 设计决策（[023.12] plan-eng-review 用户表决 B）：
+ * - 不做自动 executionRecord 清空（避免「回退悄悄丢数据」的隐式行为）
+ * - UI 层（T8）接 toast 弹窗提示用户先到 EditTimeboxes 清记录再 revert
+ *
+ * @param timeboxId - 目标时间盒 ID
+ */
+export async function revertTimebox(
+  timeboxId: string,
+): Promise<TimeboxActionResult> {
+  // [AM7] ownership + executionRecord 守卫
+  const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+  if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
+  if (tb.executionRecord != null) {
+    throw new Error('请先清理执行记录再回退')
+  }
+  // 走 SM revert transition；cancelled→planned / logged(已守卫清空)→planned
+  const result = await submitDynamicIntent('timebox', 'revertTimebox', { objectId: timeboxId })
+  if (!result.success) {
+    // SM 兜底：极端 case（数据库与 SM 不一致）下抛错
+    throw new Error(result.error ?? '回退时间盒失败')
   }
   return { status: 'ok', timebox: result.object as Timebox }
 }
@@ -375,50 +414,70 @@ export async function deleteAppointment(
 }
 
 /**
- * 约定状态推进：scheduled → in_progress（[026] A1.7）
+ * 约定状态推进：scheduled → completed（[023.12] T5）
  *
- * 走 Nexus：submitDynamicIntent('timebox', 'markInProgressAppointment')。
+ * 走 Nexus：submitDynamicIntent('timebox', 'completeAppointment') →
  * resolveObjectType 因 action 名含 "Appointment"，分派到 'appointment' →
- * SM markInProgress transition → emit AppointmentMarkedInProgress。
+ * SM complete transition → emit AppointmentCompleted。
  *
- * 通常由 reconcileAndAdvanceAppointments（T8）调用——它把 reconcileAppointmentStatuses
- * 纯函数计算的 needsMarkInProgress 行动转化为实际 SM 落库。
- * `confirmed = true` 跳过 NeedsConfirm 弹窗（reconcile 是后台行动，用户已默许）。
+ * SM 守门：仅 from=scheduled 合法；cancelled/completed 直接 SM 拒绝。
  *
- * 客户端直接调用罕见（如「立刻开始」按钮）；同样 SM 自动拒绝非 from=scheduled。
+ * [OQ-1] 任务/习惯关联守卫：当前无 junction 表达 appointment ↔ task/habit 关系，
+ * 按钮无条件放行。T10 UI 实现 // TODO [027]: appointment task/habit guard。
  */
-export async function markInProgressAppointment(
+export async function completeAppointment(
   appointmentId: USOM_ID,
-  at: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<AppointmentActionResult> {
   const result = await submitDynamicIntent(
     'timebox',
-    'markInProgressAppointment',
-    { objectId: appointmentId, at },
-    true, // confirmed: reconcile 路径无用户交互
+    'completeAppointment',
+    { objectId: appointmentId },
   )
-  return { ok: result.success, error: result.success ? undefined : result.error }
+  if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: 'completeAppointment',
+        confirmFields: { objectId: appointmentId },
+      }
+    }
+    throw new Error(result.error ?? '完成约定失败')
+  }
+  return { status: 'ok', appointment: result.object as Appointment }
 }
 
 /**
- * 约定状态推进：{scheduled, in_progress} → expired（[026] A1.7）
+ * 约定状态回退：{cancelled, completed} → scheduled（[023.12] T5）
  *
- * 走 Nexus：submitDynamicIntent('timebox', 'markExpiredAppointment')。
+ * 走 Nexus：submitDynamicIntent('timebox', 'revertAppointment') →
  * resolveObjectType 因 action 名含 "Appointment"，分派到 'appointment' →
- * SM markExpired transition → emit AppointmentMarkedExpired。
+ * SM revert transition → emit AppointmentReverted。
  *
- * 通常由 reconcileAndAdvanceAppointments（T8）调用。
- * SM 自动拒绝：from ∈ terminal_states（含 cancelled/completed）或已 expired。
+ * SM 守门：仅 from ∈ {cancelled, completed} 合法；scheduled 直接 SM 拒绝（同态）。
+ *
+ * 与 timebox.revertTimebox 对称的设计：调用方需确认「cancelled / completed 数据
+ * 痕迹要清空」语义（仓库 revert 方法清掉 cancelledAt / completedAt）。UI 弹窗提示
+ * 用户「回退将清除完成/取消时间戳，是否继续」——T10 实现。
  */
-export async function markExpiredAppointment(
+export async function revertAppointment(
   appointmentId: USOM_ID,
-  at: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<AppointmentActionResult> {
   const result = await submitDynamicIntent(
     'timebox',
-    'markExpiredAppointment',
-    { objectId: appointmentId, at },
-    true, // confirmed: reconcile 路径无用户交互
+    'revertAppointment',
+    { objectId: appointmentId },
   )
-  return { ok: result.success, error: result.success ? undefined : result.error }
+  if (!result.success) {
+    if (result.needsConfirmation) {
+      return {
+        status: 'needs_confirm',
+        message: result.confirmationMessage ?? '需确认',
+        confirmAction: 'revertAppointment',
+        confirmFields: { objectId: appointmentId },
+      }
+    }
+    throw new Error(result.error ?? '回退约定失败')
+  }
+  return { status: 'ok', appointment: result.object as Appointment }
 }

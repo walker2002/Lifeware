@@ -1,15 +1,15 @@
 /**
  * @file okr-cycle.test
- * @brief [022.01] Phase 1: createCycle / approveCycle 集成测试
+ * @brief [022.01] Phase 1 + [023.12] T6: createCycle / approveCycle / reviewCycle / finishCycle / revertCycle 集成测试
  *
  * 目的（eng-review D3 + Task 7 Finding #2）：
  * 1. 验证 createCycle 经 orchestrator.executeIntent 调用，不再走 repo.save 直写
  * 2. 验证 status 入参已被 server-side SM create→draft 强制，
  *    即调用方传入的 fields 不含 status（构造侧验证）
- * 3. 验证 approveCycle 按 server 时刻 now 与 period.start 比较分派：
- *    - now >= periodStart → executeIntent('startCycle')
- *    - now <  periodStart → executeIntent('planCycle')
- *    - 非 draft cycle → 不调用 orchestrator，直接返回错误
+ * 3. [023.12] T6：approveCycle 移除「now vs periodStart」分派——单一 action='approveCycle'
+ *    替代旧的 startCycle / planCycle 二选一。批准即活跃，无「未开始」中间态。
+ * 4. [T6]：finishCycle 替代 endCycle（in_progress→approved 入参、startCycle→finishCycle action）
+ * 5. [T6]：revertCycle 新增（reviewed→finished 一致性回退，[AM10]）
  *
  * 模式（参照现有 frontend/src/app/actions/__tests__/*.test.ts）：
  * - vi.mock 拦截 @/domains/okrs/wiring，注入假 createOKROrchestrator + makeIntent
@@ -165,12 +165,15 @@ describe('[022.01] createCycle 走 executeIntent', () => {
 })
 
 /**
- * [022.01] Phase 1 Task 7 Finding #2：
- * approveCycle 的 server 端分派逻辑（now vs period.start）从未被单测覆盖。
- * 现有 cycle-menu.test.tsx vi.mock 替掉了整个 approveCycle，UI 只断言调用，
- * 分派选择本身留空。本 describe 直击 server action 行为。
+ * [022.01] Phase 1 Task 7 Finding #2 + [023.12] T6：approveCycle 单一 action 收敛
+ *
+ * [T6] 旧实现按 server 时刻 now 与 period.start 比较：
+ *   - now >= periodStart → executeIntent('startCycle')（draft → in_progress）
+ *   - now <  periodStart → executeIntent('planCycle')  （draft → not_started）
+ * [T6] 新设计：4 态收敛——not_started 状态删除，approve 单一动作 draft → approved。
+ * 此处 verify approveCycle 直接调 executeIntent('approveCycle')，无 now 分派。
  */
-describe('[022.01] approveCycle 分派逻辑', () => {
+describe('[022.01] + [023.12] T6 approveCycle 分派逻辑', () => {
   const draftCycle = {
     id: 'c1e00000-0000-0000-0000-000000000001',
     cycleType: 'quarterly' as const,
@@ -185,14 +188,13 @@ describe('[022.01] approveCycle 分派逻辑', () => {
     vi.clearAllMocks()
   })
 
-  it('now >= periodStart 时调 executeIntent("startCycle")', async () => {
-    // server 取 now = 2026-07-15，period.start = 2026-07-01 → 立即启动分支
-    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-07-15T12:00:00.000Z')
-    // approveCycle 调两次 findById：前置读 + 成功后回读；统一返回 draft cycle
+  it('draft cycle → executeIntent("approveCycle")（[T6] 单一 action，无 now 分派）', async () => {
+    // [T6] 不再做 now vs periodStart 比较——所有 draft cycle 都走 approveCycle
     mockFindById.mockResolvedValue(draftCycle)
     mockExecuteIntent.mockResolvedValueOnce({
       success: true,
-      object: { ...draftCycle, status: 'in_progress' },
+      // [T6] approveCycle 的成功 to 状态：approved（[AM6] 同步，原 in_progress）
+      object: { ...draftCycle, status: 'approved', approvedAt: '2026-07-15T00:00:00.000Z' as any },
       objectType: 'cycle',
     })
 
@@ -202,42 +204,21 @@ describe('[022.01] approveCycle 分派逻辑', () => {
     expect(mockFindById).toHaveBeenCalledTimes(2) // 前置读 + 回读
     expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
     const [intent] = mockExecuteIntent.mock.calls[0]
-    expect(intent.action).toBe('startCycle')
+    // [T6] 单一 action：'approveCycle'（旧 startCycle/planCycle 二选一已删）
+    expect(intent.action).toBe('approveCycle')
     expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
-
-    vi.restoreAllMocks()
-  })
-
-  it('now < periodStart 时调 executeIntent("planCycle")', async () => {
-    // server 取 now = 2026-06-15，period.start = 2026-07-01 → 未开始分支
-    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-06-15T12:00:00.000Z')
-    mockFindById.mockResolvedValue(draftCycle)
-    mockExecuteIntent.mockResolvedValueOnce({
-      success: true,
-      object: { ...draftCycle, status: 'not_started' },
-      objectType: 'cycle',
-    })
-
-    const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
-
-    expect(r.success).toBe(true)
-    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
-    const [intent] = mockExecuteIntent.mock.calls[0]
-    expect(intent.action).toBe('planCycle')
-    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
-
-    vi.restoreAllMocks()
   })
 
   it('非 draft cycle 直接返回错误，不调用 orchestrator', async () => {
-    const inProgressCycle = { ...draftCycle, status: 'in_progress' as const }
-    mockFindById.mockResolvedValueOnce(inProgressCycle)
+    // [T6] in_progress→approved
+    const approvedCycle = { ...draftCycle, status: 'approved' as const }
+    mockFindById.mockResolvedValueOnce(approvedCycle)
 
     const r = await approveCycle('c1e00000-0000-0000-0000-000000000001')
 
-    // 不走 orchestrator：避免误改已 in_progress/ended 周期
+    // 不走 orchestrator：避免误改已 approved/finished/reviewed 周期
     expect(r.success).toBe(false)
-    expect(r.error).toBe('当前周期状态为「in_progress」，仅 draft 状态可审核通过')
+    expect(r.error).toBe('当前周期状态为「approved」，仅 draft 状态可审核通过')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
     expect(mockFindById).toHaveBeenCalledTimes(1) // 仅前置读，无回读
   })
@@ -346,17 +327,19 @@ describe('[022.01] createCycle catch-all', () => {
   })
 })
 
-// ─── reviewCycle 分派逻辑（[022.01] Phase 2）─────────────────────────
+// ─── reviewCycle 分派逻辑（[022.01] Phase 2 + [023.12] T6）─────────────────────────
 
-describe('[022.01] reviewCycle 分派逻辑', () => {
-  const endedCycle = {
+describe('[022.01] + [023.12] T6 reviewCycle 分派逻辑', () => {
+  // [023.12] T6：[AM6] ended→finished
+  const finishedCycle = {
     id: 'c1e00000-0000-0000-0000-000000000001',
     cycleType: 'quarterly' as const,
     name: '2026-Q3',
     period: { start: '2026-07-01', end: '2026-09-30' },
-    status: 'ended' as const,
-    startedAt: '2026-07-01T00:00:00.000Z' as any,
-    endedAt: '2026-09-30T00:00:00.000Z' as any,
+    status: 'finished' as const,
+    // [T6] AM6：startedAt→approvedAt, endedAt→finishedAt
+    approvedAt: '2026-07-01T00:00:00.000Z' as any,
+    finishedAt: '2026-09-30T00:00:00.000Z' as any,
     createdAt: '2026-06-01T00:00:00.000Z' as any,
     updatedAt: '2026-10-01T00:00:00.000Z' as any,
   }
@@ -365,11 +348,11 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
     vi.clearAllMocks()
   })
 
-  it('ended cycle → executeIntent("reviewCycle")', async () => {
-    mockFindById.mockResolvedValue(endedCycle)
+  it('finished cycle → executeIntent("reviewCycle")（[T6] 原 ended）', async () => {
+    mockFindById.mockResolvedValue(finishedCycle)
     mockExecuteIntent.mockResolvedValueOnce({
       success: true,
-      object: { ...endedCycle, status: 'reviewed' },
+      object: { ...finishedCycle, status: 'reviewed' },
       objectType: 'cycle',
     })
 
@@ -384,32 +367,33 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
     expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
   })
 
-  it('非 ended cycle → error（不调 orchestrator）', async () => {
-    const draftCycle = { ...endedCycle, status: 'draft' as const }
+  it('非 finished cycle → error（不调 orchestrator）', async () => {
+    const draftCycle = { ...finishedCycle, status: 'draft' as const }
     mockFindById.mockResolvedValueOnce(draftCycle)
 
     const { reviewCycle } = await import('../okr')
     const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
 
+    // [T6] 错误消息：'finished' 而非 'ended'
     expect(r.success).toBe(false)
-    expect(r.error).toBe('当前周期状态为「draft」，仅 ended 状态可复盘')
+    expect(r.error).toBe('当前周期状态为「draft」，仅 finished 状态可复盘')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 
-  it('reviewed cycle → error（终态，不可复盘）', async () => {
-    const reviewedCycle = { ...endedCycle, status: 'reviewed' as const }
+  it('reviewed cycle → error（reviewed 后可经 revertCycle 回去，不走 reviewCycle）', async () => {
+    const reviewedCycle = { ...finishedCycle, status: 'reviewed' as const }
     mockFindById.mockResolvedValueOnce(reviewedCycle)
 
     const { reviewCycle } = await import('../okr')
     const r = await reviewCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(false)
-    expect(r.error).toBe('当前周期状态为「reviewed」，仅 ended 状态可复盘')
+    expect(r.error).toBe('当前周期状态为「reviewed」，仅 finished 状态可复盘')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 
   it('executeIntent 失败 → 透传 error', async () => {
-    mockFindById.mockResolvedValue(endedCycle)
+    mockFindById.mockResolvedValue(finishedCycle)
     mockExecuteIntent.mockResolvedValueOnce({
       success: false,
       error: 'SM error',
@@ -423,10 +407,10 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
   })
 
   it('回读失败 → error', async () => {
-    mockFindById.mockResolvedValueOnce(endedCycle) // 前置读
+    mockFindById.mockResolvedValueOnce(finishedCycle) // 前置读
     mockExecuteIntent.mockResolvedValueOnce({
       success: true,
-      object: { ...endedCycle, status: 'reviewed' },
+      object: { ...finishedCycle, status: 'reviewed' },
       objectType: 'cycle',
     })
     mockFindById.mockResolvedValueOnce(null) // 回读 null
@@ -458,16 +442,18 @@ describe('[022.01] reviewCycle 分派逻辑', () => {
   })
 })
 
-// ─── endCycle 分派逻辑（[022.01] Phase 2 Task 3.5：in_progress → ended）──
+// ─── finishCycle 分派逻辑（[023.12] T6 替代 endCycle：approved → finished）──
 
-describe('[022.01] endCycle 分派逻辑', () => {
-  const inProgressCycle = {
+describe('[023.12] T6 finishCycle 分派逻辑（原 endCycle）', () => {
+  // [T6] AM6：in_progress→approved
+  const approvedCycle = {
     id: 'c1e00000-0000-0000-0000-000000000001',
     cycleType: 'quarterly' as const,
     name: '2026-Q3',
     period: { start: '2026-07-01', end: '2026-09-30' },
-    status: 'in_progress' as const,
-    startedAt: '2026-07-01T00:00:00.000Z' as any,
+    status: 'approved' as const,
+    // [T6] AM6：startedAt→approvedAt
+    approvedAt: '2026-07-01T00:00:00.000Z' as any,
     createdAt: '2026-06-01T00:00:00.000Z' as any,
     updatedAt: '2026-07-01T00:00:00.000Z' as any,
   }
@@ -476,40 +462,43 @@ describe('[022.01] endCycle 分派逻辑', () => {
     vi.clearAllMocks()
   })
 
-  it('in_progress cycle → executeIntent("endCycle")', async () => {
-    mockFindById.mockResolvedValue(inProgressCycle)
+  it('approved cycle → executeIntent("finishCycle")（[T6] 替代 endCycle）', async () => {
+    mockFindById.mockResolvedValue(approvedCycle)
     mockExecuteIntent.mockResolvedValueOnce({
       success: true,
-      object: { ...inProgressCycle, status: 'ended', endedAt: '2026-09-30T00:00:00.000Z' as any },
+      // [T6] AM6：ended→finished, endedAt→finishedAt
+      object: { ...approvedCycle, status: 'finished', finishedAt: '2026-09-30T00:00:00.000Z' as any },
       objectType: 'cycle',
     })
 
-    const { endCycle } = await import('../okr')
-    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+    const { finishCycle } = await import('../okr')
+    const r = await finishCycle('c1e00000-0000-0000-0000-000000000001')
 
     expect(r.success).toBe(true)
     expect(mockFindById).toHaveBeenCalledTimes(2)
     expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
     const [intent] = mockExecuteIntent.mock.calls[0]
-    expect(intent.action).toBe('endCycle')
+    // [T6] 函数与 action 都重命名：endCycle→finishCycle
+    expect(intent.action).toBe('finishCycle')
     expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
   })
 
-  it('非 in_progress cycle → error', async () => {
-    const draftCycle = { ...inProgressCycle, status: 'draft' as const }
+  it('非 approved cycle → error', async () => {
+    const draftCycle = { ...approvedCycle, status: 'draft' as const }
     mockFindById.mockResolvedValueOnce(draftCycle)
 
-    const { endCycle } = await import('../okr')
-    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+    const { finishCycle } = await import('../okr')
+    const r = await finishCycle('c1e00000-0000-0000-0000-000000000001')
 
+    // [T6] 错误消息：'approved' 而非 'in_progress'
     expect(r.success).toBe(false)
-    expect(r.error).toBe('当前周期状态为「draft」，仅 in_progress 状态可结束')
+    expect(r.error).toBe('当前周期状态为「draft」，仅 approved 状态可结束')
     expect(mockExecuteIntent).not.toHaveBeenCalled()
   })
 
   it('illegal UUID → error', async () => {
-    const { endCycle } = await import('../okr')
-    const r = await endCycle('not-a-uuid')
+    const { finishCycle } = await import('../okr')
+    const r = await finishCycle('not-a-uuid')
     expect(r.success).toBe(false)
     expect(r.error).toBe('无效的周期 ID')
     expect(mockFindById).not.toHaveBeenCalled()
@@ -517,8 +506,79 @@ describe('[022.01] endCycle 分派逻辑', () => {
 
   it('catch-all 异常 → error', async () => {
     mockFindById.mockRejectedValueOnce(new Error('网络错误'))
-    const { endCycle } = await import('../okr')
-    const r = await endCycle('c1e00000-0000-0000-0000-000000000001')
+    const { finishCycle } = await import('../okr')
+    const r = await finishCycle('c1e00000-0000-0000-0000-000000000001')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('网络错误')
+  })
+})
+
+// ─── revertCycle 分派逻辑（[023.12] T6 新增：[AM10]） ──────────────
+
+describe('[023.12] T6 revertCycle 分派逻辑（新增，[AM10] reviewed→finished 一致性回退）', () => {
+  const reviewedCycle = {
+    id: 'c1e00000-0000-0000-0000-000000000001',
+    cycleType: 'quarterly' as const,
+    name: '2026-Q3',
+    period: { start: '2026-07-01', end: '2026-09-30' },
+    status: 'reviewed' as const,
+    approvedAt: '2026-07-01T00:00:00.000Z' as any,
+    finishedAt: '2026-09-30T00:00:00.000Z' as any,
+    reviewedAt: '2026-10-05T00:00:00.000Z' as any,
+    createdAt: '2026-06-01T00:00:00.000Z' as any,
+    updatedAt: '2026-10-05T00:00:00.000Z' as any,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reviewed cycle → executeIntent("revertCycle")（[T6] 一致性回退到 finished）', async () => {
+    mockFindById.mockResolvedValue(reviewedCycle)
+    mockExecuteIntent.mockResolvedValueOnce({
+      success: true,
+      // [T6] AM10：revert 是 reviewed→finished（不是 to-initial draft），
+      // 保留 reviewedAt 复盘证据
+      object: { ...reviewedCycle, status: 'finished' },
+      objectType: 'cycle',
+    })
+
+    const { revertCycle } = await import('../okr')
+    const r = await revertCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(true)
+    expect(mockFindById).toHaveBeenCalledTimes(2)
+    expect(mockExecuteIntent).toHaveBeenCalledTimes(1)
+    const [intent] = mockExecuteIntent.mock.calls[0]
+    expect(intent.action).toBe('revertCycle')
+    expect(intent.fields).toEqual({ cycleId: 'c1e00000-0000-0000-0000-000000000001' })
+  })
+
+  it('非 reviewed cycle → error', async () => {
+    // [T6] finished cycle 不能直接 revert——必须先 review 走完再 revert
+    const finishedCycle = { ...reviewedCycle, status: 'finished' as const }
+    mockFindById.mockResolvedValueOnce(finishedCycle)
+
+    const { revertCycle } = await import('../okr')
+    const r = await revertCycle('c1e00000-0000-0000-0000-000000000001')
+
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('当前周期状态为「finished」，仅 reviewed 状态可撤销复盘')
+    expect(mockExecuteIntent).not.toHaveBeenCalled()
+  })
+
+  it('非法 UUID → error', async () => {
+    const { revertCycle } = await import('../okr')
+    const r = await revertCycle('not-a-uuid')
+    expect(r.success).toBe(false)
+    expect(r.error).toBe('无效的周期 ID')
+    expect(mockFindById).not.toHaveBeenCalled()
+  })
+
+  it('catch-all 异常 → error', async () => {
+    mockFindById.mockRejectedValueOnce(new Error('网络错误'))
+    const { revertCycle } = await import('../okr')
+    const r = await revertCycle('c1e00000-0000-0000-0000-000000000001')
     expect(r.success).toBe(false)
     expect(r.error).toBe('网络错误')
   })

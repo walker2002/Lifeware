@@ -346,11 +346,15 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
   })
 
   it('有 running 时间盒应返回 tile 候选', async () => {
+    // [023.12] T13 (AM4): 派生填充链就位后，currentTimebox 由 orchestrator 派生填入
+    // （用 deriveTimeboxDisplayStatus 判定 running/overtime）。此测在 hooks 视角下
+    // currentTimebox 已是「已被 orchestrator 标记为 running」的 summary——status
+    // 字段为 'planned'（持久化态），derive 出来是 'running'。
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T09:30:00Z',
       currentTimebox: makeTimeboxSummary({
         id: 'timebox-running' as USOM_ID,
-        status: 'running',
+        status: 'planned',
         startTime: '2026-05-03T09:00:00Z',
         endTime: '2026-05-03T10:00:00Z',
         title: '专注写作',
@@ -368,14 +372,15 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
   })
 
   it('有 ended 时间盒应返回 cue 候选（提示记录）', async () => {
-    // 用 upcomingTimeboxes 中 status=ended 的条目模拟
-    // 但 USOMSnapshot 没有直接的 endedTimeboxes 字段
-    // 根据 snapshot 结构，ended timebox 会出现在 currentTimebox 为 ended 状态
+    // [023.12] T13 (AM4): 在新 model 下 ended 不存在显式 status；语义映射到
+    //   「超时且尚未 log」（derive 出 overtime）——currentTimebox 派生态为
+    //   overtime，hooks 输出 overtime tile (95) + ended cue (70) 双 tile。
+    //   此测断言「ended」cue 候选（weight 70、cue 类、label 含「记录」）。
     const snapshot = makeSnapshot({
       currentTime: '2026-05-03T10:05:00Z',
       currentTimebox: makeTimeboxSummary({
         id: 'timebox-ended' as USOM_ID,
-        status: 'ended',
+        status: 'planned',
         startTime: '2026-05-03T09:00:00Z',
         endTime: '2026-05-03T10:00:00Z',
         title: '专注写作',
@@ -387,8 +392,9 @@ describe('Timebox Domain Plugin — onActionSurfaceRequest', () => {
 
     expect(result.actions.length).toBeGreaterThanOrEqual(1)
     expect(result.actions.some(a => a.label.includes('记录'))).toBe(true)
-    expect(result.category).toBe('cue')
-    expect(result.weight).toBe(70)
+    // overtime + ended 同 currentTimebox 双 tile 推送，weight 取 95（overtime）
+    expect(result.category).toBe('tile')
+    expect(result.weight).toBe(95)
   })
 
   it('没有任何相关时间盒时应返回空 actions', async () => {

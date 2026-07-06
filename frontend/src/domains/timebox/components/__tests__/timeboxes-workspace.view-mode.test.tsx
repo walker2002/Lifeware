@@ -49,7 +49,7 @@ vi.mock('@/app/actions/timebox', () => ({
 }))
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/timeboxes' }))
 
 import { TimeboxesWorkspace } from '../timeboxes-workspace'
 

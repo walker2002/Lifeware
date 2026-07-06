@@ -5,7 +5,10 @@
  * 统一 Cycle/Obj/KR 的编辑与删除权限检查，以 Cycle.status 为唯一权威源。
  * 权限矩阵见设计 spec §C。
  *
- * Phase 3 全面守卫：所有 Cycle/Obj/KR 写路径均经 assertEditable 检查。
+ * [023.12] T6：4 态收敛（draft/approved/finished/reviewed）。
+ * - draft 仍为唯一可改/删 cycle 的状态（不仅是 obj/kr）
+ * - approved/finished 仍可改 obj/kr（产品：周期内持续调整 OKR 仍允许）
+ * - reviewed 完全锁定
  */
 
 import type { Cycle } from '@/usom/types/objects'
@@ -26,9 +29,8 @@ const ALLOWED: Record<Cycle['status'], ReadonlySet<EditableOperation>> = {
     'edit_objective', 'delete_objective',
     'edit_kr', 'delete_kr',
   ]),
-  not_started: new Set(['edit_objective', 'edit_kr']),
-  in_progress: new Set(['edit_objective', 'edit_kr']),
-  ended: new Set(['edit_objective', 'edit_kr']),
+  approved: new Set(['edit_objective', 'edit_kr']),
+  finished: new Set(['edit_objective', 'edit_kr']),
   reviewed: new Set(),
 }
 

@@ -7,17 +7,16 @@
  * ActionView → 本组件。
  *
  * 与 /app/appointments/page.tsx（Next.js 页面路由）渲染同一 AppointmentWorkspace：
- * - 独立 route 走 server component（首屏直出，reconcileAndAdvanceAppointments + getAppointmentsByRange）
+ * - 独立 route 走 server component（首屏直出，getAppointmentsByRange 直出数据）
  * - 本组件走 client 懒加载 fetch（同 TimeboxTemplatesPage 范式），用于主框架内嵌
  *
  * 设计约束：SSOT 来自 manifest.yaml intent_triggers.viewAppointments（response_type: page）。
  * ActionView 的 VIEW_PAGE_COMPONENTS 路由表必须把 timebox.viewAppointments → 本组件，
  * 否则 GrowthMenu 点击会落到 "页面未找到" 占位文本（已修）。
  *
- * [026] D2 reversal：client 端调 getAppointmentsByRange 同样纯读（D5 修复），
- * reconcile 不在 read 路径触发（由 /appointments 独立 route server 加载时调）。
- * 因此经 GrowthMenu 进入时 status 可能是「过日未推进」的旧值（与独立 route 行为差异），
- * 这是 SSOT 路径选择：GrowthMenu = 快速进入（无 reconcile），独立 route = 完整路径（含 reconcile）。
+ * [023.12] T5: 3 态收敛后无 reconcile 写库路径——约定显示状态 badge
+ * （in_progress / expired）由客户端读 appointments + now 派生
+ * （status/derive-display-status.ts + status/reconcile-appointment.ts）。
  */
 
 "use client"

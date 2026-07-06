@@ -5,11 +5,14 @@
  * 展示单个 Objective 的摘要信息和进度。
  * [022.01] Phase 3：删除 STATUS_LABELS / statusColor / status Badge——
  * Objective 状态语义由 Cycle 承载。
+ * [023.12] T9：若传入 cycleStatus === 'reviewed'，点击交互被锁定——
+ *   与 guard.ts ALLOWED['reviewed'] = {} 对齐（UI 层乐观检查，
+ *   server 写路径由 assertEditable 兜底）。
  */
 
 "use client"
 
-import type { Objective, KeyResult } from "@/usom/types/objects"
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
@@ -23,6 +26,8 @@ interface ObjectiveCardProps {
   keyResults?: KeyResult[]
   /** 点击回调 */
   onClick?: (id: string) => void
+  /** [023.12] T9：父周期状态；reviewed 时点击交互被锁定 */
+  cycleStatus?: Cycle["status"]
 }
 
 const PRIORITY_VARIANT: Record<string, "destructive" | "default" | "outline"> = {
@@ -31,17 +36,27 @@ const PRIORITY_VARIANT: Record<string, "destructive" | "default" | "outline"> = 
   P2: "outline",
 }
 
-export function ObjectiveCard({ objective, keyResults, onClick }: ObjectiveCardProps) {
+export function ObjectiveCard({ objective, keyResults, onClick, cycleStatus }: ObjectiveCardProps) {
   // [022.01] Phase 3：KR 列表不再按 kr.status 过滤（findAll 已返回非软删行）。
   const activeKRs = keyResults ?? []
   const avgProgress = activeKRs.length > 0
     ? Math.round(activeKRs.reduce((sum, kr) => sum + kr.progressRate * 100, 0) / activeKRs.length)
     : 0
 
+  // [023.12] T9：reviewed 状态点击交互被锁定（与 guard.ts ALLOWED[reviewed] = {} 对齐）。
+  // UI 层乐观检查；server 写路径由 assertEditable 兜底。
+  const isLocked = cycleStatus === "reviewed"
+
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-primary"
-      onClick={() => onClick?.(objective.id)}
+      className={
+        isLocked
+          ? "border-l-4 border-l-primary opacity-60 cursor-not-allowed"
+          : "cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-primary"
+      }
+      onClick={isLocked ? undefined : () => onClick?.(objective.id)}
+      title={isLocked ? "该周期已复盘，目标已锁定" : undefined}
+      aria-disabled={isLocked || undefined}
     >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
@@ -53,6 +68,10 @@ export function ObjectiveCard({ objective, keyResults, onClick }: ObjectiveCardP
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-2">
             <Badge variant={PRIORITY_VARIANT[objective.priority] ?? "default"} className="text-xs">{objective.priority}</Badge>
+            {/* [023.12] T9：reviewed 状态标记 badge */}
+            {isLocked && (
+              <Badge variant="outline" className="text-xs">已复盘</Badge>
+            )}
           </div>
         </div>
       </CardHeader>

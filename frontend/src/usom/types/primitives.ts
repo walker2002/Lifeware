@@ -221,23 +221,27 @@ export type HabitStatus = 'draft' | 'active' | 'suspended' | 'archived' | 'delet
 /**
  * 时间盒状态
  * - planned: 已计划
- * - running: 进行中
- * - overtime: 超时中
- * - ended: 已结束
- * - cancelled: 已取消
  * - logged: 已记录
+ * - cancelled: 已取消
  */
-export type TimeboxStatus = 'planned' | 'running' | 'overtime' | 'ended' | 'cancelled' | 'logged'
+export type TimeboxStatus = 'planned' | 'logged' | 'cancelled'
 
 /**
- * 约定状态（[026]，Cycle 模式：全部存储，经 SM transition 推进）
+ * 约定状态（[026]，[023.12] 收敛：3 态存储；5 态由 derive-display-status 读时计算）
  * - scheduled：initial state（SM null→scheduled）
- * - in_progress：执行中，到日触发（SM scheduled→in_progress，lazy reconcile）
- * - expired：已过期，过日触发（SM scheduled/in_progress→expired，lazy reconcile；终态）
- * - cancelled：用户取消（SM {scheduled,in_progress}→cancelled；终态；spec "已过期/已完成不能删除"）
+ * - cancelled：用户取消（SM →cancelled；终态；spec "已过期/已完成不能删除"）
  * - completed：已完成（[027] SM →completed，timebox 打卡后；终态）
  */
-export type AppointmentStatus = 'scheduled' | 'in_progress' | 'expired' | 'cancelled' | 'completed'
+export type AppointmentStatus = 'scheduled' | 'cancelled' | 'completed'
+
+/**
+ * OKR 周期生命周期状态（[023.12]）
+ * - draft: 草稿（可编辑）
+ * - approved: 已批准（进行中）
+ * - finished: 已结束（待复盘）
+ * - reviewed: 已复盘（终态）
+ */
+export type CycleStatus = 'draft' | 'approved' | 'finished' | 'reviewed'
 /**
  * 完成状态
  * - completed: 已完成

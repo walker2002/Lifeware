@@ -35,7 +35,7 @@ const TIMEBOX_SYSTEM_PROMPT = (now: Date) => `
   "fields": {
     "target": {
       "type": "title" | "current" | "index",
-      "value": "string（标题关键词 / 'running' / 数字序号）"
+      "value": "string（标题关键词 / 数字序号）"
     }
   },
   "confidence": 0-1

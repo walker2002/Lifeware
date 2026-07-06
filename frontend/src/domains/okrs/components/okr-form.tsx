@@ -7,12 +7,14 @@
  * [022] 3A-T2：ModeSwitcher（手动 | AI 导入）+ TemplateSelector（3 个硬编码模板）。
  * [024] G1：周期选择器 + 内联新建表单迁出至 CycleCreateDrawer/T13 工作台 wiring；
  *       OKRForm 仅保留 presetCycleId 透传 + KR 信心度输入。
+ * [023.12] T9：cycleStatus === 'reviewed' 时整表只读 + banner 提示，
+ *   与 guard.ts ALLOWED['reviewed'] = {} 对齐（UI 层乐观锁，server 写路径兜底）。
  */
 
 "use client"
 
 import { useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { Cycle } from "@/usom/types/objects"
 
 /**
  * OKR 表单字段
@@ -121,11 +124,19 @@ interface OKRFormProps {
    * OKRForm 的 ai-import mode 仅作入口引导，实际导入流程在 OKRImportDialog 中完成。
    */
   onImportTrigger?: () => void
+  /**
+   * [023.12] T9：父周期状态；reviewed 时整表只读 + banner 提示
+   * （与 guard.ts ALLOWED['reviewed'] = {} 对齐）。未传时不禁用。
+   */
+  cycleStatus?: Cycle["status"]
 }
 
 export function OKRForm({
   initial, presetCycleId, onSubmit, onCancel, isLoading, onImportTrigger,
+  cycleStatus,
 }: OKRFormProps) {
+  // [023.12] T9：reviewed 状态整表锁定
+  const isLocked = cycleStatus === "reviewed"
   const [title, setTitle] = useState(initial?.title ?? "")
   const [description, setDescription] = useState(initial?.description ?? "")
   const [okrType, setOkrType] = useState<"visionary" | "committed">(initial?.okrType ?? "committed")
@@ -192,6 +203,11 @@ export function OKRForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // [023.12] T9：reviewed 状态直接拒绝提交（UI 乐观锁；server 写路径由 assertEditable 兜底）
+    if (isLocked) {
+      setErrors(["该周期已复盘，目标已锁定，无法保存"])
+      return
+    }
     const validationErrors = validate()
     if (validationErrors.length > 0) {
       setErrors(validationErrors)
@@ -218,18 +234,26 @@ export function OKRForm({
         </div>
       )}
 
+      {/* [023.12] T9：reviewed 状态 banner（与 guard.ts ALLOWED[reviewed] = {} 对齐） */}
+      {isLocked && (
+        <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground flex items-center gap-2" role="status">
+          <Lock className="size-4 shrink-0" />
+          <span>该周期已复盘，目标/KR 已锁定，无法编辑。</span>
+        </div>
+      )}
+
       {/* [022] 3A-T2 Mode Switcher: 手动输入 | AI 导入 */}
       <div className="flex items-center gap-1 border-b border-hairline pb-3">
-        <button type="button" onClick={() => setFormMode("manual")}
-          className={`px-4 py-1.5 rounded-t-md text-sm font-medium transition-colors ${
+        <button type="button" onClick={() => setFormMode("manual")} disabled={isLocked}
+          className={`px-4 py-1.5 rounded-t-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             formMode === "manual"
               ? "bg-background text-ink border-b-2 border-primary"
               : "text-muted-foreground hover:text-body"
           }`}>
           手动输入
         </button>
-        <button type="button" onClick={() => setFormMode("ai-import")}
-          className={`px-4 py-1.5 rounded-t-md text-sm font-medium transition-colors ${
+        <button type="button" onClick={() => setFormMode("ai-import")} disabled={isLocked}
+          className={`px-4 py-1.5 rounded-t-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             formMode === "ai-import"
               ? "bg-background text-ink border-b-2 border-primary"
               : "text-muted-foreground hover:text-body"
@@ -243,7 +267,7 @@ export function OKRForm({
           {/* [022] 3A-T2 Template Selector：3 个硬编码模板快速开始 */}
           <div className="space-y-2">
             <Label>快速模板（可选）</Label>
-            <Select value={selectedTemplateId} onValueChange={applyTemplate}>
+            <Select value={selectedTemplateId} onValueChange={applyTemplate} disabled={isLocked}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="选择模板快速开始..." />
               </SelectTrigger>
@@ -259,23 +283,23 @@ export function OKRForm({
 
           <div className="space-y-2">
             <Label htmlFor="okr-title">目标标题</Label>
-            <Input id="okr-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：提升产品体验" maxLength={200} />
+            <Input id="okr-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：提升产品体验" maxLength={200} disabled={isLocked} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="okr-desc">描述（可选）</Label>
-            <Textarea id="okr-desc" value={description} onChange={e => setDescription(e.target.value)} placeholder="目标的详细说明..." rows={2} />
+            <Textarea id="okr-desc" value={description} onChange={e => setDescription(e.target.value)} placeholder="目标的详细说明..." rows={2} disabled={isLocked} />
           </div>
 
           <div className="space-y-2">
             <Label>OKR 类型</Label>
             <div className="flex gap-3">
-              <button type="button" onClick={() => setOkrType("committed")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${okrType === "committed" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              <button type="button" onClick={() => setOkrType("committed")} disabled={isLocked}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${okrType === "committed" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
                 承诺型
               </button>
-              <button type="button" onClick={() => setOkrType("visionary")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${okrType === "visionary" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              <button type="button" onClick={() => setOkrType("visionary")} disabled={isLocked}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${okrType === "visionary" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
                 愿景型
               </button>
             </div>
@@ -284,16 +308,16 @@ export function OKRForm({
           <div className="space-y-2">
             <Label>重要程度</Label>
             <div className="flex gap-3">
-              <button type="button" onClick={() => setPriority("P0")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P0" ? "bg-error text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              <button type="button" onClick={() => setPriority("P0")} disabled={isLocked}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${priority === "P0" ? "bg-error text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
                 P0 必须完成
               </button>
-              <button type="button" onClick={() => setPriority("P1")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P1" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              <button type="button" onClick={() => setPriority("P1")} disabled={isLocked}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${priority === "P1" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
                 P1 应该完成
               </button>
-              <button type="button" onClick={() => setPriority("P2")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${priority === "P2" ? "bg-muted text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              <button type="button" onClick={() => setPriority("P2")} disabled={isLocked}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${priority === "P2" ? "bg-muted text-on-primary" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
                 P2 有余力则做
               </button>
             </div>
@@ -305,16 +329,16 @@ export function OKRForm({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>关键结果 (KR)</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addKR}>+ 添加 KR</Button>
+              <Button type="button" variant="outline" size="sm" onClick={addKR} disabled={isLocked}>+ 添加 KR</Button>
             </div>
             {keyResults.map((kr, i) => (
               <div key={i} className="flex gap-2 items-start p-3 rounded-md bg-muted/50">
                 <span className="text-xs text-muted-foreground mt-2 w-6 shrink-0">KR{i + 1}</span>
                 <div className="flex-1 space-y-2">
-                  <Input value={kr.title} onChange={e => updateKR(i, "title", e.target.value)} placeholder="关键结果标题" />
+                  <Input value={kr.title} onChange={e => updateKR(i, "title", e.target.value)} placeholder="关键结果标题" disabled={isLocked} />
                   <div className="flex gap-2">
-                    <Input type="number" value={kr.targetValue} onChange={e => updateKR(i, "targetValue", Number(e.target.value))} placeholder="目标值" className="w-24" min={0} />
-                    <Input value={kr.unit} onChange={e => updateKR(i, "unit", e.target.value)} placeholder="单位" className="w-20" maxLength={20} />
+                    <Input type="number" value={kr.targetValue} onChange={e => updateKR(i, "targetValue", Number(e.target.value))} placeholder="目标值" className="w-24" min={0} disabled={isLocked} />
+                    <Input value={kr.unit} onChange={e => updateKR(i, "unit", e.target.value)} placeholder="单位" className="w-20" maxLength={20} disabled={isLocked} />
                   </div>
                   {/* [024] G2 信心度输入：留空时提交时默认 50 */}
                   <div className="flex items-center gap-2">
@@ -322,20 +346,20 @@ export function OKRForm({
                     <Input type="number" min={0} max={100}
                       value={kr.confidence ?? ''}
                       onChange={e => updateKR(i, "confidence", e.target.value === '' ? undefined as any : Number(e.target.value))}
-                      placeholder="50" className="w-16 h-7 text-xs" />
+                      placeholder="50" className="w-16 h-7 text-xs" disabled={isLocked} />
                     <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 </div>
                 {keyResults.length > 1 && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeKR(i)} className="text-destructive shrink-0">×</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeKR(i)} className="text-destructive shrink-0" disabled={isLocked}>×</Button>
                 )}
               </div>
             ))}
           </div>
 
           <div className="flex gap-3 justify-end">
-            {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>取消</Button>}
-            <Button type="submit" disabled={isLoading}>
+            {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading || isLocked}>取消</Button>}
+            <Button type="submit" disabled={isLoading || isLocked}>
               {isLoading ? <><Loader2 className="size-4 animate-spin mr-1" />保存中...</> : "保存"}
             </Button>
           </div>
@@ -352,7 +376,7 @@ export function OKRForm({
               支持格式: .md, .txt（大小限制 5MB）
             </p>
             <Button type="button" variant="outline" size="sm"
-              onClick={() => onImportTrigger?.()}>
+              onClick={() => onImportTrigger?.()} disabled={isLocked}>
               选择文件
             </Button>
           </div>

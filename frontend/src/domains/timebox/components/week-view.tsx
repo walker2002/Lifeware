@@ -15,11 +15,13 @@ interface WeekViewProps {
   currentDate: Date
 }
 
+// [023.12] T13 (AM4) — STATUS_BG 收窄为 3 键（planned/logged/cancelled）。
+//   历史 running/overtime/ended 派生显示态在 023.12 中已废（[023.12] T6 4 态收敛）：
+//   status 字段不再含 'running'|'overtime'|'ended'。派生态（overtime/running）由
+//   `deriveTimeboxDisplayStatus(status, startTime, endTime, now)` 计算，但
+//   日历网格层不做 per-second 派生，渲染时仅基于持久 status 取色。
 const STATUS_BG: Record<TimeboxStatus, string> = {
   planned: "#e6dfd8",
-  running: "#cc785c",
-  overtime: "#f97316",
-  ended: "#8e8b82",
   cancelled: "#d1d5db",
   logged: "#5db872",
 }
@@ -95,7 +97,7 @@ export function WeekView({ timeboxes, currentDate }: WeekViewProps) {
         eventPropGetter={(event: CalendarEvent) => ({
           style: {
             backgroundColor: STATUS_BG[event.status] ?? STATUS_BG.planned,
-            color: event.status === "running" ? "#ffffff" : "#141413",
+            color: "#141413",
             borderLeft: `4px solid ${BORDER_COLOR_MAP[getCardBorderColor(event.executionRecord)] ?? "transparent"}`,
           },
         })}

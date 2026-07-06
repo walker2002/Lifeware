@@ -98,11 +98,13 @@ export async function getKeyResultsByObjective(
 
 /**
  * 获取当前用户的活跃周期列表
+ *
+ * [023.12] T6：in_progress 状态已退役，活跃语义改为 approved（[AM6] 同步）。
  */
 export async function getActiveCycles(): Promise<OKRActionResult<Cycle[]>> {
   try {
     const repo = new CycleRepository();
-    const data = await repo.findByUserAndStatus("in_progress", MVP_USER_ID);
+    const data = await repo.findByUserAndStatus("approved", MVP_USER_ID);
     return { success: true, data };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "获取周期失败" };
@@ -376,19 +378,20 @@ export async function updateKeyResultProgress(
 }
 
 /**
- * 周期状态转换共享辅助函数（[022.01] Phase 2 neat — 消除 approveCycle/reviewCycle/endCycle 重复）
+ * 周期状态转换共享辅助函数（[022.01] Phase 2 neat — 消除 approveCycle/reviewCycle/finishCycle/revertCycle 重复）
  *
  * 统一 6 步模式：UUID 校验 → findById → 状态前置条件 → executeIntent → 回读 → catch-all。
- * approveCycle 的特殊分派（now >= periodStart ? startCycle : planCycle）通过 getAction 回调实现。
+ * [023.12] T6：approveCycle 移除「now vs periodStart」分派，简化为单一 approveCycle action；
+ * finishCycle / reviewCycle / revertCycle 各自单一 action。
  */
 async function transitionCycle(
   cycleId: string,
   opts: {
     /** 允许执行操作的周期状态 */
     allowedStatus: Cycle['status'],
-    /** 从 cycle 对象派生 SM action 名称（approveCycle 需按 now vs periodStart 分派） */
+    /** 从 cycle 对象派生 SM action 名称（当前 4 个 action 都是常量，预留扩展点） */
     getAction: (cycle: Cycle) => string,
-    /** 状态不匹配时的操作标签（如 "审核通过"、"复盘"、"结束"） */
+    /** 状态不匹配时的操作标签（如 "审核通过"、"复盘"、"结束"、"撤销复盘"） */
     actionLabel: string,
     /** 回读失败时的错误前缀（如 "审核通过后回读失败"） */
     reReadError: string,
@@ -422,14 +425,14 @@ async function transitionCycle(
 }
 
 /**
- * 审核通过周期（[022.01] Phase 1: Task 7）
+ * 审核通过周期（[022.01] Phase 1 + [023.12] T6：now 分派移除）
  *
- * 按 server 时刻 now（UTC date-only YYYY-MM-DD）与 periodStart 比较分派：
- * - now >= periodStart → executeIntent('startCycle')（draft → in_progress）
- * - now <  periodStart → executeIntent('planCycle')  （draft → not_started）
+ * [023.12] T6：旧实现按 server 时刻 now（UTC date-only YYYY-MM-DD）与 periodStart 比较，
+ * 决定走 startCycle（draft→in_progress）还是 planCycle（draft→not_started）。
+ * 新设计 4 态收敛：not_started 状态整体删除，approve 单一动作 draft→approved。
+ * 产品行为变化：旧「未到开始日期 → 进入未开始」语义被删——批准即活跃。
  *
- * 仅允许从 draft 状态审核通过；非 draft 返回错误，避免误改已 in_progress/ended 周期。
- * 不接受其他 fromState 的 transition；分派由 server 决定，避免客户端造假。
+ * 仅允许从 draft 状态审核通过；非 draft 返回错误，避免误改已 approved/finished/reviewed 周期。
  *
  * @param cycleId - 周期 ID（USOM UUID 字符串）
  * @returns 执行结果，成功时返回更新后的 Cycle
@@ -437,10 +440,7 @@ async function transitionCycle(
 export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
   return transitionCycle(cycleId, {
     allowedStatus: 'draft',
-    getAction: (cycle) => {
-      const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC date-only)
-      return now >= cycle.period.start ? "startCycle" : "planCycle";
-    },
+    getAction: () => 'approveCycle',
     actionLabel: '审核通过',
     reReadError: '审核通过后回读失败',
     catchFallback: '审核通过失败',
@@ -448,16 +448,17 @@ export async function approveCycle(cycleId: string): Promise<OKRActionResult<Cyc
 }
 
 /**
- * 复盘周期（[022.01] Phase 2：ended → reviewed）
+ * 复盘周期（[022.01] Phase 2 + [023.12] T6：finished → reviewed）
  *
- * 仅允许 ended 状态复盘；复盘后周期将锁定，目标编辑将在后续版本中限制。
+ * [023.12] T6：allowedStatus 由 ended→finished（[AM6] 同步）。
+ * 复盘后周期将锁定（reviewed 完全只读）。
  *
  * @param cycleId - 周期 ID（USOM UUID 字符串）
  * @returns 执行结果，成功时返回更新后的 Cycle
  */
 export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
   return transitionCycle(cycleId, {
-    allowedStatus: 'ended',
+    allowedStatus: 'finished',
     getAction: () => 'reviewCycle',
     actionLabel: '复盘',
     reReadError: '复盘后回读失败',
@@ -466,20 +467,39 @@ export async function reviewCycle(cycleId: string): Promise<OKRActionResult<Cycl
 }
 
 /**
- * 结束周期（[022.01] Phase 2 Task 3.5: in_progress → ended）
+ * 结束周期（[023.12] T6：endCycle → finishCycle，approved → finished）
  *
- * 仅允许 in_progress 状态结束；结束后 cycle 可被复盘或直接转终态。
- * 不接受其他 fromState 的 transition。
+ * [023.12] T6：函数重命名 endCycle → finishCycle（产品语义「结束」即「完成目标进入复盘」）。
+ * allowedStatus 由 in_progress→approved（[AM6] 同步）。
  *
  * @param cycleId - 周期 ID（USOM UUID 字符串）
  * @returns 执行结果
  */
-export async function endCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
+export async function finishCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
   return transitionCycle(cycleId, {
-    allowedStatus: 'in_progress',
-    getAction: () => 'endCycle',
+    allowedStatus: 'approved',
+    getAction: () => 'finishCycle',
     actionLabel: '结束',
     reReadError: '结束后回读失败',
     catchFallback: '结束周期失败',
+  });
+}
+
+/**
+ * 撤销复盘周期（[023.12] T6 新增：reviewed → finished，[AM10]）
+ *
+ * 一致性约束：仅 reviewed 状态可撤销，撤销后回到 finished（而非 draft）。
+ * 复盘证据（reviewedAt）保留——可再次走 finish→review 路径。
+ *
+ * @param cycleId - 周期 ID（USOM UUID 字符串）
+ * @returns 执行结果，成功时返回更新后的 Cycle
+ */
+export async function revertCycle(cycleId: string): Promise<OKRActionResult<Cycle>> {
+  return transitionCycle(cycleId, {
+    allowedStatus: 'reviewed',
+    getAction: () => 'revertCycle',
+    actionLabel: '撤销复盘',
+    reReadError: '撤销复盘后回读失败',
+    catchFallback: '撤销复盘失败',
   });
 }

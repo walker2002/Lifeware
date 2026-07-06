@@ -1,13 +1,14 @@
 /**
  * @file edit-appointment.test.tsx
- * @brief [026] T17 P2 CNUI EditAppointment surface 渲染测试
+ * @brief [026] T17 P2 CNUI EditAppointment surface 渲染测试 / [023.12] T10 收敛 in_progress
  *
  * 守护 3 个分支：
- * - items=0 → "暂无计划/执行中的约定" 空态
+ * - items=0 → "暂无计划中的约定" 空态
  * - items>0 → 列表（点击 item 进入编辑表单）
  * - 编辑表单 submit → 调 onConfirm(dataModel with selected)
  *
  * 不依赖 DB（纯 RTL 渲染 + onConfirm spy）。
+ * [023.12] T10 (AM8)：in_progress 已不持久化，列表项恒显示「计划」。
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -18,16 +19,16 @@ import type { AppointmentDraftFields } from '../AppointmentFormFields'
 
 type EditItem = AppointmentDraftFields & { status: string }
 
-/** 构造 items（2 条） */
+/** 构造 items（2 条）—— [023.12] T10：in_progress 移除，list 仅 scheduled */
 function makeItems(): EditItem[] {
   return [
     { id: 'i1', title: '看牙医', startTime: '2026-07-10T09:00:00.000Z', durationMin: 30, detail: '', people: [], status: 'scheduled' },
-    { id: 'i2', title: '买菜', startTime: '2026-07-10T14:00:00.000Z', durationMin: 20, detail: '', people: [], status: 'in_progress' },
+    { id: 'i2', title: '买菜', startTime: '2026-07-10T14:00:00.000Z', durationMin: 20, detail: '', people: [], status: 'scheduled' },
   ]
 }
 
 describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
-  it('items.length=0 渲染「暂无计划/执行中的约定」空态', () => {
+  it('items.length=0 渲染「暂无计划中的约定」空态', () => {
     render(
       <EditAppointment
         surfaceType="editAppointment"
@@ -36,7 +37,7 @@ describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('暂无计划/执行中的约定')).toBeInTheDocument()
+    expect(screen.getByText('暂无计划中的约定')).toBeInTheDocument()
   })
 
   it('items>0 渲染列表：标题 + 状态标签 + 时间 + 时长', () => {
@@ -48,12 +49,11 @@ describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
         onConfirm={vi.fn()}
       />,
     )
-    expect(screen.getByText('选择要修改的约定（仅计划/执行中）')).toBeInTheDocument()
+    expect(screen.getByText('选择要修改的约定（仅计划）')).toBeInTheDocument()
     expect(screen.getByText('看牙医')).toBeInTheDocument()
     expect(screen.getByText('买菜')).toBeInTheDocument()
-    // status 标签
-    expect(screen.getByText('计划')).toBeInTheDocument()
-    expect(screen.getByText('执行中')).toBeInTheDocument()
+    // [023.12] T10：2 条都显示「计划」（in_progress 已不持久化）
+    expect(screen.getAllByText('计划').length).toBe(2)
   })
 
   it('点击 item 进入编辑表单：渲染「编辑约定」标题 + 字段', () => {
@@ -125,7 +125,7 @@ describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
     fireEvent.click(screen.getByText('看牙医').closest('button')!)
     expect(screen.getByText('编辑约定（计划）')).toBeInTheDocument()
     fireEvent.click(screen.getByText('返回列表'))
-    expect(screen.getByText('选择要修改的约定（仅计划/执行中）')).toBeInTheDocument()
+    expect(screen.getByText('选择要修改的约定（仅计划）')).toBeInTheDocument()
   })
 
   it('isDone=true 渲染「✅ 约定已更新」', () => {

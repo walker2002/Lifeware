@@ -246,6 +246,13 @@
       "when": 1783500000000,
       "tag": "0034_023_11_archetype_synonyms",
       "breakpoints": false
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783328535912,
+      "tag": "0034_023_12_lifecycle_simplify",
+      "breakpoints": false
     }
   ]
 }
