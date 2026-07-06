@@ -290,4 +290,17 @@ describe('[023.04] T4 <EditTimeboxes>', () => {
     fireEvent.click(screen.getByText('第二条').closest('button')!)
     expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('第二条')
   })
+
+  // [023.11] T10 接线测试：EditTimeboxes ArchetypePicker 应渲染「AI 匹配」按钮
+  //   当 editing + title 非空时（enableAiMatch + title 由 picker 决定是否显示主动匹配按钮）
+  it('[023.11] editing title 非空 → 渲染「AI 匹配」', async () => {
+    render(<EditTimeboxes {...makeProps({
+      mode: 'editing',
+      items: [tb('tb1', 'planned')],
+      selectedId: 'tb1',
+      prefill: { title: '写代码' },
+      status: 'planned',
+    })} />)
+    expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
+  })
 })

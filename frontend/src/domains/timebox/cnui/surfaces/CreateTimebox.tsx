@@ -110,6 +110,8 @@ export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, is
             <ArchetypePicker
               value={cur.activityArchetypeId}
               onChange={(id) => update({ activityArchetypeId: id })}
+              enableAiMatch
+              title={cur.title}
             />
           </div>
         </div>

@@ -256,7 +256,9 @@ export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, is
           <label className="text-xs text-body">活动原型</label>
           <div className="mt-0.5">
             <ArchetypePicker value={draft.activityArchetypeId}
-              onChange={id => update({ activityArchetypeId: id })} />
+              onChange={id => update({ activityArchetypeId: id })}
+              enableAiMatch
+              title={draft.title} />
           </div>
         </div>
         <div>

@@ -152,3 +152,19 @@ describe('[023.04] T2 <CreateTimebox> 渲染稳定性', () => {
     expect(warn.textContent).not.toMatch(/早会\(第 1 页\)/)
   })
 })
+
+// [023.11] T10 接线测试：CreateTimebox ArchetypePicker 应渲染「AI 匹配」按钮
+//   当 title 非空时（enableAiMatch + title 由 picker 决定是否显示主动匹配按钮）
+describe('[023.11] CreateTimebox ArchetypePicker 接线', () => {
+  it('title 非空时渲染「AI 匹配」按钮', async () => {
+    render(
+      <CreateTimebox
+        surfaceType="createTimebox"
+        dataModel={{ items: [makeDraft({ title: '下午写代码' })] }}
+        onDataChange={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    )
+    expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
+  })
+})
