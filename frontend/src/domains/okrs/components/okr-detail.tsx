@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { Objective, KeyResult } from "@/usom/types/objects"
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -45,8 +45,9 @@ interface OKRDetailProps {
   onDeleteKR: (id: string) => Promise<boolean>
   /** 返回回调 */
   onBack: () => void
-  /** [022.01] Task 5：父组件透传的 cycle 状态，供下游 KRProgress / ContributionPanel 使用 */
-  cycleStatus?: string
+  /** [022.01] Task 5：父组件透传的 cycle 状态，供下游 KRProgress / ContributionPanel / OKRForm 使用
+   *  [023.12] T9 review fix：收紧类型至 Cycle["status"] 以便直接透传至 OKRForm。 */
+  cycleStatus?: Cycle["status"]
 }
 
 export function OKRDetail({
@@ -124,6 +125,9 @@ export function OKRDetail({
           }}
           onSubmit={handleSaveEdit}
           onCancel={() => setIsEditing(false)}
+          // [023.12] T9 review fix：cycleStatus 已在父 props 持有（line 49），
+          // 透传至 OKRForm 激活 reviewed 锁定。
+          cycleStatus={cycleStatus}
         />
       </div>
     )

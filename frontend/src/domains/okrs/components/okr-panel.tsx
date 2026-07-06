@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { ObjectiveWithKR } from "@/usom/interfaces/irepository"
-import type { Objective, KeyResult } from "@/usom/types/objects"
+import type { Objective, KeyResult, Cycle } from "@/usom/types/objects"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +35,10 @@ interface OKRPanelProps {
   presetCycleId?: string
   /** [022] 3A-T2：触发外部 OKRImportDialog（由 OKRWorkspace 注入） */
   onImportTrigger?: () => void
+  /** [023.12] T9 review fix：父周期状态，由 OKRWorkspace 从 hook.cycles 派生后透传；
+   *  reviewed 时激活 OKRForm 整表锁（与 guard.ts ALLOWED['reviewed']={} 对齐）。
+   *  detail 模式：data.cycleId 对应 cycle.status；create 模式：presetCycleId 对应 cycle.status。 */
+  cycleStatus?: Cycle["status"]
 }
 
 /**
@@ -42,6 +46,8 @@ interface OKRPanelProps {
  *   OKRPanel 不渲染 ContributionPanel（主路径 OKRWorkspace → OKRPanel → KRProgress）；
  *   KR 进度编辑权限由 KRProgress.editable 控制，本组件不消费 cycleStatus。
  *   ContributionPanel 由 OKRDetail 渲染，cycleStatus 在 OKRList → OKRDetail 路径上透传。
+ * [023.12] T9 review fix：恢复 cycleStatus 透传——OKRForm 内 reviewed 锁定
+ *   必须由父组件提供 status（OKRPanel 自身无 hook.cycles 引用）。
  */
 
 const PRIORITY_LABELS: Record<string, { label: string; variant: "destructive" | "default" | "secondary" | "outline" }> = {
@@ -55,6 +61,7 @@ export function OKRPanel({
   onAddKR, onUpdateKRProgress, onConfidenceUpdate, onDeleteKR, onReload,
   presetCycleId,
   onImportTrigger,
+  cycleStatus,
 }: OKRPanelProps) {
   const [isAddingKR, setIsAddingKR] = useState(false)
   const [newKR, setNewKR] = useState({ title: "", targetValue: 100, unit: "%" })
@@ -75,7 +82,7 @@ export function OKRPanel({
     return (
       <div className="p-4">
         <h2 className="text-lg font-semibold mb-4">创建新 OKR</h2>
-        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} presetCycleId={presetCycleId} onImportTrigger={onImportTrigger} />
+        <OKRForm onSubmit={onSaveCreate} isLoading={isCreating} presetCycleId={presetCycleId} onImportTrigger={onImportTrigger} cycleStatus={cycleStatus} />
       </div>
     )
   }
@@ -102,6 +109,7 @@ export function OKRPanel({
           onSubmit={onSaveEdit}
           onCancel={onBack}
           onImportTrigger={onImportTrigger}
+          cycleStatus={cycleStatus}
         />
       </div>
     )
