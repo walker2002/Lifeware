@@ -1695,7 +1695,8 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_07_05*
+*文档版本：2026_07_06*
 *关联上游文档：docs/usom-design.md*
 
+*变更：[023.11] (2026_07_06) — §7.6 activity_archetypes 加 `synonyms jsonb NOT NULL DEFAULT '[]'` 列（迁移 0034_023_11_archetype_synonyms.sql，幂等 ADD COLUMN IF NOT EXISTS）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §4.X appointments（rename 自 itineraries）+ 0033 RENAME 迁移 + F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal）*
