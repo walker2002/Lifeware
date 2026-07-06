@@ -6,7 +6,7 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
     class="grid gap-4 sm:grid-cols-2"
   >
     <div
-      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-surface-card"
+      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-error-soft border border-error border-l-4"
     >
       <div
         class="flex items-center gap-2"
@@ -35,6 +35,13 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
         >
           已规划
         </span>
+        <span
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 bg-destructive text-white focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90 shrink-0"
+          data-slot="badge"
+          data-variant="destructive"
+        >
+          已超时
+        </span>
         <div
           class="flex items-center gap-1 shrink-0"
         >
@@ -44,7 +51,7 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
             data-slot="button"
             data-variant="default"
           >
-            开始
+            打卡
           </button>
           <button
             class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
@@ -54,11 +61,46 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
           >
             取消
           </button>
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
+            data-size="sm"
+            data-slot="button"
+            data-variant="ghost"
+          >
+            删除
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex flex-col gap-1"
+      >
+        <div
+          class="flex items-center justify-between text-xs"
+        >
+          <span
+            class="font-mono text-error"
+          >
+            超时 +3:00:00
+          </span>
+          <span
+            class="text-body"
+          >
+            100
+            %
+          </span>
+        </div>
+        <div
+          class="h-1.5 rounded-full bg-muted overflow-hidden"
+        >
+          <div
+            class="h-full rounded-full transition-all duration-1000 bg-error"
+            style="width: 100%;"
+          />
         </div>
       </div>
     </div>
     <div
-      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-surface-card"
+      class="flex flex-col gap-2 rounded-lg p-4 border-l-4 border-l-transparent bg-error-soft border border-error border-l-4"
     >
       <div
         class="flex items-center gap-2"
@@ -81,22 +123,45 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
           </button>
         </h3>
         <span
-          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 bg-primary text-primary-foreground [a&]:hover:bg-primary/90 shrink-0"
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground shrink-0"
           data-slot="badge"
-          data-variant="default"
+          data-variant="outline"
         >
-          进行中
+          已规划
+        </span>
+        <span
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 bg-destructive text-white focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90 shrink-0"
+          data-slot="badge"
+          data-variant="destructive"
+        >
+          已超时
         </span>
         <div
           class="flex items-center gap-1 shrink-0"
         >
           <button
-            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/90 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
             data-size="sm"
             data-slot="button"
-            data-variant="outline"
+            data-variant="default"
           >
-            结束
+            打卡
+          </button>
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
+            data-size="sm"
+            data-slot="button"
+            data-variant="ghost"
+          >
+            取消
+          </button>
+          <button
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
+            data-size="sm"
+            data-slot="button"
+            data-variant="ghost"
+          >
+            删除
           </button>
         </div>
       </div>
@@ -107,9 +172,9 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
           class="flex items-center justify-between text-xs"
         >
           <span
-            class="font-mono text-success"
+            class="font-mono text-error"
           >
-            2:30:00
+            超时 +1:00:00
           </span>
           <span
             class="text-body"
@@ -122,7 +187,7 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
           class="h-1.5 rounded-full bg-muted overflow-hidden"
         >
           <div
-            class="h-full rounded-full transition-all duration-1000 bg-success"
+            class="h-full rounded-full transition-all duration-1000 bg-error"
             style="width: 100%;"
           />
         </div>
@@ -152,22 +217,22 @@ exports[`[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归 > 纯 kind
           </button>
         </h3>
         <span
-          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground shrink-0"
+          class="inline-flex w-fit items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3 bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 shrink-0"
           data-slot="badge"
-          data-variant="outline"
+          data-variant="secondary"
         >
-          已结束
+          已记录
         </span>
         <div
           class="flex items-center gap-1 shrink-0"
         >
           <button
-            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5"
+            class="inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5 text-body"
             data-size="sm"
             data-slot="button"
-            data-variant="outline"
+            data-variant="ghost"
           >
-            记录
+            回退
           </button>
         </div>
       </div>

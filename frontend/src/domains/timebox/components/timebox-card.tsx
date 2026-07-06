@@ -1,8 +1,12 @@
 /**
  * @file timebox-card
  * @brief 时间盒卡片组件
- * 
+ *
  * 展示单个时间盒的摘要信息和操作按钮
+ *
+ * [023.12] T8：STATUS_STYLES 收敛 3 状态（planned/logged/cancelled）。
+ * 旧 running/overtime/ended 不再持久化——读时由 deriveTimeboxDisplayStatus 派生。
+ * 按钮改造：planned→打卡/取消/删除；logged/cancelled→回退；logged+executionRecord→查看记录。
  */
 
 "use client";
@@ -19,23 +23,21 @@ import type { TimeboxSummary } from "@/usom/types/summaries";
 import type { TimeboxStatus } from "@/usom/types/primitives";
 import { getCardBorderColor, getCompletionIcon } from "@/lib/color-coding";
 import { MessageSquare } from "lucide-react";
+import { deriveTimeboxDisplayStatus } from "@/domains/timebox/status/derive-display-status";
 
-/** 时间盒状态样式映射 */
+/** 时间盒状态样式映射（[023.12] T8：收敛到 3 状态；running/overtime 由 displayStatus 派生） */
 const STATUS_STYLES: Record<
   TimeboxStatus,
   { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
 > = {
   planned: { variant: "outline", label: "已规划" },
-  running: { variant: "default", label: "进行中" },
-  overtime: { variant: "destructive", label: "已超时" },
-  ended: { variant: "outline", label: "已结束" },
-  cancelled: { variant: "outline", label: "已取消" },
   logged: { variant: "secondary", label: "已记录" },
+  cancelled: { variant: "outline", label: "已取消" },
 };
 
 /**
  * 格式化时间戳为 HH:MM
- * 
+ *
  * @param timestamp - ISO 时间戳
  * @returns 格式化的时间字符串
  */
@@ -88,22 +90,37 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
     timebox.executionRecord?.mode === "detailed" ? timebox.executionRecord.notes : undefined
   );
 
-  // 计时器：running / overtime 状态下每秒更新
+  // [023.12] T8：派生 displayStatus（替代原 startedAt 计时器逻辑）
+  // - planned + now 在窗口内 → 'running'
+  // - planned + now > endTime → 'overtime'
+  // - 其他 → null
   const [now, setNow] = useState(0);
   useEffect(() => {
     setNow(Date.now());
-    if (timebox.status !== "running" && timebox.status !== "overtime") return;
+    if (timebox.status !== "planned") return; // 仅 planned 需要每秒驱动进度条
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [timebox.status]);
 
-  const startedAt = timebox.startedAt ? new Date(timebox.startedAt).getTime() : null;
-  const plannedEnd = new Date(timebox.endTime).getTime();
-  const plannedDuration = plannedEnd - new Date(timebox.startTime).getTime();
+  const displayStatus = deriveTimeboxDisplayStatus(
+    timebox.status,
+    timebox.startTime,
+    timebox.endTime,
+    new Date(now),
+  );
 
-  const elapsed = startedAt ? now - startedAt : 0;
-  const progressPercent = startedAt ? Math.min((elapsed / plannedDuration) * 100, 100) : 0;
-  const overtimeMs = timebox.status === "overtime" && startedAt ? now - plannedEnd : 0;
+  const plannedStart = new Date(timebox.startTime).getTime();
+  const plannedEnd = new Date(timebox.endTime).getTime();
+  const plannedDuration = plannedEnd - plannedStart;
+  // 进度条：planned + running/overtime 才有意义；其他状态为 0
+  const progressPercent =
+    timebox.status === "planned" && now > 0 && plannedDuration > 0
+      ? Math.min(((now - plannedStart) / plannedDuration) * 100, 100)
+      : 0;
+  // 派生状态下的计时显示
+  const elapsedMs = timebox.status === "planned" ? Math.max(0, now - plannedStart) : 0;
+  const overtimeMs =
+    timebox.status === "planned" && now > plannedEnd ? now - plannedEnd : 0;
 
   const handleAction = useCallback((action: string) => {
     onAction?.(timebox.id, action);
@@ -135,17 +152,17 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           {timebox.archetypeName && (
             <span className="text-xs text-muted whitespace-nowrap">· {timebox.archetypeName}</span>
           )}
-          {timebox.status === "running" && (
+          {displayStatus === "running" && (
             <span className="text-xs font-mono text-success whitespace-nowrap">
-              {formatElapsed(elapsed)}
+              {formatElapsed(elapsedMs)}
             </span>
           )}
-          {timebox.status === "overtime" && (
+          {displayStatus === "overtime" && (
             <span className="text-xs font-mono text-error whitespace-nowrap">
               +{formatElapsed(overtimeMs)}
             </span>
           )}
-          {!["running", "overtime"].includes(timebox.status) && (
+          {displayStatus === null && (
             <span className="text-xs text-body whitespace-nowrap">
               {formatDuration(timebox.startTime, timebox.endTime)}
             </span>
@@ -153,17 +170,18 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           <Badge variant={statusStyle.variant} className="text-xs shrink-0">
             {statusStyle.label}
           </Badge>
+          {/* [023.12] T8：派生 displayStatus 徽章（紧凑模式也显示） */}
+          {displayStatus === "running" && (
+            <Badge variant="default" className="text-xs shrink-0">进行中</Badge>
+          )}
+          {displayStatus === "overtime" && (
+            <Badge variant="destructive" className="text-xs shrink-0">已超时</Badge>
+          )}
           {timebox.status === "planned" && (
-            <Button size="sm" variant="default" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("start")}>开始</Button>
+            <Button size="sm" variant="default" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("log")}>打卡</Button>
           )}
-          {timebox.status === "running" && (
-            <Button size="sm" variant="outline" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("end")}>结束</Button>
-          )}
-          {timebox.status === "overtime" && (
-            <Button size="sm" variant="destructive" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("end")}>确认结束</Button>
-          )}
-          {timebox.status === "ended" && (
-            <Button size="sm" variant="outline" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("log")}>记录</Button>
+          {(timebox.status === "logged" || timebox.status === "cancelled") && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-body shrink-0" onClick={() => handleAction("revert")}>回退</Button>
           )}
           {timebox.status === "logged" && timebox.executionRecord && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-body shrink-0" onClick={() => handleAction("viewLog")}>查看</Button>
@@ -193,7 +211,7 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
     <div className={`flex flex-col gap-2 rounded-lg p-4 border-l-4 ${borderColor} ${
       timebox.status === "cancelled"
         ? "bg-surface-card opacity-60"
-        : timebox.status === "overtime"
+        : displayStatus === "overtime"
           ? "bg-error-soft border border-error border-l-4"
           : "bg-surface-card"
     }`}>
@@ -222,22 +240,24 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           <span className="text-xs text-muted whitespace-nowrap">· {timebox.archetypeName}</span>
         )}
         <Badge variant={statusStyle.variant} className="shrink-0">{statusStyle.label}</Badge>
+        {/* [023.12] T8：派生 displayStatus 徽章（planned + 窗口内/超时时显示） */}
+        {displayStatus === "running" && (
+          <Badge variant="default" className="shrink-0">进行中</Badge>
+        )}
+        {displayStatus === "overtime" && (
+          <Badge variant="destructive" className="shrink-0">已超时</Badge>
+        )}
         {/* 操作按钮 */}
         <div className="flex items-center gap-1 shrink-0">
           {timebox.status === "planned" && (
             <>
-              <Button size="sm" onClick={() => handleAction("start")}>开始</Button>
+              <Button size="sm" onClick={() => handleAction("log")}>打卡</Button>
               <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("cancel")}>取消</Button>
+              <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("delete")}>删除</Button>
             </>
           )}
-          {timebox.status === "running" && (
-            <Button size="sm" variant="outline" onClick={() => handleAction("end")}>结束</Button>
-          )}
-          {timebox.status === "overtime" && (
-            <Button size="sm" variant="destructive" onClick={() => handleAction("end")}>确认结束</Button>
-          )}
-          {timebox.status === "ended" && (
-            <Button size="sm" variant="outline" onClick={() => handleAction("log")}>记录</Button>
+          {(timebox.status === "logged" || timebox.status === "cancelled") && (
+            <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("revert")}>回退</Button>
           )}
           {timebox.status === "logged" && timebox.executionRecord && (
             <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("viewLog")}>查看记录</Button>
@@ -245,12 +265,12 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
         </div>
       </div>
 
-      {/* 进度条 + 计时器 */}
-      {(timebox.status === "running" || timebox.status === "overtime") && startedAt && (
+      {/* 进度条 + 计时器（仅 planned + 派生非 null 时显示） */}
+      {timebox.status === "planned" && displayStatus !== null && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between text-xs">
-            <span className={timebox.status === "overtime" ? "font-mono text-error" : "font-mono text-success"}>
-              {timebox.status === "overtime" ? `超时 +${formatElapsed(overtimeMs)}` : formatElapsed(elapsed)}
+            <span className={displayStatus === "overtime" ? "font-mono text-error" : "font-mono text-success"}>
+              {displayStatus === "overtime" ? `超时 +${formatElapsed(overtimeMs)}` : formatElapsed(elapsedMs)}
             </span>
             <span className="text-body">
               {Math.round(progressPercent)}%
@@ -259,7 +279,7 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
-                timebox.status === "overtime" ? "bg-error" : "bg-success"
+                displayStatus === "overtime" ? "bg-error" : "bg-success"
               }`}
               style={{ width: `${Math.min(progressPercent, 100)}%` }}
             />

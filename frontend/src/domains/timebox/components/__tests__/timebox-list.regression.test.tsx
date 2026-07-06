@@ -11,9 +11,12 @@
  * - **方案 A（snapshot 锁）**：对当前已通过的渲染输出做 `toMatchSnapshot`，
  *   future 任意回归会自动 fail。
  *
+ * [023.12] T8 适配：TimeboxStatus 收窄为 3（planned/logged/cancelled）。
+ * sample 改用 planned/logged/cancelled；派生 displayStatus 由 now 决定。
+ *
  * 不依赖 T13 改动前的代码（已不存在），以当前实现渲染为 SSOT。
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { TimeboxList } from '../timebox-list'
 import type { TimeboxSummary } from '@/usom/types/summaries'
@@ -31,7 +34,7 @@ afterAll(() => {
   vi.useRealTimers()
 })
 
-/** 构造 3 个不同形态的 TimeboxSummary 样本（覆盖 status / taskIds / habitIds / startedAt） */
+/** 构造 3 个不同形态的 TimeboxSummary 样本（[023.12] T8 改用 3 状态） */
 function makeSamples(): TimeboxesEvent[] {
   const s1: TimeboxSummary = {
     id: 'tb-1',
@@ -45,23 +48,20 @@ function makeSamples(): TimeboxesEvent[] {
   const s2: TimeboxSummary = {
     id: 'tb-2',
     title: '深度工作',
-    status: 'running',
+    status: 'planned',
     startTime: '2026-07-15T09:30:00.000Z',
     endTime: '2026-07-15T11:00:00.000Z',
     taskIds: [],
     habitIds: [],
-    startedAt: '2026-07-15T09:30:00.000Z',
   }
   const s3: TimeboxSummary = {
     id: 'tb-3',
     title: '复盘',
-    status: 'ended',
+    status: 'logged',
     startTime: '2026-07-15T14:00:00.000Z',
     endTime: '2026-07-15T15:00:00.000Z',
     taskIds: ['t-1'],
     habitIds: ['h-2'],
-    startedAt: '2026-07-15T14:00:00.000Z',
-    endedAt: '2026-07-15T15:00:00.000Z',
   }
   return [s1, s2, s3].map(timeboxToEvent)
 }
