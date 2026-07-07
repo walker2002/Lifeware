@@ -173,27 +173,41 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
     expect(objectIds).not.toContain('tb-3')
   })
 
-  it('submit completed 调 logTimebox intent 且 completionStatus=completed', async () => {
+  it('submit completed 调 logTimebox intent 且 executionRecord.completionStatus=completed', async () => {
     const r = await timeboxCnuiHandler.submit('logTimebox', {
       items: [{ id: 'tb-1', title: '写作', state: 'completed', notes: '顺利' }],
     })
     expect(r.success).toBe(true)
     expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
       objectId: 'tb-1',
-      completionStatus: 'completed',
-      notes: '顺利',
+      executionRecord: expect.objectContaining({
+        mode: 'simple',
+        completionStatus: 'completed',
+        sourceType: 'timebox',
+        actualDuration: 0,
+        plannedDuration: 0,
+        deviationMinutes: 0,
+        notes: '顺利',
+      }),
     })
   })
 
-  it('submit incomplete 映射为 completionStatus=partial', async () => {
+  it('submit incomplete 映射为 executionRecord.completionStatus=partial', async () => {
     const r = await timeboxCnuiHandler.submit('logTimebox', {
       items: [{ id: 'tb-1', title: '写作', state: 'incomplete', notes: '被打断' }],
     })
     expect(r.success).toBe(true)
     expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
       objectId: 'tb-1',
-      completionStatus: 'partial',
-      notes: '被打断',
+      executionRecord: expect.objectContaining({
+        mode: 'simple',
+        completionStatus: 'partial',
+        sourceType: 'timebox',
+        actualDuration: 0,
+        plannedDuration: 0,
+        deviationMinutes: 0,
+        notes: '被打断',
+      }),
     })
   })
 })

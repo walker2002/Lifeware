@@ -552,7 +552,9 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     }
 
     // [023] A2.7 — logTimebox CNUI surface 提交：逐条 log，跳过 state='skipped' 或无 state 的项
-    // completionStatus: 'completed'|'partial'，notes 透传
+    // [023.13] T0 AM1 — 把 flat fields 重组为 ExecutionRecord 对象（与 USOM 类型对齐），
+    //   executionRecord 必填字段（actualDuration/plannedDuration/deviationMinutes/sourceType/loggedAt）
+    //   在 T8 接 ExecutionDetailFields 共享组件后会被真实数据覆盖；当前走 simple 模式零值兜底。
     if (action === 'logTimebox') {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const items = (fields.items as any[]) ?? []
@@ -564,10 +566,25 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         // open 后修改时间窗口让某条进入终态，故加 server-side 守护。
         if (it.status && it.status !== 'planned') continue
         try {
+          // 组装 ExecutionRecord（simple 模式）。T8 接 ExecutionDetailFields 后，
+          //   actualDuration/plannedDuration/actualStartTime/actualEndTime/focusMinutes/
+          //   energyActual/completionRating/actualOutput/deviationReasons 会从 surface 真实值
+          //   覆盖；当前使用零值兜底保证 executionRecord 列永不为 null。
+          const executionRecord = {
+            mode: 'simple' as const,
+            completionStatus: it.state === 'completed' ? 'completed' : 'partial',
+            // base 必填字段（T0 兜底值；T8 详细数据接入后会改）
+            actualDuration: 0,
+            plannedDuration: 0,
+            deviationMinutes: 0,
+            sourceType: 'timebox' as const,
+            loggedAt: new Date().toISOString() as Timestamp,
+            // notes optional 透传（surface 现有 notes 字段）
+            ...(it.notes ? { notes: it.notes } : {}),
+          }
           const r = await submitDynamicIntent('timebox', 'logTimebox', {
             objectId: it.id,
-            completionStatus: it.state === 'completed' ? 'completed' : 'partial',
-            notes: it.notes,
+            executionRecord,
           })
           if (!r.success) return { success: false, error: r.error ?? `${it.title} 打卡失败` }
         } catch (e) {

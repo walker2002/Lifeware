@@ -285,6 +285,23 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
           object = { ...object, [timestampKey]: now }
           await repo.save(object, userId, tx)
         }
+
+        // [023.13] T0 AM1 — executionRecord 列持久化基础修复 (P0)
+        // 问题：updateStatus 只写 {status, updatedAt}，proposal.payload['executionRecord']
+        //   永不入库，导致 ExecutionLogged 事件触发后 timeboxes.execution_record 列恒为 null。
+        //   修复：log 类 transition 携带 executionRecord 时，updateStatus 之后立即用
+        //   updateFields 单 UPDATE 写一列（沿用 lifecycle_timestamp 后写范式，同 tx 原子）。
+        //   守卫：AM3 兼容 — executionRecord 为 undefined 时跳过本分支（T5 显式 null 清空走
+        //   updateFields 单独路径）；executionRecord 类型断言避免 TS 联合过严。
+        const executionRecord = proposal.payload['executionRecord']
+        if (executionRecord !== undefined && transition.to === 'logged') {
+          object = await repo.updateFields(
+            objectId!,
+            { executionRecord },
+            userId,
+            tx,
+          )
+        }
       } else {
         // 创建：注入目标 status，由 Repository 一次写入（透传 tx）
         const createPayload = { ...proposal.payload, status: transition.to }
