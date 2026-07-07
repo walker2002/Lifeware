@@ -256,14 +256,74 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     }
 
     if (action === 'editAppointment') {
-      // D2 reversal：列表筛 {scheduled, in_progress}，终态自然不在列表
+      // [026.01] 对齐 /editTimeboxes 范式（解析优先 + selecting 降级）
+      const prompt = (intentFields?.prompt as string | undefined) ?? ''
+      const { parseAppointmentIntent } = await import('@/domains/timebox/cnui/parse-appointments')
+
+      // 候选列表：{scheduled} 非终态约定（findActive 已 filter 终态）
       const all = await new AppointmentRepository().findActive(MVP_USER_ID as USOM_ID)
+      const todayAppointments = all.map(i => ({
+        id: i.id,
+        title: i.title,
+        startTime: i.startTime,
+        durationMin: i.durationMin,
+        status: i.status,
+      }))
+
+      // 调 AI 解析
+      const { createAIRuntime } = await import('@/nexus/ai-runtime')
+      const aiRuntime = createAIRuntime()
+      const parsed = await parseAppointmentIntent(prompt, todayAppointments, aiRuntime)
+
+      // 置信度 < 0.5 → 强制降级 selecting（与 editTimeboxes:295-298 一致）
+      const confidenceGate =
+        parsed.kind === 'edit' && parsed.confidence < 0.5
+          ? { kind: 'unsure' as const, reason: '未识别到具体修改意图，请补充如「改到 14:00」' }
+          : parsed
+
+      if (confidenceGate.kind === 'edit') {
+        const target = all.find(a => a.id === confidenceGate.appointmentId)
+        // safe-default：解析命中但不在候选列表（race / 数据漂移）→ 降级 selecting
+        if (target) {
+          const prefill: Record<string, unknown> = {
+            id: target.id,
+            title: target.title,
+            startTime: target.startTime,
+            durationMin: target.durationMin,
+            detail: target.detail,
+            people: target.people,
+            status: target.status,
+            ...(confidenceGate.newStartTime ? { startTime: confidenceGate.newStartTime } : {}),
+            ...(confidenceGate.newDurationMin ? { durationMin: confidenceGate.newDurationMin } : {}),
+            ...(confidenceGate.newTitle ? { title: confidenceGate.newTitle } : {}),
+            ...(target.activityArchetypeId ? { activityArchetypeId: target.activityArchetypeId } : {}),
+          }
+          return {
+            content: `请确认修改「${target.title}」`,
+            dataSnapshot: {
+              mode: 'editing',
+              selectedId: target.id,
+              prefill,
+              status: target.status,
+              items: todayAppointments,
+              originalPrompt: prompt,
+              parseReason: confidenceGate.confidence < 1 ? `匹配到「${target.title}」（置信度 ${confidenceGate.confidence}）` : '',
+              readOnly: false,
+            },
+          }
+        }
+      }
+
+      // 解析失败 / 不确定 / 命中无 target → selecting 模式（兜底）
       return {
-        content: '请选择要修改的计划/执行中约定',
-        dataSnapshot: { items: all.map(i => ({
-          id: i.id, title: i.title, startTime: i.startTime,
-          durationMin: i.durationMin, detail: i.detail, people: i.people, status: i.status,
-        })) },
+        content: '请选择要修改的约定',
+        dataSnapshot: {
+          mode: 'selecting',
+          items: todayAppointments,
+          originalPrompt: prompt,
+          parseReason: confidenceGate.kind === 'unsure' ? confidenceGate.reason : '',
+          readOnly: false,
+        },
       }
     }
 
@@ -533,6 +593,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             title: it.title, startTime: it.startTime, durationMin: it.durationMin,
             ...(it.detail ? { detail: it.detail } : {}),
             ...(it.people?.length ? { people: it.people } : {}),
+            ...(it.activityArchetypeId ? { activityArchetypeId: it.activityArchetypeId } : {}), // [026.01]
           })
           if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
           else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
@@ -554,15 +615,33 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const sel = fields.selected as {
         id: string; title: string; startTime: string; durationMin: number
         detail?: string | null; people: string[]; status?: string
+        activityArchetypeId?: string
       }
       if (!sel?.id) return { success: false, error: '未选择约定' }
+
+      const op = (fields as { operation?: string }).operation
+
+      // [026.01] 删除分支（op === 'delete'）— 走 deleteAppointment，SM 自动拒终态
+      if (op === 'delete') {
+        const { deleteAppointment } = await import('@/app/actions/timebox')
+        try {
+          await deleteAppointment(sel.id as any)
+          return { success: true, data: { id: sel.id, operation: 'delete' } }
+        } catch (e) {
+          // Global Constraint #8：handler 不预校验，失败错误透传 throw
+          return { success: false, error: e instanceof Error ? e.message : '删除失败' }
+        }
+      }
+
+      // update 分支（默认）
       const { updateAppointment } = await import('@/app/actions/timebox')
       try {
         await updateAppointment(sel.id as any, {
           title: sel.title, startTime: sel.startTime, durationMin: sel.durationMin,
           detail: sel.detail ?? null, people: sel.people,
+          ...(sel.activityArchetypeId ? { activityArchetypeId: sel.activityArchetypeId } : {}), // [026.01]
         })
-        return { success: true, data: { id: sel.id } }
+        return { success: true, data: { id: sel.id, operation: 'update' } }
       } catch (e) {
         return { success: false, error: e instanceof Error ? e.message : '更新失败' }
       }

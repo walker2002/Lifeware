@@ -42,6 +42,22 @@ const UPDATE_ALLOWED_FIELDS = new Set([
   'notes',
 ])
 
+/**
+ * [026.01] appointment 更新字段白名单（仿 timebox UPDATE_ALLOWED_FIELDS）。
+ *
+ * 字段白名单防绕过状态机——拒绝 status / completedAt / cancelledAt / inProgressAt /
+ * expiredAt 等生命周期列，状态转换必须走 cancelAppointment / completeAppointment（SM）。
+ * 允许：title / startTime / durationMin / detail / people / activityArchetypeId
+ */
+const APPOINTMENT_UPDATE_ALLOWED_FIELDS = new Set([
+  'title',
+  'startTime',
+  'durationMin',
+  'detail',
+  'people',
+  'activityArchetypeId', // [026.01]
+])
+
 /** [023] A2 /review fix（C2）：edit 路径同样守住 endTime>startTime 且 ≤8h（与 rule-engine 对齐） */
 function assertEndTimeValid(startTime: unknown, endTime: unknown): void {
   if (typeof startTime !== 'string' || typeof endTime !== 'string') return
@@ -293,15 +309,18 @@ export interface CreateAppointmentInput {
  * SM create transition → emit AppointmentCreated。
  */
 export async function createAppointment(
-  input: CreateAppointmentInput,
+  input: CreateAppointmentInput & { activityArchetypeId?: string },
   confirmed?: boolean,
 ): Promise<AppointmentActionResult> {
+  // [026.01] archetype owner-check（FK 不验租户隔离，防跨用户 archetype 落库）
+  if (input.activityArchetypeId) await assertArchetypeOwned(input.activityArchetypeId)
   const confirmFields: Record<string, unknown> = {
     title: input.title,
     startTime: input.startTime,
     durationMin: input.durationMin,
     ...(input.detail != null ? { detail: input.detail } : {}),
     ...(input.people?.length ? { people: input.people } : {}),
+    ...(input.activityArchetypeId ? { activityArchetypeId: input.activityArchetypeId } : {}), // [026.01]
   }
   const result = await submitDynamicIntent('timebox', 'createAppointment', confirmFields, confirmed)
   if (!result.success) {
@@ -337,44 +356,50 @@ export async function updateAppointment(
     durationMin?: number
     detail?: string | null
     people?: string[]
+    activityArchetypeId?: string // [026.01]
   },
 ): Promise<AppointmentActionResult> {
-  // [026] 字段白名单（C2 防绕过，参 updateTimebox 的 UPDATE_ALLOWED_FIELDS）
-  const APPOINTMENT_UPDATE_ALLOWED = ['title', 'startTime', 'durationMin', 'detail', 'people'] as const
-  const fieldSteps: Array<{ kind: 'field'; field: typeof APPOINTMENT_UPDATE_ALLOWED[number]; value: unknown }> = []
-  for (const [field, value] of Object.entries(patch)) {
-    if (value === undefined) continue
-    if (!(APPOINTMENT_UPDATE_ALLOWED as readonly string[]).includes(field)) continue
-    fieldSteps.push({ kind: 'field' as const, field: field as typeof APPOINTMENT_UPDATE_ALLOWED[number], value })
+  try {
+    // [026.01] archetype owner-check（FK 不验租户隔离）
+    if (typeof patch.activityArchetypeId === 'string') await assertArchetypeOwned(patch.activityArchetypeId)
+    // [026.01] 字段白名单——丢弃 status 等生命周期列，堵住绕过状态机
+    const fieldSteps: Array<{ kind: 'field'; field: string; value: unknown }> = []
+    for (const [field, value] of Object.entries(patch)) {
+      if (value === undefined) continue
+      if (!APPOINTMENT_UPDATE_ALLOWED_FIELDS.has(field)) continue
+      fieldSteps.push({ kind: 'field' as const, field, value })
+    }
+
+    // 无字段可写：直接读回当前约定返回（保持契约——成功且有 appointment）
+    if (fieldSteps.length === 0) {
+      const it = await new AppointmentRepository().findById(appointmentId, MVP_USER_ID as USOM_ID)
+      if (!it) throw new Error(`Appointment ${appointmentId} not found`)
+      return { status: 'ok', appointment: it }
+    }
+
+    // [026] D2 reversal: 拆双服务（A1.4 决议）— updateAppointment 用 appointment service
+    const service = createAppointmentMutationService()
+    const res = await service.execute(
+      {
+        id: crypto.randomUUID() as USOM_ID,
+        domainId: 'timebox',
+        objectType: 'appointment',
+        targetId: appointmentId,
+        steps: fieldSteps,
+      },
+      MVP_USER_ID as USOM_ID,
+    )
+    if (!res.success) throw new Error(res.error ?? '更新约定失败')
+
+    // 纯 field steps 下 res.object 为 undefined（execute 仅在 state step 设 lastObject），
+    // 兜底：用 findById 读回更新后的约定。
+    if (res.object) return { status: 'ok', appointment: res.object as Appointment }
+    const appt = await new AppointmentRepository().findById(appointmentId, MVP_USER_ID as USOM_ID)
+    if (!appt) throw new Error(`Appointment ${appointmentId} not found`)
+    return { status: 'ok', appointment: appt }
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : '更新约定失败')
   }
-
-  // 无字段可写：直接读回当前约定返回（保持契约——成功且有 appointment）
-  if (fieldSteps.length === 0) {
-    const it = await new AppointmentRepository().findById(appointmentId, MVP_USER_ID as USOM_ID)
-    if (!it) throw new Error(`Appointment ${appointmentId} not found`)
-    return { status: 'ok', appointment: it }
-  }
-
-  // [026] D2 reversal: 拆双服务（A1.4 决议）— updateAppointment 用 appointment service
-  const service = createAppointmentMutationService()
-  const res = await service.execute(
-    {
-      id: crypto.randomUUID() as USOM_ID,
-      domainId: 'timebox',
-      objectType: 'appointment',
-      targetId: appointmentId,
-      steps: fieldSteps,
-    },
-    MVP_USER_ID as USOM_ID,
-  )
-  if (!res.success) throw new Error(res.error ?? '更新约定失败')
-
-  // 纯 field steps 下 res.object 为 undefined（execute 仅在 state step 设 lastObject），
-  // 兜底：用 timebox repo 的 findById 不适用（id 是 appointment），此处仍依赖 res.object；
-  // 保留与 updateTimebox 同样的处理——若 res.object 缺失则表示字段执行器配置需补；
-  // 暂以 res.object 缺失时直接抛错（生产路径应 100% 返回 object）。
-  if (res.object) return { status: 'ok', appointment: res.object as Appointment }
-  throw new Error('更新约定失败：mutation service 未返回对象（字段执行器配置需排查）')
 }
 
 	/**
