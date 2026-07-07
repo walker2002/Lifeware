@@ -2,16 +2,27 @@
  * @file log-timebox
  * @brief 时间盒打卡 CNUI surface（[023] A2）
  *
- * 批量打卡：每条 ended timebox 三态（完成/未完成/跳过）+ 备注。
+ * 批量打卡：每条 ended timebox 三态（完成/未完成/跳过）。
  * 「提交打卡」逐条走 Nexus logTimebox。
  * [023.13] §4 — per-item 详细展开：每条 item 独立 detailedOpen 标志，
  *   展开时实例化 ExecutionDetailFields 共享组件，submit 时该 item 升级 detailed。
+ *
+ * [023.13] Fix #3 — 删除 outer notes textarea（与 ExecutionDetailFields 内层 notes
+ *   双轨存导致 outer 静默丢失，handler 仅读 it.notes 但 submit 时被 detailed 路径覆盖）。
+ *   notes 字段完全交给 ExecutionDetailFields owns,避免 CNUI 表单分叉（[memory [[project-domain-paradigm-tech-debt]]）。
+ *
+ * [023.13] Fix #2 — activityArchetypeId 由 cnui/handlers.ts open 路径传入后,LogTimebox 在
+ *   detail 展开时通过 getArchetypeById 拉原型详情缓存到 Record<id, ActivityArchetype|null>,
+ *   喂给 ExecutionDetailFields.defaultEnergyActual;仅在 hasArchetypeId 时 load,降级为 undefined。
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExecutionDetailFields, type ExecutionDetailDraft } from '../../components/execution-detail-fields'
+import { getArchetypeById } from '@/app/actions/activity-archetype'
+import { getDefaultEnergyActual } from '../../lib/get-default-energy-actual'
+import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 type LogState = 'completed' | 'incomplete' | 'skipped'
 
@@ -22,8 +33,8 @@ interface LogItem {
   endTime: string
   activityArchetypeId?: string
   state?: LogState
-  notes?: string
-  // [023.13] §4 — 详细字段（展开时填）；submit 时并入 executionRecord
+  // [023.13] Fix #3 — 移除 outer notes：完全交给 ExecutionDetailFields owns
+  /** 详细字段草稿（展开时填）；同时承担 notes 字段（→ executionRecord.notes） */
   detailed?: ExecutionDetailDraft
 }
 
@@ -49,6 +60,28 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
   // [023.13] §4 — per-item 独立详细展开标志（切换某 item 不影响其他 item）
   const [detailedOpen, setDetailedOpen] = useState<Record<string, boolean>>({})
 
+  // [023.13] Fix #2 — archetype 池缓存:per-item(per-archetypeId)拉一次,避免 N+1
+  const [archetypes, setArchetypes] = useState<Record<string, ActivityArchetype | null>>({})
+  useEffect(() => {
+    // 扫描所有 items 的 archetypeId,逐个 fetch(去重)
+    const ids = Array.from(new Set(items.map(i => i.activityArchetypeId).filter((x): x is string => Boolean(x))))
+    let cancelled = false
+    void (async () => {
+      for (const id of ids) {
+        if (cancelled) return
+        try {
+          const r = await getArchetypeById(id)
+          if (cancelled) return
+          setArchetypes(prev => ({ ...prev, [id]: r.success ? (r.data ?? null) : null }))
+        } catch {
+          if (cancelled) return
+          setArchetypes(prev => ({ ...prev, [id]: null }))
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [items])
+
   if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 打卡已提交</p>
   if (items.length === 0) return <p className="py-8 text-center text-sm text-body/70">没有待打卡的时间盒</p>
 
@@ -61,6 +94,10 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
     setDetailedOpen(prev => ({ ...prev, [cur.id]: !prev[cur.id] }))
   }
   const isDetailedOpen = detailedOpen[cur.id] ?? false
+
+  // [023.13] Fix #2 — 计算当前 item 的 energy default
+  const curArchetype = cur.activityArchetypeId ? archetypes[cur.activityArchetypeId] : undefined
+  const defaultEnergyActual = curArchetype ? getDefaultEnergyActual(curArchetype) : undefined
 
   return (
     <>
@@ -88,13 +125,7 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
             </button>
           ))}
         </div>
-        <label htmlFor="lt-notes" className="text-xs text-body">备注</label>
-        <textarea
-          id="lt-notes"
-          value={cur.notes ?? ''} onChange={e => update({ notes: e.target.value })} rows={2}
-          placeholder="备注（可选）"
-          className="w-full rounded border border-hairline bg-canvas px-2 py-1 text-sm text-ink resize-none"
-        />
+        {/* [023.13] Fix #3 — outer notes textarea 已删除,完全让 ExecutionDetailFields owns notes 字段（CNUI 表单防分叉） */}
         {/* [023.13] §4 — 详细打卡展开（per-item 独立） */}
         <button
           type="button"
@@ -108,6 +139,7 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
           <ExecutionDetailFields
             value={cur.detailed ?? {}}
             onChange={(d) => update({ detailed: d })}
+            defaultEnergyActual={defaultEnergyActual}
           />
         )}
       </div>

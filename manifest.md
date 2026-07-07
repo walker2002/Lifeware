@@ -49,11 +49,7 @@ superpowers/plans/
 
 # [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2）— Plan 在 `docs/superpowers/plans/2026-07-05-023-05-2-itinerary-to-appointment-rename.md`（11 task + C1 fix + T11 fixup 共 12 commits，ship-ready 2026-07-05）。设计覆盖：schedule→appointment（eng-review 用户识别 schedule 与 timebox 撞车）。Authority：plan SSOT + CHANGELOG.md `## [023.05-2] Itinerary → Appointment 全层重命名（PR2 阶段 2，ship-ready 2026_07_05）` + docs/usom-design.md §3.13 + docs/database-design.md §4.X。剩余 defer：[023.10] postship follow-up。
 
-<<<<<<< Updated upstream
-# [023.12] 三域生命周期语义重构（timebox / OKR cycle / appointment）— Design `docs/superpowers/specs/2026-07-06-023-12-lifecycle-simplify-design.md`（APPROVED by /office-hours）+ Plan `docs/superpowers/plans/2026-07-06-023-12-lifecycle-simplify.md`（plan-eng-review 21 findings 全折入，14 task + T9 fix + T11 docs + T12 待跑）。Authority：CHANGELOG.md `## [023.12] 三域生命周期语义重构（2026-07-06）` + docs/usom-design.md §3.5a/§3.9/§3.13 + docs/database-design.md §4.0/§4.7/§4.X + 迁移 0034 摘要。**关键决议**：反转 [026] D2 reversal（appointment 持久态 5 值→3 值，in_progress/expired 派生显示；不再 lazy reconcile 写库）。
-=======
 # [023.12] 三域生命周期语义重构（office-hours DESIGN + plan-eng-review CLEARED + /qa ship-ready）— Plan 在 `docs/superpowers/plans/2026-07-06-023-12-lifecycle-simplify.md`（15 SDD task + 4 plan-eng-review AM1-AM10 amendments + codex outside voice 吸收 + 3 /qa 真 issue 修 + 4 pre-land cluster fix = 24 commits，ship-ready 2026-07-06）。设计覆盖：timebox 6→3 态、cycle 5→4 态、appointment 5→3 态；时间态（running/overtime/in_progress/expired）改读时派生；cycle 字段 AM6 rename（started_at→approved_at, ended_at→finished_at）；2 条 revert transition per domain；**反向 [026] D2 reversal**（appointment 从持久化改派生）。Authority：plan SSOT（含 GSTACK REVIEW REPORT + per-task briefs/reports at .superpowers/sdd/）+ CHANGELOG.md `## USOM 详细设计 2026_07_06 [023.12]` + docs/usom-design.md §3.5a/§3.9/§3.13 + docs/database-design.md §4.0/§4.7/§4.X。剩余 ship-then-polish 7 错：tsc 95（baseline 103 - 8 真修；剩 7 是 tasks/hooks.ts fixture + intent.ts/timebox.ts 漏跟 + habits 域），[023.13] 收口。
->>>>>>> Stashed changes
 ```
 
 ### 第三层：Claude 自动维护

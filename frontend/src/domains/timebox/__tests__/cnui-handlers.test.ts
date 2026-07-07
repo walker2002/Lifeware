@@ -174,14 +174,15 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
   })
 
   it('submit completed 调 logTimebox intent 且 executionRecord.completionStatus=completed', async () => {
+    // [023.13] Fix #3 — notes 由 detailed.notes owns(LogTimebox 已删除 outer notes 字段)
     const r = await timeboxCnuiHandler.submit('logTimebox', {
-      items: [{ id: 'tb-1', title: '写作', state: 'completed', notes: '顺利' }],
+      items: [{ id: 'tb-1', title: '写作', state: 'completed', detailed: { notes: '顺利' } }],
     })
     expect(r.success).toBe(true)
     expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
       objectId: 'tb-1',
       executionRecord: expect.objectContaining({
-        mode: 'simple',
+        mode: 'detailed',
         completionStatus: 'completed',
         sourceType: 'timebox',
         actualDuration: 0,
@@ -193,14 +194,15 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
   })
 
   it('submit incomplete 映射为 executionRecord.completionStatus=partial', async () => {
+    // [023.13] Fix #3 — detailed.notes 透传 (notes 单源: ExecutionDetailFields)
     const r = await timeboxCnuiHandler.submit('logTimebox', {
-      items: [{ id: 'tb-1', title: '写作', state: 'incomplete', notes: '被打断' }],
+      items: [{ id: 'tb-1', title: '写作', state: 'incomplete', detailed: { notes: '被打断' } }],
     })
     expect(r.success).toBe(true)
     expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', {
       objectId: 'tb-1',
       executionRecord: expect.objectContaining({
-        mode: 'simple',
+        mode: 'detailed',
         completionStatus: 'partial',
         sourceType: 'timebox',
         actualDuration: 0,

@@ -176,6 +176,9 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         title: t.title,
         startTime: t.startTime,
         endTime: t.endTime,
+        // [023.13] Fix #2 — 传 activityArchetypeId 让 LogTimebox 拿到 archetype 详情,
+        // 然后 ExecutionDetailFields 才能调 getDefaultEnergyActual 显示能量均值。
+        activityArchetypeId: t.activityArchetypeId,
       }))
       if (targetId) {
         const idx = items.findIndex(i => i.id === targetId)
@@ -572,10 +575,13 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
           // [023.13] T8 — detailed 字段注入：仅当 item 展开过（it.detailed 存在且任一字段有值）
           //   时升级 mode='detailed' 并注入 actualStart/End/focusMinutes/energyActual。
           //   notes 仍走 it.notes 通道（避免 detailed.notes 与 it.notes 重复注入同一字段）。
-          const detailed: { actualStartTime?: string; actualEndTime?: string; focusMinutes?: number; energyActual?: number } = it.detailed ?? {}
+          const detailed: { actualStartTime?: string; actualEndTime?: string; focusMinutes?: number; energyActual?: number; notes?: string } = it.detailed ?? {}
+          // [023.13] Fix #3 — notes 现在由 ExecutionDetailFields 完全 owns,source of truth = detailed.notes
+          //   item.notes 已删除;hasDetailed 只需看 detailed 任一字段含值即可升级 detailed
           const hasDetailed = Boolean(
             detailed.actualStartTime || detailed.actualEndTime ||
-            detailed.focusMinutes != null || detailed.energyActual != null,
+            detailed.focusMinutes != null || detailed.energyActual != null ||
+            detailed.notes,
           )
           const executionRecord = {
             mode: hasDetailed ? ('detailed' as const) : ('simple' as const),
@@ -586,8 +592,8 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             deviationMinutes: 0,
             sourceType: 'timebox' as const,
             loggedAt: new Date().toISOString() as Timestamp,
-            // notes optional 透传（surface 现有 notes 字段）
-            ...(it.notes ? { notes: it.notes } : {}),
+            // [023.13] Fix #3 — notes 从 detailed.notes 走 (单源: ExecutionDetailFields 完全 owns)
+            ...(detailed.notes ? { notes: detailed.notes } : {}),
             // [023.13] T8 — 详细字段条件性注入
             ...(detailed.actualStartTime ? { actualStartTime: detailed.actualStartTime } : {}),
             ...(detailed.actualEndTime ? { actualEndTime: detailed.actualEndTime } : {}),
