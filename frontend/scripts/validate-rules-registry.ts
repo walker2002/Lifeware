@@ -6,24 +6,30 @@
  * @usage npx tsx scripts/validate-rules-registry.ts
  * @exitcode 0 = 一致, 1 = drift（STATUS_TRANSITION_ACTIONS 缺失/多余或退化为手工 Set）, 2 = 脚本错误
  *
- * 校验策略（AM5：双侧直读，不 import 模块）：
+ * 校验策略（AM5：双侧直读 + 纯函数 import）：
  *   - 读 `manifest.yaml` 文本 → deriveExpected（与 buildStatusTransitionActions 同逻辑，
  *     但**不**走 loadDomainManifest，直接 YAML parse）
+ *   - 形态合法时:把同一份 yaml 喂给 `deriveStatusTransitionActions` 纯函数 → actual 集合
+ *     与 expected 集合对比;若缺失/多余 → drift(missing/extra 报告)
  *   - 读 `rules-registry.ts` 文本 → 静态扫描 STATUS_TRANSITION_ACTIONS 的 RHS
- *     - 包含 `buildStatusTransitionActions()` / `getTransitionsFromManifest(...)` 之类派生调用
- *       → 视为合法，drift = 0
- *     - 包含 `new Set([` 紧跟多行字符串字面量（且不在 build* 内部）→ 手工 Set drift
+ *     - 包含 `buildStatusTransitionActions()` / `getTransitionsFromManifest(...)` /
+ *       `deriveStatusTransitionActions(...)` 等派生调用 → 视为合法形态
+ *     - 包含 `new Set([` + 字符串字面量成员 → 手工 Set drift
  *     - 其他形态 → 未识别形态 drift
  *
- * AM5 关键约束：双侧均从 source as text 解析，**不** import TS 模块。原因：
- *   1. tsx 脚本里 `@/` alias 在 ESM 解析下会失败（TD-019 doc 明示）
- *   2. 即便绕开 alias，import 会调 buildStatusTransitionActions()。但若 rules-registry.ts
- *      已退化为手工常量（new Set([...])），buildStatusTransitionActions 仍返回 manifest 派生集，
- *      **两边永远相等，drift 检测失效**。所以必须读源码字面形态。
+ * AM5 关键约束 + [023.13] Critical Fix #1：
+ *   - validator `import` 的是 `deriveStatusTransitionActions` **纯函数**(无副作用,不会
+ *     触发 loadDomainManifest 或其他 @/ alias 解析)。feed 纯函数的是 validator 手动
+ *     parse 出来的 yaml 对象——不读 manifest-loader cache,不踩 ESM 副作用链。
+ *   - 形态合法时必须做 actual vs expected 集合比对:若 `deriveStatusTransitionActions`
+ *     函数体本身退化(toPascalCase 漏 charAt、忘了过滤 create),expected(validator 同源)
+ *     与 actual(纯函数)会出现 missing/extra,validator 必须 exit 1+drift 报告。
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as yaml from 'js-yaml'
+// [023.13] Critical Fix #1: import 纯函数（无副作用、不触发 manifest-loader）
+import { deriveStatusTransitionActions } from '../src/domains/timebox/lib/build-status-transition-actions'
 
 const ROOT_DIR = path.resolve(__dirname, '..')
 const MANIFEST_PATH = path.join(ROOT_DIR, 'src', 'domains', 'timebox', 'manifest.yaml')
@@ -41,25 +47,29 @@ interface RawManifest {
 
 /**
  * snake_case_objectType → PascalCaseObjectType（timebox→Timebox, appointment→Appointment）
- * 与 build-status-transition-actions.ts:toPascalCase 同源。
+ * 与 build-status-transition-actions.ts:toPascalCase 同源手工（[023.13] Critical Fix #1：
+ * validator 内部独立派生,不直接复用被测代码的 toPascalCase,以便在 derive 函内漏写时
+ * 仍能产出 missing/extra 差异）。
  */
 function toPascalCase(snake: string): string {
   return snake.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
 }
 
-// ─── 期望集派生（与 buildStatusTransitionActions 逻辑同源）──────────
+// ─── 期望集派生（与 deriveStatusTransitionActions 逻辑同源手工）──────────
 
 /**
- * 从 manifest.yaml 直读 YAML，派生 expected STATUS_TRANSITION_ACTIONS 集合。
- * 逻辑对齐 lib/build-status-transition-actions.ts:buildStatusTransitionActions：
- *   - lifecycle[objectType].transitions[*].action → `${action}${PascalCase(objectType)}`
- *   - 排除 `create`（create 需字段必含校验）
+ * 读 manifest.yaml,返回 raw manifest 对象 + validator 自己派生的 expected Set。
+ * expected 走 validator 本地 toPascalCase + 排除 create,作为「独立 oracle」。
+ *
+ * [023.13] Critical Fix #1:返回 raw manifest,让 main() 把它喂给纯函数 deriveStatusTransitionActions
+ * 算出 actual;两边同源输入不同派生路径——若 derive 函内 toPascalCase 退化为 slice(1)、
+ * 漏过滤 create 等,expected 与 actual 即出现 missing/extra。
  */
-function deriveExpected(): Set<string> {
-  const raw = fs.readFileSync(MANIFEST_PATH, 'utf8')
-  const manifest = yaml.load(raw) as RawManifest
+function loadManifestAndDeriveExpected(): { rawManifest: RawManifest; expected: Set<string> } {
+  const rawText = fs.readFileSync(MANIFEST_PATH, 'utf8')
+  const rawManifest = yaml.load(rawText) as RawManifest
   const result = new Set<string>()
-  const lifecycle = manifest.lifecycle ?? {}
+  const lifecycle = rawManifest.lifecycle ?? {}
   for (const [objectType, def] of Object.entries(lifecycle)) {
     const pascal = toPascalCase(objectType)
     for (const t of def.transitions ?? []) {
@@ -69,7 +79,7 @@ function deriveExpected(): Set<string> {
       result.add(`${action}${pascal}`)
     }
   }
-  return result
+  return { rawManifest, expected: result }
 }
 
 // ─── 实际形态检测（读 rules-registry.ts 源码扫描 RHS）────────────
@@ -135,7 +145,9 @@ function inspectRulesRegistryShape(): ActualShape {
   const rhsHead = (lines[lineNumber - 1] ?? '').trim()
 
   // 判定 1：是否走派生函数
-  const usesDerivation = /\b(buildStatusTransitionActions|getTransitionsFromManifest)\s*\(/.test(rhsText)
+  // [023.13] Critical Fix #1:加入 deriveStatusTransitionActions 关键词（[023.13] 抽纯函数后,
+  // rules-registry.ts 可能直接调纯函数而非 wrapper;两者都视为合法形态）
+  const usesDerivation = /\b(buildStatusTransitionActions|getTransitionsFromManifest|deriveStatusTransitionActions)\s*\(/.test(rhsText)
 
   // 判定 2：是否手工 Set 字面量
   // 启发式：RHS 含 `new Set(` （允许 `new Set<string>([` 这种泛型形式），
@@ -174,7 +186,11 @@ interface DriftReport {
   extra?: string[]
 }
 
-function checkDrift(expected: Set<string>, shape: ActualShape): DriftReport {
+function checkDrift(
+  expected: Set<string>,
+  actual: Set<string>,
+  shape: ActualShape,
+): DriftReport {
   const report: DriftReport = {}
 
   if (!shape.usesDerivation) {
@@ -185,24 +201,26 @@ function checkDrift(expected: Set<string>, shape: ActualShape): DriftReport {
     } else {
       report.shapeProblem =
         `STATUS_TRANSITION_ACTIONS 形态未识别（${shape.rhsHead}）。` +
-        `RHS 必须调用 buildStatusTransitionActions() 或 getTransitionsFromManifest(...) 等派生函数。`
+        `RHS 必须调用 buildStatusTransitionActions() / deriveStatusTransitionActions(...) / ` +
+        `getTransitionsFromManifest(...) 等派生函数。`
     }
     return report
   }
 
-  // 形态合法：但 manifest 与派生函数应当产生完全一致的集合。
-  // 此处我们没有读 actual 集合（避免 import 链），但 manifest lifecycle 增删 transitions
-  // 后必须由派生函数正确反映——如果形态合法（走派生），实际集合 = 期望集合是构造性保证。
-  // 此处仍做"成员级别 sanity check"：通过解析 manifest 派生 expected，
-  // 形态合法即视为通过。
-  void expected
+  // [023.13] Critical Fix #1:形态合法 ≠ 派生正确。必须比对 actual(纯函数算的)与
+  // expected(validator 内部同源手工);若 deriveStatusTransitionActions 函数体退化
+  // (toPascalCase 漏 charAt、忘了过滤 create),actual 与 expected 出现 missing/extra。
+  const missing = [...expected].filter((x) => !actual.has(x)).sort()
+  const extra = [...actual].filter((x) => !expected.has(x)).sort()
+  if (missing.length > 0) report.missing = missing
+  if (extra.length > 0) report.extra = extra
   return report
 }
 
 function main(): number {
-  let expected: Set<string>
+  let loadResult: { rawManifest: RawManifest; expected: Set<string> }
   try {
-    expected = deriveExpected()
+    loadResult = loadManifestAndDeriveExpected()
   } catch (e) {
     console.error('validate:rules-registry — manifest 解析失败:', (e as Error).message)
     return 2
@@ -216,7 +234,13 @@ function main(): number {
     return 2
   }
 
-  const report = checkDrift(expected, shape)
+  // [023.13] Critical Fix #1:形态合法时调纯函数算 actual,validator 喂入自己 parse 的 yaml
+  // —— 不走 manifest-loader cache、不踩 @/ alias 副作用链。
+  const actual = shape.usesDerivation
+    ? deriveStatusTransitionActions(loadResult.rawManifest)
+    : new Set<string>()
+
+  const report = checkDrift(loadResult.expected, actual, shape)
 
   if (report.shapeProblem) {
     console.error('✗ validate:rules-registry drift:')
@@ -225,8 +249,34 @@ function main(): number {
     return 1
   }
 
-  // 形态合法：报告派生集合的成员（仅诊断用，不阻断）
-  const sorted = [...expected].sort()
+  if (report.missing && report.missing.length > 0) {
+    console.error('✗ validate:rules-registry drift:')
+    console.error(
+      `  expected 有但 actual（deriveStatusTransitionActions）缺 ${report.missing.length} 项:`,
+    )
+    for (const m of report.missing) console.error(`    - ${m}`)
+    console.error(
+      `  修复:检查 src/domains/timebox/lib/build-status-transition-actions.ts 内 ` +
+        `deriveStatusTransitionActions 函数(toPascalCase / create 过滤 是否仍正确)`,
+    )
+    return 1
+  }
+
+  if (report.extra && report.extra.length > 0) {
+    console.error('✗ validate:rules-registry drift:')
+    console.error(
+      `  actual（deriveStatusTransitionActions）有但 expected 缺 ${report.extra.length} 项:`,
+    )
+    for (const e of report.extra) console.error(`    - ${e}`)
+    console.error(
+      `  修复:deriveStatusTransitionActions 多算了——多半忘了过滤 create 或 lifecycle ` +
+        `解析读错了键`,
+    )
+    return 1
+  }
+
+  // 形态合法 + 集合一致:报告派生集合的成员（仅诊断用,不阻断）
+  const sorted = [...loadResult.expected].sort()
   console.log(
     `✓ validate:rules-registry — STATUS_TRANSITION_ACTIONS 与 manifest.lifecycle 一致（${sorted.length} 项: ${sorted.join(', ')}）`,
   )
