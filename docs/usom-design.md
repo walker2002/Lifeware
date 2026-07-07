@@ -779,6 +779,15 @@ interface DetailedExecutionRecord extends ExecutionRecordBase {
   deviationReasons?: string
   energyLevel?: number
   notes?: string
+  // [023.13] 打卡专区扩展（存在 execution_record JSONB，免 DDL 迁移）
+  /** 实际开始时间（与 actualEndTime 派生 actualDuration） */
+  actualStartTime?: Timestamp
+  /** 实际结束时间 */
+  actualEndTime?: Timestamp
+  /** 深度专注时长（分钟，rule: ≤ actualDuration） */
+  focusMinutes?: number
+  /** 实际能量消耗 1-10（单值度量，默认 archetype 4 维均值；绕开 D8 4 维禁令） */
+  energyActual?: number
 }
 
 type ExecutionRecord = SimpleExecutionRecord | DetailedExecutionRecord
@@ -2002,9 +2011,10 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_07_06*
+*文档版本：2026_07_07*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
 
+*变更：[023.13] (2026_07_07) — §3.9 DetailedExecutionRecord 扩展 4 字段 `actualStartTime?/actualEndTime?/focusMinutes?/energyActual?`（打卡专区；JSONB 演进免 DDL；energyActual 单值绕 D8 4 维禁令）*
 *变更：[023.11] (2026_07_06) — §3.11 ActivityArchetype 加 `synonyms: string[]` 字段（jsonb 列于 activity_archetypes；用于标题→archetype 匹配；空=未维护）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §3.13 Itinerary→Appointment 全层重命名 + 设计覆盖注（schedule→appointment 因 timebox 语义撞车）+ 中文「行程」→「约定」*

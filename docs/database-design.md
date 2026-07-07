@@ -744,6 +744,7 @@ CREATE TABLE timeboxes (
   activity_archetype_id  uuid  REFERENCES activity_archetypes(id) ON DELETE SET NULL,
 
   -- JSONB 允许：执行记录，记录实际执行情况
+  -- [023.13] JSONB 形状扩展 4 可选字段 actualStartTime/actualEndTime/focusMinutes/energyActual（USOM DetailedExecutionRecord），免 DDL 迁移
   execution_record jsonb,  -- ExecutionRecord（SimpleExecutionRecord | DetailedExecutionRecord）
 
   -- [023] A2 OV#P1-#2: USOM taskIds/habitIds 落库列（软关联，无 FK；强一致性由 Repository 负责）
@@ -1752,6 +1753,7 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 *文档版本：2026_07_07*
 *关联上游文档：docs/usom-design.md*
 
+*变更：[023.13] (2026_07_07) — §4.7 timeboxes.execution_record JSONB 形状扩展 4 可选字段（actualStartTime/actualEndTime/focusMinutes/energyActual），免 DDL 迁移（JSONB 演进）*
 *变更：[023.11] (2026_07_06) — §7.6 activity_archetypes 加 `synonyms jsonb NOT NULL DEFAULT '[]'` 列（迁移 0034_023_11_archetype_synonyms.sql，幂等 ADD COLUMN IF NOT EXISTS）*
 *变更：[026.01] (2026_07_07) — §appointments 加 `activity_archetype_id uuid REFERENCES activity_archetypes(id) ON DELETE SET NULL` 列 + 索引 `idx_appointments_archetype`，迁移 0035_026_01_appointment_activity_archetype.sql（IF NOT EXISTS 幂等）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §4.X appointments（rename 自 itineraries）+ 0033 RENAME 迁移 + F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal）*

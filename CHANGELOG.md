@@ -8,6 +8,35 @@
 
 ---
 
+## [023.13] 时间盒持续优化（2026-07-07）
+
+> 2026_07_07 — **T3 docs+USOM partial**：本任务先 Tier 2 文档同步 + USOM `DetailedExecutionRecord` 扩展 4 字段 + mapper 向后兼容测试；下游 T4-T9 待续。**核心**：JSONB 演进免 DDL 迁移；`energyActual` 单值度量 1-10（绕开 [023] D8 4 维能量禁令）。
+
+### 决策
+
+- **D-T3-1** JSONB schema 演进：`timeboxes.execution_record` 加 4 字段 = 零 DDL 迁移（mapper 不删未知键/不补缺键，直接 spread 透传）
+- **D-T3-2** `energyActual` 是单值度量（1-10），默认取 archetype 4 维 `EnergyCost` 均值；无 archetype 留空；显式绕开 [023] D8「`EnergyState` 单维 vs `EnergyCost` 4 维」分层隔离（避免宪章 amendment）
+
+### 改动（本任务）
+
+- **USOM 类型扩展**：`frontend/src/usom/types/objects.ts` `DetailedExecutionRecord` 加 4 可选字段 `actualStartTime?: Timestamp` / `actualEndTime?: Timestamp` / `focusMinutes?: number` / `energyActual?: number`
+- **Tier 2 文档同步**：
+  - `docs/usom-design.md` §3.9 DetailedExecutionRecord interface 块更新（4 字段 + 行内注释 + JSDoc）；footer 版本号 2026_07_06→2026_07_07
+  - `docs/database-design.md` §4.7 timeboxes.execution_record JSONB 章节加 `[023.13] JSONB 形状扩展` 行注释；变更记录追加一条
+- **Mapper 后向兼容测试**：`frontend/src/usom/__tests__/execution-record-compat.test.ts`（2 cases：旧行 4 新字段 undefined + 新行保留 4 字段）
+
+### 验证
+
+- vitest：`execution-record-compat.test.ts` 2/2 PASS
+- tsc：0 新增 error（本任务改动文件范围）
+
+### 范围
+
+- 5 文件：3 docs + 1 USOM types + 1 test 新建
+- 无 PG migration / 无 DDL 变更（JSONB 演进）
+
+---
+
 ## [023.12] 三域生命周期语义重构（2026-07-06）
 
 > 2026_07_06 — **ship-ready**：14/15 task 完成（T1a / T1b / T2 / T3 / T4 / T5 / T6 / T7 / T8 / T9 / T10 / T13 / T14 + T11 docs 本任务），T12 验证门待跑。T11 docs 同步 + T9 fix wire cycleStatus at 5 call sites（reviewed lock EFFECTIVE）。**核心思路**：把 timebox / cycle / appointment 三域持久态收敛到「只跟踪用户行为」——时间态一律读时派生显示。

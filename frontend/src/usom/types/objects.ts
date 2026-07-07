@@ -562,6 +562,10 @@ export interface SimpleExecutionRecord extends ExecutionRecordBase {
  * @property deviationReasons - 偏差原因
  * @property energyLevel - 执行时的能量等级
  * @property notes - 备注
+ * @property actualStartTime - 实际开始时间（[023.13] 打卡专区扩展，JSONB 演进免 DDL）
+ * @property actualEndTime - 实际结束时间（[023.13] 与 actualStartTime 派生 actualDuration）
+ * @property focusMinutes - 深度专注时长（[023.13] rule: ≤ actualDuration）
+ * @property energyActual - 实际能量消耗 1-10（[023.13] 单值度量；默认 archetype 4 维均值；绕 D8 4 维禁令）
  */
 export interface DetailedExecutionRecord extends ExecutionRecordBase {
   mode: 'detailed'
@@ -570,6 +574,15 @@ export interface DetailedExecutionRecord extends ExecutionRecordBase {
   deviationReasons?: string
   energyLevel?: number
   notes?: string
+  // [023.13] 打卡专区扩展（存在 execution_record JSONB，免 DDL 迁移）
+  /** 实际开始时间（与 actualEndTime 派生 actualDuration） */
+  actualStartTime?: Timestamp
+  /** 实际结束时间 */
+  actualEndTime?: Timestamp
+  /** 深度专注时长（分钟，rule: ≤ actualDuration） */
+  focusMinutes?: number
+  /** 实际能量消耗 1-10（单值度量，默认 archetype 4 维均值；绕开 D8 4 维禁令） */
+  energyActual?: number
 }
 
 /**
