@@ -1,6 +1,6 @@
 /**
  * @file timeboxes-workspace
- * @brief 时间盒工作台（[023] A2 / [026] A3.2 / [023.03] T3 错误反馈 / [023.03] T4 重命名 /schedule→/timeboxes）
+ * @brief 时间盒工作台（[023] A2 / [026] A3.2 / [023.03] T3 错误反馈 / [023.03] T4 重命名 /schedule→/timeboxes / [023.13] T7 批量多选+回退确认）
  *
  * 左栏：日期导航 + 当日时间盒列表（DayView 复用），支持创建/编辑/删除/lifecycle。
  * 右栏：Timebox Drawer 挂载点（Variant C v2，T4 实现）。
@@ -30,6 +30,17 @@
  * TimeboxesEvent[]（discriminated union），所以在 workspace 里过滤
  * kind='timebox' 转 source 数组传入。appointment 在周/月视图不渲染
  * ——设计如此，时间盒域视图只显示 timebox，约定由 /appointments 域承担。
+ *
+ * [023.13] T7：批量多选模式 + 一键打卡 + 回退确认弹窗
+ * - handleAction union 加 'quickLog'：不开抽屉，simple executionRecord（plannedDuration
+ *   按 startTime/endTime 算，actualDuration=plannedDuration，deviation=0）走
+ *   transitionTimebox('log', {executionRecord:{...}})，T6 验证 AM1 SM 写入路径
+ * - handleAction union 加 'quickLog' 后 action='revert' 改为先查 executionRecord：
+ *   logged+executionRecord → 弹 AlertDialog 二次确认（确认后调 revertTimebox
+ *   传 {clearExecutionRecord:true}，复用 T5 P3 AM3 updateFields 路径），
+ *   cancelled → 直接 revertTimebox()（无 executionRecord 守卫自动过）
+ * - selectMode state（不持久化，刷新重置）+ selectedIds state + handleBatch 串行 await
+ *   + 顶栏 [多选] toggle + 底部批量操作栏（已选 N 时显示）
  */
 
 'use client'
@@ -94,6 +105,11 @@ export function TimeboxesWorkspace() {
   const [aiProposals, setAiProposals] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([])
   // revertableBatches（来自 cnui handler open 调用 getRevertableBatches）
   const [revertableBatches, setRevertableBatches] = useState<Array<{ batchId: string; acceptedAt: number; count: number }>>([])
+  // [023.13] T7：批量多选模式 + 回退确认弹窗 state
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // 回退确认：logged + executionRecord 时弹窗让用户显式确认清空执行记录
+  const [revertConfirm, setRevertConfirm] = useState<{ id: string } | null>(null)
 
   // [023.06] T2：范围拉取（替代 loadDay，行为对齐 T1 getDateRange）
   // [023.12] T14 fix: pathname 守卫 —— workspace 只在 /timeboxes（或含时间盒主区）挂载
@@ -157,22 +173,39 @@ export function TimeboxesWorkspace() {
   )
 
   /**
-   * [023.03] T3 / [023.12] T8：handleAction 包 try/catch + 处理 needs_confirm AlertDialog
+   * [023.03] T3 / [023.12] T8 / [023.13] T7：handleAction 包 try/catch + 处理 needs_confirm AlertDialog
    *
    * [023.12] T8 扩展：
    * - 新增 'revert' / 'delete' 动作（取代旧 start/end 流程）
    * - 'revert' 走 revertTimebox（[AM7] executionRecord 守卫：守卫命中会 throw
    *   '请先清理执行记录再回退'，catch 内 toast.error 提示）
    * - 'delete' 走 deleteTimebox（仅 planned 可用；其他状态 throw）
+   *
+   * [023.13] T7 扩展：
+   * - 新增 'quickLog' 动作（planned 卡一键 simple 打卡，不开 Drawer）。
+   *   走 transitionTimebox('log', {executionRecord:{simple + plannedDuration/0 偏差/...}})，
+   *   T6 验证 AM1 SM 写入路径。plannedDuration 按 startTime/endTime 算分钟，
+   *   actualDuration=plannedDuration，deviation=0（按时完成假设）。
+   * - 'revert' 流程改为：查 events 拿该 timebox 的 executionRecord；
+   *   有值 → 弹 AlertDialog 二次确认（确认后走 revertTimebox(id, {clearExecutionRecord:true}，
+   *   复用 T5 P3 AM3 updateFields 路径）；无值（cancelled 状态）→ 直接 revertTimebox()。
    */
   const handleAction = useCallback(async (
     timeboxId: string,
-    action: 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog',
+    action: 'start' | 'end' | 'cancel' | 'log' | 'quickLog' | 'revert' | 'delete' | 'viewLog',
   ) => {
     setActionSubmitting(true)
     try {
       if (action === 'revert') {
-        // [023.12] T8 [AM7]：revertTimebox 抛错 → toast 提示
+        // [023.13] T7：logged + executionRecord → 弹窗确认清空；cancelled → 直接 revert
+        const tb = events.find(
+          (e): e is Extract<TimeboxesEvent, { kind: 'timebox' }> =>
+            e.kind === 'timebox' && e.source.id === timeboxId,
+        )?.source
+        if (tb?.executionRecord) {
+          setRevertConfirm({ id: timeboxId })
+          return
+        }
         await revertTimebox(timeboxId)
         toast.success('已回退为已规划')
         await loadRange(dateMode, currentDate)
@@ -185,11 +218,50 @@ export function TimeboxesWorkspace() {
         await loadRange(dateMode, currentDate)
         return
       }
-      // [023.03] T3 旧路径：start/end/cancel/log 走 transitionTimebox + needs_confirm
       if (action === 'viewLog') {
         // viewLog 是只读跳转，workspace 端不处理（由父级面板接管）
         return
       }
+      // [023.13] T7：quickLog 一键 simple 打卡（不开 Drawer）
+      if (action === 'quickLog') {
+        const tb = events.find(
+          (e): e is Extract<TimeboxesEvent, { kind: 'timebox' }> =>
+            e.kind === 'timebox' && e.source.id === timeboxId,
+        )?.source
+        if (!tb) {
+          toast.error('未找到该时间盒')
+          return
+        }
+        const plannedDuration = Math.max(
+          0,
+          Math.round(
+            (new Date(tb.endTime).getTime() - new Date(tb.startTime).getTime()) / 60000,
+          ),
+        )
+        const r = await transitionTimebox(timeboxId, 'log', {
+          executionRecord: {
+            mode: 'simple',
+            completionStatus: 'completed',
+            actualDuration: plannedDuration,
+            plannedDuration,
+            deviationMinutes: 0,
+            sourceType: 'timebox',
+            loggedAt: new Date().toISOString(),
+          },
+        })
+        if (r.status === 'ok') {
+          toast.success('已打卡')
+          await loadRange(dateMode, currentDate)
+          return
+        }
+        if (r.status === 'needs_confirm') {
+          // quickLog 一般不会撞 needs_confirm（logged 已是终态），但 SM 兜底提示
+          toast.error(r.message ?? '需要确认')
+          return
+        }
+        return
+      }
+      // [023.03] T3 旧路径：start/end/cancel/log 走 transitionTimebox + needs_confirm
       const r = await transitionTimebox(timeboxId, action, {}, false)
       if (r.status === 'ok') {
         await loadRange(dateMode, currentDate)
@@ -215,7 +287,96 @@ export function TimeboxesWorkspace() {
     } finally {
       setActionSubmitting(false)
     }
-  }, [dateMode, currentDate, loadRange])
+  }, [dateMode, currentDate, loadRange, events])
+
+  /**
+   * [023.13] T7：批量多选 toggle 切换 + 批量操作
+   * - handleToggleSelect：单 id 切换（已选剔除/未选加入）
+   * - handleBatch：遍历 selectedIds 顺序 await transitionTimebox(id, action, ...)
+   *   聚合成功/失败计数；MVP 串行可接受（小 N），大 N 优化留 P1 债。
+   * - 退出多选时清空 selectedIds（避免下次进选状态残留）
+   */
+  const handleToggleSelectMode = useCallback(() => {
+    setSelectMode(prev => {
+      if (prev) setSelectedIds([])
+      return !prev
+    })
+  }, [])
+
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  }, [])
+
+  const handleBatch = useCallback(async (batchAction: 'log' | 'cancel') => {
+    if (selectedIds.length === 0) return
+    // 仅 planned 卡参与批量（其他状态过滤：cancelled/logged 单卡已有专属按钮）
+    const findTimebox = (id: string) =>
+      events.find(
+        (e): e is Extract<TimeboxesEvent, { kind: 'timebox' }> =>
+          e.kind === 'timebox' && e.source.id === id,
+      )?.source
+    const plannedIds = selectedIds.filter((id) => findTimebox(id)?.status === 'planned')
+    if (plannedIds.length === 0) {
+      toast.error('所选时间盒无可批量操作的状态')
+      return
+    }
+    setActionSubmitting(true)
+    let successCount = 0
+    let failCount = 0
+    try {
+      for (const id of plannedIds) {
+        try {
+          if (batchAction === 'cancel') {
+            const r = await transitionTimebox(id, 'cancel', {}, false)
+            if (r.status === 'ok') successCount++
+            else failCount++
+          } else {
+            // 批量 log 走 simple 模式（同 quickLog）：plannedDuration 来自 timebox 自身
+            const tb = findTimebox(id)
+            if (!tb) {
+              failCount++
+              continue
+            }
+            const plannedDuration = Math.max(
+              0,
+              Math.round(
+                (new Date(tb.endTime).getTime() - new Date(tb.startTime).getTime()) / 60000,
+              ),
+            )
+            const r = await transitionTimebox(id, 'log', {
+              executionRecord: {
+                mode: 'simple',
+                completionStatus: 'completed',
+                actualDuration: plannedDuration,
+                plannedDuration,
+                deviationMinutes: 0,
+                sourceType: 'timebox',
+                loggedAt: new Date().toISOString(),
+              },
+            })
+            if (r.status === 'ok') successCount++
+            else failCount++
+          }
+        } catch (e) {
+          console.error('[TimeboxesWorkspace.handleBatch] item failed', id, e)
+          failCount++
+        }
+      }
+      if (successCount > 0) {
+        toast.success(
+          batchAction === 'log'
+            ? `已批量打卡 ${successCount} 个${failCount > 0 ? `（${failCount} 失败）` : ''}`
+            : `已批量取消 ${successCount} 个${failCount > 0 ? `（${failCount} 失败）` : ''}`,
+        )
+      } else {
+        toast.error('批量操作全部失败')
+      }
+      await loadRange(dateMode, currentDate)
+      setSelectedIds([])
+    } finally {
+      setActionSubmitting(false)
+    }
+  }, [selectedIds, events, dateMode, currentDate, loadRange])
 
   /**
    * [023.08] T5：AI 智能推荐入口 — 打开 AI panel
@@ -341,6 +502,15 @@ export function TimeboxesWorkspace() {
             onNavigate={handleNavigate}
           />
           <div className="flex items-center gap-2">
+            {/* [023.13] T7：批量多选 toggle（进入多选模式时按钮高亮） */}
+            <Button
+              size="sm"
+              variant={selectMode ? 'default' : 'outline'}
+              data-testid="batch-toggle-btn"
+              onClick={handleToggleSelectMode}
+            >
+              {selectMode ? '退出多选' : '多选'}
+            </Button>
             {/* [023.08] T5 [F5 fold]: AI 智能推荐入口（data-testid 给 E2E + 验证测试用） */}
             <Button
               size="sm"
@@ -377,8 +547,11 @@ export function TimeboxesWorkspace() {
                 events={events}
                 currentDate={currentDate}
                 onDateSelect={handleDateSelect}
-                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log' | 'revert' | 'delete' | 'viewLog')}
+                onAction={(id, action) => handleAction(id, action as 'start' | 'end' | 'cancel' | 'log' | 'quickLog' | 'revert' | 'delete' | 'viewLog')}
                 onEdit={handleEdit}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
               />
             )
           ) : (
@@ -394,6 +567,37 @@ export function TimeboxesWorkspace() {
             )
           )}
         </div>
+        {/* [023.13] T7：批量操作底栏（selectMode + 已选 N > 0 时显示） */}
+        {selectMode && (
+          <div
+            data-testid="batch-action-bar"
+            className="flex items-center justify-between gap-2 border-t border-hairline px-4 py-2 bg-surface-card"
+          >
+            <span className="text-xs text-body">
+              已选 <span data-testid="batch-count" className="font-medium text-ink">{selectedIds.length}</span> 个
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                disabled={selectedIds.length === 0 || actionSubmitting}
+                onClick={() => handleBatch('log')}
+                data-testid="batch-log-btn"
+              >
+                批量打卡
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-body"
+                disabled={selectedIds.length === 0 || actionSubmitting}
+                onClick={() => handleBatch('cancel')}
+                data-testid="batch-cancel-btn"
+              >
+                批量取消
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 右栏：Drawer（T4 实现，由 drawer 状态控制开关） */}
@@ -461,6 +665,48 @@ export function TimeboxesWorkspace() {
               }}
             >
               {actionSubmitting ? '处理中...' : '确认'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* [023.13] T7：logged + executionRecord 回退二次确认 AlertDialog
+          - 复用 P3 AM3 updateFields 路径：确认后调 revertTimebox(id, {clearExecutionRecord:true})
+          - 取消按钮 disabled 时防双击（actionSubmitting）
+          - 关闭（点空白 / Esc）只清 state，不调任何 revert（按 brief） */}
+      <AlertDialog
+        open={!!revertConfirm}
+        onOpenChange={o => { if (!o) setRevertConfirm(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认回退</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作将清除该时间盒的执行记录（实际时长、深度专注、能量消耗、执行详情），不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionSubmitting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={actionSubmitting}
+              data-testid="revert-confirm-btn"
+              onClick={async () => {
+                const id = revertConfirm?.id
+                setRevertConfirm(null)
+                if (!id) return
+                setActionSubmitting(true)
+                try {
+                  await revertTimebox(id, { clearExecutionRecord: true })
+                  toast.success('已回退为已规划')
+                  await loadRange(dateMode, currentDate)
+                } catch (e) {
+                  toast.error(`操作失败：${e instanceof Error ? e.message : String(e)}`)
+                } finally {
+                  setActionSubmitting(false)
+                }
+              }}
+            >
+              {actionSubmitting ? '处理中...' : '确认回退'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

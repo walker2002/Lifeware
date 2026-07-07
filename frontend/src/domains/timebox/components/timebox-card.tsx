@@ -7,6 +7,12 @@
  * [023.12] T8：STATUS_STYLES 收敛 3 状态（planned/logged/cancelled）。
  * 旧 running/overtime/ended 不再持久化——读时由 deriveTimeboxDisplayStatus 派生。
  * 按钮改造：planned→打卡/取消/删除；logged/cancelled→回退；logged+executionRecord→查看记录。
+ *
+ * [023.13] T7：planned 卡按钮排序 `[一键打卡][打卡][取消][删除]`。
+ * - quickLog：不开抽屉，simple executionRecord（plannedDuration/0 偏差），T6 验证 AM1 SM 写入路径
+ * - log：开 Drawer 走详细记录（T6）
+ * - cancel：transitionTimebox('cancel')
+ * - delete：deleteTimebox
  */
 
 "use client";
@@ -181,7 +187,18 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
             <Badge variant="destructive" className="text-xs shrink-0">已超时</Badge>
           )}
           {timebox.status === "planned" && (
-            <Button size="sm" variant="default" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("log")}>打卡</Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs shrink-0"
+                onClick={() => handleAction("quickLog")}
+                data-testid="quick-log-btn"
+              >
+                ✓ 一键打卡
+              </Button>
+              <Button size="sm" variant="default" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("log")}>打卡</Button>
+            </>
           )}
           {(timebox.status === "logged" || timebox.status === "cancelled") && (
             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-body shrink-0" onClick={() => handleAction("revert")}>回退</Button>
@@ -254,6 +271,7 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
         <div className="flex items-center gap-1 shrink-0">
           {timebox.status === "planned" && (
             <>
+              <Button size="sm" variant="outline" onClick={() => handleAction("quickLog")} data-testid="quick-log-btn">✓ 一键打卡</Button>
               <Button size="sm" onClick={() => handleAction("log")}>打卡</Button>
               <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("cancel")}>取消</Button>
               <Button size="sm" variant="ghost" className="text-body" onClick={() => handleAction("delete")}>删除</Button>

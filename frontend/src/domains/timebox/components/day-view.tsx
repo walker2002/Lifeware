@@ -27,12 +27,33 @@ interface DayViewProps {
   onDateSelect?: (date: Date) => void
   onAction?: (timeboxId: string, action: string) => void
   onEdit?: (tb: TimeboxSummary) => void   // [023] A2 C1：卡片标题点击进入编辑
+  // [023.13] T7：批量多选透传
+  selectMode?: boolean
+  selectedIds?: string[]
+  onToggleSelect?: (id: string) => void
 }
 
-export function DayView({ events, currentDate, onDateSelect, onAction, onEdit }: DayViewProps) {
+export function DayView({
+  events,
+  currentDate,
+  onDateSelect,
+  onAction,
+  onEdit,
+  selectMode = false,
+  selectedIds = [],
+  onToggleSelect,
+}: DayViewProps) {
   return (
     <div className="grid w-full gap-4 md:[grid-template-columns:30%_40%_30%] max-md:grid-cols-1">
-      <TimeboxList events={events} compact onAction={onAction} onEdit={onEdit} />
+      <TimeboxList
+        events={events}
+        compact
+        onAction={onAction}
+        onEdit={onEdit}
+        selectMode={selectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+      />
       <TimeboxTimeline events={events} />
       <div className="hidden md:block">
         <MiniCalendar

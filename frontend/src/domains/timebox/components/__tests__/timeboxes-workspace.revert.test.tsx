@@ -1,6 +1,7 @@
 /**
  * @file timeboxes-workspace.revert.test
  * @brief [023.10] T1 — workspace handleAiConfirm revert 路径必须真调 submitCnuiSurface 而非 toast placeholder
+ *          [023.13] T7 — workspace handleAction('revert') 走 AlertDialog 确认 + revertTimebox(id, {clearExecutionRecord:true})
  *
  * 关联 [023.08] P0 (4d6e7ca) 同源路由错配防御 — accept 已修，revert 仍 placeholder。
  *
@@ -10,6 +11,11 @@
  *
  * 实现策略：通过 accept 路径触发 setRevertableBatches 注入一条测试数据，
  * 然后点 revert 按钮 → 断言 submitCnuiSurface 被以正确参数调用 + 不显 placeholder toast。
+ *
+ * [023.13] T7 扩展：第二组 describe 验证 handleAction('revert') 的回退确认弹窗。
+ * - logged+executionRecord 卡点回退 → 触发 AlertDialog「确认回退」 → 点确认 →
+ *   revertTimebox(id, {clearExecutionRecord:true}) 被调
+ * - cancelled 卡点回退 → 直接调 revertTimebox(id) 不开弹窗
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -18,6 +24,8 @@ import userEvent from '@testing-library/user-event'
 
 const submitCnuiSurfaceMock = vi.fn()
 const submitDynamicIntentMock = vi.fn()
+const transitionTimeboxMock = vi.fn()
+const revertTimeboxMock = vi.fn()
 
 vi.mock('@/app/actions/intent', () => ({
   submitCnuiSurface: (...a: unknown[]) => submitCnuiSurfaceMock(...a),
@@ -28,7 +36,9 @@ vi.mock('@/app/actions/intent', () => ({
 
 vi.mock('@/app/actions/timebox', () => ({
   getTimeboxById: vi.fn(),
-  transitionTimebox: vi.fn(),
+  transitionTimebox: (...a: unknown[]) => transitionTimeboxMock(...a),
+  revertTimebox: (...a: unknown[]) => revertTimeboxMock(...a),
+  deleteTimebox: vi.fn(),
 }))
 
 const toastSuccessMock = vi.fn()
@@ -46,6 +56,42 @@ vi.mock('next/navigation', () => ({
 }))
 
 import { TimeboxesWorkspace } from '../timeboxes-workspace'
+import type { TimeboxSummary } from '@/usom/types/summaries'
+
+/** [023.13] T7 辅助：构造带 executionRecord 的 logged 卡样本 */
+function makeLoggedSummary(id: string): TimeboxSummary {
+  return {
+    id,
+    title: `测试 logged-${id}`,
+    status: 'logged',
+    startTime: '2026-07-15T09:00:00.000Z',
+    endTime: '2026-07-15T10:00:00.000Z',
+    taskIds: [],
+    habitIds: [],
+    executionRecord: {
+      mode: 'simple',
+      completionStatus: 'completed',
+      actualDuration: 60,
+      plannedDuration: 60,
+      deviationMinutes: 0,
+      sourceType: 'timebox',
+      loggedAt: '2026-07-15T10:00:00.000Z',
+    },
+  }
+}
+
+/** [023.13] T7 辅助：构造 cancelled 卡样本（无 executionRecord） */
+function makeCancelledSummary(id: string): TimeboxSummary {
+  return {
+    id,
+    title: `测试 cancelled-${id}`,
+    status: 'cancelled',
+    startTime: '2026-07-15T11:00:00.000Z',
+    endTime: '2026-07-15T12:00:00.000Z',
+    taskIds: [],
+    habitIds: [],
+  }
+}
 
 /**
  * [023.10] T1 — workspace handleAiConfirm revert 路径必须真调 submitCnuiSurface 而非 toast placeholder。
@@ -115,5 +161,115 @@ describe('[023.10] T1 — workspace handleAiConfirm revert 真 wire', () => {
       )
       expect(placeholderCall).toBeUndefined()
     })
+  })
+})
+
+/**
+ * [023.13] T7 — workspace handleAction('revert') 走 AlertDialog 二次确认。
+ *
+ * 关联 [023.13] T5：revertTimebox(id, opts?: { clearExecutionRecord?: boolean })
+ * - logged + executionRecord → UI 弹 AlertDialog「确认回退」→ 点确认 →
+ *   revertTimebox(id, { clearExecutionRecord: true }) 被调
+ * - cancelled（无 executionRecord）→ 直接 revertTimebox(id) 不开弹窗
+ *
+ * 测试策略：mock getTimeboxesByRange 返回带 executionRecord 的 logged 卡 / cancelled 卡
+ * → 等 DayView 渲染出「回退」按钮 → 点 → 断言：
+ *   - logged case: 弹窗出现，点确认后 revertTimebox 收到 {clearExecutionRecord:true}
+ *   - cancelled case: 弹窗不出现，revertTimebox 立即被调用
+ */
+describe('[023.13] T7 — workspace handleAction("revert") 走 AlertDialog 二次确认', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 关键：本组测试依赖 DayView 渲染出「回退」按钮 — 必须 mock getTimeboxesByRange 返回样本卡
+    // 直接通过 mockResolvedValueOnce + mockResolvedValue 反复轮换；这里简化：在 beforeEach 重设默认
+    revertTimeboxMock.mockResolvedValue({ status: 'ok', timebox: undefined })
+    submitDynamicIntentMock.mockResolvedValue({ success: true })
+  })
+
+  it('logged+executionRecord 卡点回退 → 触发确认弹窗 → 点确认 → revertTimebox(id, {clearExecutionRecord:true})', async () => {
+    const user = userEvent.setup()
+    const loggedSample = makeLoggedSummary('tb-logged-001')
+    // 第一次调用（initial load）返回样本；后续 loadRange 调用也用相同返回
+    const { getTimeboxesByRange } = await import('@/app/actions/intent')
+    vi.mocked(getTimeboxesByRange).mockResolvedValue([loggedSample])
+
+    render(<TimeboxesWorkspace />)
+
+    // 等 DayView 渲染出 logged 卡的「回退」按钮
+    const revertBtn = await screen.findByRole('button', { name: /回退/ })
+    await user.click(revertBtn)
+
+    // 弹窗出现：「确认回退」标题 + 「清除执行记录...」描述（用 heading role 避免与按钮文字重名）
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '确认回退' })).toBeInTheDocument()
+    })
+    expect(screen.getByText(/清除该时间盒的执行记录/)).toBeInTheDocument()
+
+    // 此时 revertTimebox 还没被调
+    expect(revertTimeboxMock).not.toHaveBeenCalled()
+
+    // 点确认
+    const confirmBtn = screen.getByTestId('revert-confirm-btn')
+    await user.click(confirmBtn)
+
+    // 断言：revertTimebox(id, { clearExecutionRecord: true }) 被调
+    await waitFor(() => {
+      expect(revertTimeboxMock).toHaveBeenCalledWith(
+        'tb-logged-001',
+        expect.objectContaining({ clearExecutionRecord: true }),
+      )
+    })
+
+    // 弹窗关闭
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: '确认回退' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('logged 卡点回退 → 取消弹窗 → revertTimebox 不被调', async () => {
+    const user = userEvent.setup()
+    const loggedSample = makeLoggedSummary('tb-logged-002')
+    const { getTimeboxesByRange } = await import('@/app/actions/intent')
+    vi.mocked(getTimeboxesByRange).mockResolvedValue([loggedSample])
+
+    render(<TimeboxesWorkspace />)
+
+    const revertBtn = await screen.findByRole('button', { name: /回退/ })
+    await user.click(revertBtn)
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '确认回退' })).toBeInTheDocument())
+
+    // 点取消 — AlertDialogCancel 默认就是「取消」按钮
+    const cancelBtn = screen.getByRole('button', { name: '取消' })
+    await user.click(cancelBtn)
+
+    // revertTimebox 不应被调
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: '确认回退' })).not.toBeInTheDocument()
+    })
+    expect(revertTimeboxMock).not.toHaveBeenCalled()
+  })
+
+  it('cancelled 卡点回退 → 直接调 revertTimebox(id) 不开弹窗', async () => {
+    const user = userEvent.setup()
+    const cancelledSample = makeCancelledSummary('tb-cancelled-001')
+    const { getTimeboxesByRange } = await import('@/app/actions/intent')
+    vi.mocked(getTimeboxesByRange).mockResolvedValue([cancelledSample])
+
+    render(<TimeboxesWorkspace />)
+
+    const revertBtn = await screen.findByRole('button', { name: /回退/ })
+    await user.click(revertBtn)
+
+    // cancelled 卡点回退 → 不应弹窗
+    expect(screen.queryByText('确认回退')).not.toBeInTheDocument()
+
+    // revertTimebox 立即被调（无第二参数，或 opts 为 undefined）
+    await waitFor(() => {
+      expect(revertTimeboxMock).toHaveBeenCalledWith('tb-cancelled-001')
+    })
+    // 关键断言：opts 不传 {clearExecutionRecord:true}
+    const call = revertTimeboxMock.mock.calls[0] as [string, unknown?]
+    expect(call[1]).toBeUndefined()
   })
 })
