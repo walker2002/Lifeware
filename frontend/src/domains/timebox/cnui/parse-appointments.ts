@@ -119,11 +119,19 @@ export async function parseAppointmentIntent(
       return { kind: 'unsure', reason: '未找到匹配的约定（候选列表中不存在）' }
     }
 
+    // [026.01] post-ship adversarial review fix: LLM-supplied newStartTime 必须 ISO 格式，
+    // 否则 `new Date(garbage).toISOString()` 在 AppointmentFormFields.tsx:64 抛 RangeError，
+    // 直接污染 UI/潜在 DB 写脏数据（防御深度 #1）
+    const startTimeValid = !parsed.newStartTime || !Number.isNaN(Date.parse(parsed.newStartTime))
+    if (!startTimeValid) {
+      return { kind: 'unsure', reason: 'LLM 返回时间格式无效（需 ISO 8601）' }
+    }
+
     return {
       kind: 'edit',
       appointmentId: parsed.appointmentId,
-      ...(parsed.newStartTime ? { newStartTime: parsed.newStartTime } : {}),
-      ...(parsed.newDurationMin > 0 ? { newDurationMin: parsed.newDurationMin } : {}),
+      ...(parsed.newStartTime && startTimeValid ? { newStartTime: parsed.newStartTime } : {}),
+      ...(typeof parsed.newDurationMin === 'number' && parsed.newDurationMin > 0 ? { newDurationMin: parsed.newDurationMin } : {}),
       ...(parsed.newTitle ? { newTitle: parsed.newTitle } : {}),
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
     }

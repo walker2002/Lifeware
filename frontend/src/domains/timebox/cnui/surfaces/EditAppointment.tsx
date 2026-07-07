@@ -9,7 +9,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { AppointmentFormFields, type AppointmentDraftFields } from './AppointmentFormFields'
 
@@ -41,6 +41,18 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   const [draft, setDraft] = useState<(AppointmentDraftFields & { status: string }) | null>(prefill ?? null)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+
+  // [026.01] post-ship adversarial review fix (防御深度 #4):
+  // dataModel 变化时(如 AI panel 第二次 open('editAppointment') 拿到不同 selectedId/prefill)
+  // React 不重 mount,useState 初始值仅 mount 时读取一次→旧 state 与新 snapshot 不同步。
+  // 跟随 initialSelectedId/prefill prop 变化 resync(view/selectedId/draft)。
+  useEffect(() => {
+    setView(initialMode)
+    setSelectedId(initialSelectedId)
+    setDraft(prefill ?? null)
+    // page 故意保留:用户上次选中的页数,典型 PAG-1。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectedId, prefill])
 
   if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 约定已更新</p>
 
