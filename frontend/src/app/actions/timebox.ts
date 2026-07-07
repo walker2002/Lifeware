@@ -162,7 +162,7 @@ export async function transitionTimebox(
 }
 
 /**
- * 回退：{logged, cancelled} → planned（[023.12] T4）
+ * 回退：{logged, cancelled} → planned（[023.12] T4，[023.13] T5 P3 确认清空分支）
  *
  * 走 Nexus：submitDynamicIntent('timebox', 'revertTimebox', { id }) →
  * Orchestrator → resolveObjectType('timebox', 'revertTimebox') → 'timebox' →
@@ -172,25 +172,46 @@ export async function transitionTimebox(
  *
  * [AM7] executionRecord 守卫：logged 状态下 executionRecord 必有值（archive
  * 路径写入），直接 revert 会让已记录的执行结果「悬空」。守卫语义：若
- * executionRecord != null，抛错「请先清理执行记录再回退」——强制调用方先
- * 显式清记录。cancelled 状态 executionRecord 恒为 null，可直接 revert。
+ * executionRecord != null 且调用方未显式确认清空，抛错「请先清理执行记录
+ * 再回退」——强制调用方先显式清记录。cancelled 状态 executionRecord 恒为
+ * null，可直接 revert。
  *
- * 设计决策（[023.12] plan-eng-review 用户表决 B）：
- * - 不做自动 executionRecord 清空（避免「回退悄悄丢数据」的隐式行为）
- * - UI 层（T8）接 toast 弹窗提示用户先到 EditTimeboxes 清记录再 revert
+ * [023.13] P3 确认清空分支：UI 弹窗（logged 卡点回退 → AlertDialog「将清除
+ * 执行记录，实际时长/专注/能量/详情不可恢复」）确认后传
+ * `opts.clearExecutionRecord=true`：
+ * - 复用通用 repo.updateFields(id, { executionRecord: null }, userId)（[AM3]
+ *   精化：与持久化修复 [AM1] 同通道，单条 UPDATE + T-02 userId 过滤，
+ *   不引入 clearExecutionRecord repo 抽象 → DRY）。
+ * - 清空后才走 SM revert（同事务外顺序调用，updateFields 已落库）。
+ *
+ * 设计决策（[023.12] plan-eng-review 用户表决 B，[023.13] 保留 + 增显式入口）：
+ * - 默认路径（opts 未传 / false）抛 AM7——「回退悄悄丢数据」仍禁止
+ * - 显式 opts.clearExecutionRecord=true 才允许清记录——明示丢
  *
  * @param timeboxId - 目标时间盒 ID
+ * @param opts.clearExecutionRecord - logged + executionRecord 时是否先清空记录
  */
 export async function revertTimebox(
   timeboxId: string,
+  opts?: { clearExecutionRecord?: boolean },
 ): Promise<TimeboxActionResult> {
   // [AM7] ownership + executionRecord 守卫
-  const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+  const repo = new TimeboxRepository()
+  const tb = await repo.findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
-  if (tb.executionRecord != null) {
+  // [023.13] P3：确认清空分支——UI 弹窗确认后传 clearExecutionRecord=true
+  if (opts?.clearExecutionRecord) {
+    // AM3 复用 updateFields：单条 UPDATE，T-02 userId 过滤，与持久化修复同通道
+    await repo.updateFields(
+      timeboxId as USOM_ID,
+      { executionRecord: null },
+      MVP_USER_ID as USOM_ID,
+    )
+  } else if (tb.executionRecord != null) {
+    // [AM7] 守卫保留（默认路径不变）
     throw new Error('请先清理执行记录再回退')
   }
-  // 走 SM revert transition；cancelled→planned / logged(已守卫清空)→planned
+  // 走 SM revert transition；cancelled→planned / logged(已守卫或已清空)→planned
   const result = await submitDynamicIntent('timebox', 'revertTimebox', { objectId: timeboxId })
   if (!result.success) {
     // SM 兜底：极端 case（数据库与 SM 不一致）下抛错
