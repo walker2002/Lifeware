@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -42,12 +42,20 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ArchetypePickerCard } from '@/components/archetype/archetype-picker-card'
 import {
+  ExecutionDetailFields,
+  type ExecutionDetailDraft,
+} from './execution-detail-fields'
+import { getDefaultEnergyActual } from '../lib/get-default-energy-actual'
+import {
   createTimebox,
   updateTimebox,
   deleteTimebox,
+  transitionTimebox,
   type CreateTimeboxInput,
 } from '@/app/actions/timebox'
+import { getArchetypeById } from '@/app/actions/activity-archetype'
 import type { Timebox } from '@/usom/types/objects'
+import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 export type DrawerMode = 'create' | 'edit' | 'template-batch'
 
@@ -104,6 +112,33 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
     action: () => Promise<void>
   } | null>(null)
 
+  // [023.13] AM4 — 打卡专区 state（仅 edit 模式生效）+ archetype 详情 fetch
+  const [execDetail, setExecDetail] = useState<ExecutionDetailDraft>({})
+  const [archetype, setArchetype] = useState<ActivityArchetype | null>(null)
+  useEffect(() => {
+    // 仅 edit 模式拉 archetype；fetch 失败/未找到 → null（降级为 undefined 默认能量）
+    if (mode !== 'edit' || !activityArchetypeId) {
+      setArchetype(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await getArchetypeById(activityArchetypeId)
+        if (!cancelled) setArchetype(r.success ? r.data ?? null : null)
+      } catch {
+        if (!cancelled) setArchetype(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mode, activityArchetypeId])
+  const defaultEnergyActual = useMemo(
+    () => (archetype ? getDefaultEnergyActual(archetype) : undefined),
+    [archetype],
+  )
+
   const handleSubmit = useCallback(
     async (confirmed?: boolean) => {
       const trimmed = title.trim()
@@ -115,7 +150,51 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
         const endIso = new Date(new Date(startIso).getTime() + duration * 60000).toISOString()
 
         if (mode === 'edit' && editTarget) {
-          // T2 updateTimebox 无 confirmed（edit 路径无 needs_confirm）
+          // [023.13] AM4 — 打卡专区写入：若 execDetail 任一字段有值 → 走 detailed log 路径，
+          // 构造 DetailedExecutionRecord 调 transitionTimebox(..., 'log', { executionRecord })
+          // SM 端（state-machine/index.ts）会从 proposal.payload['executionRecord'] 透传并写列。
+          const hasExecDetail = Boolean(
+            execDetail.actualStartTime ||
+              execDetail.actualEndTime ||
+              execDetail.focusMinutes !== undefined ||
+              execDetail.energyActual !== undefined ||
+              execDetail.notes,
+          )
+          if (hasExecDetail) {
+            const plannedMinutes = Math.round(
+              (new Date(editTarget.endTime).getTime() - new Date(editTarget.startTime).getTime()) / 60000,
+            )
+            const actualMinutes =
+              execDetail.actualStartTime && execDetail.actualEndTime
+                ? Math.round(
+                    (Date.parse(execDetail.actualEndTime) - Date.parse(execDetail.actualStartTime)) / 60000,
+                  )
+                : plannedMinutes
+            const detailed = {
+              mode: 'detailed' as const,
+              completionStatus: 'completed' as const,
+              actualDuration: actualMinutes,
+              plannedDuration: plannedMinutes,
+              deviationMinutes: actualMinutes - plannedMinutes,
+              sourceType: 'timebox' as const,
+              loggedAt: new Date().toISOString(),
+              completionRating: 5,
+              actualOutput: '',
+              notes: execDetail.notes,
+              actualStartTime: execDetail.actualStartTime,
+              actualEndTime: execDetail.actualEndTime,
+              focusMinutes: execDetail.focusMinutes,
+              energyActual: execDetail.energyActual,
+            }
+            const r = await transitionTimebox(editTarget.id, 'log', { executionRecord: detailed })
+            if (r.status !== 'ok') {
+              throw new Error('打卡失败')
+            }
+            toast.success('时间盒已更新并打卡')
+            onSaved()
+            return
+          }
+          // 无打卡字段：仅改计划字段（保持原 updateTimebox 路径）
           await updateTimebox(editTarget.id, {
             title: trimmed,
             startTime: startIso,
@@ -161,6 +240,7 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
       mode,
       editTarget,
       submitting,
+      execDetail,
       onSaved,
     ],
   )
@@ -240,6 +320,15 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
                 className="w-full rounded-md border border-hairline bg-canvas px-2 py-1.5 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-focus-ring"
               />
             </div>
+
+            {/* [023.13] AM4 — 打卡专区（仅 edit 模式）：实际时间/专注/能量/执行详情 → detailed log */}
+            {mode === 'edit' && (
+              <ExecutionDetailFields
+                value={execDetail}
+                onChange={setExecDetail}
+                defaultEnergyActual={defaultEnergyActual}
+              />
+            )}
           </div>
 
           {/* footer */}

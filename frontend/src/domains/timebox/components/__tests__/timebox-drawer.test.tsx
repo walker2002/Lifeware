@@ -9,10 +9,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('@/app/actions/timebox', () => ({
   createTimebox: vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb-1' } }),
   updateTimebox: vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb-1' } }),
+  // [023.13] T6 — 新增 import 须 mock
+  deleteTimebox: vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb-1' } }),
+  transitionTimebox: vi.fn().mockResolvedValue({ status: 'ok', timebox: { id: 'tb-1' } }),
 }))
 
 vi.mock('@/app/actions/activity-archetype', () => ({
   getArchetypes: vi.fn().mockResolvedValue({ success: true, data: [] }),
+  // [023.13] T6 — AM4 archetype 接线
+  getArchetypeById: vi.fn().mockResolvedValue({ success: true, data: null }),
 }))
 
 import { TimeboxDrawer } from '@/domains/timebox/components/timebox-drawer'

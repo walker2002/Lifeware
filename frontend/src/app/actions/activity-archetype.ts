@@ -50,6 +50,25 @@ export async function getArchetypes(): Promise<ArchetypeActionResult<ActivityArc
   }
 }
 
+/**
+ * [023.13] AM4 — 按 id 查单个 Archetype（[023.13] 打卡专区能量默认值用）
+ *
+ * 给 TimeboxDrawer 在 edit 模式时查 archetype 4 维 EnergyCost 算均值。
+ * 无 id 或未找到 → success:true data=null（caller 降级为 undefined，UI 强制手填）。
+ */
+export async function getArchetypeById(
+  id: string | null | undefined,
+): Promise<ArchetypeActionResult<ActivityArchetype | null>> {
+  if (!id) return { success: true, data: null };
+  try {
+    const repo = new ActivityArchetypeRepository();
+    const data = await repo.findById(id as USOM_ID, MVP_USER_ID);
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "获取 Archetype 失败" };
+  }
+}
+
 // ─── 操作 ────────────────────────────────────────────────────────
 
 /**
