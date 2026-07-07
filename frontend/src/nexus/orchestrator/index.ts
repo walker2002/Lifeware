@@ -1010,9 +1010,13 @@ export function createOrchestrator(deps: OrchestratorDeps) {
         // （用于 domain.onEvent）。executeFieldStateWrite 路径不调 domain.onEvent：
         // mutation service 内部 SM 已将事件落库到 eventRepo，与 completeTask 现状
         // （此前绕过 Orchestrator）一致，不构成回归。
+        // [QA BUG #2] 守卫：executeFieldStateWrite 当前仅绑定 tasks 域（mut service
+        //   已对接）。其他域（timebox）走 sm.execute — SM updateFields AM1 分支
+        //   已支持 executionRecord 原子写（state-machine/index.ts:289-300），
+        //   无需 mutation service 等价物。
         let writeResult: { success: boolean; object?: Record<string, unknown>; error?: string; event?: SystemEvent }
 
-        if (fieldSteps.length > 0 && deps.executeFieldStateWrite && targetId) {
+        if (fieldSteps.length > 0 && deps.executeFieldStateWrite && targetId && domainId === 'tasks') {
           // 带字段 → 走 mutation service（原子字段+状态写，单事务）
           const wr = await deps.executeFieldStateWrite({
             domainId,
