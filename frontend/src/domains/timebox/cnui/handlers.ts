@@ -554,7 +554,10 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     // [023] A2.7 — logTimebox CNUI surface 提交：逐条 log，跳过 state='skipped' 或无 state 的项
     // [023.13] T0 AM1 — 把 flat fields 重组为 ExecutionRecord 对象（与 USOM 类型对齐），
     //   executionRecord 必填字段（actualDuration/plannedDuration/deviationMinutes/sourceType/loggedAt）
-    //   在 T8 接 ExecutionDetailFields 共享组件后会被真实数据覆盖；当前走 simple 模式零值兜底。
+    //   走零值兜底保证列永不为 null。
+    // [023.13] T8 §4 — item 展开 ExecutionDetailFields 时 detailed 字段并入 executionRecord：
+    //   展开 → mode='detailed' + 注入 actualStart/End/focusMinutes/energyActual；未展开 → mode='simple'。
+    //   notes 统一从 it.notes 走（与 T0 行为兼容；detailed.notes 字段不重复注入）。
     if (action === 'logTimebox') {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const items = (fields.items as any[]) ?? []
@@ -566,14 +569,18 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         // open 后修改时间窗口让某条进入终态，故加 server-side 守护。
         if (it.status && it.status !== 'planned') continue
         try {
-          // 组装 ExecutionRecord（simple 模式）。T8 接 ExecutionDetailFields 后，
-          //   actualDuration/plannedDuration/actualStartTime/actualEndTime/focusMinutes/
-          //   energyActual/completionRating/actualOutput/deviationReasons 会从 surface 真实值
-          //   覆盖；当前使用零值兜底保证 executionRecord 列永不为 null。
+          // [023.13] T8 — detailed 字段注入：仅当 item 展开过（it.detailed 存在且任一字段有值）
+          //   时升级 mode='detailed' 并注入 actualStart/End/focusMinutes/energyActual。
+          //   notes 仍走 it.notes 通道（避免 detailed.notes 与 it.notes 重复注入同一字段）。
+          const detailed: { actualStartTime?: string; actualEndTime?: string; focusMinutes?: number; energyActual?: number } = it.detailed ?? {}
+          const hasDetailed = Boolean(
+            detailed.actualStartTime || detailed.actualEndTime ||
+            detailed.focusMinutes != null || detailed.energyActual != null,
+          )
           const executionRecord = {
-            mode: 'simple' as const,
+            mode: hasDetailed ? ('detailed' as const) : ('simple' as const),
             completionStatus: it.state === 'completed' ? 'completed' : 'partial',
-            // base 必填字段（T0 兜底值；T8 详细数据接入后会改）
+            // base 必填字段（T0 兜底零值；T8 详细数据仅在 hasDetailed 时并入）
             actualDuration: 0,
             plannedDuration: 0,
             deviationMinutes: 0,
@@ -581,6 +588,11 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             loggedAt: new Date().toISOString() as Timestamp,
             // notes optional 透传（surface 现有 notes 字段）
             ...(it.notes ? { notes: it.notes } : {}),
+            // [023.13] T8 — 详细字段条件性注入
+            ...(detailed.actualStartTime ? { actualStartTime: detailed.actualStartTime } : {}),
+            ...(detailed.actualEndTime ? { actualEndTime: detailed.actualEndTime } : {}),
+            ...(detailed.focusMinutes != null ? { focusMinutes: detailed.focusMinutes } : {}),
+            ...(detailed.energyActual != null ? { energyActual: detailed.energyActual } : {}),
           }
           const r = await submitDynamicIntent('timebox', 'logTimebox', {
             objectId: it.id,

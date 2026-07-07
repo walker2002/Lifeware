@@ -4,11 +4,14 @@
  *
  * 批量打卡：每条 ended timebox 三态（完成/未完成/跳过）+ 备注。
  * 「提交打卡」逐条走 Nexus logTimebox。
+ * [023.13] §4 — per-item 详细展开：每条 item 独立 detailedOpen 标志，
+ *   展开时实例化 ExecutionDetailFields 共享组件，submit 时该 item 升级 detailed。
  */
 
 'use client'
 
 import { useState } from 'react'
+import { ExecutionDetailFields, type ExecutionDetailDraft } from '../../components/execution-detail-fields'
 
 type LogState = 'completed' | 'incomplete' | 'skipped'
 
@@ -20,6 +23,8 @@ interface LogItem {
   activityArchetypeId?: string
   state?: LogState
   notes?: string
+  // [023.13] §4 — 详细字段（展开时填）；submit 时并入 executionRecord
+  detailed?: ExecutionDetailDraft
 }
 
 interface LogTimeboxProps {
@@ -41,6 +46,8 @@ const STATE_BTN: { key: LogState; label: string; cls: string }[] = [
 export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: LogTimeboxProps) {
   const items = (dataModel.items as LogItem[]) ?? []
   const [page, setPage] = useState(0)
+  // [023.13] §4 — per-item 独立详细展开标志（切换某 item 不影响其他 item）
+  const [detailedOpen, setDetailedOpen] = useState<Record<string, boolean>>({})
 
   if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ 打卡已提交</p>
   if (items.length === 0) return <p className="py-8 text-center text-sm text-body/70">没有待打卡的时间盒</p>
@@ -50,6 +57,10 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
     const next = items.map((it, i) => i === page ? { ...it, ...patch } : it)
     onDataChange({ ...dataModel, items: next })
   }
+  const toggleDetailed = () => {
+    setDetailedOpen(prev => ({ ...prev, [cur.id]: !prev[cur.id] }))
+  }
+  const isDetailedOpen = detailedOpen[cur.id] ?? false
 
   return (
     <>
@@ -84,6 +95,21 @@ export function LogTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoa
           placeholder="备注（可选）"
           className="w-full rounded border border-hairline bg-canvas px-2 py-1 text-sm text-ink resize-none"
         />
+        {/* [023.13] §4 — 详细打卡展开（per-item 独立） */}
+        <button
+          type="button"
+          onClick={toggleDetailed}
+          aria-expanded={isDetailedOpen}
+          className="text-xs text-primary hover:underline"
+        >
+          {isDetailedOpen ? '收起详细' : '详细打卡'}
+        </button>
+        {isDetailedOpen && (
+          <ExecutionDetailFields
+            value={cur.detailed ?? {}}
+            onChange={(d) => update({ detailed: d })}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
