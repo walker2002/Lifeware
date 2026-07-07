@@ -1045,6 +1045,8 @@ interface Appointment {
   // [023.12] 移除 inProgressAt / expiredAt（时间派生态不持久化）
   completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
   cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
+  // [026.01] Activity Archetype 归属：全链路 AI 匹配（DB+USOM+mapper+表单+handler+server action+UI）
+  activityArchetypeId?:  USOM_ID           // [026.01] 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId，FK ON DELETE SET NULL）
   schemaVersion:  number
 }
 
@@ -1809,6 +1811,19 @@ interface TimeboxSummary {
   endedAt?:        Timestamp
   loggedAt?:       Timestamp
   executionRecord?: ExecutionRecord
+}
+
+interface AppointmentSummary {
+  id:        USOM_ID
+  title:     string
+  startTime: Timestamp
+  durationMin: number
+  status:    AppointmentStatus
+  // [026] 编辑入口零延迟：detail / people / archetype 透传（避免编辑前再 fetch）
+  detail?:   string | null
+  people?:   string[]
+  // [026.01] 透传 archetype（与 detail/people 同性质）
+  activityArchetypeId?: USOM_ID
 }
 
 interface ObjectiveSummary {

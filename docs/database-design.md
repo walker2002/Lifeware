@@ -892,6 +892,9 @@ CREATE TABLE appointments (
 >>>>>>> Stashed changes
   cancelled_at    timestamptz,             -- →cancelled 时盖
 
+  -- [026.01] archetype FK（nullable，archetype 删除时 appointment 保留）
+  activity_archetype_id uuid REFERENCES activity_archetypes(id) ON DELETE SET NULL,
+
   -- 审计字段
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -900,6 +903,8 @@ CREATE TABLE appointments (
 -- 索引
 CREATE INDEX idx_appointments_user_status_start ON appointments(user_id, status, start_time);
 CREATE INDEX idx_appointments_user_status       ON appointments(user_id, status);
+-- [026.01] archetype 反向查询索引
+CREATE INDEX idx_appointments_archetype         ON appointments(activity_archetype_id);
 ```
 
 **设计要点**：
@@ -921,6 +926,8 @@ CREATE INDEX idx_appointments_user_status       ON appointments(user_id, status)
 **[023.12] 反转（2026_07_06）**：appointment lifecycle 从 [026] 5 态存储 + lazy reconcile 反转回读时派生模式（持久态 3 值 + 派生 in_progress/expired badge）。`reconcile-appointment.ts` 改造为纯派生函数；`reconcile-appointments.ts` plural 写库入口删除；migration 0034 删除 `in_progress_at` / `expired_at` 两列。详见 CHANGELOG.md `## [023.12]`。
 
 **[023.05] F2 snapshot drift acknowledge**：drizzle snapshot 停在 `0006_snapshot.json`，0007+ 全手写无 snapshot。本表 0033 RENAME 后 `schema.ts` 写 `pgTable('appointments')`，未来 `drizzle-kit generate` 会生成 `CREATE TABLE appointments`（表已存在）→ apply 失败。**决议**：维持手写迁移 convention，未来 appointments 表 schema 变更继续手写 SQL + 登记 journal；**不引入 `drizzle-kit up`**。
+
+**[026.01] archetype 全链路接入（2026_07_07）**：`appointments` 表加 `activity_archetype_id uuid REFERENCES activity_archetypes(id) ON DELETE SET NULL` 列（nullable，archetype 删除时 appointment 保留）+ 索引 `idx_appointments_archetype ON appointments(activity_archetype_id)`（反向查询：列出某 archetype 的所有约定）。migration 编号 `0035_026_01_appointment_archetype_fk.sql`（IF NOT EXISTS 幂等 + 单独 DROP INDEX/INDEX/COLUMN down 兜底）。schema.ts 与 mapper 双向读写 archetype。详见 CHANGELOG.md `## [026.01]`。
 
 ### 迁移 0034 — 三域 lifecycle 简化（[023.12] 2026-07-06）
 

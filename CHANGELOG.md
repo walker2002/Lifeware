@@ -85,6 +85,52 @@
 
 ---
 
+## [026.01] 约定 CNUI 优化 + archetype 全链路集成（2026-07-07）
+
+> 2026_07_07 — 5 SDD task 完成（T1 数据层 / T2 解析器 / T3 handler+server action / T4 EditAppointment 重写 / T5 docs 同步本任务）。**3 件事一次性**：(1) `/createAppointment` 保留 + 加 archetype picker；(2) `/editAppointment` 重写对齐 `/editTimeboxes` 范式（解析优先 + 降级 + 双视图 + 分页 + 删除集成）；(3) `activityArchetypeId` 全链路接入（DB → USOM → mapper → 表单 → handler → server action → AI 匹配）。
+
+### 决策摘要
+
+- **archetype 范围**：全链路 AI 匹配（DB+USOM+mapper+表单+handler+server action+UI 端 `matchArchetypeForTitle`）
+- **editAppointment 模式**：对齐 `/editTimeboxes` 范式（解析优先 + selecting 降级 + 双视图 + 分页 + 删除集成）
+- **「未知的卡片类型」**：现状已修复（CNUI surface 双注册 + manifest K-block + intent_trigger A 区块四路注册闭合），任务文档描述过期
+- **列表范围**：`scheduled+in_progress`（`findActive()`）
+
+### 改动清单
+
+- DB migration 0035：`appointments` 加 `activity_archetype_id` 列 + FK + 索引 `idx_appointments_archetype`（IF NOT EXISTS 幂等）
+- USOM `Appointment` + `AppointmentSummary` 加 `activityArchetypeId` 字段（nullable，对齐 timebox.activityArchetypeId）
+- mapper 双向读写 archetype
+- manifest `field_metadata.appointment` 加 archetype 元数据（type=string）
+- `AppointmentFormFields` 嵌入 `<ArchetypePickerCard enableAiMatch title={...}>`（4 字段 → 5 字段）
+- 新建 `parseAppointmentIntent`（参照 `parse-timeboxes.ts` 范式，6 测试）
+- handler `open('editAppointment')` 重写为解析优先模式（返回 `dataSnapshot: { mode, selectedId, prefill, status, items, originalPrompt, parseReason, readOnly }`）
+- handler `submit('editAppointment')` 增加 `op='delete'` 分支
+- server action `createAppointment` / `updateAppointment` 加 `assertArchetypeOwned` owner-check
+- server action `updateAppointment` 加 `APPOINTMENT_UPDATE_ALLOWED_FIELDS` 白名单防绕过状态机
+- `EditAppointment` 重写：双视图 + 分页 5/页 + 删除集成 + AlertDialog 二次确认
+
+### 验证结果
+
+- vitest base=head 失败集合零新增
+- tsc 零新增错误
+- `validate:manifest` 0 errors
+- `validate:domain-structure` ✓
+- 浏览器 E2E 4 场景（创建 AI 匹配 + 编辑解析成功 + 编辑降级 selecting + 编辑删除）
+
+### 风险与缓解
+
+- DB 加列 + FK：IF NOT EXISTS 幂等 + nullable + ON DELETE SET NULL（archetype 删除不影响 appointment）
+- LLM 解析 prompt 质量：单元测试覆盖 4 路径，失败时降级 selecting 不阻塞
+- 删除按钮误操作：AlertDialog 二次确认（参照 [023.04] 范式）
+
+### 参照
+
+- Spec SSOT: `docs/superpowers/specs/2026-07-06-026-01-appointment-cnui-optimization-design.md`
+- Plan SSOT: `docs/superpowers/plans/2026-07-06-026-01-appointment-cnui-optimization.md`
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
