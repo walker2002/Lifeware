@@ -188,8 +188,12 @@ describe('[020] R14 fail-CLOSED 行为', () => {
 })
 
 // [023.03] QA regression: status transition actions skip field validation
+// [023.12] ship 后发现 revertTimebox 漏注册（[023.12] D7/T4 新增 revert 转换）— 补 case
 describe('STATUS_TRANSITION_ACTIONS — 状态转换 action 跳过字段必含检查', () => {
-  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
+  const transitionActions = [
+    'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox',
+    'revertTimebox',
+  ]
 
   for (const action of transitionActions) {
     it(`${action} 仅有 objectId 字段也应当 Passed（字段从 DB 加载）`, async () => {

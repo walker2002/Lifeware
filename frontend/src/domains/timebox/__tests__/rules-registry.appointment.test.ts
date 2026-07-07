@@ -174,6 +174,32 @@ describe('appointment_fields_valid (submit — 聚合规则)', () => {
   })
 })
 
+// [023.12] 防御：状态转换 action（completeAppointment / revertAppointment /
+// cancelAppointment / startAppointment / expireAppointment）提交仅 fields={objectId}，
+// submit 规则不应误判 Rejected（[026] P0-1 修复范式已在 appointmentFieldsValid 内显式
+// skip,本测试守护不再回归）
+describe('appointment 状态转换 action 跳过字段必含检查', () => {
+  const check = appointmentRuleRegistry.submit.appointment_fields_valid.check
+  const transitionActions = [
+    'completeAppointment',
+    'revertAppointment',
+    'cancelAppointment',
+    'startAppointment',
+    'expireAppointment',
+  ]
+
+  for (const action of transitionActions) {
+    it(`${action} 仅有 objectId 字段也应当 Passed（字段从 DB 加载）`, async () => {
+      const intent = {
+        ...baseIntent({ objectId: 'test-id' }),
+        action,
+      }
+      const result = await check(intent, baseCtx(Date.now()))
+      expect(result.kind).toBe('Passed')
+    })
+  }
+})
+
 // ─── [020] registry rule 自带 meta 不变式 ──────────────────────────
 describe('[020] appointment registry rule 自带 meta', () => {
   it('每条 realtime rule 含 check/fields/message 且 fields 恰 1 字段', () => {
