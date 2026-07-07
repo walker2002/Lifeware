@@ -490,6 +490,12 @@ export const WRITE_ENTRY_EXEMPTIONS = [
     reason: 'updateObjective 绕过写入口（字段更新非状态转换，正确修复需 mutation-service=onboarding 一部分）',
     sunset: 'okrs 全量 onboarding（缠 [025] 跨域事务）',
   },
+  {
+    // [023.13] Fix #6 + TD-023 — AM3 reuse updateFields(列写绕 mutation service)
+    file: 'timebox.ts',
+    reason: 'revertTimebox clearExecutionRecord 分支直调 repo.updateFields 写列（[023.13] AM3 复用 updateFields）',
+    sunset: 'TD-023 关闭（mutation service 重构时一并 / 或 revertTimebox 整体迁 mutation service）',
+  },
 ] as const
 
 /** rules-registry 豁免（缺 L3 + [020] C/L 旧范式，带 sunset） */
