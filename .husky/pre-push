@@ -2,3 +2,5 @@
 # [019.ci-validator] push 前跑双 validator（写入口溯源 + manifest 诊断）
 # 违规 → exit 1 → 阻断 push
 cd frontend && npm run validate:manifest && npm run validate:structure
+# [023.13] TD-019 A2: rules-registry 派生形态校验（防 STATUS_TRANSITION_ACTIONS 退化为手工 Set）
+npm run validate:rules-registry

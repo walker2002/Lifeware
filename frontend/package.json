@@ -17,6 +17,7 @@
     "generate:routes:force": "npx tsx scripts/generate-routes.ts --force",
     "generate:routes:clean": "npx tsx scripts/generate-routes.ts --clean",
     "validate:manifest": "npx tsx scripts/validate-manifest.ts",
+    "validate:rules-registry": "npx tsx scripts/validate-rules-registry.ts",
     "validate:structure": "npx tsx scripts/validate-domain-structure.ts",
     "adopt:design": "npx tsx scripts/adopt-gstack-design.ts",
     "prepare": "husky",
