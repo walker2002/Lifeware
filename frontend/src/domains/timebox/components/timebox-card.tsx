@@ -186,6 +186,9 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           {displayStatus === "overtime" && (
             <Badge variant="destructive" className="text-xs shrink-0">已超时</Badge>
           )}
+        </div>
+        {/* 第二行：操作按钮（[QA BUG #1 fix 视觉] 拆独立行 + flex-wrap；logged/cancelled 1-2 按钮不换行） */}
+        <div className="flex flex-wrap items-center gap-1 px-3 pb-2">
           {timebox.status === "planned" && (
             <>
               <Button
@@ -198,6 +201,9 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
                 ✓ 一键打卡
               </Button>
               <Button size="sm" variant="default" className="h-6 px-2 text-xs shrink-0" onClick={() => handleAction("log")}>打卡</Button>
+              {/* [QA BUG #1] 紧凑模式补 取消/删除，对齐完整模式 [一键打卡][打卡][取消][删除] (brief T7) */}
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-body shrink-0" onClick={() => handleAction("cancel")}>取消</Button>
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-body shrink-0" onClick={() => handleAction("delete")}>删除</Button>
             </>
           )}
           {(timebox.status === "logged" || timebox.status === "cancelled") && (
