@@ -13,12 +13,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AIRuntime } from '@/nexus/ai-runtime'
 import type { AIGenerateResponse } from '@/nexus/ai-runtime/types'
+import { parseAppointmentIntent } from '@/domains/timebox/cnui/parse-appointments'
 
 // ── Mock AIRuntime factory（参考 ai-parser-migration.test.ts） ──
 
-function createMockAIRuntime(response: Partial<AIGenerateResponse>): AIRuntime {
+function createMockAIRuntime(response: Partial<AIGenerateResponse> & { text?: string }): AIRuntime {
   const fullResponse: AIGenerateResponse = {
-    content: response.content ?? '',
+    content: response.content ?? response.text ?? '',
     tokenUsage: response.tokenUsage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     model: response.model ?? 'test-model',
     cached: false,
@@ -289,5 +290,69 @@ describe('parseAppointmentIntentOnly（[026] A2.1 约定 dry-run）', () => {
     expect(result.success).toBe(false)
     expect(result.error).toBe('LLM 网络超时')
     expect(result.drafts).toBeUndefined()
+  })
+})
+
+// [026.01] T2 parseAppointmentIntent —— EditAppointment 解析优先模式
+describe('parseAppointmentIntent', () => {
+  const todayAppointments = [
+    { id: 'a-1', title: '看牙医', startTime: '2026-07-15T14:00:00Z', durationMin: 60, status: 'scheduled' },
+    { id: 'a-2', title: '和张三吃饭', startTime: '2026-07-16T19:00:00Z', durationMin: 90, status: 'scheduled' },
+  ]
+
+  it('returns edit with appointmentId when high confidence match', async () => {
+    const runtime = createMockAIRuntime({ text: JSON.stringify({
+      kind: 'edit',
+      appointmentId: 'a-1',
+      newStartTime: '2026-07-15T15:00:00Z',
+      newDurationMin: 0,
+      newTitle: '',
+      confidence: 0.95,
+      reason: '',
+    }) })
+    const result = await parseAppointmentIntent('把看牙医改到下午3点', todayAppointments, runtime)
+    expect(result.kind).toBe('edit')
+    if (result.kind === 'edit') {
+      expect(result.appointmentId).toBe('a-1')
+      expect(result.newStartTime).toBe('2026-07-15T15:00:00Z')
+      expect(result.confidence).toBe(0.95)
+    }
+  })
+
+  it('returns unsure when prompt is empty', async () => {
+    const runtime = createMockAIRuntime({ text: '' })
+    const result = await parseAppointmentIntent('', todayAppointments, runtime)
+    expect(result.kind).toBe('unsure')
+  })
+
+  it('returns unsure when todayAppointments is empty', async () => {
+    const runtime = createMockAIRuntime({ text: '' })
+    const result = await parseAppointmentIntent('把看牙医改到下午3点', [], runtime)
+    expect(result.kind).toBe('unsure')
+  })
+
+  it('returns unsure when LLM response is non-JSON', async () => {
+    const runtime = createMockAIRuntime({ text: '不是 JSON' })
+    const result = await parseAppointmentIntent('把看牙医改到下午3点', todayAppointments, runtime)
+    expect(result.kind).toBe('unsure')
+  })
+
+  it('returns unsure when appointmentId not in candidates', async () => {
+    const runtime = createMockAIRuntime({ text: JSON.stringify({
+      kind: 'edit',
+      appointmentId: 'ghost-id',
+      newStartTime: '',
+      newDurationMin: 0,
+      confidence: 0.9,
+      reason: '',
+    }) })
+    const result = await parseAppointmentIntent('ghost match', todayAppointments, runtime)
+    expect(result.kind).toBe('unsure')
+  })
+
+  it('returns unsure when LLM throws', async () => {
+    const runtime = { generate: async () => { throw new Error('mock LLM 异常') } }
+    const result = await parseAppointmentIntent('把看牙医改到下午3点', todayAppointments, runtime as any)
+    expect(result.kind).toBe('unsure')
   })
 })
