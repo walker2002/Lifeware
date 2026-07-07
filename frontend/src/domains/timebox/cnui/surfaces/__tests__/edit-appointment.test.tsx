@@ -1,143 +1,129 @@
 /**
- * @file edit-appointment.test.tsx
- * @brief [026] T17 P2 CNUI EditAppointment surface 渲染测试 / [023.12] T10 收敛 in_progress
- *
- * 守护 3 个分支：
- * - items=0 → "暂无计划中的约定" 空态
- * - items>0 → 列表（点击 item 进入编辑表单）
- * - 编辑表单 submit → 调 onConfirm(dataModel with selected)
- *
- * 不依赖 DB（纯 RTL 渲染 + onConfirm spy）。
- * [023.12] T10 (AM8)：in_progress 已不持久化，列表项恒显示「计划」。
+ * @file edit-appointment.test
+ * @brief [026.01] 重写测试覆盖双视图 + 分页 + 删除集成 + archetype 透传
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { EditAppointment } from '@/domains/timebox/cnui/surfaces/EditAppointment'
+import type { AppointmentDraftFields } from '@/domains/timebox/cnui/surfaces/AppointmentFormFields'
 
-import { EditAppointment } from '../EditAppointment'
-import type { AppointmentDraftFields } from '../AppointmentFormFields'
+const makeItem = (overrides: Partial<AppointmentDraftFields & { status: string }> = {}) => ({
+  id: 'a-1',
+  title: '看牙医',
+  startTime: '2026-07-15T14:00:00Z',
+  durationMin: 60,
+  detail: null,
+  people: [],
+  status: 'scheduled',
+  ...overrides,
+})
 
-type EditItem = AppointmentDraftFields & { status: string }
-
-/** 构造 items（2 条）—— [023.12] T10：in_progress 移除，list 仅 scheduled */
-function makeItems(): EditItem[] {
-  return [
-    { id: 'i1', title: '看牙医', startTime: '2026-07-10T09:00:00.000Z', durationMin: 30, detail: '', people: [], status: 'scheduled' },
-    { id: 'i2', title: '买菜', startTime: '2026-07-10T14:00:00.000Z', durationMin: 20, detail: '', people: [], status: 'scheduled' },
-  ]
-}
-
-describe('[026] T17 <EditAppointment> 渲染稳定性', () => {
-  it('items.length=0 渲染「暂无计划中的约定」空态', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: [] }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    )
-    expect(screen.getByText('暂无计划中的约定')).toBeInTheDocument()
-  })
-
-  it('items>0 渲染列表：标题 + 状态标签 + 时间 + 时长', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    )
-    expect(screen.getByText('选择要修改的约定（仅计划）')).toBeInTheDocument()
+describe('EditAppointment selecting mode', () => {
+  it('renders list of items', () => {
+    const items = [makeItem({ id: 'a-1' }), makeItem({ id: 'a-2', title: '约张三' })]
+    render(<EditAppointment dataModel={{ items, mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
     expect(screen.getByText('看牙医')).toBeInTheDocument()
-    expect(screen.getByText('买菜')).toBeInTheDocument()
-    // [023.12] T10：2 条都显示「计划」（in_progress 已不持久化）
-    expect(screen.getAllByText('计划').length).toBe(2)
+    expect(screen.getByText('约张三')).toBeInTheDocument()
   })
 
-  it('点击 item 进入编辑表单：渲染「编辑约定」标题 + 字段', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    )
-    fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    // 进入 form 态：标题变为「编辑约定（计划）」
-    expect(screen.getByText('编辑约定（计划）')).toBeInTheDocument()
-    // 字段预填
-    expect((screen.getByLabelText('事件名称') as HTMLInputElement).value).toBe('看牙医')
-    expect((screen.getByLabelText('时长(分)') as HTMLInputElement).value).toBe('30')
+  it('shows pagination when items > PAGE_SIZE', () => {
+    const items = Array.from({ length: 12 }, (_, i) => makeItem({ id: `a-${i}`, title: `约定 ${i}` }))
+    render(<EditAppointment dataModel={{ items, mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByText(/1\/3/)).toBeInTheDocument()
+    expect(screen.getByText('下一页 ›')).toBeInTheDocument()
   })
 
-  it('编辑表单：修改 title + submit 调 onConfirm(dataModel with selected)', () => {
-    const onConfirm = vi.fn()
+  it('hides pagination when items <= PAGE_SIZE', () => {
+    const items = Array.from({ length: 3 }, (_, i) => makeItem({ id: `a-${i}`, title: `约定 ${i}` }))
+    render(<EditAppointment dataModel={{ items, mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.queryByText('下一页 ›')).toBeNull()
+  })
+
+  it('clicking 下一页 moves to next page', async () => {
+    const items = Array.from({ length: 12 }, (_, i) => makeItem({ id: `a-${i}`, title: `约定 ${i}` }))
+    render(<EditAppointment dataModel={{ items, mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    await userEvent.click(screen.getByText('下一页 ›'))
+    expect(screen.getByText(/2\/3/)).toBeInTheDocument()
+  })
+
+  it('clicking item switches to editing mode', async () => {
     const onDataChange = vi.fn()
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={onDataChange}
-        onConfirm={onConfirm}
-      />,
-    )
-    fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    const titleInput = screen.getByLabelText('事件名称') as HTMLInputElement
-    fireEvent.change(titleInput, { target: { value: '复诊牙医' } })
-    fireEvent.click(screen.getByText('保存').closest('button')!)
-    // onConfirm 收到 dataModel（含 selected 含修改后的 title）
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-    const arg = onConfirm.mock.calls[0][0] as Record<string, unknown>
-    const selected = arg.selected as EditItem
-    expect(selected.id).toBe('i1')
-    expect(selected.title).toBe('复诊牙医')
-    expect(selected.status).toBe('scheduled')
+    const items = [makeItem({ id: 'a-1' })]
+    render(<EditAppointment dataModel={{ items, mode: 'selecting' }} onDataChange={onDataChange} onConfirm={() => {}} />)
+    await userEvent.click(screen.getByText('看牙医'))
+    expect(screen.getByText(/编辑约定/)).toBeInTheDocument()
   })
 
-  it('编辑表单：title 空 → 保存按钮 disabled', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    )
-    fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    const titleInput = screen.getByLabelText('事件名称') as HTMLInputElement
-    fireEvent.change(titleInput, { target: { value: '' } })
-    const save = screen.getByText('保存').closest('button') as HTMLButtonElement
-    expect(save.disabled).toBe(true)
+  it('shows parseReason hint when provided', () => {
+    const items = [makeItem({ id: 'a-1' })]
+    render(<EditAppointment dataModel={{ items, mode: 'selecting', originalPrompt: '改成下午', parseReason: '未识别到具体时间' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByText(/未识别到具体时间/)).toBeInTheDocument()
   })
 
-  it('编辑表单：点「返回列表」回到列表态（selectedId 重置）', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-      />,
-    )
-    fireEvent.click(screen.getByText('看牙医').closest('button')!)
-    expect(screen.getByText('编辑约定（计划）')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('返回列表'))
-    expect(screen.getByText('选择要修改的约定（仅计划）')).toBeInTheDocument()
+  it('renders empty state when items is empty', () => {
+    render(<EditAppointment dataModel={{ items: [], mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByText(/暂无计划/)).toBeInTheDocument()
+  })
+})
+
+describe('EditAppointment editing mode', () => {
+  it('renders AppointmentFormFields with prefill', () => {
+    const prefill = { ...makeItem({ id: 'a-1' }), activityArchetypeId: 'arch-1' }
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByDisplayValue('看牙医')).toBeInTheDocument()
+    expect(screen.getByText(/编辑约定/)).toBeInTheDocument()
   })
 
-  it('isDone=true 渲染「✅ 约定已更新」', () => {
-    render(
-      <EditAppointment
-        surfaceType="editAppointment"
-        dataModel={{ items: makeItems() }}
-        onDataChange={vi.fn()}
-        onConfirm={vi.fn()}
-        isDone
-      />,
-    )
-    expect(screen.getByText('✅ 约定已更新')).toBeInTheDocument()
+  it('shows 删除 button when status is scheduled', () => {
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByRole('button', { name: '删除' })).toBeInTheDocument()
+  })
+
+  it('hides 删除 button when status is expired', () => {
+    const prefill = makeItem({ id: 'a-1', status: 'expired' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.queryByRole('button', { name: '删除' })).toBeNull()
+  })
+
+  it('AlertDialog opens when 删除 clicked', async () => {
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    expect(screen.getByText(/确认删除约定/)).toBeInTheDocument()
+  })
+
+  it('confirming delete calls onConfirm with operation=delete', async () => {
+    const onConfirm = vi.fn()
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={onConfirm} />)
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    await userEvent.click(screen.getByRole('button', { name: /确认/ }))
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ operation: 'delete' }))
+  })
+
+  it('点击 保存 calls onConfirm with operation=update', async () => {
+    const onConfirm = vi.fn()
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={onConfirm} />)
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ operation: 'update' }))
+  })
+
+  it('点击 返回列表 switches back to selecting', async () => {
+    const onDataChange = vi.fn()
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    const items = [makeItem({ id: 'a-1' }), makeItem({ id: 'a-2' })]
+    render(<EditAppointment dataModel={{ items, mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={onDataChange} onConfirm={() => {}} />)
+    await userEvent.click(screen.getByText('返回列表'))
+    expect(screen.getByText(/选择要修改的约定/)).toBeInTheDocument()
+  })
+
+  it('disables 保存 when title is empty', () => {
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled', title: '' })
+    render(<EditAppointment dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }} onDataChange={() => {}} onConfirm={() => {}} />)
+    expect(screen.getByRole('button', { name: '保存' })).toBeDisabled()
   })
 })
