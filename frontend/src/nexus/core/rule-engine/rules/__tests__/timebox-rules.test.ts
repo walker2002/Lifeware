@@ -202,12 +202,18 @@ describe('StartTimeInFutureRule', () => {
 })
 
 // [023.03] QA regression: status transition actions skip FieldCompletenessRule
+// [023.13] A1 / AM2：状态转换 action 改为从 manifest.lifecycle 派生——断言集合实际成员
+// （logTimebox/cancelTimebox/revertTimebox + appointment 类），不再依赖死成员
+// startTimebox/endTimebox/overtimeTimebox（[023.12] 已废）
 describe('FieldCompletenessRule — 状态转换 action 跳过字段检查', () => {
-  const transitionActions = ['startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox']
+  const transitionActions = [
+    'logTimebox', 'cancelTimebox', 'revertTimebox',
+    'cancelAppointment', 'completeAppointment', 'revertAppointment',
+  ]
 
   for (const action of transitionActions) {
-    it(`${action} 仅有 objectId 字段应当 pass（字段从 DB 加载）`, () => {
-      const result = FieldCompletenessRule.evaluate(
+    it(`${action} 仅有 objectId 字段应当 pass（字段从 DB 加载）`, async () => {
+      const result = await FieldCompletenessRule.evaluate(
         {
           action,
           targetDomain: 'timebox',

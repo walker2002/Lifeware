@@ -46,6 +46,7 @@
 import { validationPassed, validationRejected } from '@/usom/types/process'
 import type { DomainRuleRegistry, RealtimeCheck, SubmitCheck } from '@/nexus/rules'
 import type { StructuredIntent } from '@/usom/types/objects'
+import { buildStatusTransitionActions } from './lib/build-status-transition-actions'
 
 /** timebox 规则提示文案（单源，与 realtime message 同源） */
 const TIMEBOX_RULE_MESSAGES = {
@@ -89,19 +90,11 @@ const endTimeFormat: RealtimeCheck = (value) => {
  * 状态转换 action（不含 createTimebox/editTimebox / createAppointment/editAppointment）：
  * title/startTime/endTime 从 DB 行加载（不是 form 提交），submit 端字段必含检查应跳过。
  *
- * 包含 startTimebox / endTimebox / cancelTimebox / logTimebox / revertTimebox + 约定
- * cancelAppointment / startAppointment / completeAppointment / expireAppointment /
- * revertAppointment —
- * 这些 action 在 submitDynamicIntent 时 fields 仅有 { objectId }，跑字段必含
- * 校验会被错判 Rejected，阻塞 SM transition（[023.03] QA 发现：点开始无反应；
- * [023.12] ship 后发现 revertTimebox 同样阻断 — — D7 / T4 新增的 revert 转换漏注册）。
+ * [023.13] TD-019 A1：从 manifest.lifecycle 派生（lib/build-status-transition-actions），
+ * 取代手工常量——新增 lifecycle transition 自动纳入，杜绝漂移（[023.12] revert 漏注册根因）。
+ * create action 显式排除（create 需字段必含校验，不跳过）。
  */
-const STATUS_TRANSITION_ACTIONS = new Set([
-  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox',
-  'overtimeTimebox', 'revertTimebox',
-  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
-  'revertAppointment',
-])
+export const STATUS_TRANSITION_ACTIONS: Set<string> = buildStatusTransitionActions()
 
 const timeboxFieldsValid: SubmitCheck = async (intent: StructuredIntent) => {
   // [023.03] QA fix: 状态转换 action 跳过字段必含检查（字段从 DB 加载）
@@ -236,7 +229,8 @@ const appointmentFieldsValid: SubmitCheck = async (
   //   终态/转移检查。
   // [023.05] PR2 T9: action 名 itinerary→appointment
   // [023.12] T5: 取代原 markInProgressAppointment / markExpiredAppointment
-  if (intent.action !== 'createAppointment' && intent.action !== 'editAppointment') {
+  // [023.13] A1 收敛：appointment 状态转换也走派生 Set（与 timebox 同机制，drift 单一源）
+  if (STATUS_TRANSITION_ACTIONS.has(intent.action)) {
     return validationPassed()
   }
 

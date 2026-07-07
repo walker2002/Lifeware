@@ -7,6 +7,9 @@
 import type { Rule, RuleResult } from '../evaluator'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ContextSnapshot } from '@/usom/types/process'
+// [023.13] TD-019 A1 / AM2：从 domains/timebox 派生 Set import，消除与 rules-registry.ts
+// 的副本漂移（[023.12] revertTimebox 漏注册即根因）。两侧都用同一 Set → drift 单一源。
+import { buildStatusTransitionActions } from '@/domains/timebox/lib/build-status-transition-actions'
 
 // ─── 辅助函数 ─────────────────────────────────────────────────
 
@@ -42,16 +45,12 @@ const REQUIRED_FIELDS = ['title', 'startTime', 'endTime']
  * 状态转换 action（不含 createTimebox/editTimebox）：title/startTime/endTime 从 DB
  * 行加载（不是 form 提交），字段必含检查应跳过。
  *
- * 与 domains/timebox/rules-registry.ts:STATUS_TRANSITION_ACTIONS 同源——两侧都需
- * 跳过，否则一边漏一边拦截仍会弹 confirmation dialog。
- *
- * [023.03] QA fix: status transition 应当 pass（字段从 DB 加载，submit 端不会
- * 携带），否则核心规则仍会误判 warning → orchestrator 聚合成 NeedConfirm。
+ * [023.13] TD-019 A1 / AM2：从 domains/timebox/lib/build-status-transition-actions
+ * 派生，消除本地手工副本漂移（[023.12] revertTimebox 漏注册即根因）。
+ * 与 domains/timebox/rules-registry.ts:STATUS_TRANSITION_ACTIONS 同源（两侧都引用
+ * 同一 Set），新增 lifecycle transition 自动纳入。
  */
-const STATUS_TRANSITION_ACTIONS = new Set([
-  'startTimebox', 'endTimebox', 'cancelTimebox', 'logTimebox', 'overtimeTimebox',
-  'cancelAppointment', 'startAppointment', 'completeAppointment', 'expireAppointment',
-])
+const STATUS_TRANSITION_ACTIONS = buildStatusTransitionActions()
 
 export const FieldCompletenessRule: Rule = {
   name: 'FieldCompletenessRule',

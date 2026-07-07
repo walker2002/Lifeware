@@ -178,14 +178,15 @@ describe('appointment_fields_valid (submit — 聚合规则)', () => {
 // cancelAppointment / startAppointment / expireAppointment）提交仅 fields={objectId}，
 // submit 规则不应误判 Rejected（[026] P0-1 修复范式已在 appointmentFieldsValid 内显式
 // skip,本测试守护不再回归）
+// [023.13] A1：状态转换 action 改为从 manifest.lifecycle 派生——断言集合实际成员
+// （cancelAppointment/completeAppointment/revertAppointment），不再依赖死成员
+// startAppointment/expireAppointment（[023.12] 已废）
 describe('appointment 状态转换 action 跳过字段必含检查', () => {
   const check = appointmentRuleRegistry.submit.appointment_fields_valid.check
   const transitionActions = [
+    'cancelAppointment',
     'completeAppointment',
     'revertAppointment',
-    'cancelAppointment',
-    'startAppointment',
-    'expireAppointment',
   ]
 
   for (const action of transitionActions) {
