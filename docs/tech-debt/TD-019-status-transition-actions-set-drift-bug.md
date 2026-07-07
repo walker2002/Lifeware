@@ -1,9 +1,10 @@
 ---
 id: TD-019
 title: "STATUS_TRANSITION_ACTIONS Set 漂移:新增 lifecycle transition 时漏注册,点「回退」/「完成约定」误触字段必含校验"
-status: 新建
+status: 已解决
 created: 2026-07-07
 last_updated: 2026-07-07
+resolved: 2026-07-07
 ---
 
 # TD-019: STATUS_TRANSITION_ACTIONS Set 漂移:新增 lifecycle transition 时漏注册,点「回退」/「完成约定」误触字段必含校验
@@ -133,3 +134,12 @@ const STATUS_TRANSITION_ACTIONS = new Set([
 - ✅ 5+1 个守护测试 PASS
 - ✅ tsc 0 新增错
 - 预防 A1/A2 留 P2 跟踪(下次 lifecycle 改动前实施)
+
+## [023.13] 关闭（2026-07-07）
+
+A1/A2 预防建议在本 cycle 提前落地，从「下次 lifecycle 改动前」升级为「本 PR 内完成」：
+
+- ✅ A1：`STATUS_TRANSITION_ACTIONS` 从 `manifest.lifecycle` 派生（`frontend/src/domains/timebox/lib/build-status-transition-actions.ts`，T1 commit `41f764a`）—— `lib/build-status-transition-actions.ts:37 deriveStatusTransitionActions` 纯函数 + `buildStatusTransitionActions()` 运行时 wrapper；`rules-registry.ts:97` 直接 `export const STATUS_TRANSITION_ACTIONS = buildStatusTransitionActions()`，消除手工常量。
+- ✅ A2：pre-push `validate:rules-registry` 阻断 drift（T2 commit `7740abd` + critical fix `1dd1e4b`）—— `frontend/scripts/validate-rules-registry.ts` 静态扫 manifest vs registry action 集合，drift 即 fail；纳入 pre-push 钩子链（与 `validate:manifest` / `validate:structure` 并列）。
+- ✅ appointment 域 skip 收敛到同一派生 Set：`build-status-transition-actions.ts` 遍历 `lifecycle[objectType]` 全表（timebox + appointment 共 manifest），生成 `${action}${PascalCase(objectType)}` 全部纳入；`appointmentFieldsValid`（rules-registry.ts:236）复用同一 Set 跳过字段必含校验，无需再维护第二份。
+- ✅ 回归测试 `revert-regression.test.ts` PASS（logged/cancelled → planned）—— 集成层 2 case（cancelled 直走 SM + logged+executionRecord+confirm 走 AM3 updateFields），与 T5 `revertTimebox.test.ts` 8 个单元 case 互补，证明 TD-019 hot-fix 端到端生效。
