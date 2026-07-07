@@ -7,9 +7,25 @@ exports[`[026] T15 IRON RULE — MiniCalendar 纯 timebox 渲染回归 > 纯 kin
     style="max-width: 280px;"
   >
     <div
-      class="mb-2 text-center text-sm font-medium text-ink"
+      class="mb-2 flex items-center justify-between text-sm font-medium text-ink"
     >
-      2026年7月
+      <button
+        aria-label="上个月"
+        class="px-1 text-body hover:text-ink"
+        type="button"
+      >
+        ‹
+      </button>
+      <span>
+        2026年7月
+      </span>
+      <button
+        aria-label="下个月"
+        class="px-1 text-body hover:text-ink"
+        type="button"
+      >
+        ›
+      </button>
     </div>
     <div
       class="mb-1 grid grid-cols-7 gap-0"

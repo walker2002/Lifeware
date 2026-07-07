@@ -14,7 +14,9 @@
  */
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import {
+  addMonths,
   format,
   startOfMonth,
   endOfMonth,
@@ -46,8 +48,37 @@ function hasEventOnDate(date: Date, events: TimeboxesEvent[]): boolean {
 }
 
 export function MiniCalendar({ currentDate, selectedDate, events, onDateSelect }: MiniCalendarProps) {
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
+  // [023.13] §5：内部 viewMonth state，支持上下月翻页；用户翻过 → 锁定，跨月 → 跟随。
+  const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(currentDate))
+  const [userTouchedMonth, setUserTouchedMonth] = useState(false)
+
+  // 同步规则：
+  // - 未手动翻 → 跟随 currentDate
+  // - 手动翻过 → 保持 viewMonth；仅当 currentDate 自己跨入新月份时重置跟随并清 userTouchedMonth
+  // 用 ref 跟踪 currentDate 的月份变化，避免首次 mount 误判 + setState 新对象引用导致的循环
+  const prevCurrentMonthRef = useRef<Date>(currentDate)
+  useEffect(() => {
+    const prevCurrentMonth = prevCurrentMonthRef.current
+    if (!userTouchedMonth) {
+      setViewMonth(startOfMonth(currentDate))
+      prevCurrentMonthRef.current = currentDate
+      return
+    }
+    // 手动翻过：仅当 currentDate 自己从 month A 跨到 month B 时才重置跟随
+    if (!isSameMonth(prevCurrentMonth, currentDate)) {
+      setViewMonth(startOfMonth(currentDate))
+      setUserTouchedMonth(false)
+    }
+    prevCurrentMonthRef.current = currentDate
+  }, [currentDate, userTouchedMonth])
+
+  const navMonth = (delta: -1 | 1) => {
+    setViewMonth((m) => startOfMonth(addMonths(m, delta)))
+    setUserTouchedMonth(true)
+  }
+
+  const monthStart = startOfMonth(viewMonth)
+  const monthEnd = endOfMonth(viewMonth)
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 })
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
   const days = eachDayOfInterval({ start: calStart, end: calEnd })
@@ -56,9 +87,25 @@ export function MiniCalendar({ currentDate, selectedDate, events, onDateSelect }
 
   return (
     <div className="rounded-lg border border-hairline bg-surface-card p-3" style={{ maxWidth: 280 }}>
-      {/* 月份标题 */}
-      <div className="mb-2 text-center text-sm font-medium text-ink">
-        {format(currentDate, 'yyyy年M月', { locale: zhCN })}
+      {/* 月份标题（带翻页按钮） */}
+      <div className="mb-2 flex items-center justify-between text-sm font-medium text-ink">
+        <button
+          type="button"
+          aria-label="上个月"
+          onClick={() => navMonth(-1)}
+          className="px-1 text-body hover:text-ink"
+        >
+          ‹
+        </button>
+        <span>{format(viewMonth, 'yyyy年M月', { locale: zhCN })}</span>
+        <button
+          type="button"
+          aria-label="下个月"
+          onClick={() => navMonth(1)}
+          className="px-1 text-body hover:text-ink"
+        >
+          ›
+        </button>
       </div>
 
       {/* 星期头 */}
@@ -73,7 +120,7 @@ export function MiniCalendar({ currentDate, selectedDate, events, onDateSelect }
       {/* 日期网格 */}
       <div className="grid grid-cols-7 gap-0">
         {days.map((day) => {
-          const isCurrentMonth = isSameMonth(day, currentDate)
+          const isCurrentMonth = isSameMonth(day, viewMonth)
           const isToday = isSameDay(day, today)
           const isSelected = selectedDate ? isSameDay(day, selectedDate) : isSameDay(day, currentDate)
           const hasEvent = hasEventOnDate(day, events)
