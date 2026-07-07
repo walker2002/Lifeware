@@ -50,6 +50,7 @@ last_updated: 2026-07-07
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
 | TD-018 | [023.12] pre-existing 写入口连锁债：tasks/hooks.ts 死 action + 2 测试 fixture | 🟡 | cross-domain | [023.12] | 暂未指派 |
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮 | ✅ | lifeware-timebox | [023.12] hot-fix → [023.13] 关闭 | 暂未指派 |
+| TD-023 | timebox 写入口绕过 mutation service：revertTimebox 直调 repo.updateFields 写列 (AM3 reuse) | 🟡 | lifeware-timebox | [023.13] | 暂未指派 |
 
 ### 🛠 修复中
 
@@ -93,6 +94,7 @@ last_updated: 2026-07-07
 - [[TD-012]] · [023.05-1] PR1 Polish 3 Minor · ⚪ Trivial
 - [[TD-017]] · [023.12] 生产代码漏跟 status 收窄（timebox.ts + intent.ts） · 🔴 Critical
 - [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix + A1/A2 已落地 [023.13])
+- [[TD-023]] · timebox 写入口绕过 mutation service (AM3 reuse updateFields) · 🟡 Medium
 
 ### `lifeware-appointments`
 
@@ -133,6 +135,7 @@ last_updated: 2026-07-07
 - [[TD-007]] · Suspend CNUI 回环未闭环
 - [[TD-008]] · lifecycle-configs require 多键域债
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
+- [[TD-023]] · timebox 写入口绕过 mutation service → 架构治理修复时关闭
 
 ### 🟢 Low（有精力再说）
 
@@ -174,7 +177,8 @@ last_updated: 2026-07-07
 | 第 3 批(🟢🟢) | 2026-07-06 | TD-014 ~ TD-015(2 条) | 手动调起,录 /review 冲突调查时发现的 2 条工具链债 |
 | 第 4 批(🔴🟠🟡) | 2026-07-07 | TD-016 ~ TD-018(3 条,簇合并) | `[023.12]` ship-then-polish 7 错分簇合并为 3 TD（test fixture / production code / pre-existing chain） |
 | 第 5 批(🔴) | 2026-07-07 | TD-019(1 条) | `[023.12]` hot-fix:STATUS_TRANSITION_ACTIONS 漂移导致 revert 100% 阻断,含已修复 + A1/A2 预防建议 |
+| 第 6 批(🟡) | 2026-07-07 | TD-023(1 条) | `[023.13]` whole-branch review 抓出:AM3 reuse repo.updateFields 列写绕 mutation service 架构治理债 |
 
 ---
 
-**最后更新**: 2026-07-07 · 共 19 条（1 条本批关闭 → 已修复）· 🔴1 / 🟠5 / 🟡5 / 🟢5 / ⚪2
+**最后更新**: 2026-07-07 · 共 20 条（1 条本批关闭 → 已修复;新增 TD-023）· 🔴0 / 🟠5 / 🟡6 / 🟢5 / ⚪2
