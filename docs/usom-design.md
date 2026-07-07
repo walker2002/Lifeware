@@ -336,7 +336,6 @@ interface StructuredIntent {
 
 **对象意图**：OKR 的周期归属对象，是 Objective 的权威时间容器。一个 Cycle 可承载多个 Objective；周期信息（类型 + 起止）由 Cycle 独占，Objective 经 `cycleId` 引用。
 
-<<<<<<< Updated upstream
 **生命周期**（持久态，[023.12] 2026-07-06 收敛）：`draft → approved → finished → reviewed`，外加回退 `reviewed → finished`。
 
 > **状态枚举收敛（[023.12] 2026-07-06）**：原 `not_started / in_progress` 折叠为 `approved`（语义合并：审批通过即代表进入活跃执行期）；原 `ended` 改名 `finished`（与「reviewer 复盘」区分）。SM action rename：`startCycle / planCycle → approve`（塌缩二选一分支，按 `now vs periodStart` 不再区分）；`endCycle → finish`；`review` 不变；**新增** `revert`（reviewed→finished）。guard ALLOWED map 同步重写。
@@ -358,18 +357,6 @@ interface StructuredIntent {
 | `approved` | 已审批进入执行期（原 `not_started` / `in_progress` 合并值） |
 | `finished` | 用户主动结束（原 `ended`，[023.12] 改名） |
 | `reviewed` | 已完成复盘，锁定 objective/KR 写路径 |
-=======
-**生命周期**：`Draft → Approved → Finished → Reviewed`（加 1 条 revert：`Reviewed → Finished`）
-
-> **状态枚举收窄（2026-07-06, [023.12]）**：原 5 态 `Draft | NotStarted | InProgress | Ended | Reviewed` 收敛到 4 态 `Draft | Approved | Finished | Reviewed`。`NotStarted` 与 `InProgress` 合并为 `Approved`（"已批准 = 进行中"，时间态不再是独立状态——由审批动作驱动而非时间触发器）。`Ended` 改名 `Finished`（"已结束"）。**单步回退**：`Reviewed → Finished` 不回初态（保留复盘证据），与 timebox/appointment 回到 `Planned`/`Scheduled` 不对称——是有意设计：cycle 的 `Reviewed` 是"复盘锁定"语义，单步回退保留 review 记录，timebox/appointment 无等价锁定中间态。
-
-| 状态 | 语义 |
-|---|---|
-| `Draft` | 已创建但未排期，允许修改 |
-| `Approved` | 已批准（审批通过），进行中 |
-| `Finished` | 已结束（时间到达 periodEnd），等待复盘 |
-| `Reviewed` | 已完成复盘，锁定；可通过 revert 回到 Finished |
->>>>>>> Stashed changes
 
 ```typescript
 export interface Cycle {
@@ -377,19 +364,11 @@ export interface Cycle {
   cycleType:    'annual' | 'quarterly' | 'monthly' | 'semi_annual' | 'custom'
   name:         string
   period:       { start: DateOnly; end: DateOnly }   // Cycle 自身字段
-<<<<<<< Updated upstream
   status:       'draft' | 'approved' | 'finished' | 'reviewed'  // [023.12] 收敛 4 态
   createdAt:    Timestamp
   updatedAt:    Timestamp
   approvedAt?:  Timestamp   // [023.12] 原 startedAt 重命名，状态进入 approved 的时刻
   finishedAt?:  Timestamp   // [023.12] 原 endedAt 重命名，状态进入 finished 的时刻
-=======
-  status:       'draft' | 'approved' | 'finished' | 'reviewed'
-  createdAt:    Timestamp
-  updatedAt:    Timestamp
-  approvedAt?:  Timestamp   // [023.12] AM6：rename 自 startedAt（语义=批准时间戳）
-  finishedAt?:  Timestamp   // [023.12] AM6：rename 自 endedAt（语义=结束时间戳）
->>>>>>> Stashed changes
   reviewedAt?:  Timestamp   // 状态进入 reviewed 的时刻
 }
 ```
@@ -734,7 +713,6 @@ interface HabitLog {
 
 **对象意图**：一段被显式划分给特定任务/习惯的时间区间，是时间结构的最小执行单元。
 
-<<<<<<< Updated upstream
 **生命周期**（持久态）：`Planned → Logged` / `Planned → Cancelled`，外加两条回退 `Logged/Cancelled → Planned`。
 
 > **状态枚举收敛（[023.12] 2026-07-06）**：持久态只跟踪**用户行为状态**（planned / logged / cancelled）。原 `Running / Overtime / Ended` 不再持久化，由读时派生显示（见下方）。原 Paused→Overtime 转换历史已折叠（[023.12] 任务前历史）。SM action 名：`create / log / cancel / revert`（revert 为 [023.12] 新增，对应 `logged|cancelled → planned` 回退）。
@@ -752,17 +730,6 @@ interface HabitLog {
 **可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
 
 **事件清理（[023.12]）**：移除 `TimeboxStarted / TimeboxEnded / TimeboxOvertime` 事件（无消费方）；新增 `TimeboxReverted` 事件承载 revert 转换。manifest `subscribed_events` 同步。
-=======
-**生命周期**：`Planned → Logged | Cancelled`（加 2 条 revert：`Logged → Planned`、`Cancelled → Planned`）
-
-> **状态枚举收窄（2026-07-06, [023.12]）**：原 6 态 `Planned | Running | Overtime | Ended | Cancelled | Logged` 收敛到 3 态 `Planned | Logged | Cancelled`。`Running`/`Overtime`/`Ended` 不再是持久化状态——改为**读时派生**（timebox 看 `now` vs `startTime`/`endTime`）：`now ∈ [startTime, endTime]` → 派生 `Running`；`now > endTime` → 派生 `Overtime`；否则 `null`（未开始）。设计理由：Timebox 状态只应跟踪用户行为（计划 / 取消 / 记录），时间态是显示关注不应污染 SM 持久化层。
-
-| 状态 | 语义 |
-|---|---|
-| `Planned` | 已安排，未到开始时间 |
-| `Logged` | 已记录完成情况，归档（含 executionRecord） |
-| `Cancelled` | 已取消，不生成执行记录 |
->>>>>>> Stashed changes
 
 ```typescript
 interface Timebox {
@@ -780,13 +747,7 @@ interface Timebox {
   activityArchetypeId?: USOM_ID
   createdAt:       Timestamp
   updatedAt:       Timestamp
-<<<<<<< Updated upstream
   // [023.12] 移除 startedAt / endedAt / overtimeAt 三列（时间派生态不持久化）
-=======
-  startedAt?:      Timestamp          // [023.12] 标记 deprecated，时间态改读时派生（[023.12] 后实际未使用，保留兼容旧数据）
-  overtimeAt?:     Timestamp          // [023.12] 标记 deprecated，同上
-  endedAt?:        Timestamp          // [023.12] 标记 deprecated，同上
->>>>>>> Stashed changes
   loggedAt?:       Timestamp
   executionRecord?: ExecutionRecord // 执行记录（Logged 时填入）
   notes?:          Notes
@@ -1052,13 +1013,8 @@ interface Appointment {
 
 type AppointmentStatus =
   | 'scheduled'   // initial state（SM null→scheduled）
-<<<<<<< Updated upstream
   | 'cancelled'   // 用户取消（SM scheduled→cancelled；终态）
   | 'completed'   // 已完成（SM scheduled→completed；[027] 启用）
-=======
-  | 'cancelled'   // 用户取消（SM {scheduled,cancelled}→scheduled 可逆；终态 schema 含义但可回退）
-  | 'completed'   // 已完成（[027] SM →completed，timebox 打卡后；终态）
->>>>>>> Stashed changes
 ```
 
 **状态机**（[023.12] 收敛 + 派生显示）：

@@ -310,21 +310,12 @@ CREATE TABLE cycles (
   name          text NOT NULL,
   period_start  date NOT NULL,
   period_end    date NOT NULL,
-<<<<<<< Updated upstream
   status        text NOT NULL,  -- [023.12] enum: draft | approved | finished | reviewed（原 5 值收敛 4 值）
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
   approved_at   timestamptz,    -- [023.12] 原 started_at 重命名（status 进入 approved 的时刻）
   finished_at   timestamptz,    -- [023.12] 原 ended_at 重命名（status 进入 finished 的时刻）
   reviewed_at   timestamptz,    -- 不变
-=======
-  status        text NOT NULL,  -- enum: draft | approved | finished | reviewed
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
-  approved_at   timestamptz,  -- [023.12] rename 自 started_at（语义=批准时间戳）
-  finished_at   timestamptz,  -- [023.12] rename 自 ended_at（语义=结束时间戳）
-  reviewed_at   timestamptz,
->>>>>>> Stashed changes
   CONSTRAINT check_cycles_period_end_after_start CHECK (period_end > period_start)
 );
 CREATE INDEX idx_cycles_user_status ON cycles(user_id, status);
@@ -739,12 +730,7 @@ CREATE TABLE timeboxes (
   schema_version integer not null default 2,
 
   -- 查询关键字段（独立列）
-<<<<<<< Updated upstream
   status        text not null check (status in ('planned', 'logged', 'cancelled')),  -- [023.12] 6 值→3 值
-=======
-  -- [023.12] 状态枚举 6→3 态：running/overtime/ended 改读时派生（看 now vs start_time/end_time）
-  status        text not null check (status in ('planned', 'logged', 'cancelled')),
->>>>>>> Stashed changes
   title         text not null,
   start_time    timestamptz not null,
   end_time      timestamptz not null,
@@ -768,11 +754,7 @@ CREATE TABLE timeboxes (
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
-<<<<<<< Updated upstream
   -- [023.12] 移除 started_at / overtime_at / ended_at 三列（时间派生态不持久化）
-=======
-  -- [023.12] 删 started_at/overtime_at/ended_at（时间态改读时派生 + schema 同步）
->>>>>>> Stashed changes
   logged_at     timestamptz
 );
 
@@ -859,37 +841,22 @@ CREATE INDEX idx_task_exec_logs_user_logged ON task_execution_logs(user_id, logg
 > **DDL 实现在 T2 迁移（手写 SQL + psql + 登记 journal，idx=31）落地**；本节先登记列/索引契约供 Repository 与 server actions 引用。
 
 ```sql
-<<<<<<< Updated upstream
 -- T2 迁移落地 SQL 草案（DDL 在 0031 迁移精确化；0033 RENAME 为 appointments；0034 删 2 个时间戳列）
-=======
--- v2 变更（2026-07-06, [023.12]）：status 5→3 态（删 in_progress/expired 改读时派生）；删 2 个时间戳列（in_progress_at, expired_at）。
->>>>>>> Stashed changes
 CREATE TABLE appointments (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references users(id) on delete cascade,
   schema_version  integer not null default 1,
 
   -- 核心业务字段
-<<<<<<< Updated upstream
   status          text not null check (status in ('scheduled', 'cancelled', 'completed')),  -- [023.12] 5 值→3 值
-=======
-  -- [023.12] 状态枚举 5→3 态：in_progress/expired 改读时派生（看 now 与 start_time 同日历日）
-  status          text not null check (status in ('scheduled', 'cancelled', 'completed')),
->>>>>>> Stashed changes
   title           text not null,
   detail          text,                    -- 活动详情，可空
   start_time      timestamptz not null,    -- 开始时间（UTC 存）
   duration_min    integer not null,        -- 时长（分钟）；end_time = start_time + duration_min 派生
   people          text[] not null default '{}',  -- 关系人（纯文本，D1=A）
 
-<<<<<<< Updated upstream
   -- 2 个用户操作 transition 时间戳（[023.12] 移除 in_progress_at / expired_at 两个时间派生态时间戳）
   completed_at    timestamptz,             -- →completed 时盖（[023.12] 正式启用，[027] 由 timebox 打卡联动）
-=======
-  -- [023.12] 删 in_progress_at, expired_at（[023.12] 反转 [026] D2：派生代替持久化）
-  -- 2 个 transition 时间戳（用户操作触发盖戳）
-  completed_at    timestamptz,             -- [027] →completed 时盖
->>>>>>> Stashed changes
   cancelled_at    timestamptz,             -- →cancelled 时盖
 
   -- [026.01] archetype FK（nullable，archetype 删除时 appointment 保留）
@@ -909,13 +876,8 @@ CREATE INDEX idx_appointments_archetype         ON appointments(activity_archety
 
 **设计要点**：
 - `end_time` 不存列：派生 = `start_time + duration_min * interval '1 minute'`，与 USOM 注释一致；调度查询用 `tstzrange` 表达式。
-<<<<<<< Updated upstream
 - 2 时间戳 nullable（[023.12] 收敛）：只在用户操作 transition 触发时盖（cancelled/completed）；初始创建后仅 `created_at`/`updated_at` 有值。`in_progress_at` / `expired_at` 已删除——这两态由 `derive-display-status` 派生显示。
 - 状态枚举与 USOM `AppointmentStatus` 3 值严格对齐；CHECK 约束由迁移 SQL 加。
-=======
-- 4 时间戳 nullable：只在 transition 触发时盖；初始创建后仅 `created_at`/`updated_at` 有值。
-- 状态枚举与 USOM `AppointmentStatus` 3 态严格对齐（[023.12] 收窄）；CHECK 约束由迁移 SQL 加。
->>>>>>> Stashed changes
 - `people` 是 `text[]`（D1=A，关系人纯文本），不引入 relation 表。
 - **[023.12] 派生 in_progress/expired 的数据源**：`status='scheduled'` 行的 `start_time`（UTC 存，按本地时区换算日历日）由 `derive-display-status` 工具在读取时按 `now` 与 `start_time` 日历日关系派生。SQL 级"查过期约定"不再可能——单用户 MVP 可接受；报表/分析需求时再考虑物化视图。
 
