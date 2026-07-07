@@ -81,6 +81,7 @@
 - [[TD-016]] · 🟠 · `cross-domain` · 测试 fixture 漏改（status 收窄与字段删除后,3 处 test fixture 未同步,tsc 累计 9 错）→ [023.13] 收口
 - [[TD-017]] · 🔴 · `lifeware-timebox` · 生产代码漏跟 status 收窄（timebox.ts:262 + intent.ts:126-128 仍读被删字段与死状态）→ [023.13] 收口
 - [[TD-018]] · 🟡 · `cross-domain` · pre-existing 写入口连锁债（tasks/hooks.ts 死 action + generic-repo-adapter 死 repo 引用,[018] G3 + [019.1] 退役 Adapter 连锁未清完）→ [023.13] 收口
+- [[TD-019]] · 🔴 · `lifeware-timebox` · STATUS_TRANSITION_ACTIONS 漂移：revertTimebox/revertAppointment 漏注册 100% 阻断「回退」/「撤销完成约定」按钮 → **已 hot-fix**(加白名单 + 6 守护测试),A1 自动化生成 + A2 pre-push hook 预防 → [023.13] 实施
 
 ---
 

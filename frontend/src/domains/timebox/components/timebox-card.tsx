@@ -149,6 +149,9 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           >
             {timebox.title}
           </button>
+          {timebox.status === "logged" && (
+            <span className="text-success shrink-0 text-sm" aria-label="已打卡" title="已打卡">✓</span>
+          )}
           {timebox.archetypeName && (
             <span className="text-xs text-muted whitespace-nowrap">· {timebox.archetypeName}</span>
           )}

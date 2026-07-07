@@ -49,6 +49,7 @@ last_updated: 2026-07-07
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
 | TD-018 | [023.12] pre-existing 写入口连锁债：tasks/hooks.ts 死 action + 2 测试 fixture | 🟡 | cross-domain | [023.12] | 暂未指派 |
+| TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮 | 🔴 | lifeware-timebox | [023.12] hot-fix | 暂未指派 |
 
 ### 🛠 修复中
 
@@ -90,6 +91,7 @@ last_updated: 2026-07-07
 - [[TD-011]] · I-3 _dayStart/_dayEnd unused params · ⚪ Trivial
 - [[TD-012]] · [023.05-1] PR1 Polish 3 Minor · ⚪ Trivial
 - [[TD-017]] · [023.12] 生产代码漏跟 status 收窄（timebox.ts + intent.ts） · 🔴 Critical
+- [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix 已发,A1/A2 预防 → [023.13])
 
 ### `lifeware-appointments`
 
@@ -114,6 +116,7 @@ last_updated: 2026-07-07
 ### 🔴 Critical（必须本季度修复）
 
 - [[TD-017]] · [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 错 → [023.13]
+- [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移（revert 100% 阻断） · 已 hot-fix,A1/A2 预防 → [023.13]
 
 ### 🟠 High（本年内修复）
 
@@ -170,7 +173,8 @@ last_updated: 2026-07-07
 | 第 2 批(🟢⚪) | 2026-07-06 | TD-009 ~ TD-013(5 条,#11 合并到 TD-007) | 同次手动调起续录 |
 | 第 3 批(🟢🟢) | 2026-07-06 | TD-014 ~ TD-015(2 条) | 手动调起,录 /review 冲突调查时发现的 2 条工具链债 |
 | 第 4 批(🔴🟠🟡) | 2026-07-07 | TD-016 ~ TD-018(3 条,簇合并) | `[023.12]` ship-then-polish 7 错分簇合并为 3 TD（test fixture / production code / pre-existing chain） |
+| 第 5 批(🔴) | 2026-07-07 | TD-019(1 条) | `[023.12]` hot-fix:STATUS_TRANSITION_ACTIONS 漂移导致 revert 100% 阻断,含已修复 + A1/A2 预防建议 |
 
 ---
 
-**最后更新**: 2026-07-07 · 共 18 条 · 🔴1 / 🟠5 / 🟡5 / 🟢5 / ⚪2
+**最后更新**: 2026-07-07 · 共 19 条 · 🔴2 / 🟠5 / 🟡5 / 🟢5 / ⚪2
