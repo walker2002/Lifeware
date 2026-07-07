@@ -261,7 +261,23 @@ export function TimeboxesWorkspace() {
         }
         return
       }
-      // [023.03] T3 旧路径：start/end/cancel/log 走 transitionTimebox + needs_confirm
+      // [023.13] QA BUG #3 fix：'log' (打卡) 不直接 transition，而是打开 TimeboxDrawer
+      // edit 模式，让用户填 ExecutionDetailFields（actualStartTime/endTime/focusMinutes/
+      // energyActual/notes）。drawer save handler 按 hasExecDetail 走 detailed log，
+      // 否则 simple log。直接 simple log 改由 quickLog 一键完成。
+      if (action === 'log') {
+        const tb = events.find(
+          (e): e is Extract<TimeboxesEvent, { kind: 'timebox' }> =>
+            e.kind === 'timebox' && e.source.id === timeboxId,
+        )?.source
+        if (!tb) {
+          toast.error('未找到该时间盒')
+          return
+        }
+        await handleEdit(tb)
+        return
+      }
+      // [023.03] T3 旧路径：start/end/cancel 走 transitionTimebox + needs_confirm
       const r = await transitionTimebox(timeboxId, action, {}, false)
       if (r.status === 'ok') {
         await loadRange(dateMode, currentDate)
