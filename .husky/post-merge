@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# [restore-tsconfig] git merge / pull / rebase 后兜底还原被 Next.js 污染的 tsconfig.json
+# 详见 frontend/scripts/restore-tsconfig.sh
+sh frontend/scripts/restore-tsconfig.sh
