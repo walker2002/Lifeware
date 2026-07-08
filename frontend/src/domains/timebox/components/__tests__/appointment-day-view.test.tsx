@@ -9,7 +9,7 @@
  * 避免硬编码日期随真实日期漂移而翻转「过期/未过期」判定。
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { beforeAll, afterAll, vi } from 'vitest'
 import { AppointmentDayView } from '../appointment-day-view'
 import type { AppointmentSummary } from '@/usom/types/summaries'
@@ -124,5 +124,137 @@ describe('AppointmentDayView', () => {
     expect(
       container.querySelector(`[data-day-cell="${ymd(tomorrow)}"] [data-marker="future"]`),
     ).toBeInTheDocument()
+  })
+})
+
+// ─── [026.02] T9.5 修复：DayView 可选动作按钮 + multi-select ─────────────
+describe('AppointmentDayView - T9.5 actions', () => {
+  const itemScheduled = mk({ id: 'sch', title: '计划中' })
+  const itemCancelled = mk({ id: 'cx', title: '已取消', status: 'cancelled' })
+  const itemCompleted = mk({ id: 'cp', title: '已完成', status: 'completed' })
+
+  const byDate = new Map<string, AppointmentSummary[]>([
+    [ymd(today), [itemScheduled, itemCancelled, itemCompleted]],
+  ])
+
+  it('onEdit/onComplete/onCancel 提供时给 scheduled 渲染三按钮', () => {
+    const onEdit = vi.fn()
+    const onComplete = vi.fn()
+    const onCancel = vi.fn()
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onEdit={onEdit}
+        onComplete={onComplete}
+        onCancel={onCancel}
+      />,
+    )
+    expect(container.querySelector('[data-action="edit"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-action="complete"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-action="cancel"]')).toBeInTheDocument()
+  })
+
+  it('onRevert 提供时给 cancelled/completed 渲染回退按钮', () => {
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled, itemCancelled, itemCompleted]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onRevert={() => {}}
+      />,
+    )
+    // 两条终态 item 各一个 revert 按钮
+    expect(container.querySelectorAll('[data-action="revert"]').length).toBe(2)
+  })
+
+  it('scheduled item 即使 onRevert 提供也不渲染回退按钮', () => {
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onRevert={() => {}}
+      />,
+    )
+    expect(container.querySelector('[data-action="revert"]')).toBeNull()
+  })
+
+  it('点击 edit 按钮触发 onEdit(item)', () => {
+    const onEdit = vi.fn()
+    render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onEdit={onEdit}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText(`编辑约定：${itemScheduled.title}`))
+    expect(onEdit).toHaveBeenCalledWith(itemScheduled)
+  })
+
+  it('点击 complete 按钮触发 onComplete(id)', () => {
+    const onComplete = vi.fn()
+    render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onComplete={onComplete}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText(`完成约定：${itemScheduled.title}`))
+    expect(onComplete).toHaveBeenCalledWith(itemScheduled.id)
+  })
+
+  it('selected 提供时通过 aria-pressed 反映', () => {
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        selected={new Set([itemScheduled.id])}
+      />,
+    )
+    const wrapper = container.querySelector(`[data-day-item="${itemScheduled.id}"]`)
+    expect(wrapper?.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('未 selected 时 aria-pressed=false', () => {
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        selected={new Set()}
+      />,
+    )
+    const wrapper = container.querySelector(`[data-day-item="${itemScheduled.id}"]`)
+    expect(wrapper?.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('点击 item 触发 onToggleSelect(id)', () => {
+    const onToggleSelect = vi.fn()
+    const { container } = render(
+      <AppointmentDayView
+        appointments={[itemScheduled]}
+        selectedDate={today}
+        appointmentsByDate={byDate}
+        onSelectDate={() => {}}
+        onToggleSelect={onToggleSelect}
+      />,
+    )
+    const wrapper = container.querySelector(`[data-day-item="${itemScheduled.id}"]`) as HTMLElement
+    fireEvent.click(wrapper)
+    expect(onToggleSelect).toHaveBeenCalledWith(itemScheduled.id)
   })
 })
