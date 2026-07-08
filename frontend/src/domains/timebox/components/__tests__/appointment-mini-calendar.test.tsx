@@ -9,21 +9,47 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeAll, afterAll, vi } from 'vitest'
 import { AppointmentMiniCalendar } from '../appointment-mini-calendar'
 import type { AppointmentSummary } from '@/usom/types/summaries'
+
+// 把组件内部的 `new Date()` 锁定到 currentDate，规避真实今天日期漂移导致
+// 「过期/未过期」判定反转（例如 2026-07-10 随真实日期从未来→过去漂移）。
+// 与 mini-calendar.regression.test.tsx 同模式（IRON RULE 同源）。
+const currentDate = new Date('2026-07-15T12:00:00Z')
+beforeAll(() => {
+  // 只冻结 Date，使组件内部的 `new Date()` 固定到 currentDate；
+  // 不冻结 setTimeout 等，避免 userEvent.click 等异步操作挂死。
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(currentDate)
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
+
+// 日期帮助：从 currentDate 派生相对偏移日期，抗漂移。
+const DAY_MS = 24 * 60 * 60 * 1000
+const dayBefore = new Date(currentDate.getTime() - 5 * DAY_MS)
+const dayAfter = new Date(currentDate.getTime() + 5 * DAY_MS)
+function ymd(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+const dayBeforeKey = ymd(dayBefore)
+const dayAfterKey = ymd(dayAfter)
 
 const mkAppt = (overrides: Partial<AppointmentSummary> = {}): AppointmentSummary => ({
   id: 'a-' + Math.random(),
   title: 'x',
-  startTime: '2026-07-10T10:00:00.000Z',
+  startTime: dayBefore.toISOString(),
   durationMin: 60,
   status: 'scheduled',
   ...overrides,
 })
 
 describe('AppointmentMiniCalendar', () => {
-  const currentDate = new Date('2026-07-15T12:00:00Z')
-
   it('渲染本月日历网格（含标题行 + 6 周）', () => {
     const { container } = render(
       <AppointmentMiniCalendar currentDate={currentDate} appointments={[]} />,
@@ -36,32 +62,35 @@ describe('AppointmentMiniCalendar', () => {
   })
 
   it('过期约定（startTime < now, status=scheduled）日期格显示红点', () => {
-    const appt = mkAppt({ startTime: '2026-07-10T10:00:00Z', status: 'scheduled' })
+    const appt = mkAppt({ startTime: dayBefore.toISOString(), status: 'scheduled' })
     const { container } = render(
       <AppointmentMiniCalendar currentDate={currentDate} appointments={[appt]} />,
     )
-    // 找到 10 号的日期格，检查有红点
-    const day10 = container.querySelector('[data-day-cell="2026-07-10"]')
-    expect(day10?.querySelector('[data-marker="expired"]')).toBeInTheDocument()
+    const cell = container.querySelector(`[data-day-cell="${dayBeforeKey}"]`)
+    expect(cell?.querySelector('[data-marker="expired"]')).toBeInTheDocument()
   })
 
   it('未过期约定（startTime >= now, status=scheduled）日期格显示蓝点', () => {
-    const appt = mkAppt({ startTime: '2026-07-20T10:00:00Z', status: 'scheduled' })
+    const appt = mkAppt({ startTime: dayAfter.toISOString(), status: 'scheduled' })
     const { container } = render(
       <AppointmentMiniCalendar currentDate={currentDate} appointments={[appt]} />,
     )
-    const day20 = container.querySelector('[data-day-cell="2026-07-20"]')
-    expect(day20?.querySelector('[data-marker="future"]')).toBeInTheDocument()
+    const cell = container.querySelector(`[data-day-cell="${dayAfterKey}"]`)
+    expect(cell?.querySelector('[data-marker="future"]')).toBeInTheDocument()
   })
 
   it('终态约定（cancelled/completed）日期格不打点', () => {
-    const appt1 = mkAppt({ id: '1', startTime: '2026-07-12T10:00:00Z', status: 'cancelled' })
-    const appt2 = mkAppt({ id: '2', startTime: '2026-07-13T10:00:00Z', status: 'completed' })
+    const appt1 = mkAppt({ id: '1', startTime: dayBefore.toISOString(), status: 'cancelled' })
+    const appt2 = mkAppt({ id: '2', startTime: dayAfter.toISOString(), status: 'completed' })
     const { container } = render(
       <AppointmentMiniCalendar currentDate={currentDate} appointments={[appt1, appt2]} />,
     )
-    expect(container.querySelector('[data-day-cell="2026-07-12"]')?.querySelector('[data-marker]')).toBeNull()
-    expect(container.querySelector('[data-day-cell="2026-07-13"]')?.querySelector('[data-marker]')).toBeNull()
+    expect(
+      container.querySelector(`[data-day-cell="${dayBeforeKey}"]`)?.querySelector('[data-marker]'),
+    ).toBeNull()
+    expect(
+      container.querySelector(`[data-day-cell="${dayAfterKey}"]`)?.querySelector('[data-marker]'),
+    ).toBeNull()
   })
 
   it('selectedDate 渲染选中态', () => {
