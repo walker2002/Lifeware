@@ -10,30 +10,64 @@
 
 ## [023.13] 时间盒持续优化（2026-07-07）
 
-> 2026_07_07 — **T3 docs+USOM partial**：本任务先 Tier 2 文档同步 + USOM `DetailedExecutionRecord` 扩展 4 字段 + mapper 向后兼容测试；下游 T4-T9 待续。**核心**：JSONB 演进免 DDL 迁移；`energyActual` 单值度量 1-10（绕开 [023] D8 4 维能量禁令）。
+> 2026_07_07 — **ship-ready**：11 task (T0-T10) 全完成 + 4 commit whole-branch 修复波 + 3 commit `/qa` 修复 + push gitee origin/main @ `7466534`。**核心**：JSONB 演进免 DDL 迁移（`execution_record` + 4 字段）；`energyActual` 单值度量 1-10（绕开 [023] D8 4 维能量禁令）；ARCHITECTURE TD-019/023 闭环。
 
 ### 决策
 
-- **D-T3-1** JSONB schema 演进：`timeboxes.execution_record` 加 4 字段 = 零 DDL 迁移（mapper 不删未知键/不补缺键，直接 spread 透传）
-- **D-T3-2** `energyActual` 是单值度量（1-10），默认取 archetype 4 维 `EnergyCost` 均值；无 archetype 留空；显式绕开 [023] D8「`EnergyState` 单维 vs `EnergyCost` 4 维」分层隔离（避免宪章 amendment）
+- **D1** JSONB schema 演进：`timeboxes.execution_record` 加 4 字段（`actualStartTime?` / `actualEndTime?` / `focusMinutes?` / `energyActual?`）= 零 DDL 迁移（mapper 不删未知键/不补缺键，直接 spread 透传）
+- **D2** `energyActual` 是单值度量（1-10），默认取 archetype 4 维 `EnergyCost` 均值；无 archetype 留空；显式绕开 [023] D8「`EnergyState` 单维 vs `EnergyCost` 4 维」分层隔离（避免宪章 amendment）
+- **D3** P0 持久化修复（AM1）：SM `updateStatus` 不再丢 executionRecord payload 字段（state-machine/index.ts:289-300 updateFields 单 UPDATE 写列）
+- **D4** P2 打卡专区：5 字段（actualStart/End/focusMinutes/energyActual/notes）双向 detail flow — TimeboxDrawer edit 模式（T6 AM4 archetype 接线）+ LogTimebox CNUI surface per-item（T8）
+- **D5** P3 revert 确认清空分支：AM3 复用 `updateFields(id, {executionRecord: null}, userId)`（不引入新 repo 抽象）；AM7 守卫保留（无 opts.clearExecutionRecord 时 logged+executionRecord 抛错）
+- **D6** A1 STATUS_TRANSITION_ACTIONS 派生：build-status-transition-actions.ts 用 `loadDomainManifest` 动态派生（rules-registry.ts 同步 AM2 core/rule-engine 双副本），validate:rules-registry pre-push 校验
+- **D7** A2 validate:rules-registry pre-push 接线：scripts/validate-rules-registry.ts fail-closed 检查 `lifecycle.transitions` 与 build 派生一致
+- **D8** UI 改造：紧凑模式 planned 卡 `[✓ 一键打卡][打卡][取消][删除]` 4 按钮 + flex-wrap 拆独立行（兼容性零回归：logged/cancelled 1-2 按钮不换行）；批量多选（selectMode=true + checkbox + 批量打卡 + 批量取消）
+- **D9** MiniCalendar 上下月翻页：viewMonth state + prevCurrentMonthRef 锁定规则（用户翻 ≠ currentDate 跨月）
+- **A1 dual** orchestrator executeFieldStateWrite 守卫 `domainId === 'tasks'`：其他域走 sm.execute（[QA BUG-2 修复]）；timebox 不需 mutation service 等价物
+- **A1 命名空间陷阱**：`intent_triggers` (manifest yaml) ≠ `transitions` (lifecycle map) — A1 derivation 走 `transitions` 字段，不是 deprecated 的 `intent_triggers`（[QA BUG 的邻近纠错]）
 
 ### 改动（本任务）
 
-- **USOM 类型扩展**：`frontend/src/usom/types/objects.ts` `DetailedExecutionRecord` 加 4 可选字段 `actualStartTime?: Timestamp` / `actualEndTime?: Timestamp` / `focusMinutes?: number` / `energyActual?: number`
-- **Tier 2 文档同步**：
-  - `docs/usom-design.md` §3.9 DetailedExecutionRecord interface 块更新（4 字段 + 行内注释 + JSDoc）；footer 版本号 2026_07_06→2026_07_07
-  - `docs/database-design.md` §4.7 timeboxes.execution_record JSONB 章节加 `[023.13] JSONB 形状扩展` 行注释；变更记录追加一条
-- **Mapper 后向兼容测试**：`frontend/src/usom/__tests__/execution-record-compat.test.ts`（2 cases：旧行 4 新字段 undefined + 新行保留 4 字段）
+- **T1** A1 STATUS_TRANSITION_ACTIONS 派生（`src/domains/timebox/lib/build-status-transition-actions.ts` + rules-registry.ts 同步 + timebox-rule-engine.ts AM2 双副本） + `timebox-status-transition-guard.test.ts` 6 dynamic cases
+- **T2** validate:rules-registry pre-push 校验（`scripts/validate-rules-registry.ts` + 纯 `deriveStatusTransitionActions(rawManifest)` 提取） + 6 items 一致性
+- **T3** USOM `DetailedExecutionRecord` +4 optional fields + Tier 2 docs (`usom-design.md` §3.9, `database-design.md` §4.7) + mapper 后向兼容测试 `execution-record-compat.test.ts` 2 cases
+- **T0/AM1** state-machine SM `executionRecord` write branch（guards `transition.to === 'logged' && proposal.payload['executionRecord']`）+ cnui/handlers.ts:567 flat→executionRecord object wrap
+- **T4** defaultEnergyActual helper (4-dim mean round) + ExecutionDetailFields 共享 controlled 5-field component (110 行)
+- **T5** `revertTimebox(id, opts?: {clearExecutionRecord: boolean})` — AM3 复用 updateFields + AM7 守卫保留；写入口（timebox.ts:205 直调 repo.updateFields）登记 WRITE_ENTRY_EXEMPTIONS (TD-023)
+- **T6** TimeboxDrawer edit 模式接入 ExecutionDetailFields（AM4 archetype 接线 + activityArchetypeId 6 路同步）— archetype 字段 AM4 全链路
+- **T7** 卡按钮重排 + quickLog（一键 simple log 不开 drawer）+ batch mode（多选）+ AlertDialog revert confirm（"此操作将清除该时间盒的执行记录（实际时长、深度专注、能量消耗、执行详情），不可恢复"）+ handleBatch
+- **T8** `LogTimebox.tsx` per-item `detailedOpen: Record<id, boolean>` + ExecutionDetailFields integration + handler `logTimebox` payload-wrap alignment (cnui/handlers.ts:554-602)
+- **T9** MiniCalendar `viewMonth` state + `prevCurrentMonthRef` 锁定规则（区分 user 翻月 vs currentDate 跨月）
+- **T10** `__tests__/revert-regression.test.ts` (TD-019 regression) + `docs/tech-debt/TD-019...md` 关闭段 + tech-debt/README 状态 🔴→✅
+- **Whole-branch fix wave (4 commit)**：
+  - `b2d1f4d` LogTimebox open-path archetype wire + 双 notes 收口
+  - `c6e0d6e` spec §5 sync test-aligned (prevCurrentMonthRef)
+  - `32049d9` manifest.md conflict markers + prebuild 加 validate-rules-registry + TD-023 exemption
+  - `169180c` docs(tech-debt): TD-023 登记
+- **`/qa` 修复 (3 atomic commit)** — 真实 PG 验证 E2E：
+  - `24160b1` ISSUE-001: 紧凑模式 planned 卡补 取消/删除 + 拆独立按钮行
+  - `df8dc94` ISSUE-002: executeFieldStateWrite 守卫 tasks 域 (orchestrator 500 错误修复)
+  - `7466534` ISSUE-003: 'log' 按钮开 ExecutionDetailFields 抽屉（不再直接 log）
 
 ### 验证
 
-- vitest：`execution-record-compat.test.ts` 2/2 PASS
-- tsc：0 新增 error（本任务改动文件范围）
+- vitest base=head：24 fail = baseline (零新增回归)
+- tsc 121=121 (本任务改动 0 新增；QA 修复 0 新增)
+- validate:manifest 0 errors
+- validate:rules-registry 6 items PASS (cancelAppointment/cancelTimebox/completeAppointment/logTimebox/revertAppointment/revertTimebox)
+- validate:structure 全部通过（WRITE_ENTRY_EXEMPTIONS 接入 timebox.ts 后）
+- 真实 PG (lifeware_dev) E2E：5 场景过 (一键打卡/打卡专区/批量/回退确认/cancelled 直退) + 6/7 QA 场景 PASS
 
 ### 范围
 
-- 5 文件：3 docs + 1 USOM types + 1 test 新建
-- 无 PG migration / 无 DDL 变更（JSONB 演进）
+- 21 文件（16 SDD impl + 3 /qa 修复 + 4 whole-branch fix 折叠）：orchestrator/index.ts (1 line guard), state-machine/index.ts (AM1 updateFields), usom/types/objects.ts (+4 fields), timebox components + cnui/handlers (双 notes + detailed wrap), scripts/validate-rules-registry.ts, tech-debt/TD-019 (close), tech-debt/TD-023 (登记)
+
+### 设计 authority
+
+- Design: `docs/superpowers/specs/2026-07-07-023-13-timebox-optimization-design.md`（APPROVED by office-hours + plan-eng-review 9/10）
+- Plan: `docs/superpowers/plans/2026-07-07-023-13-timebox-optimization.md`
+- QA 报告: `.gstack/qa-reports/qa-report-timeboxes-2026-07-07.md` + `baseline.json` (health 50→95, 3 bugs fix)
+- review chain: plan-eng-review GSTACK REVIEW REPORT (AM1-AM5 folded) + whole-branch review (4 Important + 11 Minor → 4 fix commits folded) + /qa E2E（6/7 PASS）
 
 ---
 
