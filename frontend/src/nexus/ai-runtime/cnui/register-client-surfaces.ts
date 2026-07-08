@@ -18,6 +18,10 @@ import { AdjustTimeboxes } from '@/domains/timebox/cnui/surfaces/AdjustTimeboxes
 import { EditTimeboxes } from '@/domains/timebox/cnui/surfaces/EditTimeboxes'
 // [023.08] T5 — CreateSmartTimebox CNUI surface 客户端注册（[cnui-surface-dual-registration] memory: server + client 双注册）
 import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
+// [026.02] T1 — 约定 3 surface（[026.01] 漏注册 client，触发 IRON RULE）
+import { CreateAppointment } from '@/domains/timebox/cnui/surfaces/CreateAppointment'
+import { EditAppointment } from '@/domains/timebox/cnui/surfaces/EditAppointment'
+import { DeleteAppointment } from '@/domains/timebox/cnui/surfaces/DeleteAppointment'
 
 cnuiRegistry.register('habits', 'habit-action-panel', { component: HabitActionPanel })
 cnuiRegistry.register('habits', 'habit-checkin-panel', { component: HabitCheckinPanel })
@@ -30,6 +34,11 @@ cnuiRegistry.register('timebox', 'adjust-timeboxes', { component: AdjustTimeboxe
 cnuiRegistry.register('timebox', 'edit-timeboxes', { component: EditTimeboxes })
 // [023.08] T5 — CreateSmartTimebox CNUI surface（client 双注册 + manifest K-block create-smart-timebox）
 cnuiRegistry.register('timebox', 'create-smart-timebox', { component: CreateSmartTimebox })
+// [026.02] T1 — 修复 [026.01] 回归（server 已注册 surfaceHandlers，client 漏 3 个 surface）
+//   per [[project-cnui-surface-dual-registration]]：server + client 双注册闭合。
+cnuiRegistry.register('timebox', 'create-appointment', { component: CreateAppointment })
+cnuiRegistry.register('timebox', 'edit-appointment',   { component: EditAppointment })
+cnuiRegistry.register('timebox', 'delete-appointment', { component: DeleteAppointment })
 
 // Tasks surfaces
 import { TaskCreationCard } from '@/domains/tasks/cnui/surfaces/TaskCreationCard'
