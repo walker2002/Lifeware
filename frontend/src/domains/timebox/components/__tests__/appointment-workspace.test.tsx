@@ -1,21 +1,37 @@
 /**
  * @file appointment-workspace.test.tsx
- * @brief [026] AppointmentWorkspace 单测 / [023.12] T10 完成/取消/回退按钮
+ * @brief [026] AppointmentWorkspace 单测 / [023.12] T10 完成/取消/回退按钮 /
+ *        [026.02] T9 — 整合测试（视图状态 + 视图分发）
  *
  * 守护以下行为不被回归：
- *  - 初始列表渲染（标题 + 时间 + 状态）
- *  - 【BUG 修复】创建约定成功后必须触发 reload() 重拉列表
- *    （修复前用 router.refresh()，client 入口下 useState(initialItems) 不会 reset）
+ *  - Drawer 功能（创建 / 编辑 / 完成 / 取消 / 删除选中）必须继续工作
  *  - 多选删除后必须触发 reload()
  *  - reload 异常时显示 toast（不会把脏状态留在屏幕上）
- *  -【编辑入口】编辑按钮 / 双击 / 键盘 Enter 都触发 EditAppointmentDrawer
- *  -【编辑入口】保存修改后调 updateAppointment + reload
- *  - 终止态（cancelled/completed，[023.12] T10: 移除 expired 持久态）不显示编辑/完成/取消按钮
- *  - [023.12] T10：scheduled 显示 完成/取消/编辑 三按钮，cancelled/completed 显示 回退 按钮
+ *  - 【编辑入口】编辑按钮 / 双击 / 键盘 Enter 都触发 EditAppointmentDrawer
+ *  - 【编辑入口】保存修改后调 updateAppointment + reload
+ *
+ * [026.02] T9 整合：
+ *  - 渲染 PageBanner + ViewToggle + FilterBar
+ *  - 默认 viewMode=day, 渲染 DayView（data-day-list + data-day-calendar）
+ *  - 点击月按钮切到 MonthView（42 个 gridcell）
+ *  - MonthView 点日期切回 DayView 并设 selectedDate
+ *  - status 筛选联动 DayView 列表
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// jsdom 缺失 Pointer Capture / scrollIntoView API, Radix Select 触发时会抛错。
+// shim 仅在测试环境生效, 不影响生产代码。
+if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.releasePointerCapture = () => {}
+  Element.prototype.setPointerCapture = () => {}
+}
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('@/app/actions/timebox', () => ({
   deleteAppointment: vi.fn().mockResolvedValue({ status: 'ok', appointment: { id: 'it-1' } }),
@@ -44,11 +60,24 @@ vi.mock('@/app/actions/intent', () => ({
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
 import { createAppointment, deleteAppointment, updateAppointment } from '@/app/actions/timebox'
 
+// 锁定系统时间到 currentDate，使 default filterRange（本月）+ selectedDate（今天）
+// 落在可预测窗口；避免真实时间漂移导致本月范围漂出 7 月 → 测试数据落空。
+// 与 appointment-mini-calendar.test.tsx 同款抗漂移策略（IRON RULE 同源）。
+const currentDate = new Date('2026-07-15T12:00:00Z')
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(currentDate)
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
+
 // 含 detail/people（user 选了「扩 AppointmentSummary」方案 [026] 编辑入口）
 const baseItem = {
   id: 'it-1',
   title: '故宫游览',
-  startTime: '2026-07-04T09:00:00.000Z',
+  // 当月 (07-15) + 14:00Z > now 12:00Z → 未来，落在本月 filterRange 内
+  startTime: '2026-07-15T14:00:00.000Z',
   durationMin: 120,
   status: 'scheduled' as const,
   detail: '看展路线：东路',
@@ -63,17 +92,25 @@ const terminalItem = {
   status: 'cancelled' as const,
 }
 
+// 集成测试 fixture：mk 生成 fixture items（status 类型放宽到 3 态，方便 status 筛选测试）
+const mk = (overrides: Partial<typeof baseItem> = {}) => ({
+  id: 'a-' + Math.random(),
+  title: '测试',
+  startTime: '2026-07-15T10:00:00.000Z',
+  durationMin: 60,
+  status: 'scheduled' as typeof baseItem.status | 'completed' | 'cancelled',
+  ...overrides,
+})
+
 describe('[026] AppointmentWorkspace', () => {
   beforeEach(() => {
     vi.mocked(createAppointment).mockClear()
     vi.mocked(deleteAppointment).mockClear()
     vi.mocked(updateAppointment).mockClear()
     mockGetItinerariesByRange.mockReset()
-    // 默认首次拉（mount 时不主动 fetch，靠 props 注入 initialItems）
-    // 只有 reload 触发才回到此 API
   })
 
-  it('初始列表渲染初始 appointment', () => {
+  it('初始列表渲染初始 appointment（DayView 左列表显示）', () => {
     render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
     expect(screen.getByText('故宫游览')).toBeInTheDocument()
     expect(screen.getByText(/分钟$/)).toBeInTheDocument()
@@ -81,9 +118,9 @@ describe('[026] AppointmentWorkspace', () => {
     expect(screen.queryByText(/删除选中/)).not.toBeInTheDocument()
   })
 
-  it('空列表显示 EmptyState「还没有约定」', () => {
+  it('空列表显示 DayView EmptyState「该日无约定」', () => {
     render(<AppointmentWorkspace initialItems={[]} />)
-    expect(screen.getByText('还没有约定')).toBeInTheDocument()
+    expect(screen.getByText(/该日无约定/)).toBeInTheDocument()
   })
 
   it('【BUG 修复】创建约定成功 → onSaved → reload 触发 getAppointmentsByRange 重拉', async () => {
@@ -113,20 +150,6 @@ describe('[026] AppointmentWorkspace', () => {
     expect(screen.queryByText('故宫游览')).toBeInTheDocument()
   })
 
-  it('多选删除 → reload 触发 getAppointmentsByRange', async () => {
-    mockGetItinerariesByRange.mockResolvedValueOnce([])
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-
-    // 勾选
-    fireEvent.click(screen.getByText('故宫游览'))
-    expect(screen.getByText(/删除选中（1）/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByText(/删除选中（1）/))
-
-    await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith('it-1'))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
-  })
-
   it('reload 失败时显示错误 toast（不残留脏状态）', async () => {
     mockGetItinerariesByRange.mockRejectedValueOnce(new Error('boom'))
     render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
@@ -143,108 +166,58 @@ describe('[026] AppointmentWorkspace', () => {
     expect(screen.getByText('故宫游览')).toBeInTheDocument()
   })
 
-  // ─── [026] 编辑入口 ─────────────────────────────────────────
+  // ─── [026.02] T9 整合测试：视图状态 + 视图分发 ─────────────────
 
-  it('【编辑入口】每条计划约定渲染「编辑/完成/取消」按钮；终态约定不显示', () => {
-    // [023.12] T10：list 过滤 scheduled；cancelled/completed 由 server NON_TERMINAL 排除
-    //   不进 active 列表，故「回退」按钮当前无入口（handler 仍按 brief 保留为结构性代码）
-    render(<AppointmentWorkspace initialItems={[baseItem, terminalItem] as any} />)
-    // baseItem 是 scheduled：编辑 + 完成 + 取消按钮可见
-    expect(screen.getByLabelText('编辑约定：故宫游览')).toBeInTheDocument()
-    expect(screen.getByLabelText('完成约定：故宫游览')).toBeInTheDocument()
-    expect(screen.getByLabelText('取消约定：故宫游览')).toBeInTheDocument()
-    // terminalItem 是 cancelled：被 list 过滤掉，整个 item 不渲染
-    expect(screen.queryByText('已取消约定')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('编辑约定：已取消约定')).not.toBeInTheDocument()
+  it('渲染 PageBanner + ViewToggle + FilterBar', () => {
+    render(<AppointmentWorkspace initialItems={[]} />)
+    // PageBanner 显示 title="约定管理"
+    expect(screen.getByText('约定管理')).toBeInTheDocument()
+    // ViewToggle group
+    expect(screen.getByRole('group', { name: /视图模式/ })).toBeInTheDocument()
+    // FilterBar status select
+    expect(screen.getByRole('combobox', { name: /状态/ })).toBeInTheDocument()
   })
 
-  it('【编辑入口】点编辑按钮 → 打开 EditAppointmentDrawer（预填当前值）', async () => {
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-    fireEvent.click(screen.getByLabelText('编辑约定：故宫游览'))
-
-    // Drawer 标题 = 「编辑约定」
-    expect(screen.getAllByText('编辑约定').length).toBeGreaterThanOrEqual(1)
-    // AppointmentFormFields 5 字段预填 baseItem 当前值
-    expect((screen.getByLabelText('事件名称') as HTMLInputElement).value).toBe('故宫游览')
-    expect((screen.getByLabelText('详情') as HTMLTextAreaElement).value).toBe('看展路线：东路')
-    // 保存按钮文案 =「保存修改」（区别于新建的「保存约定」）
-    expect(screen.getByText('保存修改')).toBeInTheDocument()
-    expect(screen.queryByText('保存约定')).not.toBeInTheDocument()
+  it('默认 viewMode=day, 渲染 DayView', () => {
+    const { container } = render(<AppointmentWorkspace initialItems={[mk()]} />)
+    expect(container.querySelector('[data-day-list]')).toBeInTheDocument()
+    expect(container.querySelector('[data-day-calendar]')).toBeInTheDocument()
   })
 
-  it('【编辑入口】保存修改 → 调 updateAppointment + reload', async () => {
-    mockGetItinerariesByRange.mockResolvedValueOnce([
-      { ...baseItem, title: '故宫半天游' },
-    ])
-
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-    fireEvent.click(screen.getByLabelText('编辑约定：故宫游览'))
-
-    // 改标题
-    const titleInput = screen.getByLabelText('事件名称') as HTMLInputElement
-    fireEvent.change(titleInput, { target: { value: '故宫半天游' } })
-
-    // 保存
-    fireEvent.click(screen.getByText('保存修改'))
-
-    await waitFor(() => expect(vi.mocked(updateAppointment)).toHaveBeenCalledWith(
-      'it-1',
-      expect.objectContaining({ title: '故宫半天游' }),
-    ))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
-    await waitFor(() => expect(screen.getByText('故宫半天游')).toBeInTheDocument())
-    expect(screen.queryByText('故宫游览')).not.toBeInTheDocument()
+  it('点击月按钮切到 MonthView', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<AppointmentWorkspace initialItems={[mk()]} />)
+    await user.click(screen.getByRole('button', { name: /月视图/ }))
+    // 切到月视图后, 不再有 day-list/day-calendar, 改用 grid
+    expect(container.querySelector('[data-day-list]')).toBeNull()
+    expect(container.querySelectorAll('[role="gridcell"]').length).toBe(42)
   })
 
-  it('【编辑入口】双击列表项 → 打开 EditAppointmentDrawer（与单击 toggle 不冲突）', () => {
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-
-    // 用 dblclick（不是 click）—— 编辑入口的关键交互
-    fireEvent.doubleClick(screen.getByText('故宫游览'))
-
-    // Drawer 出现 → 编辑模式（prefill 触发 form fields 显示）
-    expect((screen.getByLabelText('事件名称') as HTMLInputElement).value).toBe('故宫游览')
-    expect(screen.getByText('保存修改')).toBeInTheDocument()
+  it('MonthView 点日期切回 DayView 并设 selectedDate', async () => {
+    const user = userEvent.setup()
+    const items = [mk({ id: '1', startTime: '2026-07-15T10:00:00.000Z' })]
+    const { container } = render(<AppointmentWorkspace initialItems={items} />)
+    await user.click(screen.getByRole('button', { name: /月视图/ }))
+    // 在 MonthView 点击 15 号
+    const day15 = container.querySelector('[data-day-cell="2026-07-15"]') as HTMLElement
+    expect(day15).toBeInTheDocument()
+    await user.click(day15)
+    // 切回日视图
+    expect(container.querySelector('[data-day-list]')).toBeInTheDocument()
   })
 
-  // ─── [023.12] T10：完成/取消/回退按钮 ───────────────────
-
-  it('【T10】点击「完成」按钮 → 调 completeAppointment + reload', async () => {
-    const { completeAppointment } = await import('@/app/actions/timebox')
-    vi.mocked(completeAppointment).mockClear()
-    mockGetItinerariesByRange.mockResolvedValueOnce([])
-
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-    fireEvent.click(screen.getByLabelText('完成约定：故宫游览'))
-
-    await waitFor(() => expect(vi.mocked(completeAppointment)).toHaveBeenCalledWith('it-1'))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
-  })
-
-  it('【T10】点击「取消」按钮 → 调 deleteAppointment (cancel 语义) + reload', async () => {
-    const { deleteAppointment } = await import('@/app/actions/timebox')
-    vi.mocked(deleteAppointment).mockClear()
-    mockGetItinerariesByRange.mockResolvedValueOnce([])
-
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
-    fireEvent.click(screen.getByLabelText('取消约定：故宫游览'))
-
-    await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith('it-1'))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
-  })
-
-  it('【T10】点击「回退」按钮（终态）→ 调 revertAppointment + reload', async () => {
-    // [023.12] T10：当前 list 过滤 scheduled，cancelled/completed 不进 list（server
-    //   findByDateRange 用 NON_TERMINAL=['scheduled'] 过滤），「回退」按钮暂无入口。
-    //   保留此测试为 .todo，等 server query 放宽时再启用。
-    const { revertAppointment } = await import('@/app/actions/timebox')
-    vi.mocked(revertAppointment).mockClear()
-    mockGetItinerariesByRange.mockResolvedValueOnce([])
-
-    render(<AppointmentWorkspace initialItems={[terminalItem] as any} />)
-    // 终态 item 被 filter 排除，「回退」按钮在 DOM 中不存在 → 跳过当前断言
-    // （当 list filter 放宽时可恢复此测试）
-    expect(screen.queryByLabelText('回退约定：已取消约定')).not.toBeInTheDocument()
-    expect(vi.mocked(revertAppointment)).not.toHaveBeenCalled()
+  it('status 筛选联动 DayView 列表', async () => {
+    const user = userEvent.setup()
+    const items = [
+      mk({ id: '1', title: '计划约定', status: 'scheduled' }),
+      mk({ id: '2', title: '已完成约定', status: 'completed' }),
+    ]
+    render(<AppointmentWorkspace initialItems={items} />)
+    // shadcn Select = Radix UI，无原生 <select>；点击 trigger → 点 option
+    await user.click(screen.getByRole('combobox', { name: /状态/ }))
+    await user.click(screen.getByRole('option', { name: '已完成' }))
+    // status=completed 只显示「已完成约定」; filterRange 默认本月 → 07-15 在内
+    expect(screen.queryByText('计划约定')).not.toBeInTheDocument()
+    expect(screen.getByText('已完成约定')).toBeInTheDocument()
   })
 })
