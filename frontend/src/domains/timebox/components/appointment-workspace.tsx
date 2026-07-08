@@ -35,7 +35,6 @@
 
 import { useState, useCallback, useTransition, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/empty-state'
 import {
   Sheet,
   SheetContent,
@@ -53,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Trash2, CalendarOff, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   deleteAppointment,
