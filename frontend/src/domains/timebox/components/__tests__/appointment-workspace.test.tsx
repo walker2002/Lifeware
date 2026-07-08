@@ -116,7 +116,13 @@ describe('[026] AppointmentWorkspace', () => {
     vi.mocked(updateAppointment).mockClear()
     vi.mocked(completeAppointment).mockClear()
     vi.mocked(revertAppointment).mockClear()
+    // [026.02] T9.6: mockReset 清掉默认返回 → reload() 后 setItems(undefined)
+    // → useMemo filterAppointments(undefined) 抛 'Cannot read properties of
+    // undefined' (5 个 unhandled React render 异常)。reset 后必须重新设默认
+    // 返回 []；测试用 mockResolvedValueOnce 覆盖的下一次 reload 不受影响
+    // (once-only 优先级 > 默认 resolvedValue)。
     mockGetItinerariesByRange.mockReset()
+    mockGetItinerariesByRange.mockResolvedValue([])
   })
 
   it('初始列表渲染初始 appointment（DayView 左列表显示）', () => {
