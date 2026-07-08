@@ -275,6 +275,50 @@
 
 ---
 
+## [026.02.1] post-ship review follow-up（2026-07-08）
+
+> [026.02] SHIP 后 `superpowers:requesting-code-review` 触发的 post-ship review，1 项 Important 修复 + 7 项 Minor 登记。
+
+### 修复
+
+- **I-1 mk() 返回类型缩窄 → TS2322 回归**（`appointment-workspace.test.tsx`）
+  - **根因**：[026.02] T9 (commit `8f06271`) 引入 `mk()` fixture helper，未给显式返回类型，TS 推断把 status 缩窄成 `'scheduled'` literal，导致 overrides 中的 `status: 'completed' / 'cancelled'` 触发 TS2322
+  - **修复**：定义 `MkItem = Omit<typeof baseItem, 'status' | 'detail' | 'people'> & { status: 3 态联合; detail/people optional }` + 显式返回类型注解
+  - **验证**：tsc TS2322 总数 12 → 11（appointment-workspace.test.tsx 错误数 1 → 0）；vitest 26/26 pass（workspace 18 + mini-calendar regression 4 + register-client-surfaces 4）；[026.02] 其他变更文件 0 tsc regression
+
+### 登记 follow-up（defer 到后续任务）
+
+| # | 项目 | 类型 | 来源 |
+|---|---|---|---|
+| I-2 | T8 月视图格子计数「条」后缀补全（plan vs 实现对齐） | UX cosmetic | code-reviewer |
+| M-1 | 5+ 处 `[baseItem] as any` 测试 casts（用 MkItem 类型替代） | Test typing | code-reviewer |
+| M-2 | `mockGetItinerariesByRange` 命名 stale（[023.05] itinerary→appointment rename drift） | Naming | code-reviewer |
+| M-3 | `appointment-filter.test.ts:14` hardcoded date `'2026-07-08T10:00:00.000Z'`（建议改相对 offset + fake timers） | Test determinism | code-reviewer |
+| M-4 | `ymdKey(d: Date)` 函数 3 处重复（`appointment-workspace.tsx:124` + `appointment-mini-calendar.tsx:21` + `appointment-month-view.tsx:17`） | DRY | code-reviewer |
+| M-5 | T9.5 click-to-toggle-select UX affordance user-testing（点击 item 是 toggle 多选还是打开 Edit？） | UX validation | code-reviewer |
+| M-6 | `handleDelete` sequential awaits → `Promise.allSettled`（多选删除性能） | Perf | code-reviewer |
+| TD-022 | 5 项 deferred（archetype clearing 语义 / UUID 验证 / perf N+1 / originalPrompt banner / 浏览器 E2E） | From [026.02] | existing |
+
+### 推回（no-op）
+
+- **I-3 `reload` `useCallback` deps**：`[]` deps 但闭包捕获 `startReload`（stable `useTransition` setter）+ 多个 React state setter（stable identity）。功能性正确，lint exhaustive-deps 可能 flag 但不阻塞。code-reviewer 误判（"Actually correct"）。
+
+### 推回结论（[026.02] reviewer push-back）
+
+- 11/12 项目 TS2322 错误是 pre-existing baseline，[026.02] 引入的仅 I-1 这 1 处。
+- 0 new tsc regression（变更文件 0 错）。
+- 65+ focused test pass，2 IRON RULE guardian pass。
+- Ship-ready as a whole。
+
+### 验证
+
+- tsc: appointment-workspace.test.tsx 错误数 1 → 0；TS2322 总数 12 → 11
+- vitest focused 26/26 pass（workspace + IRON RULE + register-client-surfaces）
+- pre-push hooks: `validate:domain-structure` ✓ + `validate:rules-registry` ✓（6 项 lifecycle 一致）
+- push: gitee origin `1372bb4..22ac0a7 main -> main`
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
