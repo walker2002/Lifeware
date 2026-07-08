@@ -100,12 +100,20 @@ const terminalItem = {
 }
 
 // 集成测试 fixture：mk 生成 fixture items（status 类型放宽到 3 态，方便 status 筛选测试）
-const mk = (overrides: Partial<typeof baseItem> = {}) => ({
+// [026.02.1] I-1 fix: 显式返回类型注解 + 改用更窄的"必填字段"返回类型（detail/people optional，
+//   与 mk() 实际提供的字段对齐），避免 TS 推断把 status 缩窄成 'scheduled' literal
+//   导致 overrides.status='completed'/'cancelled' 触发 TS2322。
+type MkItem = Omit<typeof baseItem, 'status' | 'detail' | 'people'> & {
+  status: 'scheduled' | 'completed' | 'cancelled'
+  detail?: string
+  people?: string[]
+}
+const mk = (overrides: Partial<MkItem> = {}): MkItem => ({
   id: 'a-' + Math.random(),
   title: '测试',
   startTime: '2026-07-15T10:00:00.000Z',
   durationMin: 60,
-  status: 'scheduled' as typeof baseItem.status | 'completed' | 'cancelled',
+  status: 'scheduled',
   ...overrides,
 })
 
