@@ -217,6 +217,64 @@
 
 ---
 
+## [026.02] 约定管理优化（§1 CNUI bug fix + §2 /appointments 重构）（2026-07-08）
+
+> 2026_07_08 — 10 SDD task（T1 §1 fix + T2 纯函数 + T3-T8 6 组件 + T9 Workspace 整合 + T9.5 UX 恢复 + T9.6 测试 mock + T10 加载窗口扩窗）+ T11 docs/ship。**修复 [026.01] 客户端 CNUI surface 漏注册的回归** + **/appointments page 重构为 Day/Month 双视图 + 筛选 + Banner**。
+
+### 决策摘要
+
+- **§1 bug fix root cause**：[026.01] 仅注册了 server `surfaceHandlers`，client `register-client-surfaces` 漏 3 个 appointment surface，导致 `/createAppointment` /`/editAppointment` /`/deleteAppointment` 报「未知的卡片类型」（per [[project-cnui-surface-dual-registration]]）
+- **§2 视图模式**：严格按 dev doc，日/月两档（不做 Week）；复用 [023.06] view-mode 模式，状态名 `viewMode`（避免与 [023.06] `dateMode` 跨 workspace 术语冲突，spec §7.2）
+- **§2 月视图**：全月日历网格（参照 /timeboxes MonthView）
+- **§2 筛选**：status + 日期范围（dev doc 要求；不做 people/archetype 多维筛选）
+- **§2 Banner**：沿用 timebox 图片集（`domainId="timebox"`），无 appointment 独立 banner
+- **§2 IRON RULE**：新建独立 `AppointmentMiniCalendar`，不污染 timebox `MiniCalendar` IRON RULE 守护测试
+
+### 改动清单
+
+- **§1 fix**：`frontend/src/nexus/ai-runtime/cnui/register-client-surfaces.ts` 补 3 行 `cnuiRegistry.register('timebox', 'create-appointment' / 'edit-appointment' / 'delete-appointment', ...)` + IRON RULE 守护测试
+- **§2 新增组件**（6 个）：
+  - `AppointmentPageBanner`（T3，包装 PageBanner）
+  - `AppointmentViewToggle`（T4，日/月切换，a11y aria-pressed）
+  - `AppointmentFilterBar`（T5，shadcn Select + 本周/本月快捷）
+  - `AppointmentMiniCalendar`（T6，独立组件，过期/未过期双色 + 42 天格 + a11y grid + IRON RULE 不破 timebox）
+  - `AppointmentDayView`（T7，两栏：左列表 + 右本月日历 + per-item 动作按钮 + multi-select）
+  - `AppointmentMonthView`（T8，全月日历网格 + 计数 + 状态色）
+- **§2 纯函数**：`filterAppointments(items, status, range)` (T2，6 TDD 测试，闭区间，readonly input)
+- **§2 Workspace 整合**（T9）：`AppointmentWorkspace` 新增 viewMode / filterStatus / filterRange / selectedDate state；视图分发（DayView | MonthView）；MonthView 点日期自动切日视图；restore [023.12] T10 的 per-item Edit/Complete/Cancel/Revert 按钮 + multi-select delete
+- **§2 加载窗口**：`/appointments/page.tsx` -7d → -90d，与 Workspace reload 一致（避免 reload 丢数据）
+
+### 验证结果
+
+- vitest base=head 失败集合零新增（47 → 47，含 IRON RULE 4/4 守护）
+- tsc 零新增错误（变更文件 0 错；5 个 `as any` 是 baseline 既有）
+- `validate:manifest` 0 errors（timebox domain 无新增问题）
+- `validate:domain-structure` ✓
+- 新增测试数：7 单元 + 2 回归守护 + 0 E2E（/browse 因环境约束未自动执行，留人工验证）
+
+### 风险与缓解
+
+- **§1 修复回归风险**：用新守护测试 `register-client-surfaces.test.ts` 显式 assert 3 surface 在 client 表（防 [026.01] 漏注册模式再现）
+- **§2 状态命名冲突**：明确 `viewMode` vs [023.06] `dateMode`，spec §7.2 文档化
+- **§2 MiniCalendar IRON RULE**：T6 用独立组件路径（`appointment-mini-calendar.tsx`）而非复用/扩展 timebox MiniCalendar，回归测试 `mini-calendar.regression.test.tsx` 4/4 持续通过
+- **§2 T9 UX regression**：T9 整合后 DayView 是纯展示，删掉了 inline 列表的 Edit/Complete/Cancel/Revert 按钮 + multi-select delete（用户决策后 T9.5 fix 全部恢复）
+- **T6 测试日期漂移**：brief 硬编码 2026-07-10 假设今天 7-15，实际 7-8。T6 fix 用 `vi.useFakeTimers({ toFake: ['Date'] })` + 相对 offset 锁定（commit 5f0d5b1）
+
+### 遗留 / Follow-up
+
+- **TD-022 5 项 deferred**（archetype clearing 语义 / UUID 验证 / perf N+1 / originalPrompt banner 等）→ 拆 [026.02.1] follow-up，本任务不解决
+- **DayView `as any` casts** (baseline 既有) — 5 处 `as any` 在 server action 调用处，需后续用 proper USOM ID 类型替代
+- **T8 " 条" 后缀 UX polish** — component 用纯数字（`{info.count}`），T9 整合时未补「条」字，建议 whole-branch 阶段补或记入 [026.02.1]
+- **vitest globals tsc 噪声** — 项目 pre-existing baseline pattern，新增 `it()` 会增加同源错误
+
+### 参照
+
+- Spec SSOT: `docs/superpowers/specs/2026-07-08-026-02-appointment-management-optimization-design.md`
+- Plan SSOT: `docs/superpowers/plans/2026-07-08-026-02-appointment-management-optimization-plan.md`
+- Dev Doc: `mydocs/dev/026.02-约定相关优化.md`
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
