@@ -13,9 +13,10 @@ import { getAppointmentsByRange } from '@/app/actions/intent'
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
 
 export default async function AppointmentsPage() {
-  // 查询窗口：过去 7 天 + 未来 90 天（A3.1 范式，brief §Step 1 明确）
+  // 查询窗口：过去 90 天 + 未来 90 天（[026.02] T10：7→90 扩窗以支持 Month 视图 90 天回看，
+  //   与 AppointmentWorkspace reload 窗口一致，避免 reload 后数据丢失）
   const start = new Date()
-  start.setDate(start.getDate() - 7)
+  start.setDate(start.getDate() - 90)
   const end = new Date()
   end.setDate(end.getDate() + 90)
   const items = await getAppointmentsByRange(start, end)
