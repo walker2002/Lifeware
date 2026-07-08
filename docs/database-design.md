@@ -1315,6 +1315,24 @@ Connector Layer 预留，MVP 不实现。
 
 ### activity_archetypes（活动原型）
 
+```sql
+CREATE TABLE activity_archetypes (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  schema_version  integer NOT NULL DEFAULT 1,
+  l1_category     text NOT NULL,
+  l2_name         text NOT NULL,
+  energy_cost     jsonb NOT NULL,                                  -- EnergyCost 4 维 {physical,mental,emotional,creative}
+  activity_label  jsonb NOT NULL DEFAULT '{}'::jsonb,             -- ActivityLabel 6 维
+  synonyms        jsonb NOT NULL DEFAULT '[]'::jsonb,             -- [023.11] 同义词/范围描述数组
+  is_system       boolean NOT NULL DEFAULT false,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_activity_archetypes_user_l1 ON activity_archetypes(user_id, l1_category);
+CREATE INDEX idx_activity_archetypes_user_system ON activity_archetypes(user_id, is_system);
+```
+
 | 列 | 类型 | 约束 | 说明 |
 |----|------|------|------|
 | id | uuid | PK, DEFAULT gen_random_uuid() | 主键 |
@@ -1332,6 +1350,22 @@ Connector Layer 预留，MVP 不实现。
 索引：`(user_id, l1_category)`、`(user_id, is_system)`
 
 ### user_audit_log（用户操作审计日志）
+
+```sql
+CREATE TABLE user_audit_log (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  table_name      text NOT NULL,
+  record_id       uuid NOT NULL,
+  action          text NOT NULL CHECK (action IN ('create', 'update', 'delete')),
+  changed_fields  jsonb,                                          -- string[]
+  old_values      jsonb,                                          -- Record<string, unknown>
+  new_values      jsonb,                                          -- Record<string, unknown>
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_user_audit_log_user_table ON user_audit_log(user_id, table_name, created_at DESC);
+CREATE INDEX idx_user_audit_log_user_time ON user_audit_log(user_id, created_at DESC);
+```
 
 | 列 | 类型 | 约束 | 说明 |
 |----|------|------|------|
@@ -1690,6 +1724,19 @@ interface DerivedSignalsRepository {
 
 ### `user_settings`
 
+```sql
+CREATE TABLE user_settings (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  timezone    text NOT NULL DEFAULT 'Asia/Shanghai',
+  llm_config  jsonb,                                              -- LLMConfig
+  ui_prefs    jsonb,                                              -- Record<string, unknown>
+  created_at  timestamptz NOT NULL DEFAULT NOW(),
+  updated_at  timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX uniq_user_settings_user ON user_settings(user_id);
+```
+
 | 列名 | 类型 | 约束 | 说明 |
 |---|---|---|---|
 | `id` | UUID | PK, defaultRandom() | 主键 |
@@ -1720,6 +1767,22 @@ interface DerivedSignalsRepository {
 - 生产环境：明确设置 `TZ` 环境变量，并在变更记录中标注（参考本文档第 §「变更记录」）。
 
 ### `memory_episodes`
+
+```sql
+CREATE TABLE memory_episodes (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id    uuid REFERENCES ai_sessions(id) ON DELETE SET NULL,
+  domain_id     text,
+  action        text,
+  episode_type  text NOT NULL DEFAULT 'session_summary',
+  summary       text NOT NULL,
+  metadata      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_memory_episodes_user_created ON memory_episodes(user_id, created_at);
+CREATE INDEX idx_memory_episodes_session ON memory_episodes(session_id);
+```
 
 Session 归档时自动生成的摘要记录，用于跨会话记忆。
 

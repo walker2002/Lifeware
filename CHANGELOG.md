@@ -8,6 +8,25 @@
 
 ---
 
+## [neat-2026_07_08] /lifeware-neat 数据库设计补 CREATE 段（2026-07-08）
+
+> 2026_07_08 — `/lifeware-neat` 检测到 §二 总览有 4 张表 (`activity_archetypes` / `user_audit_log` / `user_settings` / `memory_episodes`) **缺 CREATE TABLE 段**（历史累积 drift）。补 4 段 `\`\`\`sql\`\`\`` 块（与 schema.ts pgTable 一一对齐），§二 总览 33 表 vs CREATE 31 表，剩 2 张差异 (`ai_sessions` / `external_events`) 是 §十二 阶段二预留，合法。
+
+### 改动
+
+- `docs/database-design.md`：
+  - §七 `activity_archetypes` 补 CREATE 段（12 列 + 2 索引）
+  - §七 `user_audit_log` 补 CREATE 段（8 列含 `action IN('create','update','delete')` CHECK + 2 索引含 `created_at DESC`）
+  - §十三 `user_settings` 补 CREATE 段（7 列含 `timezone DEFAULT 'Asia/Shanghai'` + `uniq_user_settings_user` UNIQUE INDEX）
+  - §十三 `memory_episodes` 补 CREATE 段（9 列含 `session_id REFERENCES ai_sessions ON DELETE SET NULL` + 2 索引）
+
+### 验证
+
+- 2B 互验：CREATE TABLE 段数 27→**31**（+4 张表），§二 总览一致
+- 2 张 §二 总览 vs CREATE 差异均属 §十二 阶段二预留（合法）
+
+---
+
 ## [023.13] 时间盒持续优化（2026-07-07）
 
 > 2026_07_07 — **ship-ready**：11 task (T0-T10) 全完成 + 4 commit whole-branch 修复波 + 3 commit `/qa` 修复 + push gitee origin/main @ `7466534`。**核心**：JSONB 演进免 DDL 迁移（`execution_record` + 4 字段）；`energyActual` 单值度量 1-10（绕开 [023] D8 4 维能量禁令）；ARCHITECTURE TD-019/023 闭环。
