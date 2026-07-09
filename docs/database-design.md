@@ -1713,7 +1713,6 @@ interface DerivedSignalsRepository {
 CREATE TABLE ai_sessions (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  schema_version        integer NOT NULL DEFAULT 1,
 
   -- 基础字段
   title                 text NOT NULL DEFAULT '新对话',
