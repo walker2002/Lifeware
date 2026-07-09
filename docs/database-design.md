@@ -1548,7 +1548,7 @@ WHERE h.status = 'active'
 -- [026.02.3.1] T2 — [023.12] status 6→3 态后 'running'/'overtime' 不再持久化。
 -- 重写 view 派生「当前进行中」: planned 且 now 落在 [start_time, end_time] 区间内。
 -- 与 derive-display-status.ts 派生语义对齐 (server side 优化版)。
--- 替代状态 'overtime': 是 logged + 已过 end_time 状态用 case when 派生 (不在 view 范围)。
+-- 替代 'overtime' 派生: 是 logged 且已过 end_time, 由 application 用 case when 派生, 本 view 不覆盖。
 CREATE OR REPLACE VIEW v_running_timeboxes AS
 SELECT
   id, user_id, title, status, start_time, end_time, tags

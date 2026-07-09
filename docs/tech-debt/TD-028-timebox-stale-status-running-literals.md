@@ -31,6 +31,13 @@ last_updated: 2026-07-09
 
 ## 4 处遗留 (按 I-1 列表 verbatim)
 
+### Site 0 — `frontend/src/domains/timebox/repository/index.ts:48-52` （本条 root source）
+- `TimeboxRepository.findRunning(userId)` 内 `where(eq(s.timeboxes.status, 'running'))` — [023.12] 后 timebox.status 6→3 收窄不再有 'running' 字面值,本查询永远返空集
+- **接口契约**：`ITimeboxRepository.findRunning` 声明在 `frontend/src/usom/interfaces/irepository.ts:633`（post-[023.12] 仍是返回 `Timebox[]` 的公开方法,USOM 未跟随 status 收窄重命名）
+- **调用者分布**：4 个调用者 (`intent.ts:649-650` / `use-auto-trigger.ts:53` / `timebox.ts:299` / 测试 fixture) 在测试 mock 中返回 `[]`,但 production 实际无 caller post-[023.12]
+- **行为影响**：repo method 是 dead query,接口契约与实现定义性死值;若未来新增 caller 会拿到空集,定位修复费时
+- **修复模式**：方案 1 核心 — 改写 findRunning 内部查询为 `status='planned' AND start_time <= NOW() AND end_time >= NOW()` (server-side 等价于 TD-025 重写的 SQL view,application 层不用派生)
+
 ### Site 1 — `frontend/src/app/actions/intent.ts:649-650`
 - `intent.ts:649-651` `matchTarget()` `target.type === "current" || target.value === "running"` → `timeboxes.find(t => t.status === "running")`
 - **行为影响**: user 输入 "current" / "running" 触发 matchTarget 返 null (因 status='running' 行不存在), graceful fall-through 但语义错误
@@ -54,13 +61,14 @@ last_updated: 2026-07-09
 ## 修复路径
 
 下次涉及 timebox status 派生 / orchestration handler 改写时一并处理:
-1. 共修方案: 抽 `findRunningTimeboxes(timeboxes): Timebox[]` shared helper 同时覆盖 Site 1 + Site 2
+1. 共修方案: 抽 `findRunningTimeboxes(timeboxes): Timebox[]` shared helper 同时覆盖 Site 1 + Site 2,**并改写 `TimeboxRepository.findRunning` 内部查询为 `status='planned' AND start_time <= NOW() AND end_time >= NOW()`(server-side 等价 TD-025 重写的 SQL view)**
 2. 单独方案: 4 处逐一改 `as AppointmentActionResult` typed-style 替换成 `derive-display-status` 调用
 3. 推荐: 方案 1 — 与 TD-028 同 PR, 加 helper + grep 全 codebase 删除 `'running'` 字面量
 
 ## 状态
 
 - [x] 已提交技术债 ledger (本文件)
+- [ ] Site 0 fix — pending next session (改写 findRunning 内部查询 + 同步 `ITimeboxRepository` JSDoc 注释)
 - [ ] Site 1 fix — pending next session
 - [ ] Site 2 fix — pending next session
 - [ ] Site 3 fix — pending next session
