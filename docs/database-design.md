@@ -1709,25 +1709,43 @@ interface DerivedSignalsRepository {
 
 ### `ai_sessions`
 
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | UUID | PK, defaultRandom() | 主键 |
-| `user_id` | UUID | NOT NULL, FK→users(id) ON DELETE CASCADE | 所属用户 |
-| `title` | TEXT | NOT NULL, DEFAULT '新对话' | 会话标题 |
-| `status` | TEXT | NOT NULL, DEFAULT 'created', ENUM(created/active/completing/archived/deleted/closed) | 状态 |
-| `domain_id` | TEXT | NULLABLE | 关联的 Domain ID |
-| `action` | TEXT | NULLABLE | 触发的 action |
-| `session_mode` | TEXT | NOT NULL, DEFAULT 'single_shot' | 会话模式 |
-| `messages` | JSONB | NOT NULL, DEFAULT [] | ChatMessage[] |
-| `state_snapshot` | JSONB | NOT NULL, DEFAULT {} | 状态快照 |
-| `referenced_object_ids` | JSONB | NOT NULL, DEFAULT [] | 引用对象 ID 列表 |
-| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 创建时间 |
-| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | 更新时间 |
-| `archived_at` | TIMESTAMPTZ | NULLABLE | 归档时间 |
+```sql
+CREATE TABLE ai_sessions (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id               uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  schema_version        integer NOT NULL DEFAULT 1,
 
-索引：
-- `idx_ai_sessions_user_status` ON (user_id, status)
-- `idx_ai_sessions_updated` ON (user_id, updated_at)
+  -- 基础字段
+  title                 text NOT NULL DEFAULT '新对话',
+
+  -- [026.02.3.1] T1 三向一致: status 6 值与 USOM `AISessionStatus` 完全一致
+  -- (created/active/completing/archived/closed/deleted)
+  status                text NOT NULL DEFAULT 'created'
+                          CHECK (status IN ('created', 'active', 'completing', 'archived', 'closed', 'deleted')),
+
+  -- Domain 路由字段 (l1/l2)
+  domain_id             text,
+  action                text,
+
+  -- 会话模式 (single_shot default)
+  session_mode          text NOT NULL DEFAULT 'single_shot',
+
+  -- JSONB 内容: 消息流 + 状态快照 + 引用对象
+  messages              jsonb NOT NULL DEFAULT '[]',  -- ChatMessage[]
+  state_snapshot        jsonb NOT NULL DEFAULT '{}',  -- 状态快照
+  referenced_object_ids jsonb NOT NULL DEFAULT '[]',  -- 引用对象 ID 列表
+
+  -- 审计字段
+  created_at            timestamptz NOT NULL DEFAULT NOW(),
+  updated_at            timestamptz NOT NULL DEFAULT NOW(),
+  archived_at           timestamptz,
+  -- [026.02.3.1] T3 F2: schema.ts 实际含 deleted_at (USOM 'deleted' 状态对应; 当前无 server action 触发)
+  deleted_at            timestamptz
+);
+
+CREATE INDEX idx_ai_sessions_user_status ON ai_sessions(user_id, status);
+CREATE INDEX idx_ai_sessions_updated     ON ai_sessions(user_id, updated_at);
+```
 
 ### `user_settings`
 
