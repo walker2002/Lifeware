@@ -460,6 +460,21 @@
 - Spec SSOT: `docs/superpowers/specs/2026-07-09-026-02-3-1-follow-up-fixes-design.md` (commit 17db764)
 - Plan SSOT: `docs/superpowers/plans/2026-07-09-026-02-3-1-follow-up-fixes.md`
 
+### Post-Ship Round 2 修复（2026-07-09, 3 commits: `41c9ce8` / `22304b5` / `3c08208`）
+
+Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs codebase reality" 视角) 抓第一轮 review 漏的 3 Important + 5 Minor。验证 [[feedback_post-ship-review-meta-pattern]] 模式：SDD whole-branch APPROVED ≠ ship-ready。
+
+- **I-A (Important)**：`docs/tech-debt/TD-028-timebox-stale-status-running-literals.md` 补 Site 0 — `TimeboxRepository.findRunning` @ `frontend/src/domains/timebox/repository/index.ts:48-52` 是 4 caller-site drift 的 **root source**（dead query，`status='running'` post-[023.12] 后无行匹配）。修复路径改为先改 repository method（`status='planned' AND start_time <= NOW() AND end_time >= NOW()`，server-side 等价 TD-025 view 派生）
+- **I-B (Important)**：`frontend/src/nexus/ai-runtime/__tests__/session-status.test.ts` IRON RULE 去 tautology — 删 runtime sort-join（line 30 vs 29 是同一字面量集，no-op），header 改诚实描述「compile-time annotation + length check 双校验」
+- **I-C (Important)**：`docs/tech-debt/README.md` TD-028 5 处补全 — `last_updated: 2026-07-07 → 2026-07-09` / lifeware-timebox 加 bullet / 🟠 High 加 bullet / 录入历史第 7 批 row / 底部 20→21 条
+- **M-1**：`docs/database-design.md:1551` T2 view SQL 注释「替代状态 'overtime'」→「替代 'overtime' 派生: 是 logged 且已过 end_time」句式
+- **M-2**：`0036_drop_v_running_timeboxes_recreate.sql` EOF 补 `\n`（`od -c` 验证末 5 字节 `n d ] ' ;` 无 newline）
+- **M-3**：`manifest.md` 「validate:rules-registry 6 项一致」→「(无变更)」澄清是 gate-pass 不是 delta
+- **M-4**：`manifest.md` 「1 PR 6 task」→「1 PR 7 task」（T1+T2+T3+T3-followup+T4+T5+T6 = 7）
+- **M-5**：`session/index.ts:41` 「[023.08] / [026.02.3.1]」→「[023.08] 引入 / [026.02.3.1] 扩 'deleted' 终态」
+
+**Round 2 关键修复**: post-ship second-opinion 又一次抓 SDD whole-branch review 漏的 drift — dead query root source（测试 mock 隐藏了它）/ 测试自验 tautology（作者自己写的 IRON RULE）/ ledger index secondary view 一致性（同 TD-024/025/026/027 [feedback_tier2-sync] drift class）。
+
 ### 后续 defer（不在本轮）
 
 - TD-022 5 项（archetype clearing / UUID 验证 / perf N+1 / originalPrompt banner / 浏览器 E2E）→ [026.02.4]
