@@ -65,6 +65,7 @@ import {
   updateAppointment,
   completeAppointment,
   revertAppointment,
+  type AppointmentActionResult,
 } from '@/app/actions/timebox'
 
 // 锁定系统时间到 currentDate，使 default filterRange（本月）+ selectedDate（今天）
@@ -291,7 +292,7 @@ describe('[026] AppointmentWorkspace', () => {
 
     // 第一个 delete 成功，第二个 reject
     vi.mocked(deleteAppointment)
-      .mockResolvedValueOnce({ ok: true } as any)
+      .mockResolvedValueOnce({ status: 'ok', appointment: { id: 'a-1' } } as AppointmentActionResult)
       .mockRejectedValueOnce(new Error('boom'))
 
     // 点击删除

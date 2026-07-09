@@ -19,7 +19,7 @@ const offsetISO = (deltaMs: number) => new Date(NOW.getTime() + deltaMs).toISOSt
 const mk = (overrides: Partial<AppointmentSummary> = {}): AppointmentSummary => ({
   id: 'appt-' + Math.random(),
   title: '测试约定',
-  startTime: offsetISO(-2 * HOUR), // 距 now -2h,落在本月惯例日期范围内
+  startTime: offsetISO(-2 * HOUR), // 距 now -2h,落在本月约定筛选 (fixture) 日期范围内
   durationMin: 60,
   status: 'scheduled',
   ...overrides,

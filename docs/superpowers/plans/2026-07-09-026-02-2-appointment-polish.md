@@ -165,7 +165,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `frontend/src/domains/timebox/components/appointment-month-view.tsx:94`（component 1 行）
-- Modify: `frontend/src/domains/timebox/components/__tests__/appointment-month-view.test.tsx`（4 test contract 调整）
+- Modify: `frontend/src/domains/timebox/components/__tests__/appointment-month-view.test.tsx`（2 test contract 调整 — brief 估 4 处, 实际合并; count drift 由 reviewer 抓）
 
 **Interfaces:**
 - Consumes: `info.count: number`（per `AppointmentSummary`）

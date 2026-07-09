@@ -18,7 +18,7 @@
 
 | ID | 项目 | 文件 | 类型 | 决策来源 |
 |---|---|---|---|---|
-| **I-2** | 月视图格子计数「条」后缀补回 | `appointment-month-view.tsx:94` | 1 行 + 4 test contract 调整 | user (brainstorming 3rd Q) |
+| **I-2** | 月视图格子计数「条」后缀补回 | `appointment-month-view.tsx:94` | 1 行 + 2 test contract 调整（brief 估 4 处, 实际合并到 1 个 `it()` 块下, 2 个 test contract — count drift 由 reviewer 抓, ship-then-polish 收口） | user (brainstorming 3rd Q) |
 | **M-1** | 5+ 处 `as any` 改 MkItem/AppointmentSummary 类型 | `appointment-workspace.test.tsx`（约 8 处） | 类型契约改进 | user (brainstorming 4th Q, multi) |
 | **M-2** | mock variable rename `mockGetItinerariesByRange` → `mockGetAppointmentsByRange` | `appointment-workspace.test.tsx`（1 变量 + 引用） | cosmetic | user (4th Q, multi) |
 | **M-3** | hardcoded date → fake timers + 相对 offset | `appointment-filter.test.ts:14` + setup/teardown | date determinism | user (4th Q, multi) |

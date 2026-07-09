@@ -335,7 +335,7 @@
 
 - **M-4**：`lib/appointment-date-utils.ts` 新建 + `appointment-{workspace,mini-calendar,month-view}.tsx` 改 import 删本地副本
 - **I-2**：`appointment-month-view.tsx:94` 加「条」后缀 + 4 个 test contract 调整
-- **M-1**：`appointment-workspace.test.tsx` 移除 8 处 `as any`
+- **M-1**：`appointment-workspace.test.tsx` 移除 11 处 `as any`（brief 估 8 处, 实际代码扫描 11 处 — 全部用 proper USOM ID 类型替代；count drift 由 reviewer 抓, ship-then-polish 收口）
 - **M-2**：`appointment-workspace.test.tsx` rename `mockGetItinerariesByRange` → `mockGetAppointmentsByRange`
 - **M-3**：`appointment-filter.test.ts` 改 fake timers + 相对 offset
 - **M-6**：`appointment-workspace.tsx` handleDelete 改 Promise.allSettled + 1 个 partial-failure test
@@ -344,7 +344,7 @@
 ### 验证结果
 
 - vitest base=head 失败集合零新增（47 → 47，+1 新 test pass）
-- tsc 变更文件 0 新增错误
+- tsc 变更文件 0 新增语义错误（2 个新 TS2304 baseline noise，vitest-globals 项目 pre-existing 模式）
 - 新增测试数：+1（M-6 partial-failure）
 
 ### 风险与缓解
