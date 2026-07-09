@@ -20,3 +20,6 @@ mydocs/dev/
 frontend/backups/
 # 临时文件目录
 tmp/
+
+# superpowers git worktrees
+.worktrees/
