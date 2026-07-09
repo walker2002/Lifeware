@@ -295,6 +295,10 @@ describe('parseAppointmentIntentOnly（[026] A2.1 约定 dry-run）', () => {
 
 // [026.01] T2 parseAppointmentIntent —— EditAppointment 解析优先模式
 describe('parseAppointmentIntent', () => {
+  // [026.02.4] TD-022 #2 hardening：现有测试 fixture 已从原 'a-1' / 'a-2' / 'ghost-id'
+  // 迁移到 UUID v4（满足 brief Step 8 「所有现有测试通过」要求）。原 fixture 形态恰好是
+  // 新契约要拒绝的非 UUID 字符串，所以迁移后这些测试不再覆盖「拒绝非 UUID」路径——
+  // 见下方 "rejects non-UUID candidate appointmentId" 测试覆盖拒绝路径。
   const UUID_A1 = '11111111-1111-4111-8111-111111111111'
   const UUID_A2 = '22222222-2222-4222-8222-222222222222'
   const UUID_GHOST = '99999999-9999-4999-8999-999999999999'
@@ -303,6 +307,7 @@ describe('parseAppointmentIntent', () => {
     { id: UUID_A2, title: '和张三吃饭', startTime: '2026-07-16T19:00:00Z', durationMin: 90, status: 'scheduled' },
   ]
 
+  // [026.02.4] TD-022 #2 audit：原 fixture id 为 'a-1'（commit 29c6579 迁移至 UUID_A1）
   it('returns edit with appointmentId when high confidence match', async () => {
     const runtime = createMockAIRuntime({ text: JSON.stringify({
       kind: 'edit',

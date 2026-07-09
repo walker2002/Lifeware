@@ -117,7 +117,9 @@ export async function parseAppointmentIntent(
     // [026.02.4] TD-022 #2: UUID v4 regex check（防御深度 #2，按设计而非按意外）
     // 在 candidates.find 之前挡掉非 UUID 形态的 appointmentId，
     // 避免后续 DB 查询/外键逻辑被畸形 id 污染
-    const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    // [026.02.4] TD-022 #2 M-2: 不需要 /i flag —— 字符类 [0-9a-f] 仅小写；
+    // 真实数据库 UUID v4 也是小写 hex（pgcrypto default）
+    const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     if (!UUID_V4.test(parsed.appointmentId)) {
       return { kind: 'unsure', reason: '候选 appointmentId 不是合法 UUID v4' }
     }
