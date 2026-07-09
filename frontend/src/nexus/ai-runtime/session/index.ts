@@ -38,7 +38,7 @@ interface CreateSessionParams {
  * 别名,改用 USOM `AISessionStatus`(6 值含 'deleted'); transition 表对应扩展。
  */
 const VALID_TRANSITIONS: Record<AISessionStatus, AISessionStatus[]> = {
-  // [023.08] / [026.02.3.1] transition map — 'closed' 是终态, 'deleted' 留字段兼容未来 server action
+  // [023.08] 引入 / [026.02.3.1] 扩 'deleted' 终态: 'closed' 是用户主动结束, 'deleted' 留字段兼容未来 server action
   created: ['active', 'closed'],
   active: ['completing', 'closed'],
   completing: ['archived', 'closed'],

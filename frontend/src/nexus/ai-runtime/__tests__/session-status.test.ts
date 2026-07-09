@@ -4,11 +4,15 @@
  *
  * 守护对象：USOM `AISessionStatus` 6 值 vs DB schema 6 值 vs 实际代码 5 值
  * (其中 `'deleted'` USOM 漏, `'created'`/`'completing'`/`'closed'` 漏)。
- * 本测试用 type assertion + sort-join 双校验, 避免 `as const satisfies`
- * (此 pattern codebase 无先例, grep 0 hit — pre-flight F1)。
  *
- * 实现: 用一个 typed-as-AISessionStatus[] 的字面量 → 编译错表明 USOM 漏值;
- * runtime array → sort 后 join 字符串比对表明 shape 真一致。
+ * IRON RULE 实际机制（post-review 澄清）:
+ * - 编译时: `const EXPECTED: AISessionStatus[]` 类型注解 — 字面量必须是
+ *   AISessionStatus 合法成员, USOM 漏 1 个值就编译错。
+ * - 运行时: `toHaveLength(6)` 长度校验 — 防止 USOM 扩值时 EXPECTED 跟漏。
+ * 原 sort-join 校验是 tautology (line 30 vs 29 是同一字面量集), 已移除。
+ *
+ * 实现: 不需要 `as const satisfies` (此 pattern codebase 无先例, grep 0 hit
+ * — pre-flight F1)。
  */
 import { describe, it, expect } from 'vitest'
 import type { AISessionStatus } from '@/usom/types/primitives'
@@ -25,9 +29,6 @@ const EXPECTED: AISessionStatus[] = [
 
 describe('[026.02.3.1] T1 IRON RULE — AISessionStatus shape', () => {
   it('USOM AISessionStatus 必须含 6 值 (created/active/completing/archived/closed/deleted)', () => {
-    const sorted = [...EXPECTED].sort()
-    const canonical = ['active', 'archived', 'closed', 'completing', 'created', 'deleted'].sort()
-    expect(sorted).toEqual(canonical)
     expect(EXPECTED).toHaveLength(6)
   })
 })
