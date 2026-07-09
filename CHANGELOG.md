@@ -319,6 +319,52 @@
 
 ---
 
+## [026.02.2] 7 项 polish 收口（2026-07-09）
+
+> [026.02.1] post-ship review 登记的 7 项 follow-up 收口。I-1 mk() 已 [026.02.1] 修，本段处理剩余 7 项。
+
+### 决策摘要
+
+- **范围**：7 项 polish（不含 TD-022 5 项延后 + /editAppointment TypeError 拆 [026.02.3]）
+- **I-2 月视图「条」后缀**：user 决策补回，对齐 plan §3.1
+- **M-4 ymdKey DRY**：新建 `lib/appointment-date-utils.ts`，3 处复用
+- **M-6 handleDelete**：sequential await → Promise.allSettled（并行 + 部分失败聚合）
+- **M-5 click-toggle UX 验证**：保留当前实现，登记为 UX defer（待 /browse 人工验证）
+
+### 改动清单
+
+- **M-4**：`lib/appointment-date-utils.ts` 新建 + `appointment-{workspace,mini-calendar,month-view}.tsx` 改 import 删本地副本
+- **I-2**：`appointment-month-view.tsx:94` 加「条」后缀 + 4 个 test contract 调整
+- **M-1**：`appointment-workspace.test.tsx` 移除 8 处 `as any`
+- **M-2**：`appointment-workspace.test.tsx` rename `mockGetItinerariesByRange` → `mockGetAppointmentsByRange`
+- **M-3**：`appointment-filter.test.ts` 改 fake timers + 相对 offset
+- **M-6**：`appointment-workspace.tsx` handleDelete 改 Promise.allSettled + 1 个 partial-failure test
+- **M-5**：0 代码改动，仅 CHANGELOG 登记
+
+### 验证结果
+
+- vitest base=head 失败集合零新增（47 → 47，+1 新 test pass）
+- tsc 变更文件 0 新增错误
+- 新增测试数：+1（M-6 partial-failure）
+
+### 风险与缓解
+
+- **M-3 fake timers 误用污染其他测试**：严格 beforeEach/afterEach teardown，验证 lib/__tests__ 全跑无污染
+- **M-6 改 handleDelete 改顺序逻辑**：新增 partial-failure test 锁定行为
+
+### 遗留 / Follow-up
+
+- **TD-022 5 项**（archetype clearing / UUID / perf N+1 / banner / E2E）→ [026.02.4]
+- **/editAppointment runtime TypeError**（点击即崩，独立根因未明）→ [026.02.3]
+- **M-5 click-to-toggle-select UX 验证** → 后续 /browse 人工验证后决
+
+### 参照
+
+- Spec SSOT: `docs/superpowers/specs/2026-07-09-026-02-2-appointment-polish-design.md`
+- Plan SSOT: `docs/superpowers/plans/2026-07-09-026-02-2-appointment-polish.md`
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
