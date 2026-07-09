@@ -1,6 +1,6 @@
 // AISessionManager — Session 生命周期状态机
 
-type SessionStatus = 'created' | 'active' | 'completing' | 'archived' | 'closed'
+import type { AISessionStatus } from '@/usom/types/primitives'
 
 /** 查询结果摘要条目 */
 export interface QueryResultEntry {
@@ -21,7 +21,7 @@ export interface AISession {
   domainId: string
   action: string
   userId: string
-  status: SessionStatus
+  status: AISessionStatus
   createdAt: string
   queryResults?: QueryResultEntry[]
 }
@@ -33,12 +33,18 @@ interface CreateSessionParams {
 }
 
 // 合法状态转换表
-const VALID_TRANSITIONS: Record<SessionStatus, SessionStatus[]> = {
+/**
+ * [026.02.3.1] T1 改造: 删局部 `SessionStatus = 'created' | 'active' | 'completing' | 'archived' | 'closed'`
+ * 别名,改用 USOM `AISessionStatus`(6 值含 'deleted'); transition 表对应扩展。
+ */
+const VALID_TRANSITIONS: Record<AISessionStatus, AISessionStatus[]> = {
+  // [023.08] / [026.02.3.1] transition map — 'closed' 是终态, 'deleted' 留字段兼容未来 server action
   created: ['active', 'closed'],
   active: ['completing', 'closed'],
   completing: ['archived', 'closed'],
-  archived: [],
-  closed: [],
+  archived: [],        // 终态
+  closed: [],          // 终态 — 用户主动结束
+  deleted: [],         // 终态 — 软删字段（当前无 server action 触发）
 }
 
 export interface AISessionManager {
@@ -58,7 +64,7 @@ export interface AISessionManager {
 export function createAISessionManager(): AISessionManager {
   const sessions = new Map<string, AISession>()
 
-  function transition(sessionId: string, targetStatus: SessionStatus): AISession {
+  function transition(sessionId: string, targetStatus: AISessionStatus): AISession {
     const session = sessions.get(sessionId)
     if (!session) throw new Error(`Session ${sessionId} not found`)
 

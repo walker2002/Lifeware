@@ -270,11 +270,26 @@ export type IntentionStatus = 'captured' | 'clarified' | 'routed' | 'dissolved'
 
 /**
  * AI 会话状态
+ *
+ * [026.02.3.1] T1 三向一致: USOM 6 值 = schema.ts ai_sessions enum 6 值 =
+ * database-design.md ENUM(created/active/completing/archived/closed/deleted) 6 值。
+ * 旧版 USOM 漏 3 值: 'created'(初次创建)、'completing'(完成中 — 由 active 推进)、'closed'(user 主动关闭)。
+ * 终态 2 种语义区分: 'closed'(user 主行为终止) vs 'deleted'(软删 — 当前无 server action, 留字段兼容未来)。
+ *
+ * - created: 初创
  * - active: 活跃中
+ * - completing: 完成中（用户提提交后、归档前）
  * - archived: 已归档
- * - deleted: 已删除
+ * - closed: 已关闭（用户主动结束会话）
+ * - deleted: 已软删除
  */
-export type AISessionStatus = 'active' | 'archived' | 'deleted'
+export type AISessionStatus =
+  | 'created'
+  | 'active'
+  | 'completing'
+  | 'archived'
+  | 'closed'
+  | 'deleted'
 
 // ─── Task Domain Primitives ────────────────────────────────────
 /**

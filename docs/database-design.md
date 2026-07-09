@@ -1695,6 +1695,7 @@ interface DerivedSignalsRepository {
 | `system_events` 删除 | **禁止（append-only）** | Memory Framework 数据基础 |
 | `derived_signals` 写入权限 | **仅 Memory Framework** | Repository 只对 Memory Framework 暴露 upsert |
 | Timebox-Task 关系 | **关联表（多对多）** | 支持双向查询，可分别索引 |
+| `ai_sessions.status` 三向一致 | **USOM = DB = session/index.ts transition map 均为 6 值** | `[026.02.3.1] T1`：`created/active/completing/archived/closed/deleted`，IRON RULE `session-status.test.ts` 守护防 drift |
 
 ---
 
