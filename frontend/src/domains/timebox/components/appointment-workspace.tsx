@@ -70,6 +70,7 @@ import { AppointmentFilterBar } from './appointment-filter-bar'
 import { AppointmentDayView } from './appointment-day-view'
 import { AppointmentMonthView } from './appointment-month-view'
 import { filterAppointments, type AppointmentFilterStatus } from '@/domains/timebox/lib/appointment-filter'
+import { ymdKey } from '@/domains/timebox/lib/appointment-date-utils'
 import type { AppointmentSummary } from '@/usom/types/summaries'
 
 /** 新建约定 Drawer 默认草稿（明日 9:00 + 1h，与 A2.5 handler 空 draft 同形） */
@@ -121,14 +122,14 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
     const m = new Map<string, AppointmentSummary[]>()
     for (const it of filtered) {
       const t = new Date(it.startTime)
-      const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+      const key = ymdKey(t)
       const arr = m.get(key) ?? []
       arr.push(it)
       m.set(key, arr)
     }
     return m
   }, [filtered])
-  const selectedKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
+  const selectedKey = ymdKey(selectedDate)
   const dayAppointments = byDate.get(selectedKey) ?? []
 
   // 重新拉取窗口内约定（与 /appointments/page.tsx 同步：-90d / +90d —— 7→90 扩窗

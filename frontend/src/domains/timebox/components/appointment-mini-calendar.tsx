@@ -14,16 +14,10 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { ymdKey } from '@/domains/timebox/lib/appointment-date-utils'
 import type { AppointmentSummary } from '@/usom/types/summaries'
 
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日']
-
-function ymd(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 interface Props {
   currentDate: Date
@@ -60,12 +54,12 @@ export function AppointmentMiniCalendar({
   for (const a of appointments) {
     if (a.status !== 'scheduled') continue  // 终态不打点
     const t = new Date(a.startTime)
-    const key = ymd(t)
+    const key = ymdKey(t)
     const isExpired = t.getTime() < now.getTime()
     markers.set(key, isExpired ? 'expired' : 'future')
   }
 
-  const selectedKey = selectedDate ? ymd(selectedDate) : null
+  const selectedKey = selectedDate ? ymdKey(selectedDate) : null
 
   return (
     <div className="w-full">
@@ -79,7 +73,7 @@ export function AppointmentMiniCalendar({
           </div>
         ))}
         {cells.map(({ date, inMonth }, idx) => {
-          const key = ymd(date)
+          const key = ymdKey(date)
           const marker = markers.get(key)
           const isSelected = key === selectedKey
           return (
