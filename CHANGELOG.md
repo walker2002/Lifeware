@@ -415,6 +415,58 @@
 
 ---
 
+## [026.02.3.1] 4 项 fresh drift 修复 + 5 cosmetic minor 收口（2026-07-09）
+
+> [026.02.3] ship 后 `/lifeware-neat` 5 数据源重扫发现的 4 项 fresh drift 全部 ship。Items 1+2（TaskStatus/HabitStatus USOM drift）由前会话扫描时报 drift 但实际 main 已对齐，验证后从 scope 删除。
+> 同 PR 收 [026.02.2] whole-branch review 5 cosmetic minor polish。
+
+### 决策摘要
+
+- **4 项 drift 全部 ship**：TD-024 (AISessionStatus 三向一致) + TD-025 (v_running_timeboxes view stale filter) + TD-026 (ai_sessions docs 格式) + TD-027 (docs 页脚过期)
+- **5 cosmetic minor 收口**：[026.02.2] whole-branch review 5 项 polish 全部 ship
+- **scope 不动**：type cast 透明性 (`EditAppointment.tsx:32`) 仍留 [026.02.4] 范围（与 TD-022 5 项同）
+
+### 改动清单
+
+- **T1 TD-024**：`primitives.ts:230` `AISessionStatus` 扩 3 值 (`created`/`completing`/`closed`) + 删 `session/index.ts` 局部 `SessionStatus` 别名 + 新增 `session-status.test.ts` IRON RULE (6 值 type-level + runtime array 双校验)
+- **T2 TD-025**：`docs/database-design.md:1548-1557` view SQL 重写 (`status='planned' AND start_time<=NOW() AND end_time>=NOW()`) + `migrations/0036_drop_v_running_timeboxes_recreate.sql` 新建（journal idx=36，跨 PG 幂等 DROP IF EXISTS + CREATE OR REPLACE）+ dev DB 跑通验证
+- **T3 TD-026**：`docs/database-design.md:1703-1723` §8.x ai_sessions Markdown table → ```sql CREATE TABLE``` block 格式统一（与 §4.x user_settings/memory_episodes 同模板）
+- **T4 TD-027**：`docs/usom-design.md` + `docs/database-design.md` 页脚 `2026_07_07 → 2026_07_09` bump + 补 [026.02]/[026.02.1]/[026.02.2]/[026.02.3] 4 段变更记录
+- **T5 5 cosmetic minor**：
+  - C1: CHANGELOG M-1 count "8 处" → "11 处" + 注释
+  - C2: spec/plan I-2 "4 处 test" → "2 处 test contract" + 注释
+  - C3: CHANGELOG tsc "0 新增" → "0 新增语义错误 (2 TS2304 baseline)" + 注释
+  - C4: `appointment-filter.test.ts` mk() comment "本月惯例" → "本月约定筛选 (fixture)"
+  - C5: `appointment-workspace.test.tsx:294` `{ ok: true } as any` → `{ status: 'ok', appointment: { id: 'a-1' } }` 对齐 default mock shape
+
+### 验证结果
+
+- vitest: 0 回归（baseline=head）
+- tsc: 0 新增错误
+- pre-push hooks: `validate:manifest` 0 errors + `validate:structure` ✓ + `validate:rules-registry` 6 项一致
+- USOM ↔ DB 双向互验 2A-2F 重扫: 0 新增 drift
+- IRON RULE: `session-status.test.ts` 通过（6 值 shape 锁定，TypeScript + runtime 双校验）
+
+### 风险与缓解
+
+- **T1 类型 cast 透明性**：`EditAppointment.tsx:32` `as (AppointmentDraftFields & { status: string })[]` 仍遮蔽 runtime 形状，**未触及**（属 [026.02.4] / TD-022 同范围）；T1 仅扩 USOM 6 值对齐 DB + code，未改 surface 类型 cast
+- **T2 view 替代品风险**：`v_running_timeboxes` 替代 SQL 与 `derive-display-status.ts` 派生语义等价，但 production 实际调用方需 grep 确认（已确认 production 无查询代码，仍是 documentation/audit 用途）
+- **T3 docs 格式单点**：ai_sessions 一处改动，列与 schema.ts 已逐字对齐，无歧义
+
+### 关联
+
+- 上游：[026.02.3] commit e97b9a4 + 3ffc2c9 + c220e15（`/editAppointment TypeError 双层防御` 已 ship）
+- 重扫：[`/lifeware-neat` 5 数据源] (2026-07-09) — 发现 4 项 fresh drift
+- Spec SSOT: `docs/superpowers/specs/2026-07-09-026-02-3-1-follow-up-fixes-design.md` (commit 17db764)
+- Plan SSOT: `docs/superpowers/plans/2026-07-09-026-02-3-1-follow-up-fixes.md`
+
+### 后续 defer（不在本轮）
+
+- TD-022 5 项（archetype clearing / UUID 验证 / perf N+1 / originalPrompt banner / 浏览器 E2E）→ [026.02.4]
+- `EditAppointment.tsx:32` 类型 cast 透明性 → [026.02.4]
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
