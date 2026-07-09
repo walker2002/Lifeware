@@ -355,13 +355,63 @@
 ### 遗留 / Follow-up
 
 - **TD-022 5 项**（archetype clearing / UUID / perf N+1 / banner / E2E）→ [026.02.4]
-- **/editAppointment runtime TypeError**（点击即崩，独立根因未明）→ [026.02.3]
 - **M-5 click-to-toggle-select UX 验证** → 后续 /browse 人工验证后决
 
 ### 参照
 
 - Spec SSOT: `docs/superpowers/specs/2026-07-09-026-02-2-appointment-polish-design.md`
 - Plan SSOT: `docs/superpowers/plans/2026-07-09-026-02-2-appointment-polish.md`
+
+---
+
+## [026.02.3] /editAppointment runtime TypeError 双层防御（2026-07-09）
+
+> [026.02.2] 收口时登记的「/editAppointment runtime TypeError（独立根因未明）」独立 task 闭环。
+> 用户在 /appointments 选条 → 点击编辑图标 → 触发 Runtime TypeError。
+> Source trace：`AppointmentFormFields.tsx:88` `draft.people.join('，')` 在 `draft.people === undefined` 时抛 Cannot read properties of undefined (reading 'join')。
+
+### 根因
+
+`handlers.ts:268-274` 的 `todayAppointments` 投射 mapper 只含 5 字段（`id`/`title`/`startTime`/`durationMin`/`status`），**丢 `detail`/`people`/`activityArchetypeId`**。
+
+传播链：
+
+1. handlers.ts 投射 `todayAppointments`（缺 people/detail/archetype）
+2. handlers.ts:325 `dataSnapshot.items = todayAppointments`（selecting 降级模式）
+3. `EditAppointment.tsx:32` `as (AppointmentDraftFields & { status: string })[]` 类型 cast 遮蔽 runtime 形状缺陷
+4. 用户点击 item → `EditAppointment.tsx:146` `setDraft({ ...it })` 浅拷贝 → `draft.people === undefined`
+5. `AppointmentFormFields.tsx:88` `.join('，')` 抛 TypeError
+
+### 决策
+
+- **双层防御**：
+  - **根因**：handlers.ts todayAppointments 补 3 字段（`detail` / `people` / `activityArchetypeId`）
+  - **防御深度**：`AppointmentFormFields` 加 `?? []` + `?? ''` fallback — form 自身不假设上游完美
+- **测试为何漏**：`edit-appointment.test.tsx` 的 `makeItem()` 默认值含 `people: []` / `detail: null`，**测试 mock 比生产数据更完整**，遮蔽真实 bug（即「false-positive 测试」反模式：[feedback_change-gate-baseline](~/.claude/...feedback_change-gate-baseline.md)）
+
+### 改动清单
+
+- **根因 fix**：`handlers.ts:267-281` `todayAppointments` 补 `detail: i.detail` / `people: i.people` / `activityArchetypeId: i.activityArchetypeId` 3 字段
+- **防御深度**：`AppointmentFormFields.tsx:49-50, 94, 104` `peopleArr = draft.people ?? []` + `detailVal = draft.detail ?? ''`
+- **回归守护**：`edit-appointment.test.tsx:131-153` 新增「selecting 模式点 item 缺字段时不崩」测试 — 模拟真实 handler 投射形状（5 字段）作为 IRON RULE
+
+### 验证结果
+
+- vitest：`edit-appointment.test.tsx` 16/16 pass（含新 IRON RULE）
+- tsc：`edit-appointment.test.tsx` 错误数 15 = baseline（零新增）
+- baseline flake 隔离：`handlers.test.ts > 应包含未打卡的习惯` + `timeboxes-workspace.ai-submit.test.tsx > createTimebox` 在 baseline 同样 fail — 修复零回归
+- pre-push hooks：`validate:manifest` 0 errors + `validate:structure` 全部通过 + `validate:rules-registry` 6 项一致
+
+### 风险与缓解
+
+- **类型 cast 透明性**：`EditAppointment.tsx:32` `as (AppointmentDraftFields & { status: string })[]` 仍遮蔽 runtime 形状。**未触及**：改类型会破现有测试（`makeItem` 需补 archetype），留 [026.02.4] 范围
+- **未来回归防御**：任何再次改动 todayAppointments 投射的代码会立即被 IRON RULE 测试 fail 拦截 — 不再依赖 mock makeItem 兜底
+
+### 参照
+
+- Spec/Plan 缺失：[026.02.3] 是 TypeError 单 task 修复，scope 严格（1 commit），未走完整 spec/plan 流程；root cause 在 `superpowers:systematic-debugging` skill 内追溯
+- Follow-up source：`CHANGELOG.md [026.02.2] 遗留 / Follow-up / "/editAppointment runtime TypeError"`（已 cleanup）
+- Git: commit `e97b9a4`（`fix(026.02.3): /editAppointment selecting→编辑视图 TypeError 双层防御`）
 
 ---
 
