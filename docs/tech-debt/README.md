@@ -30,6 +30,7 @@ last_updated: 2026-07-09
 | TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 暂未指派 |
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 4 处残留(intent.ts:649-650 / use-auto-trigger.ts:53 / timebox.ts:299 / createSmartTimeboxes-integration.test.ts:116) | 🟠 | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | 暂未指派 |
 | TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (line 333/337/344) | 🟡 | lifeware-timebox | [026.02.4] post-T2 | 暂未指派 |
+| TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 | lifeware-timebox | [026.02.4] post-T5 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
