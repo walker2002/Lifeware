@@ -1,6 +1,6 @@
 ---
 title: 技术债务跟踪
-last_updated: 2026-07-07
+last_updated: 2026-07-09
 ---
 
 # 技术债务跟踪（Tech Debt Ledger）
@@ -96,6 +96,7 @@ last_updated: 2026-07-07
 - [[TD-017]] · [023.12] 生产代码漏跟 status 收窄（timebox.ts + intent.ts） · 🔴 Critical
 - [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix + A1/A2 已落地 [023.13])
 - [[TD-023]] · timebox 写入口绕过 mutation service (AM3 reuse updateFields) · 🟡 Medium
+- [[TD-028]] · [026.02.3.1] post-review: 'running' status 4 处 JS literals 残留 (Site 0 root source) · 🟠 High
 
 ### `lifeware-appointments`
 
@@ -128,6 +129,7 @@ last_updated: 2026-07-07
 - [[TD-003]] · editTimeboxes TOCTOU
 - [[TD-004]] · R4 timebox/okrs 写入口债
 - [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
+- [[TD-028]] · [026.02.3.1] post-review: 'running' status JS literals 残留 (Site 0 root source)
 
 ### 🟡 Medium（下次大重构顺手解决）
 
@@ -179,7 +181,8 @@ last_updated: 2026-07-07
 | 第 4 批(🔴🟠🟡) | 2026-07-07 | TD-016 ~ TD-018(3 条,簇合并) | `[023.12]` ship-then-polish 7 错分簇合并为 3 TD（test fixture / production code / pre-existing chain） |
 | 第 5 批(🔴) | 2026-07-07 | TD-019(1 条) | `[023.12]` hot-fix:STATUS_TRANSITION_ACTIONS 漂移导致 revert 100% 阻断,含已修复 + A1/A2 预防建议 |
 | 第 6 批(🟡) | 2026-07-07 | TD-023(1 条) | `[023.13]` whole-branch review 抓出:AM3 reuse repo.updateFields 列写绕 mutation service 架构治理债 |
+| 第 7 批(🟠) | 2026-07-09 | TD-028(1 条) | `[026.02.3.1]` post-review:JS 层 4 处 'running' status literals 残留 (Site 0 root source 仓库 findRunning) |
 
 ---
 
-**最后更新**: 2026-07-07 · 共 20 条（1 条本批关闭 → 已修复;新增 TD-023）· 🔴0 / 🟠5 / 🟡6 / 🟢5 / ⚪2
+**最后更新**: 2026-07-09 · 共 21 条（1 条本批关闭 → 已修复;新增 TD-028）· 🔴0 / 🟠6 / 🟡6 / 🟢5 / ⚪2
