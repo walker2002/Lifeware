@@ -127,7 +127,7 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
   return (
     <>
       <div className="mb-2">
-        <span className="text-sm font-medium text-ink">选择要修改的约定（仅计划/执行中）</span>
+        <span className="text-sm font-medium text-ink">选择要修改的约定（仅计划）</span>
       </div>
       {(originalPrompt || parseReason) && (
         <p className="mb-2 rounded bg-muted/50 px-2 py-1 text-xs text-body/70">

@@ -525,6 +525,37 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ---
 
+## [026.02.4-r2] post-ship round 2 second-opinion 抓 3 Important + 3 Minor 修复（2026-07-09）
+
+> [026.02.4] ship 后跑 second-opinion（Opus），抓出 SDD whole-branch 漏掉的 3 Important（drift class 漂移 / 测试 tautology / ledger 索引同步）+ 3 Minor（manifest HEAD 替换 / EditAppointment subtitle 一致性 / TD-030 close）。这是 [[feedback_post-ship-review-meta-pattern]] 模式在项目内第 3 次验证。
+
+### 决策摘要
+
+- **3 Important 全部 ship**：truthy-check drift 类 4 sites 全修（TD-030 升级关闭）/ findRunning WHERE clause shape test（去 tautology）/ TD-030 ledger close（4 sites）+ README 索引同步
+- **3 Minor 全部 ship**：manifest.md `<HEAD>`/`<BASE>` 替换为真实 commit + EditAppointment subtitle `仅计划/执行中 → 仅计划`（与 T3 '执行中' → '计划' 一致）
+
+### 改动清单（3 commits on main，fix + fix + docs）
+
+- **Fix 1**（commit pending）：3-state propagation 4 sites — timebox.ts:110 (createTimebox) + :346 (createAppointment) + handlers.ts:309 (editAppointment prefill) + :384 (editTimeboxes prefill)。type widen `string` → `string | null` + truthy-check `?{...}:{}` → `!== undefined ?{...}:{}`
+- **Fix 2**（commit pending）：repository findRunning WHERE clause shape test（IRON RULE 替代 JS-level filter mock）— vi.mock drizzle 操作符捕获 eq/lte/gte/sql 调用，断言 WHERE 链含 status='planned' + NOW() 上下界 + userId 过滤
+- **Fix 3**（commit pending）：TD-030 close（status 新建 → 已修复 + 4 sites 修复记录段）+ docs/tech-debt/README.md 索引同步 + manifest.md `<HEAD>` → `0ce7574` + `<BASE>` → `4dac296` + EditAppointment.tsx:130 subtitle `仅计划/执行中 → 仅计划`
+
+### 验证结果
+
+- vitest baseline=head：0 回归（+1 新 test = 4/4 in timebox-repository.test.ts）
+- tsc：0 新增错误（199 = baseline）
+- pre-push hooks：validate:manifest 0 errors + validate:structure ✓ + validate:rules-registry 6 项一致
+- 3-state semantics verification：4 sites 全部 `!== undefined` 检查（null = clear / undefined = skip / string = set）
+
+### 关联
+
+- 上游：[026.02.4] ship（0ce7574）
+- 关联 TD：TD-030（4 sites closed）+ TD-031（仍登记）
+- 关联 spec：`docs/superpowers/specs/2026-07-09-026-02-4-follow-up-fixes-design.md`（不再修订，本轮为 post-ship review）
+- [[feedback_post-ship-review-meta-pattern]]：第 3 次验证 SDD whole-branch APPROVED ≠ ship-ready
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）

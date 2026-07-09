@@ -28,7 +28,6 @@ last_updated: 2026-07-09
 |---|---|---|---|---|---|
 | TD-014 | Claude Code settings.json schema 顶层严格,自定义 key 整个文件加载失败 | 🟢 | infra | N/A（工具链债） | 暂未指派 |
 | TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 暂未指派 |
-| TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (line 333/337/344) | 🟡 | lifeware-timebox | [026.02.4] post-T2 | 暂未指派 |
 | TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 | lifeware-timebox | [026.02.4] post-T5 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
@@ -70,6 +69,7 @@ last_updated: 2026-07-09
 |---|---|---|---|---|---|---|
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮（A1 派生 + A2 pre-push validator 落地） | 🔴 → ✅ | lifeware-timebox | [023.12] hot-fix | [023.13] | 2026-07-07 |
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 5 处残留 (Site 0 repository findRunning root source + Sites 1-4 callers) | 🟠 → ✅ | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | [026.02.4] | 2026-07-09 |
+| TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (4 sites 全修) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T2 | [026.02.4-r2] round 2 | 2026-07-09 |
 
 ## 按领域视图
 
@@ -99,6 +99,7 @@ last_updated: 2026-07-09
 - [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix + A1/A2 已落地 [023.13])
 - [[TD-023]] · timebox 写入口绕过 mutation service (AM3 reuse updateFields) · 🟡 Medium
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status 4 处 JS literals 残留 (Site 0 root source) · 🟠 High · ✅ [026.02.4]
+- ~~[[TD-030]]~~ · [026.02.4] post-T2 review:timebox.ts createAppointment truthy-check 4 sites · 🟡 Medium · ✅ [026.02.4-r2] round 2
 
 ### `lifeware-appointments`
 
@@ -185,7 +186,8 @@ last_updated: 2026-07-09
 | 第 6 批(🟡) | 2026-07-07 | TD-023(1 条) | `[023.13]` whole-branch review 抓出:AM3 reuse repo.updateFields 列写绕 mutation service 架构治理债 |
 | 第 7 批(🟠) | 2026-07-09 | TD-028(1 条) | `[026.02.3.1]` post-review:JS 层 4 处 'running' status literals 残留 (Site 0 root source 仓库 findRunning) |
 | 第 8 批(🟠→✅) | 2026-07-09 | TD-028 关闭(1 条) | `[026.02.4]` Site 0 repository findRunning rewrite (T4) + Sites 1-4 caller updates (T5) |
+| 第 9 批(🟡→✅) | 2026-07-09 | TD-030 关闭(1 条) | `[026.02.4-r2]` round 2 second-opinion 抓 truthy-check drift 类 — timebox.ts:110/346 + handlers.ts:309/384 共 4 sites 全修 |
 
 ---
 
-**最后更新**: 2026-07-09 · 共 24 条（1 条本批关闭 TD-028 → 已修复;新建 TD-030 + TD-031 已就位）· 🔴0 / 🟠5 / 🟡7 / 🟢5 / ⚪2
+**最后更新**: 2026-07-09 · 共 25 条（本批关闭 TD-030 → 已修复;TD-031 仍登记）· 🔴0 / 🟠5 / 🟡6 / 🟢5 / ⚪2
