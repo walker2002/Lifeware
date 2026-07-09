@@ -278,6 +278,31 @@ describe('[026] AppointmentWorkspace', () => {
     await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
+  it('[026.02.2] M-6: 部分删除失败不阻断成功项（Promise.allSettled）', async () => {
+    const user = userEvent.setup()
+    // 准备 2 个 item
+    const item1 = mk({ id: 'a-1', title: '约定一' })
+    const item2 = mk({ id: 'a-2', title: '约定二' })
+    render(<AppointmentWorkspace initialItems={[item1, item2]} />)
+
+    // 选中 2 个
+    await user.click(screen.getByLabelText(`约定：${item1.title}`))
+    await user.click(screen.getByLabelText(`约定：${item2.title}`))
+
+    // 第一个 delete 成功，第二个 reject
+    vi.mocked(deleteAppointment)
+      .mockResolvedValueOnce({ ok: true } as any)
+      .mockRejectedValueOnce(new Error('boom'))
+
+    // 点击删除
+    await user.click(screen.getByText(/删除选中/))
+
+    // 两条 deleteAppointment 都应被调用（Promise.allSettled 并行）
+    await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledTimes(2))
+    // reload 仍触发
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
+  })
+
   it('点击完成按钮触发 completeAppointment + reload', async () => {
     const user = userEvent.setup()
     render(<AppointmentWorkspace initialItems={[baseItem]} />)

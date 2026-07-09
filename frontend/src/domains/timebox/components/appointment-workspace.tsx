@@ -160,17 +160,18 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
     })
 
   // [026.02] T9.5 恢复：多选删除（[026] T7 已有的 deleteAppointment server action）
+  // [026.02.2] M-6: sequential await → Promise.allSettled, 并行 + 部分失败聚合
   const handleDelete = async () => {
     // 快照 selected 防止 await 期间 setSelected 状态变更
     const ids = Array.from(selected)
-    for (const id of ids) {
-      try {
-        // [026] deleteAppointment 走 submitDynamicIntent → Orchestrator → SM transition
-        await deleteAppointment(id as any)
-      } catch (e) {
-        // 单条失败不阻断剩余删除（与 reconcileAndAdvanceAppointments 同款错误隔离）
-        console.error('[AppointmentWorkspace] deleteAppointment failed', id, e)
-      }
+    const results = await Promise.allSettled(
+      ids.map((id) => deleteAppointment(id as any)),
+    )
+    const failed = results.filter((r) => r.status === 'rejected')
+    if (failed.length > 0) {
+      // 部分失败聚合提示（不阻断成功项的 reload 刷新）
+      console.error('[AppointmentWorkspace] deleteAppointment partial failure', failed)
+      toast.error(`${failed.length} 条删除失败`)
     }
     setSelected(new Set())
     // [026] 统一走 client reload —— 涵盖其他客户端并发变更；
