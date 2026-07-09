@@ -62,6 +62,27 @@ describe('EditAppointment selecting mode', () => {
     expect(screen.getByText(/未识别到具体时间/)).toBeInTheDocument()
   })
 
+  it('hides originalPrompt banner in editing mode', () => {
+    // [026.02.4] TD-022 #8: editing 视图不显示 originalPrompt banner（banner 只在 selecting 显示，用户首次进入时上下文）。
+    // 修复：editing 视图已删除 banner block（line 84-88），现在用 status='scheduled' 合 AppointmentStatus 类型。
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    render(
+      <EditAppointment
+        surfaceType="editAppointment"
+        dataModel={{
+          items: [prefill],
+          mode: 'editing',
+          selectedId: 'a-1',
+          prefill,
+          originalPrompt: '把看牙医改到下午3点',
+        }}
+        onDataChange={() => {}}
+        onConfirm={() => {}}
+      />,
+    )
+    expect(screen.queryByText(/尝试匹配/)).not.toBeInTheDocument()
+  })
+
   it('renders empty state when items is empty', () => {
     render(<EditAppointment dataModel={{ items: [], mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
     expect(screen.getByText(/暂无计划/)).toBeInTheDocument()

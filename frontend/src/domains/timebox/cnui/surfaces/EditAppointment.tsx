@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import type { AppointmentStatus } from '@/usom/types/primitives'
 import { AppointmentFormFields, type AppointmentDraftFields } from './AppointmentFormFields'
 
 interface EditAppointmentProps {
@@ -29,17 +30,17 @@ const PAGE_SIZE = 5
 type ViewMode = 'selecting' | 'editing'
 
 export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: EditAppointmentProps) {
-  const items = (dataModel.items as (AppointmentDraftFields & { status: string })[]) ?? []
+  const items = (dataModel.items as (AppointmentDraftFields & { status: AppointmentStatus })[]) ?? []
   const originalPrompt = (dataModel.originalPrompt as string) ?? ''
   const parseReason = (dataModel.parseReason as string) ?? ''
   const initialMode = ((dataModel.mode as string) ?? 'selecting') as ViewMode
-  const prefill = dataModel.prefill as (AppointmentDraftFields & { status: string }) | undefined
+  const prefill = dataModel.prefill as (AppointmentDraftFields & { status: AppointmentStatus }) | undefined
   const initialSelectedId = (dataModel.selectedId as string | null) ?? null
 
   const [view, setView] = useState<ViewMode>(initialMode)
   const [page, setPage] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
-  const [draft, setDraft] = useState<(AppointmentDraftFields & { status: string }) | null>(prefill ?? null)
+  const [draft, setDraft] = useState<(AppointmentDraftFields & { status: AppointmentStatus }) | null>(prefill ?? null)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   // [026.01] post-ship adversarial review fix (防御深度 #4):
@@ -70,22 +71,19 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
       onConfirm({ ...dataModel, selected: draft, operation: 'delete' })
       setConfirmDeleteOpen(false)
     }
-    const canDelete = selected.status === 'scheduled' || selected.status === 'in_progress'
+    // [026.02.4] TD-022 cast transparency：AppointmentStatus = scheduled | cancelled | completed。
+    // 原 canDelete 含 'in_progress' 是 [023.12] 收敛前的旧数据残留，runtime 不可达 → 移除。
+    const canDelete = selected.status === 'scheduled'
     const titleFilled = typeof draft.title === 'string' && draft.title.trim().length > 0
 
     return (
       <>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium text-ink">
-            编辑约定（{selected.status === 'in_progress' ? '执行中' : '计划'}）
+            编辑约定（计划）
           </span>
           <button type="button" onClick={back} className="text-xs text-body/70 underline">返回列表</button>
         </div>
-        {(originalPrompt || parseReason) && (
-          <p className="mb-2 rounded bg-muted/50 px-2 py-1 text-xs text-body/70">
-            💡 {parseReason || `尝试匹配「${originalPrompt}」`}
-          </p>
-        )}
         <AppointmentFormFields draft={draft} onChange={update} />
         <div className="flex items-center justify-between pt-2">
           <div>
@@ -149,7 +147,7 @@ export function EditAppointment({ dataModel, onDataChange, onConfirm, onCancel, 
                 className="w-full text-left rounded-md border border-hairline bg-canvas p-2 hover:bg-hover-overlay">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-ink truncate">{it.title}</span>
-                  <span className="text-xs text-body/70">{it.status === 'in_progress' ? '执行中' : '计划'}</span>
+                  <span className="text-xs text-body/70">计划</span>
                 </div>
                 <div className="text-xs text-body/70">
                   {new Date(it.startTime).toLocaleString('zh-CN')} · {it.durationMin}分
