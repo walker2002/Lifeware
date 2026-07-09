@@ -88,7 +88,9 @@ export interface CreateTimeboxInput {
   title: string
   startTime: string // ISO
   endTime: string // ISO（派生：startTime + duration；客户端折好，server 不接受 duration）
-  activityArchetypeId?: string
+  // [026.02.4-r2] I-1: widen to string | null — 3-state semantics 对齐 edit path
+  //   undefined=skip(保留), null=clear(显式清除), string=set
+  activityArchetypeId?: string | null
   taskIds?: string[] // [023] A2 OV#P1：T1 schema timeboxes 加 task_ids/habit_ids 列（USOM 类型已声明，D7 LinkPicker 数据落库依赖）
   habitIds?: string[]
   notes?: string
@@ -101,13 +103,18 @@ export async function createTimebox(
   input: CreateTimeboxInput,
   confirmed?: boolean,
 ): Promise<TimeboxActionResult> {
-  // A3 owner-check：archetype 归属校验（FK 只证存在）
-  if (input.activityArchetypeId) await assertArchetypeOwned(input.activityArchetypeId)
+  // A3 owner-check：archetype 归属校验（FK 只证存在）— 仅 string 时校验
+  if (typeof input.activityArchetypeId === 'string') await assertArchetypeOwned(input.activityArchetypeId)
   const confirmFields: Record<string, unknown> = {
     title: input.title,
     startTime: input.startTime,
     endTime: input.endTime,
-    ...(input.activityArchetypeId ? { activityArchetypeId: input.activityArchetypeId } : {}),
+    // [026.02.4-r2] I-1: 3-state mapper (undefined=skip, null=clear, string=set)
+    // 原 ?(input.activityArchetypeId ? {...} : {}) 用真值判断，会把 null 折叠成「skip」
+    // ——picker 清除的语义永远不达 DB。改为显式 !== undefined 区分 null vs undefined。
+    ...(input.activityArchetypeId !== undefined
+      ? { activityArchetypeId: input.activityArchetypeId }
+      : {}),
     ...(input.taskIds?.length ? { taskIds: input.taskIds } : {}),
     ...(input.habitIds?.length ? { habitIds: input.habitIds } : {}),
     ...(input.notes ? { notes: input.notes } : {}),
@@ -332,18 +339,24 @@ export interface CreateAppointmentInput {
  * SM create transition → emit AppointmentCreated。
  */
 export async function createAppointment(
-  input: CreateAppointmentInput & { activityArchetypeId?: string },
+  // [026.02.4-r2] I-1: widen activityArchetypeId to string | null (3-state semantics)
+  input: CreateAppointmentInput & { activityArchetypeId?: string | null },
   confirmed?: boolean,
 ): Promise<AppointmentActionResult> {
-  // [026.01] archetype owner-check（FK 不验租户隔离，防跨用户 archetype 落库）
-  if (input.activityArchetypeId) await assertArchetypeOwned(input.activityArchetypeId)
+  // [026.01] archetype owner-check（FK 不验租户隔离，防跨用户 archetype 落库）— 仅 string 时校验
+  if (typeof input.activityArchetypeId === 'string') await assertArchetypeOwned(input.activityArchetypeId)
   const confirmFields: Record<string, unknown> = {
     title: input.title,
     startTime: input.startTime,
     durationMin: input.durationMin,
     ...(input.detail != null ? { detail: input.detail } : {}),
     ...(input.people?.length ? { people: input.people } : {}),
-    ...(input.activityArchetypeId ? { activityArchetypeId: input.activityArchetypeId } : {}), // [026.01]
+    // [026.02.4-r2] I-1: 3-state mapper (undefined=skip, null=clear, string=set)
+    // 原 ?(input.activityArchetypeId ? {...} : {}) 用真值判断，把 null 折叠成「skip」
+    // ——picker 清除的语义永远不达 DB。改为 !== undefined 区分 null vs undefined。
+    ...(input.activityArchetypeId !== undefined
+      ? { activityArchetypeId: input.activityArchetypeId }
+      : {}), // [026.01]
   }
   const result = await submitDynamicIntent('timebox', 'createAppointment', confirmFields, confirmed)
   if (!result.success) {

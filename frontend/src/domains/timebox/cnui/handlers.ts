@@ -306,7 +306,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             ...(confidenceGate.newStartTime ? { startTime: confidenceGate.newStartTime } : {}),
             ...(confidenceGate.newDurationMin ? { durationMin: confidenceGate.newDurationMin } : {}),
             ...(confidenceGate.newTitle ? { title: confidenceGate.newTitle } : {}),
-            ...(target.activityArchetypeId ? { activityArchetypeId: target.activityArchetypeId } : {}),
+            // [026.02.4-r2] I-1: 3-state mapper (undefined=skip, null=clear, string=set)
+            // prefill 仍可能 undefined（target.activityArchetypeId 是 null）；避免空字段写。
+            // picker 清除的语义通过显式 null → prefill.activityArchetypeId=null 透传。
+            ...(target.activityArchetypeId !== undefined && target.activityArchetypeId !== null
+              ? { activityArchetypeId: target.activityArchetypeId }
+              : {}),
           }
           return {
             content: `请确认修改「${target.title}」`,
@@ -381,7 +386,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             endTime: target.endTime,
             ...(parsed.kind === 'edit' && parsed.newStartTime ? { startTime: parsed.newStartTime } : {}),
             ...(parsed.kind === 'edit' && parsed.newEndTime ? { endTime: parsed.newEndTime } : {}),
-            ...(target.activityArchetypeId ? { activityArchetypeId: target.activityArchetypeId } : {}),
+            // [026.02.4-r2] I-1: 3-state mapper (undefined=skip, null=clear, string=set)
+            // 原 ?(target.activityArchetypeId ? {...} : {}) 把 null 折叠成「skip」
+            // — prefill 永远不显式清除；与 TD-022 #6 同源 bug pattern。
+            ...(target.activityArchetypeId !== undefined && target.activityArchetypeId !== null
+              ? { activityArchetypeId: target.activityArchetypeId }
+              : {}),
           }
           return {
             content: parsed.kind === 'cancel' ? `确认要取消「${target.title}」？` : `请确认修改「${target.title}」`,
