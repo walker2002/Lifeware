@@ -727,6 +727,8 @@ interface HabitLog {
 
 **派生显示状态（不持久化，[023.12] 引入）**：`running` 与 `overtime` 不落 DB，由 `derive-display-status` 工具在读取时按 `now` vs `startTime/endTime` 计算，输出 badge 给 UI 展示。SM 路径只走 `planned / logged / cancelled` 三态 + 两条回退。
 
+> [026.02.3.1] T2 对齐: DB view `v_running_timeboxes` 现派生 `status='planned' AND now ∈ [start_time, end_time]`，与本节「时间态派生显示」语义对齐。SQL 实现见 database-design.md 第十节 + migrations 0036。
+
 **可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
 
 **事件清理（[023.12]）**：移除 `TimeboxStarted / TimeboxEnded / TimeboxOvertime` 事件（无消费方）；新增 `TimeboxReverted` 事件承载 revert 转换。manifest `subscribed_events` 同步。

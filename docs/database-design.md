@@ -1545,11 +1545,17 @@ WHERE h.status = 'active'
   AND (h.end_date IS NULL OR h.end_date >= CURRENT_DATE);
 
 -- 进行中的时间盒视图
-CREATE VIEW v_running_timeboxes AS
+-- [026.02.3.1] T2 — [023.12] status 6→3 态后 'running'/'overtime' 不再持久化。
+-- 重写 view 派生「当前进行中」: planned 且 now 落在 [start_time, end_time] 区间内。
+-- 与 derive-display-status.ts 派生语义对齐 (server side 优化版)。
+-- 替代状态 'overtime': 是 logged + 已过 end_time 状态用 case when 派生 (不在 view 范围)。
+CREATE OR REPLACE VIEW v_running_timeboxes AS
 SELECT
   id, user_id, title, status, start_time, end_time, tags
 FROM timeboxes
-WHERE status IN ('running', 'overtime');
+WHERE status = 'planned'
+  AND start_time <= NOW()
+  AND end_time >= NOW();
 ```
 
 ---
