@@ -152,9 +152,11 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 
 先判断规模，再定流程深度
 
+> ⚠️ **合并纪律（强约束）**：可自动 `commit + push`，**严禁自行 merge 分支**（git merge / gh pr merge / gitee pr merge 全部禁用）。当前 gitee 不支持自动合并，所有跨分支合入须由 Claude **主动提 PR**（或给出 PR 创建 URL），用户在 gitee 网页手动确认 merge。
+
 ####  轻量级任务（单文件、明确bug、配置）
 
-1. 直接实现
+1. 直接实现，**可直接在 main 分支修改**
 2. 人工验证，必要是 /browse
 
 #### 普通任务（多文件、边界清晰的新功能/重构）
@@ -166,6 +168,7 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 5. `/superpowers:requesting-code-review`
 6. 人工验证 + `/superpowers:systematic-debugging`
 7. `/superpowers:finishing-a-development-branch`
+8. `/ship` + **提 PR**（gitee 网页手动 merge）
 
 #### 复杂任务（跨模块、共享逻辑、架构变动、公共 API）
 
@@ -179,7 +182,7 @@ Schema lives in `frontend/src/lib/db/schema.ts`; full design in `docs/database-d
 8. `/record-tech-debt` (如果发现遗留问题)
 9. `/lifeware-neat`
 10. `/superpowers:finishing-a-development-branch`
-11. 如果需要部署生产环境，继续 `/ship → /land-and-deploy → /canary`
+11. 如果需要部署生产环境，继续 `/ship + 提PR → /land-and-deploy → /canary`
 
 
 
