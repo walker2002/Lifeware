@@ -85,7 +85,7 @@ export function AppointmentMonthView({ currentDate, appointments, onSelectDate }
               <span className="text-sm font-medium">{date.getDate()}</span>
               {info && (
                 <span data-count className="text-xs">
-                  {info.count}
+                  {info.count} 条
                 </span>
               )}
             </button>

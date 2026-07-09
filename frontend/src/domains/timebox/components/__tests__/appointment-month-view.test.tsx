@@ -72,8 +72,8 @@ describe('AppointmentMonthView', () => {
         onSelectDate={() => {}}
       />,
     )
-    expect(container.querySelector(`[data-day-cell="${day10Key}"] [data-count]`)?.textContent).toBe('1')
-    expect(container.querySelector(`[data-day-cell="${day20Key}"] [data-count]`)?.textContent).toBe('1')
+    expect(container.querySelector(`[data-day-cell="${day10Key}"] [data-count]`)?.textContent).toBe('1 条')
+    expect(container.querySelector(`[data-day-cell="${day20Key}"] [data-count]`)?.textContent).toBe('1 条')
   })
 
   it('点击日期触发 onSelectDate 并跳日视图（父组件负责切换 viewMode）', async () => {
