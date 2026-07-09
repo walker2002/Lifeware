@@ -52,10 +52,10 @@ vi.mock('@/app/actions/timebox', () => ({
 
 const RELOAD_AFTER = 'it-new'
 // 默认返回空数组 — reload() 触发时 items 一定存在，避免 filterAppointments(undefined) 崩
-const mockGetItinerariesByRange = vi.fn().mockResolvedValue([])
+const mockGetAppointmentsByRange = vi.fn().mockResolvedValue([])
 
 vi.mock('@/app/actions/intent', () => ({
-  getAppointmentsByRange: (...args: unknown[]) => mockGetItinerariesByRange(...args),
+  getAppointmentsByRange: (...args: unknown[]) => mockGetAppointmentsByRange(...args),
 }))
 
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
@@ -129,8 +129,8 @@ describe('[026] AppointmentWorkspace', () => {
     // undefined' (5 个 unhandled React render 异常)。reset 后必须重新设默认
     // 返回 []；测试用 mockResolvedValueOnce 覆盖的下一次 reload 不受影响
     // (once-only 优先级 > 默认 resolvedValue)。
-    mockGetItinerariesByRange.mockReset()
-    mockGetItinerariesByRange.mockResolvedValue([])
+    mockGetAppointmentsByRange.mockReset()
+    mockGetAppointmentsByRange.mockResolvedValue([])
   })
 
   it('初始列表渲染初始 appointment（DayView 左列表显示）', () => {
@@ -148,7 +148,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('【BUG 修复】创建约定成功 → onSaved → reload 触发 getAppointmentsByRange 重拉', async () => {
     // reload 返回含新 appointment 的列表（模拟服务端实际状态）
-    mockGetItinerariesByRange.mockResolvedValueOnce([
+    mockGetAppointmentsByRange.mockResolvedValueOnce([
       baseItem,
       { ...baseItem, id: RELOAD_AFTER, title: '新建后看到的' },
     ])
@@ -168,13 +168,13 @@ describe('[026] AppointmentWorkspace', () => {
     // createAppointment 应被调用
     await waitFor(() => expect(vi.mocked(createAppointment)).toHaveBeenCalled())
     // reload 必须触发，并写入新列表
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByText('新建后看到的')).toBeInTheDocument())
     expect(screen.queryByText('故宫游览')).toBeInTheDocument()
   })
 
   it('reload 失败时显示错误 toast（不残留脏状态）', async () => {
-    mockGetItinerariesByRange.mockRejectedValueOnce(new Error('boom'))
+    mockGetAppointmentsByRange.mockRejectedValueOnce(new Error('boom'))
     render(<AppointmentWorkspace initialItems={[baseItem]} />)
 
     // 打开新建抽屉
@@ -184,7 +184,7 @@ describe('[026] AppointmentWorkspace', () => {
     fireEvent.click(screen.getByText('保存约定'))
 
     // toast 触发（sonner 默认渲染 <li> data-sonner-toast）
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
     // 不抛白屏：原列表仍可见
     expect(screen.getByText('故宫游览')).toBeInTheDocument()
   })
@@ -275,7 +275,7 @@ describe('[026] AppointmentWorkspace', () => {
     const deleteBtn = screen.getByText(/删除选中/)
     await user.click(deleteBtn)
     await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith(baseItem.id))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
   it('点击完成按钮触发 completeAppointment + reload', async () => {
@@ -283,7 +283,7 @@ describe('[026] AppointmentWorkspace', () => {
     render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`完成约定：${baseItem.title}`))
     await waitFor(() => expect(vi.mocked(completeAppointment)).toHaveBeenCalledWith(baseItem.id))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
   it('点击取消按钮触发 deleteAppointment (cancel 语义) + reload', async () => {
@@ -291,7 +291,7 @@ describe('[026] AppointmentWorkspace', () => {
     render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`取消约定：${baseItem.title}`))
     await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith(baseItem.id))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
   it('点击回退按钮触发 revertAppointment + reload（cancelled item）', async () => {
@@ -299,7 +299,7 @@ describe('[026] AppointmentWorkspace', () => {
     render(<AppointmentWorkspace initialItems={[terminalItem]} />)
     await user.click(screen.getByLabelText(`回退约定：${terminalItem.title}`))
     await waitFor(() => expect(vi.mocked(revertAppointment)).toHaveBeenCalledWith(terminalItem.id))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
   it('点击编辑按钮打开 EditAppointmentDrawer', async () => {
@@ -320,7 +320,7 @@ describe('[026] AppointmentWorkspace', () => {
       baseItem.id,
       expect.objectContaining({ title: baseItem.title }),
     ))
-    await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
   })
 
   it('scheduled item 只在 status=scheduled 时显示编辑/完成/取消按钮', () => {
