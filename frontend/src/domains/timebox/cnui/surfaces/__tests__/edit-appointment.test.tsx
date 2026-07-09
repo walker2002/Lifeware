@@ -152,3 +152,94 @@ describe('[026.02.3] handlers.ts todayAppointments shape integration', () => {
     expect(screen.getByLabelText(/关系人/)).toBeInTheDocument()
   })
 })
+
+// [026.02.4] TD-022 #6 archetype clearing 3-state — surface type contract
+// AppointmentDraftFields.activityArchetypeId: string | null | undefined
+//   undefined = 不修改（picker 未触发）
+//   null      = 显式清除（picker 清空语义 — appointment surface 把 undefined 转换为 null）
+//   string    = 设置
+describe('[026.02.4] TD-022 #6 archetype clearing 3-state type contract', () => {
+  it('AppointmentDraftFields.activityArchetypeId accepts null (explicit clear)', () => {
+    // 类型契约测试：null 是合法值
+    const draft: AppointmentDraftFields = {
+      id: 'a-1', title: 't', startTime: '2026-07-15T14:00:00Z', durationMin: 60, people: [],
+      activityArchetypeId: null, // explicit clear
+    }
+    expect(draft.activityArchetypeId).toBeNull()
+  })
+
+  it('AppointmentDraftFields.activityArchetypeId accepts undefined (skip)', () => {
+    const draft: AppointmentDraftFields = {
+      id: 'a-1', title: 't', startTime: '2026-07-15T14:00:00Z', durationMin: 60, people: [],
+      // 不设置字段 = undefined（skip）
+    }
+    expect(draft.activityArchetypeId).toBeUndefined()
+  })
+
+  it('AppointmentDraftFields.activityArchetypeId accepts string (set)', () => {
+    const draft: AppointmentDraftFields = {
+      id: 'a-1', title: 't', startTime: '2026-07-15T14:00:00Z', durationMin: 60, people: [],
+      activityArchetypeId: 'arch-1',
+    }
+    expect(draft.activityArchetypeId).toBe('arch-1')
+  })
+
+  it('点击 保存 时 onConfirm 透传 selected.activityArchetypeId=null（显式清除语义）', async () => {
+    // [026.02.4] TD-022 #6: 模拟 AppointmentFormFields picker 清除语义转换后
+    // selected.activityArchetypeId === null 应原样透传到 onConfirm。
+    const onConfirm = vi.fn()
+    const prefill = { ...makeItem({ id: 'a-1', status: 'scheduled' }), activityArchetypeId: null as string | null }
+    render(
+      <EditAppointment
+        surfaceType="editAppointment"
+        dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }}
+        onDataChange={() => {}}
+        onConfirm={onConfirm}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selected: expect.objectContaining({ activityArchetypeId: null }),
+        operation: 'update',
+      }),
+    )
+  })
+
+  it('不修改 archetype 时 selected 透传 prefill 的活动原型值（undefined=skip）', async () => {
+    // [026.02.4] TD-022 #6: picker 未触发时 selected.activityArchetypeId 保留原 prefill 值。
+    // mapper 负责区分 null (clear) vs undefined (skip)。
+    const onConfirm = vi.fn()
+    const prefill = makeItem({ id: 'a-1', status: 'scheduled' })
+    // prefill 默认 activityArchetypeId 未设置（undefined = skip）
+    render(
+      <EditAppointment
+        surfaceType="editAppointment"
+        dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }}
+        onDataChange={() => {}}
+        onConfirm={onConfirm}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    const callArg = onConfirm.mock.calls[0][0] as { selected: Record<string, unknown> }
+    // 表面透传 prefill 原值——undefined 时键不在，mapper 跳过；若有值则原样透传
+    expect(callArg.selected.activityArchetypeId).toBeUndefined()
+  })
+
+  it('保留 prefill 中已有的 archetypeId（picker 未触发时不变）', async () => {
+    // [026.02.4] TD-022 #6: picker 未触发时 selected 保留原 prefill archetypeId
+    const onConfirm = vi.fn()
+    const prefill = { ...makeItem({ id: 'a-1', status: 'scheduled' }), activityArchetypeId: 'arch-1' as string | null }
+    render(
+      <EditAppointment
+        surfaceType="editAppointment"
+        dataModel={{ items: [prefill], mode: 'editing', selectedId: 'a-1', prefill }}
+        onDataChange={() => {}}
+        onConfirm={onConfirm}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    const callArg = onConfirm.mock.calls[0][0] as { selected: Record<string, unknown> }
+    expect(callArg.selected.activityArchetypeId).toBe('arch-1')
+  })
+})

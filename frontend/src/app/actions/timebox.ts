@@ -377,13 +377,17 @@ export async function updateAppointment(
     durationMin?: number
     detail?: string | null
     people?: string[]
-    activityArchetypeId?: string // [026.01]
+    // [026.02.4] TD-022 #6: 3-state (undefined=skip, null=clear, string=set)
+    activityArchetypeId?: string | null
   },
 ): Promise<AppointmentActionResult> {
   try {
-    // [026.01] archetype owner-check（FK 不验租户隔离）
+    // [026.01] archetype owner-check（FK 不验租户隔离）— 仅当要设置 string 值时校验
     if (typeof patch.activityArchetypeId === 'string') await assertArchetypeOwned(patch.activityArchetypeId)
-    // [026.01] 字段白名单——丢弃 status 等生命周期列，堵住绕过状态机
+    // [026.02.4] TD-022 #6: 字段迭代 3-state 语义
+    //   undefined → 跳过（不改字段）
+    //   null      → 透传 → Drizzle 写 SQL NULL（显式清除）
+    //   string    → 透传 → Drizzle 设置值
     const fieldSteps: Array<{ kind: 'field'; field: string; value: unknown }> = []
     for (const [field, value] of Object.entries(patch)) {
       if (value === undefined) continue

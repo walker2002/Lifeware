@@ -635,7 +635,11 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             title: it.title, startTime: it.startTime, durationMin: it.durationMin,
             ...(it.detail ? { detail: it.detail } : {}),
             ...(it.people?.length ? { people: it.people } : {}),
-            ...(it.activityArchetypeId ? { activityArchetypeId: it.activityArchetypeId } : {}), // [026.01]
+            // [026.02.4] TD-022 #6: 3-state mapper (undefined=skip, null=clear, string=set)
+            // createAppointment 当前未走显式 null 路径，但语义对齐 editAppointment 保持一致
+            ...(it.activityArchetypeId !== undefined
+              ? { activityArchetypeId: it.activityArchetypeId }
+              : {}),
           })
           if (r.success) succeeded.push((r.object as any)?.id ?? it.title)
           else failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
@@ -657,7 +661,8 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const sel = fields.selected as {
         id: string; title: string; startTime: string; durationMin: number
         detail?: string | null; people: string[]; status?: string
-        activityArchetypeId?: string
+        // [026.02.4] TD-022 #6: 3-state — undefined=skip, null=clear, string=set
+        activityArchetypeId?: string | null
       }
       if (!sel?.id) return { success: false, error: '未选择约定' }
 
@@ -681,7 +686,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         await updateAppointment(sel.id as any, {
           title: sel.title, startTime: sel.startTime, durationMin: sel.durationMin,
           detail: sel.detail ?? null, people: sel.people,
-          ...(sel.activityArchetypeId ? { activityArchetypeId: sel.activityArchetypeId } : {}), // [026.01]
+          // [026.02.4] TD-022 #6: 3-state mapper (undefined=skip, null=clear, string=set)
+          // 原 ?(sel.activityArchetypeId ? {...} : {}) 用真值判断，会把 null 折叠成「skip」
+          // ——picker 清除的语义永远不达 DB。改为显式 !== undefined 区分 null vs undefined。
+          ...(sel.activityArchetypeId !== undefined
+            ? { activityArchetypeId: sel.activityArchetypeId }
+            : {}),
         })
         return { success: true, data: { id: sel.id, operation: 'update' } }
       } catch (e) {

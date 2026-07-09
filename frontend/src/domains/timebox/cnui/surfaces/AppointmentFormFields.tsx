@@ -25,8 +25,8 @@ export interface AppointmentDraftFields {
   durationMin: number
   detail?: string | null
   people: string[]
-  /** [026.01] 关联 Activity Archetype（nullable；ArchetypePickerCard 渲染） */
-  activityArchetypeId?: string
+  /** [026.01] 关联 Activity Archetype（[026.02.4] 3-state: undefined=skip, null=clear, string=set；ArchetypePickerCard 渲染） */
+  activityArchetypeId?: string | null
 }
 
 export interface AppointmentFormFieldsProps {
@@ -108,10 +108,15 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
         />
       </div>
 
-      {/* [026.01] archetype picker 嵌入（对齐 CreateTimebox.tsx:107-117） */}
+      {/* [026.01] archetype picker 嵌入（对齐 CreateTimebox.tsx:107-117）
+        *  [026.02.4] TD-022 #6: picker emits undefined on clear.
+        *  Appointment surface converts to null (= "explicit clear" semantics).
+        *  Timebox surface 用不同语义（undefined=clear），此处只在 appointment 域转换。 */}
       <ArchetypePickerCard
-        value={draft.activityArchetypeId}
-        onChange={(archetypeId) => onChange({ activityArchetypeId: archetypeId })}
+        value={draft.activityArchetypeId ?? undefined}
+        onChange={(archetypeId) => onChange({
+          activityArchetypeId: archetypeId === undefined ? null : archetypeId,
+        })}
         enableAiMatch
         title={draft.title}
       />

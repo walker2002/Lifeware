@@ -120,6 +120,49 @@ describe('timeboxCnuiHandler.submit("editAppointment") with op=update', () => {
     )
   })
 
+  // [026.02.4] TD-022 #6: handler mapper 3-state 语义
+  // undefined → 跳过该字段（不传 activityArchetypeId 给 updateAppointment）
+  // null      → 透传 null（updateAppointment 写 SQL NULL）
+  // string    → 透传 string（updateAppointment 设置值）
+  it('transmits activityArchetypeId=null as explicit clear (3-state)', async () => {
+    vi.mocked(updateAppointment).mockResolvedValue({ status: 'ok', appointment: {} } as any)
+    await timeboxCnuiHandler.submit('editAppointment', {
+      selected: {
+        id: 'a-1',
+        title: '看牙医',
+        startTime: '2026-07-15T14:00:00Z',
+        durationMin: 60,
+        detail: null,
+        people: [],
+        status: 'scheduled',
+        activityArchetypeId: null, // [026.02.4] 显式清除语义
+      },
+    } as any)
+    const callArg = vi.mocked(updateAppointment).mock.calls[0]
+    expect(callArg[0]).toBe('a-1')
+    expect(callArg[1]).toHaveProperty('activityArchetypeId', null)
+  })
+
+  it('omits activityArchetypeId when undefined (skip semantics)', async () => {
+    vi.mocked(updateAppointment).mockResolvedValue({ status: 'ok', appointment: {} } as any)
+    await timeboxCnuiHandler.submit('editAppointment', {
+      selected: {
+        id: 'a-1',
+        title: '看牙医',
+        startTime: '2026-07-15T14:00:00Z',
+        durationMin: 60,
+        detail: null,
+        people: [],
+        status: 'scheduled',
+        // activityArchetypeId 不传（undefined = skip）
+      },
+    } as any)
+    const callArg = vi.mocked(updateAppointment).mock.calls[0]
+    expect(callArg[0]).toBe('a-1')
+    // undefined 时 mapper 应跳过该字段，不出现在 patch 对象中
+    expect(callArg[1]).not.toHaveProperty('activityArchetypeId')
+  })
+
   it('returns error when selected.id is missing', async () => {
     const result = await timeboxCnuiHandler.submit('editAppointment', { selected: {} } as any)
     expect(result.success).toBe(false)
