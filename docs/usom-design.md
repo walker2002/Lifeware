@@ -2013,10 +2013,15 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_07_07*
+*文档版本：2026_07_09*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
 
+*变更：[026.02.3.1] (2026_07_09) — T1 AISessionStatus 三向一致 (USOM 扩 6 值 + 删局部 SessionStatus 别名)；T2 v_running_timeboxes 派生语义重写（migration 0036）*
+*变更：[026.02.3] (2026_07_09) — /editAppointment selecting→编辑视图 Runtime TypeError 双层防御（handlers.ts todayAppointments 5→8 字段 + AppointmentFormFields ?? fallback + IRON RULE 测试）*
+*变更：[026.02.2] (2026_07_09) — [026.02.1] 登记的 7 项 polish 收口（M-4 ymdKey DRY + I-2 「条」后缀 + M-1 as any 移除 + M-2 mock rename + M-3 fake timers + M-6 Promise.allSettled + M-5 UX defer）*
+*变更：[026.02] (2026_07_08) — §1 [026.01] CNUI client 漏注册回归修复 + IRON RULE guardian；§2 /appointments Day/Month 双视图重构 + status/日期范围筛选 + 加载窗口 7d→90d*
+*变更：[026.02.1] (2026_07_08) — I-1 mk() TS2322 修复（commit 22ac0a7）+ 7 项 polish 登记（I-2 + M-1..M-6 + TD-022 5 项延后）*
 *变更：[023.13] (2026_07_07) — §3.9 DetailedExecutionRecord 扩展 4 字段 `actualStartTime?/actualEndTime?/focusMinutes?/energyActual?`（打卡专区；JSONB 演进免 DDL；energyActual 单值绕 D8 4 维禁令）*
 *变更：[023.11] (2026_07_06) — §3.11 ActivityArchetype 加 `synonyms: string[]` 字段（jsonb 列于 activity_archetypes；用于标题→archetype 匹配；空=未维护）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §3.13 Itinerary→Appointment 全层重命名 + 设计覆盖注（schedule→appointment 因 timebox 语义撞车）+ 中文「行程」→「约定」*

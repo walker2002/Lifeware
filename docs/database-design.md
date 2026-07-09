@@ -1837,10 +1837,15 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_07_07*
+*文档版本：2026_07_09*
 *关联上游文档：docs/usom-design.md*
 
+*变更：[026.02.3.1] (2026_07_09) — T1 AISessionStatus 三向一致（schema.ts ai_sessions CHECK 6 值与 USOM 对齐）+ T2 v_running_timeboxes 视图重写（迁移 0036 派生 planned AND now∈[start,end]）+ T3 §8.x ai_sessions 表格式 Markdown→SQL block 统一*
+*变更：[026.02.3] (2026_07_09) — /editAppointment selecting→编辑视图 Runtime TypeError 双层防御（handlers.ts:268-274 todayAppointments mapper 补 3 字段）*
+*变更：[026.02.2] (2026_07_09) — 7 项 polish 收口（架构影响限于 timebox/cnui/filter 等域，无 schema/db 变更）*
+*变更：[026.02] (2026_07_08) — §1 + §2（架构影响限于页面 UI 与 CNUI surface 注册，无 schema/db 变更）*
+*变更：[026.02.1] (2026_07_08) — I-1 mk() 类型签名修复（commit 22ac0a7，无 schema/db 变更）*
 *变更：[023.13] (2026_07_07) — §4.7 timeboxes.execution_record JSONB 形状扩展 4 可选字段（actualStartTime/actualEndTime/focusMinutes/energyActual），免 DDL 迁移（JSONB 演进）*
 *变更：[023.11] (2026_07_06) — §7.6 activity_archetypes 加 `synonyms jsonb NOT NULL DEFAULT '[]'` 列（迁移 0034_023_11_archetype_synonyms.sql，幂等 ADD COLUMN IF NOT EXISTS）*
 *变更：[026.01] (2026_07_07) — §appointments 加 `activity_archetype_id uuid REFERENCES activity_archetypes(id) ON DELETE SET NULL` 列 + 索引 `idx_appointments_archetype`，迁移 0035_026_01_appointment_activity_archetype.sql（IF NOT EXISTS 幂等）*
-*变更：[023.05] PR2 阶段 2 (2026_07_05) — §4.X appointments（rename 自 itineraries）+ 0033 RENAME 迁移 + F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal）*
+*变更：[023.05] PR2 阶段 2 (2026_07_05) — §4.X appointments（rename 自 itineraries）+ 0033 RENAME 迁移 + F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal，不引入 `drizzle-kit up`）*
