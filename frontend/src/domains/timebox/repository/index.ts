@@ -10,7 +10,7 @@
 
 export { AppointmentRepository } from './appointment'
 
-import { eq, and, gte, lte } from 'drizzle-orm'
+import { eq, and, gte, lte, sql } from 'drizzle-orm'
 import { db, type DbClient } from '@/lib/db'
 import * as s from '@/lib/db/schema'
 import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
@@ -45,9 +45,23 @@ export class TimeboxRepository implements ITimeboxRepository {
     return timeboxRowToUSOM(rows[0] as any, taskIds, habitIds)
   }
 
+  /**
+   * [026.02.4] TD-028 Site 0: derive 'running' as planned + now ∈ [start, end]
+   * (matches v_running_timeboxes view + derive-display-status.ts logic)
+   *
+   * 旧实现查 status='running'，但 timeboxes.status enum 不含 'running'
+   * （[023.12] 3 态收敛：planned/logged/cancelled）。6 个 caller + 6 个 mock
+   * 都因此拿到 []。本方法改为读时派生：status='planned' 且 NOW() 落在
+   * [start_time, end_time] 区间内即视为 running。
+   */
   async findRunning(userId: USOM_ID): Promise<Timebox[]> {
     const rows = await db.select().from(s.timeboxes)
-      .where(and(eq(s.timeboxes.userId, userId), eq(s.timeboxes.status, 'running')))
+      .where(and(
+        eq(s.timeboxes.userId, userId),
+        eq(s.timeboxes.status, 'planned'),
+        lte(s.timeboxes.startTime, sql`NOW()`),
+        gte(s.timeboxes.endTime, sql`NOW()`),
+      ))
     return this.loadWithJunctions(rows)
   }
 
