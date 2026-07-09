@@ -39,9 +39,15 @@ export interface AppointmentFormFieldsProps {
 /**
  * 5 字段表单（不含提交按钮 / 翻页 / 列表）。父组件负责 view/pagination/状态。
  * id 前缀动态生成（避免多 surface 同时挂载时 label-for 冲突）。
+ *
+ * [026.02.3] 防御深度：所有 draft 数组字段访问加 ?? [] fallback，
+ * 防止上游 mapper 漏字段（如 handlers.ts todayAppointments 早期 bug）
+ * 触发 .join() 抛 TypeError。生产 handler 已修，但 form 自身不应假设上游完美。
  */
 export function AppointmentFormFields({ draft, onChange, disabled }: AppointmentFormFieldsProps) {
   const idPrefix = `app-ff-${draft.id}`
+  const peopleArr = draft.people ?? []  // [026.02.3] 防御深度（defense in depth）
+  const detailVal = draft.detail ?? '' // [026.02.3] 同上
   return (
     <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
       <div>
@@ -85,7 +91,7 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
         <input
           id={`${idPrefix}-people`}
           type="text"
-          value={draft.people.join('，')}
+          value={peopleArr.join('，')}
           onChange={e => onChange({ people: e.target.value.split(/[，,]/).map(s => s.trim()).filter(Boolean) })}
           disabled={disabled}
           className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink disabled:opacity-50"
@@ -95,7 +101,7 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
         <label htmlFor={`${idPrefix}-detail`} className="text-xs text-body">详情</label>
         <textarea
           id={`${idPrefix}-detail`}
-          value={draft.detail ?? ''}
+          value={detailVal}
           onChange={e => onChange({ detail: e.target.value })}
           disabled={disabled}
           className="mt-0.5 w-full rounded border border-hairline bg-canvas px-2 py-1 text-sm text-ink disabled:opacity-50"

@@ -265,12 +265,19 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
 
       // 候选列表：{scheduled} 非终态约定（findActive 已 filter 终态）
       const all = await new AppointmentRepository().findActive(MVP_USER_ID as USOM_ID)
+      // [026.02.3] 投射必须包含 AppointmentDraftFields 全部必填字段（people/detail/activityArchetypeId）。
+      // 否则 EditAppointment selecting 模式点 item → setDraft({ ...it }) 浅拷贝漏字段 →
+      // AppointmentFormFields.tsx:88 draft.people.join 抛 TypeError。
+      // 历史 bug：曾只投射 5 字段，导致 selecting → editing 视图崩溃。
       const todayAppointments = all.map(i => ({
         id: i.id,
         title: i.title,
         startTime: i.startTime,
         durationMin: i.durationMin,
         status: i.status,
+        detail: i.detail,
+        people: i.people,
+        activityArchetypeId: i.activityArchetypeId,
       }))
 
       // 调 AI 解析

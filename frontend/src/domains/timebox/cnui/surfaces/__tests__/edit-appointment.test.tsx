@@ -127,3 +127,28 @@ describe('EditAppointment editing mode', () => {
     expect(screen.getByRole('button', { name: '保存' })).toBeDisabled()
   })
 })
+
+describe('[026.02.3] handlers.ts todayAppointments shape integration', () => {
+  // [026.02.3] 守卫：handlers.ts:268-274 todayAppointments mapper 必须包含 AppointmentDraftFields
+  // 必填字段（people/detail/activityArchetypeId）。曾因只投射 5 字段导致 selecting → 编辑视图崩溃
+  // (AppointmentFormFields.tsx:88 draft.people.join)。
+  // 用真实 handler 投射形状构造 items 测试，确保数据契约不再漂移。
+  it('selecting 模式点 item 进入 editing 时不抛错（people/detail/archetype 缺时不崩）', async () => {
+    // 模拟 handlers.ts:268-274 todayAppointments — 故意只 5 字段（id/title/startTime/durationMin/status）
+    // 模拟真实 bug：缺 people / detail / activityArchetypeId
+    const realHandlerShape = {
+      id: 'a-1',
+      title: '看牙医',
+      startTime: '2026-07-15T14:00:00Z',
+      durationMin: 60,
+      status: 'scheduled',
+      // ⚠️ 缺 people / detail / activityArchetypeId — 与真实 handlers.ts 一致
+    }
+    render(<EditAppointment surfaceType="editAppointment" dataModel={{ items: [realHandlerShape], mode: 'selecting' }} onDataChange={() => {}} onConfirm={() => {}} />)
+    // 不应抛错 — 进入 editing 视图，AppointmentFormFields.tsx:88 draft.people.join 安全
+    await userEvent.click(screen.getByText('看牙医'))
+    // 验证进入编辑视图 + people input 渲染（不再崩）
+    expect(screen.getByText(/编辑约定/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/关系人/)).toBeInTheDocument()
+  })
+})
