@@ -295,17 +295,20 @@ describe('parseAppointmentIntentOnly（[026] A2.1 约定 dry-run）', () => {
 
 // [026.01] T2 parseAppointmentIntent —— EditAppointment 解析优先模式
 describe('parseAppointmentIntent', () => {
+  const UUID_A1 = '11111111-1111-4111-8111-111111111111'
+  const UUID_A2 = '22222222-2222-4222-8222-222222222222'
+  const UUID_GHOST = '99999999-9999-4999-8999-999999999999'
   const todayAppointments = [
-    { id: 'a-1', title: '看牙医', startTime: '2026-07-15T14:00:00Z', durationMin: 60, status: 'scheduled' },
-    { id: 'a-2', title: '和张三吃饭', startTime: '2026-07-16T19:00:00Z', durationMin: 90, status: 'scheduled' },
+    { id: UUID_A1, title: '看牙医', startTime: '2026-07-15T14:00:00Z', durationMin: 60, status: 'scheduled' },
+    { id: UUID_A2, title: '和张三吃饭', startTime: '2026-07-16T19:00:00Z', durationMin: 90, status: 'scheduled' },
   ]
 
   it('returns edit with appointmentId when high confidence match', async () => {
     const runtime = createMockAIRuntime({ text: JSON.stringify({
       kind: 'edit',
-      appointmentId: 'a-1',
+      appointmentId: UUID_A1,
       newStartTime: '2026-07-15T15:00:00Z',
-      newDurationMin: 0,
+      newDurationMin: 90,
       newTitle: '',
       confidence: 0.95,
       reason: '',
@@ -313,8 +316,9 @@ describe('parseAppointmentIntent', () => {
     const result = await parseAppointmentIntent('把看牙医改到下午3点', todayAppointments, runtime)
     expect(result.kind).toBe('edit')
     if (result.kind === 'edit') {
-      expect(result.appointmentId).toBe('a-1')
+      expect(result.appointmentId).toBe(UUID_A1)
       expect(result.newStartTime).toBe('2026-07-15T15:00:00Z')
+      expect(result.newDurationMin).toBe(90)
       expect(result.confidence).toBe(0.95)
     }
   })
@@ -340,9 +344,9 @@ describe('parseAppointmentIntent', () => {
   it('returns unsure when appointmentId not in candidates', async () => {
     const runtime = createMockAIRuntime({ text: JSON.stringify({
       kind: 'edit',
-      appointmentId: 'ghost-id',
+      appointmentId: UUID_GHOST,
       newStartTime: '',
-      newDurationMin: 0,
+      newDurationMin: 60,
       confidence: 0.9,
       reason: '',
     }) })
@@ -354,5 +358,48 @@ describe('parseAppointmentIntent', () => {
     const runtime = { generate: async () => { throw new Error('mock LLM 异常') } }
     const result = await parseAppointmentIntent('把看牙医改到下午3点', todayAppointments, runtime as any)
     expect(result.kind).toBe('unsure')
+  })
+
+  it('rejects non-UUID candidate appointmentId', async () => {
+    const runtime = createMockAIRuntime({ text: JSON.stringify({
+      kind: 'edit',
+      appointmentId: 'not-a-uuid',
+      newStartTime: '',
+      newDurationMin: 0,
+      confidence: 0.9,
+      reason: '',
+    }) })
+    const result = await parseAppointmentIntent(
+      '把 a-1 改到下午3点',
+      [{ id: 'not-a-uuid', title: '看牙医', startTime: '2026-07-09T14:00:00+08:00', durationMin: 60, status: 'scheduled' }],
+      runtime,
+    )
+    expect(result.kind).toBe('unsure')
+    if (result.kind === 'unsure') {
+      expect(result.reason).toMatch(/UUID v4/)
+    }
+  })
+
+  it('rejects newDurationMin=0 per new prompt contract', async () => {
+    // mock AIRuntime to return newDurationMin=0
+    const mockAIRuntimeZero = {
+      generate: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          kind: 'edit',
+          appointmentId: '12345678-1234-4234-8234-123456789012',
+          newDurationMin: 0,
+          confidence: 0.9,
+        }),
+      }),
+    }
+    const result = await parseAppointmentIntent(
+      '把 a-1 时长改成 0',
+      [{ id: '12345678-1234-4234-8234-123456789012', title: '看牙医', startTime: '2026-07-09T14:00:00+08:00', durationMin: 60, status: 'scheduled' }],
+      mockAIRuntimeZero as any,
+    )
+    expect(result.kind).toBe('unsure')
+    if (result.kind === 'unsure') {
+      expect(result.reason).toMatch(/> 0/)
+    }
   })
 })

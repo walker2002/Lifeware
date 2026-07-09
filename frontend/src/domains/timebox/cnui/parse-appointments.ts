@@ -40,7 +40,7 @@ const APPOINTMENT_PARSE_PROMPT = `
   "kind": "edit" | "unsure",
   "appointmentId": "<候选 id 或空>",
   "newStartTime": "<ISO 时间或空，如 '2026-07-15T14:00:00+08:00'>",
-  "newDurationMin": <新时长分钟数或 0>,
+  "newDurationMin": <新时长（数字必须>0；留空表示不修改）>,
   "newTitle": "<新标题或空>",
   "confidence": <0-1>,
   "reason": "<解析说明，kind=unsure 时必填>"
@@ -114,6 +114,14 @@ export async function parseAppointmentIntent(
       return { kind: 'unsure', reason: '解析响应格式异常' }
     }
 
+    // [026.02.4] TD-022 #2: UUID v4 regex check（防御深度 #2，按设计而非按意外）
+    // 在 candidates.find 之前挡掉非 UUID 形态的 appointmentId，
+    // 避免后续 DB 查询/外键逻辑被畸形 id 污染
+    const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!UUID_V4.test(parsed.appointmentId)) {
+      return { kind: 'unsure', reason: '候选 appointmentId 不是合法 UUID v4' }
+    }
+
     const target = candidates.find(c => c.id === parsed.appointmentId)
     if (!target) {
       return { kind: 'unsure', reason: '未找到匹配的约定（候选列表中不存在）' }
@@ -125,6 +133,14 @@ export async function parseAppointmentIntent(
     const startTimeValid = !parsed.newStartTime || !Number.isNaN(Date.parse(parsed.newStartTime))
     if (!startTimeValid) {
       return { kind: 'unsure', reason: 'LLM 返回时间格式无效（需 ISO 8601）' }
+    }
+
+    // [026.02.4] TD-022 #3: newDurationMin 显式拒绝（防御深度 #3，按 prompt 契约而非静默丢弃）
+    // LLM 返回 0 或非正数时不应被静默丢弃成「不修改」，而是明确告知用户/上游解析失败
+    if (parsed.newDurationMin !== undefined && parsed.newDurationMin !== null) {
+      if (typeof parsed.newDurationMin !== 'number' || !Number.isFinite(parsed.newDurationMin) || parsed.newDurationMin <= 0) {
+        return { kind: 'unsure', reason: '新时长必须 > 0；留空表示不修改' }
+      }
     }
 
     return {
