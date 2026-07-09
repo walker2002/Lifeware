@@ -134,7 +134,7 @@ describe('[026] AppointmentWorkspace', () => {
   })
 
   it('初始列表渲染初始 appointment（DayView 左列表显示）', () => {
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     expect(screen.getByText('故宫游览')).toBeInTheDocument()
     expect(screen.getByText(/分钟$/)).toBeInTheDocument()
     // 多选删除条不显示（selected 为空）
@@ -153,7 +153,7 @@ describe('[026] AppointmentWorkspace', () => {
       { ...baseItem, id: RELOAD_AFTER, title: '新建后看到的' },
     ])
 
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
 
     // 打开新建抽屉
     fireEvent.click(screen.getByText('新建约定'))
@@ -175,7 +175,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('reload 失败时显示错误 toast（不残留脏状态）', async () => {
     mockGetItinerariesByRange.mockRejectedValueOnce(new Error('boom'))
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
 
     // 打开新建抽屉
     fireEvent.click(screen.getByText('新建约定'))
@@ -247,7 +247,7 @@ describe('[026] AppointmentWorkspace', () => {
   // ─── [026.02] T9.5 修复：per-item 动作 + multi-select ─────────────────
 
   it('点击 item 触发 selected toggle（aria-pressed 切换）', () => {
-    const { container } = render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    const { container } = render(<AppointmentWorkspace initialItems={[baseItem]} />)
     const wrapper = container.querySelector(`[data-day-item="${baseItem.id}"]`) as HTMLElement
     expect(wrapper.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(wrapper)
@@ -256,7 +256,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('selected.size > 0 时显示「删除选中」入口', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     // 初始不显示
     expect(screen.queryByText(/删除选中/)).not.toBeInTheDocument()
     // 选中 item
@@ -268,7 +268,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('点击「删除选中」触发 deleteAppointment server action + reload', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     // 选中
     await user.click(screen.getByLabelText(`约定：${baseItem.title}`))
     // 点击删除
@@ -280,7 +280,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('点击完成按钮触发 completeAppointment + reload', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`完成约定：${baseItem.title}`))
     await waitFor(() => expect(vi.mocked(completeAppointment)).toHaveBeenCalledWith(baseItem.id))
     await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
@@ -288,7 +288,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('点击取消按钮触发 deleteAppointment (cancel 语义) + reload', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`取消约定：${baseItem.title}`))
     await waitFor(() => expect(vi.mocked(deleteAppointment)).toHaveBeenCalledWith(baseItem.id))
     await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
@@ -296,7 +296,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('点击回退按钮触发 revertAppointment + reload（cancelled item）', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[terminalItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[terminalItem]} />)
     await user.click(screen.getByLabelText(`回退约定：${terminalItem.title}`))
     await waitFor(() => expect(vi.mocked(revertAppointment)).toHaveBeenCalledWith(terminalItem.id))
     await waitFor(() => expect(mockGetItinerariesByRange).toHaveBeenCalled())
@@ -304,7 +304,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('点击编辑按钮打开 EditAppointmentDrawer', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`编辑约定：${baseItem.title}`))
     // 编辑 drawer 显示「保存修改」按钮（与新建「保存约定」按钮区分）
     expect(screen.getByText('保存修改')).toBeInTheDocument()
@@ -312,7 +312,7 @@ describe('[026] AppointmentWorkspace', () => {
 
   it('编辑 Drawer 保存修改触发 updateAppointment + reload', async () => {
     const user = userEvent.setup()
-    render(<AppointmentWorkspace initialItems={[baseItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
     await user.click(screen.getByLabelText(`编辑约定：${baseItem.title}`))
     // 标题已填（来自 target），直接保存
     await user.click(screen.getByText('保存修改'))
@@ -324,7 +324,7 @@ describe('[026] AppointmentWorkspace', () => {
   })
 
   it('scheduled item 只在 status=scheduled 时显示编辑/完成/取消按钮', () => {
-    render(<AppointmentWorkspace initialItems={[terminalItem] as any} />)
+    render(<AppointmentWorkspace initialItems={[terminalItem]} />)
     // 终态 item 不显示这些按钮
     expect(screen.queryByLabelText(`编辑约定：${terminalItem.title}`)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(`完成约定：${terminalItem.title}`)).not.toBeInTheDocument()
