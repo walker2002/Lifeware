@@ -99,4 +99,12 @@ describe('[023] A2 timebox server actions', () => {
     expect(r.status).toBe('ok')
     expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'cancelTimebox', expect.objectContaining({ objectId: 'tb-1' }), undefined)
   })
+
+  // [026.02.4] TD-028 Site 3: 'running' 不持久化,error msg 不应再有 '进行中' 分支。
+  // 任何非 planned 状态(ending / cancelled / logged)均统一走「已结束」。
+  it("[026.02.4] TD-028: deleteTimebox error msg 不含「进行中」分支", async () => {
+    mockFindById.mockResolvedValue({ id: 'tb-2', status: 'cancelled' })
+    await expect(deleteTimebox('tb-2')).rejects.toThrow(/已结束/)
+    await expect(deleteTimebox('tb-2')).rejects.not.toThrow(/进行中/)
+  })
 })

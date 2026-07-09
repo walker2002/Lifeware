@@ -49,8 +49,11 @@ export function useAutoTrigger({ timeboxes, onTransition, intervalMs = 60000 }: 
         }
       }
 
-      // running + 已到结束时间 → 自动 overtime
-      if (tb.status === "running" && endTime <= now) {
+      // [026.02.4] TD-028: 'running' 不持久化（[023.12] 读时派生）。
+      // 自动 overtime 条件：status='planned'（即未显式 start，且已结束）。
+      // planned + 已到结束时间 → 自动 overtime（与原「running+endTime<=now」语义对齐：
+      // 实际持久化层面只要没 start 就还是 planned，所以这条件命中即视为超时未启动）
+      if (tb.status === "planned" && endTime <= now) {
         try {
           await onTransitionRef.current(tb.id, "overtime");
         } catch {

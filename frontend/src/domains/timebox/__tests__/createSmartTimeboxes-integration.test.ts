@@ -113,7 +113,15 @@ vi.mock('@/domains/timebox/repository', async (importOriginal) => {
       return tb && tb.userId === userId ? tb : null
     }
     async findRunning(userId: string) {
-      return Array.from(fakeTimeboxStore.values()).filter((t: any) => t.userId === userId && t.status === 'running')
+      // [026.02.4] TD-028: 'running' 不持久化（[023.12] 读时派生）。
+      // 与 derive-display-status.ts:12 同语义:status='planned' + now ∈ [startTime, endTime]。
+      const now = new Date()
+      return Array.from(fakeTimeboxStore.values()).filter((t: any) =>
+        t.userId === userId &&
+        t.status === 'planned' &&
+        new Date(t.startTime) <= now &&
+        new Date(t.endTime) >= now
+      )
     }
     async findByStatus(status: string, userId: string) {
       return Array.from(fakeTimeboxStore.values()).filter((t: any) => t.userId === userId && t.status === status)
@@ -409,5 +417,55 @@ describe('[023.10] G15 cross-task integration: createSmartTimeboxes end-to-end r
     const ep = fakeEpisodeStore.get(batchId) as any
     expect(ep.metadata.status).toBe('active')
     expect(ep.metadata.ownerUserId).toBe(MVP_USER_ID)
+  })
+})
+
+// ─── [026.02.4] TD-028 Site 4 — findRunning fake repo 派生守护 ───
+// [023.12] 后 status='running' 不持久化。FakeTimeboxRepository.findRunning 现在用
+// status='planned' + 时间区间兜底（与 derive-display-status.ts 同语义）。本测试
+// 守护 fake repo 行为不退化：仅 planned+now∈[start,end] 的 tb 算 in-progress。
+describe('[026.02.4] TD-028 Site 4 — findRunning fake repo 派生兜底', () => {
+  beforeEach(() => {
+    fakeTimeboxStore.clear()
+    fakeEpisodeStore.clear()
+    fakeIntentionStore.clear()
+    fakeEventStore.clear()
+    fakeTaskStore.clear()
+    fakeThreadStore.clear()
+    fakeHabitStore.clear()
+    fakeAppointmentStore.clear()
+  })
+
+  it('planned + now ∈ [startTime, endTime] 才算 in-progress;logged/cancelled 不算', async () => {
+    const { TimeboxRepository } = await import('@/domains/timebox/repository')
+    const repo = new TimeboxRepository()
+
+    const now = new Date()
+    const inWindow: any = {
+      id: 'tb-now', title: '进行中', status: 'planned',
+      startTime: new Date(now.getTime() - 60 * 1000).toISOString(),
+      endTime: new Date(now.getTime() + 60 * 1000).toISOString(),
+      userId: MVP_USER_ID,
+      taskIds: [], habitIds: [], activityArchetypeId: null,
+    }
+    const futureTb: any = {
+      ...inWindow, id: 'tb-future', title: '未来',
+      startTime: new Date(now.getTime() + 3600 * 1000).toISOString(),
+      endTime: new Date(now.getTime() + 7200 * 1000).toISOString(),
+    }
+    const pastTb: any = {
+      ...inWindow, id: 'tb-past', title: '过去',
+      startTime: new Date(now.getTime() - 7200 * 1000).toISOString(),
+      endTime: new Date(now.getTime() - 3600 * 1000).toISOString(),
+    }
+    const loggedTb: any = { ...inWindow, id: 'tb-logged', title: '已记', status: 'logged' }
+    fakeTimeboxStore.set('tb-now', inWindow)
+    fakeTimeboxStore.set('tb-future', futureTb)
+    fakeTimeboxStore.set('tb-past', pastTb)
+    fakeTimeboxStore.set('tb-logged', loggedTb)
+
+    const running = await repo.findRunning(MVP_USER_ID)
+    const ids = running.map((t: any) => t.id)
+    expect(ids).toEqual(['tb-now']) // 仅 inWindow 命中
   })
 })

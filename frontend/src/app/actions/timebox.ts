@@ -296,7 +296,9 @@ export async function deleteTimebox(timeboxId: string): Promise<TimeboxActionRes
   const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
   if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
   if (!CANCELABLE_STATUSES.has(tb.status)) {
-    throw new Error(`该时间盒${tb.status === 'running' ? '进行中' : tb.status === 'logged' ? '已记录' : '已结束'}，不可删除（仅未开始可取消；进行中请先结束）`)
+    // [026.02.4] TD-028: 'running' 不持久化（[023.12] 读时派生），无 status='running' 行。
+    // 删除 'running' 分支——CANCELABLE_STATUSES 仅允许 planned，其余 status 均为「已结束」。
+    throw new Error(`该时间盒${tb.status === 'logged' ? '已记录' : '已结束'}，不可删除（仅未开始可取消）`)
   }
   return transitionTimebox(timeboxId, 'cancel', {})
 }

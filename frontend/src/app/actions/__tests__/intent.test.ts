@@ -23,6 +23,9 @@ vi.mock('@/domains/timebox/lib/archetype-matcher', () => ({
 }))
 
 import { parseHabitIntentOnly, parseTimeboxBatchIntentOnly, getActionResponse, resolveShortcut } from '../intent'
+// [026.02.4] TD-028 Site 1 守护:matchTarget 用 deriveTimeboxDisplayStatus 判 running。
+// 本测试验证该函数语义:planned + now∈[start,end] → 'running';其他状态 → null。
+import { deriveTimeboxDisplayStatus } from '@/domains/timebox/status/derive-display-status'
 import { parseHabitWithAI, parseMultiTask } from '@/nexus/core/intent-engine/ai-parser'
 import { matchArchetypesForTitles } from '@/domains/timebox/lib/archetype-matcher'
 import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
@@ -315,5 +318,29 @@ describe('[023.11] parseTimeboxBatchIntentOnly 被动推断 archetype', () => {
     const r = await parseTimeboxBatchIntentOnly('写代码')
     expect(r.drafts![0].activityArchetypeId).toBeUndefined()
     expect(mockMatchArchetypes).not.toHaveBeenCalled()
+  })
+})
+
+// [026.02.4] TD-028 Site 1: matchTarget 用 deriveTimeboxDisplayStatus 判 'running'。
+//   修前:status === 'running' → 持久化层无值,永远返 null,AI 解析「现在的」「跑着的」等表达找不到 tb
+//   修后:deriveTimeboxDisplayStatus(status, start, end, now) === 'running'
+//   本测试守护 derive 语义,确保 Site 1 不退化。
+describe('[026.02.4] TD-028 Site 1 — matchTarget predicate deriveTimeboxDisplayStatus', () => {
+  const now = new Date('2026-07-09T12:00:00Z')
+  const start = new Date('2026-07-09T11:00:00Z').toISOString()
+  const end = new Date('2026-07-09T13:00:00Z').toISOString()
+
+  it('planned + now ∈ [startTime, endTime] → "running"', () => {
+    expect(deriveTimeboxDisplayStatus('planned', start, end, now)).toBe('running')
+  })
+
+  it('planned + now > endTime → "overtime" (派生显示态;非持久化 status)', () => {
+    const later = new Date('2026-07-09T14:00:00Z')
+    expect(deriveTimeboxDisplayStatus('planned', start, end, later)).toBe('overtime')
+  })
+
+  it('logged / cancelled 持久化状态直接返 null (不派生)', () => {
+    expect(deriveTimeboxDisplayStatus('logged', start, end, now)).toBeNull()
+    expect(deriveTimeboxDisplayStatus('cancelled', start, end, now)).toBeNull()
   })
 })

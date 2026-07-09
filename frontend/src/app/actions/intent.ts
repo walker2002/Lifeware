@@ -49,6 +49,7 @@ import { recordActivity } from './activity-recorder';
 import { createHabitsMutationService } from '@/app/actions/habits/mutation-service';
 import { createTasksMutationService } from '@/app/actions/tasks/mutation-service';
 import { matchArchetypesForTitles } from '@/domains/timebox/lib/archetype-matcher';
+import { deriveTimeboxDisplayStatus } from '@/domains/timebox/status/derive-display-status';
 
 // ─── CNUI Handlers 注册 ───────────────────────────────────────────
 
@@ -647,7 +648,13 @@ function matchTarget(
   timeboxes: TimeboxSummary[],
 ): string | null {
   if (target.type === "current" || target.value === "running") {
-    const running = timeboxes.find(t => t.status === "running");
+    // [026.02.4] TD-028: 'running' 是读时派生显示态，不在持久化 status 中。
+    // 用 deriveTimeboxDisplayStatus（planned + startTime <= now <= endTime）
+    // 判定「当前正在跑」。
+    const now = new Date();
+    const running = timeboxes.find(t =>
+      deriveTimeboxDisplayStatus(t.status, t.startTime, t.endTime, now) === 'running'
+    );
     return running?.id ?? null;
   }
 
