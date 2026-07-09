@@ -482,6 +482,49 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ---
 
+## [026.02.4] TD-022 5 items + TD-028 5 sites + EditAppointment cast 修复（2026-07-09）
+
+> [026.02.3.1] ship + post-ship round 2 后，本轮按 1 PR ship-ready 模式（用户 brainstorming 决策）关闭剩余 deferred tech debt + post-ship 抓的 round 2 drift。
+
+### 决策摘要
+
+- **TD-022 5 items 全 ship**：#2 UUID 防御 + #3 newDurationMin > 0 contract + #6 archetype clearing 3-state（真实 UX bug）+ #8 banner conditional + EditAppointment cast 透明性
+- **TD-028 5 sites 全 ship**：Site 0 repository rewrite + Sites 1-4 caller updates
+- **TD-029 跳过登记**：planning 阶段发现 EditAppointment.tsx 3 处 stale `'in_progress'`，T3 已 incidental fix（`status: string` cast 收紧为 `AppointmentStatus` literal 后 TS2367 forced）；TD-021 已覆盖同 drift class（[026.01] × [023.12] 交互债），独立登记会变成 paperwork 噪音
+- **scope 不动**：TD-022 #7 N+1（defer）/ TD-023 架构债 / TD-008 架构债
+
+### 改动清单（5 impl commits + 3 chore commits = 11 total on main）
+
+- **spec**（4dac296）：TD-022 5 + TD-028 5 + EditAppointment cast 修复设计
+- **plan**（e562954）：6 SDD tasks 实施 plan
+- **T1**（29c6579 + e782355）：TD-022 #2 UUID v4 regex + #3 newDurationMin > 0 contract + prompt 措辞 + fixture audit trail comment
+- **T2**（8fdbb2c）：TD-022 #6 archetype clearing 3-state — picker transform (undefined → null) + handlers.ts 3-state mapper + updateAppointment server action
+- **T3**（9c1b404）：TD-022 #8 banner conditional + EditAppointment cast 透明性（`status: string` → AppointmentStatus literal）
+- **T4**（fc90771）：TD-028 Site 0 findRunning rewrite — `status='planned' AND startTime<=NOW() AND endTime>=NOW()` server-side 等价 TD-025 view 派生
+- **T5**（825ec6b）：TD-028 Sites 1-4 caller updates — matchTarget derive-display-status + use-auto-trigger inline 派生 + timebox error msg drop 'running' branch + integration test fixture planned
+- **TD-030 ledger**（60dfed8）：timebox.ts createAppointment adapter truthy-check pattern 登记
+- **TD-031 ledger**（bdb39f2）：use-auto-trigger.ts 双分支 planned gate 同 cycle 双 fire 风险登记
+- **TD-028 ledger close**（本 task，commit pending）：status → 已修复 + 修复记录段
+
+### 验证结果
+
+- vitest baseline=head：0 回归
+- tsc：0 新增错误
+- pre-push hooks：validate:manifest 0 errors + validate:structure ✓ + validate:rules-registry 6 项一致
+- TD-028 closure proof：`grep 'running' src/` 在 production 返 0 hits（仅命中合法 `display === 'running'` 派生比较 — TD-022 范围不动）
+- 3-state semantics verification：null（clear）vs undefined（skip）distinct test
+- 编辑数据链 4 处全链路打通：picker → mapper → server action → DB
+
+### 关联
+
+- Spec：`docs/superpowers/specs/2026-07-09-026-02-4-follow-up-fixes-design.md`（commit 4dac296）
+- Plan：`docs/superpowers/plans/2026-07-09-026-02-4-follow-up-fixes.md`（commit e562954）
+- 上游：[026.02.3.1] post-ship round 2 fixes（3c08208）
+- 关联 TD：TD-022（5 items closed）+ TD-028（5 sites closed）+ TD-030 + TD-031（登记）
+- Post-ship second-opinion review：待 [026.02.4] ship 后跑（per [[feedback_post-ship-review-meta-pattern]]）
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）

@@ -1,9 +1,10 @@
 ---
 id: TD-028
 title: "[026.02.3.1] post-review — Timebox 'running' status literals 在 JS 层仍残留"
-status: 新建
+status: 已修复
 created: 2026-07-09
 last_updated: 2026-07-09
+closed: 2026-07-09
 ---
 
 # TD-028: Timebox 'running' status 字符串残留 (JS 层 drift)
@@ -68,11 +69,23 @@ last_updated: 2026-07-09
 ## 状态
 
 - [x] 已提交技术债 ledger (本文件)
-- [ ] Site 0 fix — pending next session (改写 findRunning 内部查询 + 同步 `ITimeboxRepository` JSDoc 注释)
-- [ ] Site 1 fix — pending next session
-- [ ] Site 2 fix — pending next session
-- [ ] Site 3 fix — pending next session
-- [ ] Site 4 fix — pending next session
+- [x] Site 0 fix — 改写 findRunning 内部查询 (T4)
+- [x] Site 1 fix — matchTarget derive-display-status 改写 (T5)
+- [x] Site 2 fix — use-auto-trigger inline 派生 (T5)
+- [x] Site 3 fix — timebox error msg drop 'running' branch (T5)
+- [x] Site 4 fix — fixture 改 'planned' (T5)
+- [x] TD-028 closure: grep `'running'` 在 production `src/` 返 0 hits（仅命中合法 `display === 'running'` 派生比较）
+
+## 修复记录
+
+**修复版本**: [026.02.4] (commits fc90771 + 825ec6b)
+**修复日期**: 2026-07-09
+**修复方式**:
+- Site 0 repository.findRunning WHERE clause rewrite (T4, commit fc90771) — `status='planned' AND startTime <= NOW() AND endTime >= NOW()` server-side 等价 TD-025 view 派生
+- Sites 1-4 caller updates (T5, commit 825ec6b) — matchTarget + use-auto-trigger 走 derive-display-status 派生 / timebox error msg 删 'running' branch / 集成测试 fixture 改 'planned'
+- TD-028 closure: grep `'running'` 在 production `src/` 返 0 hits（仅命中合法 `display === 'running'` 派生比较 — TD-022 范围不动）
+
+**回归覆盖**: 5 caller tests + 2 repo tests added (TimeboxRepository.findRunning 派生语义验证 + integration fixture planned)
 
 ## 关联
 
