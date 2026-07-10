@@ -254,9 +254,9 @@ describe('Habits Domain Plugin — onValidate', () => {
     expect(rejectedErrors(result).some(e => e.includes('频率类型'))).toBe(true)
   })
 
-  it('logHabit 意图缺少 habitId 应返回 valid=false', async () => {
+  it('logHabitLog 意图缺少 habitId 应返回 valid=false', async () => {
     const intent = makeIntent({
-      action: 'logHabit',
+      action: 'logHabitLog',
       fields: { status: 'completed' },
     })
     const result = await habitsPlugin.onValidate(intent, makeSnapshot())

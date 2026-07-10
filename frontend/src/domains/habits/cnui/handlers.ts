@@ -100,7 +100,7 @@ export const habitCnuiHandler: CnuiSurfaceHandler = {
       return { content: '请填写习惯信息', dataSnapshot: { startDate: new Date().toISOString().slice(0, 10) } }
     }
 
-    if (action === 'logHabit') {
+    if (action === 'logHabitLog') {
       const pending = await getTrackableHabits()
       return {
         content: '请选择要打卡的习惯',

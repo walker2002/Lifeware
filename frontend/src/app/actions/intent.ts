@@ -969,7 +969,17 @@ export async function checkHabitReferences(
   }
 }
 
-/** 记录习惯打卡 */
+/**
+ * 记录习惯打卡
+ *
+ * [Habits] 走 orchestrator contract path：targetObject.type='habit_log'（非 'habit'），
+ * manifest.yaml 的 lifecycle.habit_log 提供 `log` transition，SM 创建 HabitLog 实体。
+ * 旧实现经 submitDynamicIntent('habits', 'logHabit', ...) → resolveObjectType 把
+ * 'logHabit' 错误路由到 'habit' lifecycle → SM 报 "非法状态转换: action=\"log\""
+ * 因为 habit lifecycle 没有 `log` transition。修复：action 名对齐 PascalCase
+ * 'HabitLog'（最长匹配优先）→ 自动路由到 habit_log lifecycle → SM create path
+ * 调 habit_log_repo.create 落库（event=HabitLogged 触发 onEvent 重算 streak）。
+ */
 export async function logHabit(
   habitId: string,
   fields?: {
@@ -980,7 +990,7 @@ export async function logHabit(
   },
 ): Promise<HabitActionResult> {
   try {
-    const result = await submitDynamicIntent('habits', 'logHabit', { habitId, ...fields })
+    const result = await submitDynamicIntent('habits', 'logHabitLog', { habitId, ...fields })
     if (!result.success) {
       return { success: false, error: result.error }
     }

@@ -69,8 +69,8 @@ describe('habitCnuiHandler', () => {
       expect(result.dataSnapshot.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
 
-    it('logHabit action 应返回可打卡习惯列表', async () => {
-      const result = await habitCnuiHandler.open('logHabit')
+    it('logHabitLog action 应返回可打卡习惯列表', async () => {
+      const result = await habitCnuiHandler.open('logHabitLog')
 
       expect(result.content).toBe('请选择要打卡的习惯')
       expect(result.dataSnapshot).toHaveProperty('items')
@@ -155,9 +155,9 @@ describe('habitCnuiHandler', () => {
     it.todo('activateHabit 应成功激活习惯')
   })
 
-  describe('submit - logHabit', () => {
+  describe('submit - logHabitLog', () => {
     it('未选择习惯应返回错误', async () => {
-      const result = await habitCnuiHandler.submit('logHabit', {
+      const result = await habitCnuiHandler.submit('logHabitLog', {
         selectedIds: [],
       })
 

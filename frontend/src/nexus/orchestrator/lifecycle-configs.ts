@@ -93,7 +93,10 @@ export function buildActionMap(): Record<string, string> {
     for (const trigger of manifest.intent_triggers ?? []) {
       if (map[trigger.action]) continue // 已有映射则跳过
       let short = trigger.action
-      for (const pascal of pascalNames) {
+      // [Habits Bug 2] 最长 PascalCase 优先匹配：否则 'logHabitLog' 会被
+      // 'Habit' (5) 先匹配，留下 'logLog'（应为 'log'）。
+      const sortedPascals = [...pascalNames].sort((a, b) => b.length - a.length)
+      for (const pascal of sortedPascals) {
         if (short.includes(pascal)) {
           short = short.replace(pascal, '')
           break
@@ -135,8 +138,13 @@ export function resolveObjectType(domainId: string, action: string): string {
       const pascal = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
       pascalToKey.set(pascal, key)
     }
-    for (const [pascal, key] of pascalToKey) {
-      if (action.includes(pascal)) return key
+    // [Habits Bug 2] 最长匹配优先：避免短 PascalCase（如 'Habit' 5 字符）吞掉
+    // 长 PascalCase 子串（如 'HabitLog' 8 字符）的命中。原先按 Map 插入顺序
+    // 迭代会让 'habit' 在 'habit_log' 同域先把 'logHabitLog' 误路由到 'habit'
+    // lifecycle，导致 manifest 缺 'log' transition 时 SM 报"非法状态转换"。
+    const sortedPascals = [...pascalToKey.keys()].sort((a, b) => b.length - a.length)
+    for (const pascal of sortedPascals) {
+      if (action.includes(pascal)) return pascalToKey.get(pascal)!
     }
     return keys[0]
   } catch {

@@ -52,7 +52,7 @@ intent_triggers:
       - 恢复这个习惯
       - 重新开始冥想
     keywords: [恢复, 重新激活, reactivate]
-  - action: logHabit
+  - action: logHabitLog
     shortcut: /logHabit
     description: 记录习惯打卡
     response_type: cnui
@@ -122,6 +122,19 @@ lifecycle:
         action: delete
         event_type: HabitDeleted
     terminal_states: [archived, deleted]
+  # [Habits] HabitLog 不可变事实记录独立 lifecycle（与 habit 状态机分离）。
+  # 命名对齐 PascalCase 'HabitLog' → resolveObjectType 最长匹配优先路由到此处
+  # （lifeware 习惯设计：verb+PascalCase objectType）。
+  habit_log:
+    states: [logged]
+    initial_state: logged
+    transitions:
+      - from: null
+        to: logged
+        trigger: intent
+        action: log
+        event_type: HabitLogged
+    terminal_states: [logged]
 
 # ─── 区块 C: field_metadata（[020] 仅保留 type/options/mutation_mode；label/required 移除）──
 # 字段执行器对未声明字段拒绝写入（F-1），须与 irepository.ts CreateHabitInput 一致。
@@ -173,6 +186,32 @@ field_metadata:
     activityArchetypeId:
       type: string
       mutation_mode: ContentField
+  # [Habits] HabitLog 实体字段（与 habit 状态机独立的不可变事实记录）
+  habit_log:
+    habitId:
+      type: string
+      mutation_mode: FactField
+    date:
+      type: date
+      mutation_mode: FactField
+    completionStatus:
+      type: string
+      mutation_mode: FactField
+    actualDuration:
+      type: number
+      mutation_mode: FactField
+    completionRating:
+      type: number
+      mutation_mode: FactField
+    energyLevel:
+      type: number
+      mutation_mode: FactField
+    note:
+      type: string
+      mutation_mode: ContentField
+    source:
+      type: string
+      mutation_mode: FactField
 
 # ─── 区块 D: list_actions ────────────────────────────────────────
 list_actions:

@@ -99,8 +99,8 @@ describe('[golden] habitsPlugin.onValidate 精确输出', () => {
     expect(snap(r)).toEqual({ kind: 'Rejected', errors: ['标题必填', '默认时长必须大于 0', '最短时长不能大于默认时长', '频率类型必须是 daily/weekly/custom'] })
   })
 
-  it('logHabit 缺 habitId → Rejected「habitId 必填」', async () => {
-    const r = await habitsPlugin.onValidate(makeIntent({ action: 'logHabit', fields: { status: 'completed' } }), snap_ as any)
+  it('logHabitLog 缺 habitId → Rejected「habitId 必填」', async () => {
+    const r = await habitsPlugin.onValidate(makeIntent({ action: 'logHabitLog', fields: { status: 'completed' } }), snap_ as any)
     expect(snap(r)).toEqual({ kind: 'Rejected', errors: ['habitId 必填'] })
   })
 })

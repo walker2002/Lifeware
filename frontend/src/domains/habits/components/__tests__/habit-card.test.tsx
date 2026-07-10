@@ -32,6 +32,21 @@ describe('[024] HabitCard 单击编辑', () => {
   })
 })
 
+describe('HabitCard 双击进入编辑', () => {
+  it('批量模式下双击仍触发 onEdit（不被 selection toggle 吞掉）', () => {
+    const onEdit = vi.fn(); const onSelectToggle = vi.fn()
+    render(<HabitCard {...base} selectable onEdit={onEdit} onSelectToggle={onSelectToggle} />)
+    fireEvent.doubleClick(screen.getByText('阅读'))
+    expect(onEdit).toHaveBeenCalled()
+  })
+  it('非批量模式双击触发 onEdit', () => {
+    const onEdit = vi.fn()
+    render(<HabitCard {...base} onEdit={onEdit} />)
+    fireEvent.doubleClick(screen.getByText('阅读'))
+    expect(onEdit).toHaveBeenCalled()
+  })
+})
+
 describe('[023] A3.2 HabitCard archetype 小标签', () => {
   it('传 archetypeLabel 时渲染活动原型 Badge', () => {
     render(<HabitCard {...base} archetypeLabel="深度专注" />)

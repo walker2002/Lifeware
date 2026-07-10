@@ -1,8 +1,13 @@
 /**
  * @file habit-card
  * @brief 习惯卡片组件
- * 
+ *
  * 展示单个习惯的摘要信息和操作按钮
+ *
+ * 交互约定：
+ * - 单击卡片：批量选择模式下切换选中状态（onSelectToggle），非选择模式下进入编辑（onEdit）
+ * - 双击卡片：始终进入编辑面板（onEdit），覆盖 selection 行为，避免和批量操作冲突
+ * - 卡片内 Button（打卡/暂停/激活/恢复/归档/删除）stopPropagation 阻止冒泡到 Card 的单击/双击
  */
 
 "use client"
@@ -144,6 +149,8 @@ export function HabitCard({
         selected && "border-primary/40 bg-primary/10",
       )}
       onClick={() => (selectable ? onSelectToggle?.() : onEdit?.())}
+      // 双击始终进入编辑面板，避免单击在 selectable 模式下被 selection toggle 吞掉
+      onDoubleClick={(e) => { e.stopPropagation(); onEdit?.() }}
     >
       <CardContent className={cn("relative flex flex-col gap-3", selectable && "pl-10")}>
         {/* 批量选择复选框 */}

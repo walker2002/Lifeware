@@ -62,7 +62,7 @@ const actionFieldsValid: SubmitCheck = async (intent) => {
     errors.push(...validateHabitFields(fields, action as 'createHabit' | 'updateHabit').errors)
   }
 
-  if (action === 'logHabit') {
+  if (action === 'logHabitLog') {
     const habitId = fields['habitId']
     if (!habitId || typeof habitId !== 'string') errors.push('habitId 必填')
   }

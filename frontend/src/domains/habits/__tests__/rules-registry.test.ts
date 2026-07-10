@@ -67,8 +67,8 @@ describe('habits submit 聚合 habit_action_fields_valid（逐字对标 golden�
     expect(r.kind).toBe('Rejected')
     if (r.kind === 'Rejected') expect(r.errors).toEqual(['标题必填', '默认时长必须大于 0', '最短时长不能大于默认时长', '频率类型必须是 daily/weekly/custom'])
   })
-  it('logHabit 缺 habitId → Rejected「habitId 必填」', async () => {
-    const r = await habitRuleRegistry.submit.habit_action_fields_valid.check(intent('logHabit', { status: 'completed' }), serverCtx)
+  it('logHabitLog 缺 habitId → Rejected「habitId 必填」', async () => {
+    const r = await habitRuleRegistry.submit.habit_action_fields_valid.check(intent('logHabitLog', { status: 'completed' }), serverCtx)
     expect(r.kind === 'Rejected' && r.errors).toEqual(['habitId 必填'])
   })
   it('未知 action → Passed（无匹配分支）', async () => {

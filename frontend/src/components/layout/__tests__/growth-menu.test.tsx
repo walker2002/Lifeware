@@ -9,7 +9,7 @@ const mockDomainActions = [
     domainName: 'Habits',
     actions: [
       { action: 'createHabit', shortcut: '/createHabit', description: '创建习惯' },
-      { action: 'logHabit', shortcut: '/logHabit', description: '记录习惯' },
+      { action: 'logHabitLog', shortcut: '/logHabit', description: '记录习惯' },
     ],
   },
   {
