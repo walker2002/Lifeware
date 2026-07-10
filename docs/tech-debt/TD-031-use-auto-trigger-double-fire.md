@@ -1,12 +1,12 @@
 ---
 id: TD-031
 title: "[026.02.4] post-T5 review — use-auto-trigger.ts 双分支 planned gate 可能同时 fire start + overtime"
-status: 新建
+status: 已修复
 created: 2026-07-09
 last_updated: 2026-07-09
 ---
 
-# TD-031: use-auto-trigger 双分支 planned gate 同 cycle 双 fire 风险
+# TD-031: use-auto-trigger 双分支 planned gate 同 cycle 双 fire 风险 ✅ 已修复
 
 > 摘要: [026.02.4] T5 (commit 825ec6b) 把 `use-auto-trigger.ts:53` 的 `tb.status === "running"` 改为 `tb.status === "planned"`（TD-028 Site 2 修复）。但文件内另一分支（line ~44 附近）也是 `tb.status === "planned"` 守卫的 `onTransition(tb.id, "start")`。结果：对一个 `planned` 且 `startTime` + `endTime` 都已过期的 overdue 时间盒，同 cycle 内 `start` 和 `overtime` 两个 transition 可能都触发。
 

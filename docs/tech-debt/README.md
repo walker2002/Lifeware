@@ -28,7 +28,7 @@ last_updated: 2026-07-09
 |---|---|---|---|---|---|
 | TD-014 | Claude Code settings.json schema 顶层严格,自定义 key 整个文件加载失败 | 🟢 | infra | N/A（工具链债） | 暂未指派 |
 | TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 暂未指派 |
-| TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 | lifeware-timebox | [026.02.4] post-T5 | 暂未指派 |
+| TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 → [026.02.4-r3] closed | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
@@ -68,6 +68,7 @@ last_updated: 2026-07-09
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 修复版本 | 关闭日期 |
 |---|---|---|---|---|---|---|
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮（A1 派生 + A2 pre-push validator 落地） | 🔴 → ✅ | lifeware-timebox | [023.12] hot-fix | [023.13] | 2026-07-07 |
+| TD-031 | use-auto-trigger 双分支 planned gate 同 cycle 双 fire start + overtime (else if 互斥修复) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 | [026.02.4-r3] | 2026-07-09 |
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 5 处残留 (Site 0 repository findRunning root source + Sites 1-4 callers) | 🟠 → ✅ | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | [026.02.4] | 2026-07-09 |
 | TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (4 sites 全修) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T2 | [026.02.4-r2] round 2 | 2026-07-09 |
 
