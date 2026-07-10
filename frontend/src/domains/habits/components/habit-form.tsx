@@ -36,8 +36,8 @@ export interface HabitFormFields {
   daysOfWeek?: number[]
   startDate: string
   endDate?: string
-  // [023] A3.2：archetypeId 是可选 nullable ContentField（标签式）
-  activityArchetypeId?: string
+  // [027-A] Phase A: archetypeId 可选 nullable（支持 clear 按钮传递 null）
+  activityArchetypeId?: string | null
 }
 
 interface HabitFormProps {
@@ -165,8 +165,8 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       daysOfWeek: frequencyType !== "daily" ? daysOfWeek : undefined,
       startDate,
       endDate: endDate || undefined,
-      // [027-A] Phase A: null→undefined（onSubmit/HabitFormFields 类型用 undefined）
-      activityArchetypeId: activityArchetypeId || undefined,
+      // [027-A] Phase A: 传递 null（clear 按钮需要持久化 null 值）
+      activityArchetypeId,
     }
 
     // [018-G3] R1：客户端预检仅跑 phase: both 规则（尽力而为，服务端 onValidate 权威兜底）

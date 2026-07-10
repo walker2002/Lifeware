@@ -110,7 +110,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
     setEditPriority((detail.priority as string) ?? 'medium')
     setEditDuration(String(detail.estimatedDuration ?? 60))
     setEditThreadId((detail.threadId as string) ?? null)
-    setEditArchetypeId((detail.activityArchetypeId as string) ?? undefined)
+    setEditArchetypeId((detail.activityArchetypeId as string) ?? null)
   }
 
   // ─── 完成状态 ─────────────────────────────────────────────────

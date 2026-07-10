@@ -175,6 +175,7 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
         daysOfWeek: fields.daysOfWeek,
         startDate: fields.startDate,
         endDate: fields.endDate,
+        activityArchetypeId: fields.activityArchetypeId,
       }
       const result = await updateHabit(id, input)
       return { success: result.success, error: result.error }

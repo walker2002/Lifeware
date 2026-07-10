@@ -124,8 +124,8 @@ export interface CreateTaskInput {
   decomposition?: DecompositionLevel
   /** 捕获模式（默认 ad_hoc） */
   captureMode?: CaptureMode
-  /** [023] A3: 关联 Activity Archetype */
-  activityArchetypeId?: USOM_ID
+  /** [027-A] Phase A: 关联 Activity Archetype（支持 null 清除） */
+  activityArchetypeId?: USOM_ID | null
   /** 调度约束 */
   schedulingConstraint?: SchedulingConstraint
   /** 追踪模式（默认 check_in） */
@@ -535,8 +535,8 @@ export interface CreateHabitInput {
   endDate?: DateOnly
   /** 标签列表 */
   tags?: string[]
-  /** [023] A3: 关联 Activity Archetype */
-  activityArchetypeId?: USOM_ID
+  /** [027-A] Phase A: 关联 Activity Archetype（支持 null 清除） */
+  activityArchetypeId?: USOM_ID | null
 }
 
 /** 更新习惯输入 */
