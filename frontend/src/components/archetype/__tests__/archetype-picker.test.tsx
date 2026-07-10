@@ -1,11 +1,10 @@
 /**
  * @file archetype-picker 单测
- * @brief [023] A3.2 裸版/带盒版公共化：readOnly 行为 + Card 包裹 + M-1 fetch error UX
+ * @brief [023] A3.2 裸版公共化：readOnly 行为 + Card 包裹 + M-1 fetch error UX
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ArchetypePicker } from '../archetype-picker'
-import { ArchetypePickerCard } from '../archetype-picker-card'
 import { getArchetypes, matchArchetypeForTitle } from '@/app/actions/activity-archetype'
 
 vi.mock('@/app/actions/activity-archetype', () => ({
@@ -103,14 +102,6 @@ describe('[023] A3.2 ArchetypePicker M-1 fetch error UX', () => {
     // 等 effect 落幕
     await waitFor(() => expect(mockGetArchetypes).toHaveBeenCalled())
     expect(screen.queryByText('加载失败，点此重试')).not.toBeInTheDocument()
-  })
-})
-
-describe('[023] A3.2 ArchetypePickerCard 带盒版', () => {
-  it('渲染 h3 标题 + bg-surface-card 盒', async () => {
-    const { container } = render(<ArchetypePickerCard value={undefined} onChange={() => {}} />)
-    expect(screen.getByText('活动原型')).toBeInTheDocument()
-    expect(container.querySelector('.bg-surface-card')).toBeInTheDocument()
   })
 })
 

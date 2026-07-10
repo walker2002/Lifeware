@@ -25,7 +25,7 @@ export interface AppointmentDraftFields {
   durationMin: number
   detail?: string | null
   people: string[]
-  /** [026.01] 关联 Activity Archetype（[026.02.4] 3-state: undefined=skip, null=clear, string=set；ArchetypePickerCard 渲染） */
+  /** [026.01] 关联 Activity Archetype（[026.02.4] 3-state: undefined=skip, null=clear, string=set；ArchetypePicker variant="card" 渲染） */
   activityArchetypeId?: string | null
 }
 

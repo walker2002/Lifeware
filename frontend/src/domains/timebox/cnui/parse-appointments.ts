@@ -5,7 +5,7 @@
  * 范式：参照 parse-timeboxes.ts
  * - LLM 解析 prompt 出 { kind: 'edit', appointmentId, newStartTime?, newDurationMin?, newTitle?, confidence }
  * - 失败/不确定 → { kind: 'unsure', reason }
- * - 不解析 archetype（走 ArchetypePickerCard UI 端 matchArchetypeForTitle）
+ * - 不解析 archetype（走 ArchetypePicker UI 端 matchArchetypeForTitle）
  */
 
 import type { AIRuntime } from '@/nexus/ai-runtime'
