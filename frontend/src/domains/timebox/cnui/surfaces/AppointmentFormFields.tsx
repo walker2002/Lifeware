@@ -12,7 +12,7 @@
 'use client'
 
 import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
-import { ArchetypePickerCard } from '@/components/archetype/archetype-picker-card'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 
 /**
  * 约定 draft 形态（与 ai-parser 的 AppointmentDraft 对齐，扩展 id/detail/archetype）。
@@ -115,7 +115,8 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
         *  (timebox.ts:255),所以 picker undefined 在 timebox 域语义为「skip」(不传字段)
         *  ——与 appointment 域「undefined→null→显式清除」的语义不同。本 surface 仅在
         *  appointment 域做 undefined → null 转换,timebox 域维持 undefined=skip。 */}
-      <ArchetypePickerCard
+      <ArchetypePicker
+        variant="card"
         value={draft.activityArchetypeId ?? undefined}
         onChange={(archetypeId) => onChange({
           activityArchetypeId: archetypeId === undefined ? null : archetypeId,
