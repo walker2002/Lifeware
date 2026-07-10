@@ -57,9 +57,11 @@ describe('TaskEditZone', () => {
     // 点击清除按钮
     await user.click(screen.getByRole('button', { name: '清除活动原型' }))
 
-    // 点击保存按钮（hasChanges 为 true 时会出现保存按钮）
-    const saveButton = screen.getByRole('button', { name: /保存修改/ })
-    await user.click(saveButton)
+    // 等待保存按钮出现（hasChanges 异步重计算可能需要时间）
+    await waitFor(() => expect(screen.getByRole('button', { name: /保存修改/ })).toBeInTheDocument())
+
+    // 点击保存按钮
+    await user.click(screen.getByRole('button', { name: /保存修改/ }))
 
     await waitFor(() => {
       expect(updateTaskMock).toHaveBeenCalledWith('t1', expect.objectContaining({ activityArchetypeId: null }))
