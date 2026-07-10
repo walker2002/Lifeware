@@ -57,6 +57,11 @@ describe('TaskEditZone', () => {
     // 点击清除按钮
     await user.click(screen.getByRole('button', { name: '清除活动原型' }))
 
+    // [027-A] Finding 1: 视觉断言 - 清除后 picker 应显示「未选择」，而非旧值「深度专注」
+    await waitFor(() => {
+      expect(screen.queryByText('深度专注')).not.toBeInTheDocument()
+    })
+
     // 等待保存按钮出现（hasChanges 异步重计算可能需要时间）
     await waitFor(() => expect(screen.getByRole('button', { name: /保存修改/ })).toBeInTheDocument())
 

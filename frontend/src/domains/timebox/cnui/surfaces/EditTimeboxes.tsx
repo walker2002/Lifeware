@@ -41,7 +41,8 @@ interface TimeboxDraft {
   title: string
   startTime: string
   endTime: string
-  activityArchetypeId?: string
+  // [027-A] Finding 2b: widen type to accept null (clear)
+  activityArchetypeId?: string | null
   notes?: string
   tags?: string[]
   taskIds?: string[]
@@ -261,8 +262,11 @@ export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, is
         <div>
           <label className="text-xs text-body">活动原型</label>
           <div className="mt-0.5">
-            <ArchetypePicker value={draft.activityArchetypeId}
-              onChange={id => update({ activityArchetypeId: id })}
+            <ArchetypePicker
+              // [027-A] Finding 2b: coerce null→undefined for picker value (picker only accepts string | undefined)
+              //   onChange preserves null so it reaches DB
+              value={draft.activityArchetypeId ?? undefined}
+              onChange={id => update({ activityArchetypeId: id === undefined ? null : id })}
               enableAiMatch
               title={draft.title} />
           </div>

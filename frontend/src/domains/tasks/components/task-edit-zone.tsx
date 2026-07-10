@@ -394,7 +394,10 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
       <div className="flex flex-col gap-1">
         <label className="text-xs text-body">活动原型</label>
         <ArchetypePicker
-          value={(draft.activityArchetypeId as string | null) ?? task.activityArchetypeId ?? undefined}
+          // [027-A] Finding 1: 用 key-presence 区分「清除（null）」vs「未编辑（key absent）」
+          //   draft 有该 key → 已触摸（包括 null=清除），用 draft 值 → coerce null→undefined → picker 显示「未选择」
+          //   draft 无该 key → 未编辑，用 task 已保存值 → coerce null→undefined
+          value={('activityArchetypeId' in draft ? (draft.activityArchetypeId as string | null) : task.activityArchetypeId) ?? undefined}
           onChange={id => updateDraft('activityArchetypeId', id === undefined ? null : id)}
           enableAiMatch
           title={task.title}
