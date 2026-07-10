@@ -96,7 +96,7 @@ export function TaskCreateDrawer({ defaults, onClose, onCreated }: TaskCreateDra
     } finally {
       setSubmitting(false)
     }
-  }, [title, description, priority, durHours, durMinutes, threadId, defaults.parentId, submitting, onCreated])
+  }, [title, description, priority, durHours, durMinutes, threadId, defaults.parentId, activityArchetypeId, submitting, onCreated])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
