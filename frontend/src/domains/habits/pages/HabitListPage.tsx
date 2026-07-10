@@ -73,7 +73,7 @@ function habitToItem(h: Habit): HabitItem {
     startDate: h.startDate,
     endDate: h.endDate,
     daysOfWeek: h.frequency.daysOfWeek,
-    activityArchetypeId: h.activityArchetypeId,
+    activityArchetypeId: h.activityArchetypeId ?? undefined,
   }
 }
 
