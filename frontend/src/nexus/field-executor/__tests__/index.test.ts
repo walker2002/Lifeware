@@ -261,6 +261,32 @@ describe('Field Executor — FactField 字段写', () => {
     })
   })
 
+  // [bugfix /timeboxes 编辑失败] timebox/appointment 的 startTime/endTime 是 ISO timestamp，
+  // field_metadata 应声明为 `date`（非 `time`）。这里守护 contract：date 类型对完整 ISO 放行，
+  // 不走 HH:MM 校验。与 timebox-compliance.test.ts 的 manifest type 守护互补。
+  describe('date 类型字段（ISO timestamp 放行 — timebox/appointment startTime 语义）', () => {
+    it('ISO 8601 timestamp（2026-07-07T16:30:00.000Z）→ Passed，写库发事件', async () => {
+      const repo = makeRepo()
+      const { bus, published } = makeEventBus()
+      const executor = createFieldExecutor()
+      const ctx: FieldExecutorContext = {
+        repo,
+        eventBus: bus,
+        objectType: 'timebox',
+        fieldMetadata: { startTime: { type: 'date', label: '开始时间', required: true } },
+        fieldUpdatedEventType: 'TimeboxFieldUpdated',
+      }
+
+      const result = await executor.execute(
+        'tb-1', 'startTime', '2026-07-07T16:30:00.000Z', 'user-1', ctx,
+      )
+
+      expect(result.kind).toBe('Passed')
+      expect(repo.updateFields).toHaveBeenCalledTimes(1)
+      expect(published).toHaveLength(1)
+    })
+  })
+
   // T7: enum 类型 frequencyType 校验（验证 G1-M1 改 enum+options 后枚举校验激活）
   describe('enum 类型字段 frequencyType', () => {
     it('合法值 daily → Passed', async () => {

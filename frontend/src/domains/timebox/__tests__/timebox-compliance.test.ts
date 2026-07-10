@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { timeboxPlugin } from '../index'
 import { createTimeboxHooks } from '../hooks'
 import { timeboxTransitions } from '../transitions'
+import { loadDomainManifest } from '@/domains/manifest-loader'
 import type { DomainManifest } from '@/usom/types/domain-types'
 
 const MANIFEST_PATH = resolve(__dirname, '../manifest.yaml')
@@ -112,6 +113,35 @@ describe('T005: Timebox transitions 一致性', () => {
     expect(revertFromCancelled).toBeDefined()
     expect(revertFromCancelled!.to).toBe('planned')
     expect(revertFromCancelled!.eventType).toBe('TimeboxReverted')
+  })
+})
+
+/**
+ * [bugfix /timeboxes 编辑失败] timebox/appointment 的 startTime/endTime 是完整 ISO timestamp
+ * （DB timestamp 列、UI datetime-local、server action 注释「ISO」、rule-engine 用 Date.parse 校验），
+ * 不是「一天内时刻 HH:MM」。field_metadata 误声明为 `type: time` 会让 field-executor 在
+ * updateTimebox/updateAppointment 的 field-step 路径上按 HH_MM_REGEX 拒绝 ISO（报「要求合法
+ * HH:MM，得到 2026-07-07T16:30:00.000Z」），导致只要未填打卡字段（走 log 路径）的编辑一律失败。
+ * 守护：这些 timestamp 字段的 type 不得回退为 'time'。
+ */
+describe('[bugfix] timestamp 字段不得声明为 time（HH:MM）— field-executor 会拒 ISO', () => {
+  // 直接读 YAML loader 结果（timeboxPlugin.manifest 是精简 ProcessManifest，不含 field_metadata）
+  const loaded = loadDomainManifest('timebox')
+  const fm = (loaded.success ? loaded.manifest.field_metadata : {}) as unknown as Record<
+    string,
+    Record<string, { type: string }>
+  >
+
+  it('timebox.startTime 是 ISO timestamp → type 不为 time', () => {
+    expect(fm.timebox?.startTime?.type).not.toBe('time')
+  })
+
+  it('timebox.endTime 是 ISO timestamp → type 不为 time', () => {
+    expect(fm.timebox?.endTime?.type).not.toBe('time')
+  })
+
+  it('appointment.startTime 是 ISO timestamp → type 不为 time', () => {
+    expect(fm.appointment?.startTime?.type).not.toBe('time')
   })
 })
 

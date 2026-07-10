@@ -159,6 +159,12 @@ lifecycle:
 # ─── 区块 C: field_metadata（[026] T23：per-objectType 嵌套）
 # 一级 key 为 objectType（timebox / itinerary），二级 key 为字段名。
 # 消除跨 objectType 字段名潜在冲突（如 timebox.title 与 itinerary.title）。
+#
+# [bugfix] timebox/appointment 的 startTime/endTime 是完整 ISO timestamp（DB timestamp 列、
+# UI datetime-local、server action 注释「ISO」、rule-engine 用 Date.parse 校验），不是
+# 「一天内时刻 HH:MM」。声明为 `date`（非 `time`）——field-executor 对 time 类型强按
+# HH_MM_REGEX 校验，会拒 ISO 导致 updateTimebox/updateAppointment 编辑路径失败。
+# （habits 的 defaultTime 才是真 HH:MM 时刻，仍保留 time。）
 field_metadata:
   timebox:
     title:
@@ -166,7 +172,7 @@ field_metadata:
       label: 标题
       required: true
     startTime:
-      type: time
+      type: date
       label: 开始时间
       required: true
     duration:
@@ -174,7 +180,7 @@ field_metadata:
       label: 时长（分钟）
       required: true
     endTime:
-      type: time
+      type: date
       label: 结束时间
       required: false
     taskIds:
@@ -198,7 +204,7 @@ field_metadata:
       label: 标题
       required: true
     startTime:
-      type: time
+      type: date
       label: 开始时间
       required: true
     durationMin:
