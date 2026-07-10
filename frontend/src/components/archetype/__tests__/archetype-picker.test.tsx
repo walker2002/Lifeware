@@ -157,3 +157,33 @@ describe('[023.11] ArchetypePicker「AI 匹配」按钮', () => {
     expect(btn.closest('button')).toBeDisabled()
   })
 })
+
+describe('[027-A] ArchetypePicker variant', () => {
+  it('variant=card 渲染「活动原型」h3 标题与带盒容器', async () => {
+    const { container } = render(<ArchetypePicker variant="card" value={undefined} onChange={() => {}} />)
+    expect(await screen.findByText('活动原型')).toBeInTheDocument()
+    expect(container.firstChild).toHaveClass('bg-surface-card')
+  })
+
+  it('variant=inline（默认）不渲染 h3「活动原型」标题', async () => {
+    render(<ArchetypePicker value={undefined} onChange={() => {}} />)
+    await screen.findByText('选择')
+    expect(screen.queryByRole('heading', { name: '活动原型' })).not.toBeInTheDocument()
+  })
+
+  // [plan-eng-review D3] 清除入口：selected + 非 readOnly 时渲染「清除」，点击 emit onChange(undefined)
+  it('selected + 非 readOnly 时渲染「清除」按钮，点击调用 onChange(undefined)', async () => {
+    const onChange = vi.fn()
+    render(<ArchetypePicker value="a1" onChange={onChange} />)
+    await screen.findByText('深度专注')
+    const clearBtn = screen.getByRole('button', { name: '清除活动原型' })
+    fireEvent.click(clearBtn)
+    expect(onChange).toHaveBeenCalledWith(undefined)
+  })
+
+  it('readOnly 模式不渲染「清除」按钮', async () => {
+    render(<ArchetypePicker value="a1" readOnly onChange={() => {}} />)
+    await screen.findByText('深度专注')
+    expect(screen.queryByRole('button', { name: '清除活动原型' })).not.toBeInTheDocument()
+  })
+})
