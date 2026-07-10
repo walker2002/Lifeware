@@ -192,7 +192,13 @@ export function EditTimeboxes({ dataModel, onDataChange, onConfirm, onCancel, is
         title: draft.title,
         startTime: draft.startTime,
         endTime: draft.endTime,
-        ...(draft.activityArchetypeId ? { activityArchetypeId: draft.activityArchetypeId } : {}),
+        // [026.02.4-r3-preland] TD-022 #6 site 5: 改 !== undefined 走 3-state 语义
+        //   原 ?(draft.activityArchetypeId ? {...} : {}) 用真值判断，把 null 折叠成「skip」
+        //   ——picker 清除的语义永远不达 DB（与 AppointmentFormFields 同源 bug pattern）。
+        //   改为 !== undefined 区分 null(显式清除) vs undefined(跳过)。
+        //   server action updateTimebox 已在 [026.02.4] I-1 用 !== undefined 收紧（timebox.ts:255），
+        //   此处同构对齐即可让 DB 真正收到 null。
+        ...(draft.activityArchetypeId !== undefined ? { activityArchetypeId: draft.activityArchetypeId } : {}),
         ...(draft.notes ? { notes: draft.notes } : {}),
         ...(draft.tags?.length ? { tags: draft.tags } : {}),
         ...(draft.taskIds?.length ? { taskIds: draft.taskIds } : {}),

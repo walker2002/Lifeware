@@ -303,4 +303,60 @@ describe('[023.04] T4 <EditTimeboxes>', () => {
     })} />)
     expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
   })
+
+  // ---- [026.02.4-r3-preland] TD-022 #6 site 5 regression ----
+  //
+  // 原 bug: EditTimeboxes.tsx:195 用 truthy 判断会把 null 折叠成「skip」——
+  //   picker 显式清除(发 null)的语义永远不达 DB(同 TD-022 #6 跨域 bug class)。
+  // 修复: 改 !== undefined 区分 null(显式清除) vs undefined(跳过)。
+  // 测试: prefill 含 activityArchetypeId=null 时保存 → payload.fields 含 activityArchetypeId=null。
+
+  it('[026.02.4-r3-preland] TD-022 #6: prefill activityArchetypeId=null → payload 含 null（显式清除语义）', () => {
+    const onConfirm = vi.fn()
+    render(<EditTimeboxes {...makeProps({
+      mode: 'editing',
+      items: [tb('tb1', 'planned')],
+      selectedId: 'tb1',
+      // prefill 含 null —— 模拟「从 server 读回的活动原型原本为 null」场景，
+      //   用户未改 picker 直接保存 → payload 必须含 activityArchetypeId=null。
+      prefill: { title: '晨会', activityArchetypeId: null },
+      status: 'planned',
+      onConfirm,
+    })} />)
+    fireEvent.click(screen.getByText('保存'))
+    const payload = onConfirm.mock.calls[0][0]
+    expect(payload.operation).toBe('update')
+    expect(payload.selectedId).toBe('tb1')
+    expect(payload.fields).toHaveProperty('activityArchetypeId', null)
+  })
+
+  it('[026.02.4-r3-preland] TD-022 #6: prefill activityArchetypeId=string → payload 含 string', () => {
+    const onConfirm = vi.fn()
+    render(<EditTimeboxes {...makeProps({
+      mode: 'editing',
+      items: [tb('tb1', 'planned')],
+      selectedId: 'tb1',
+      prefill: { title: '晨会', activityArchetypeId: 'arch-1' },
+      status: 'planned',
+      onConfirm,
+    })} />)
+    fireEvent.click(screen.getByText('保存'))
+    const payload = onConfirm.mock.calls[0][0]
+    expect(payload.fields).toHaveProperty('activityArchetypeId', 'arch-1')
+  })
+
+  it('[026.02.4-r3-preland] TD-022 #6: prefill 不含 activityArchetypeId(undefined) → payload 不含该字段（skip 语义）', () => {
+    const onConfirm = vi.fn()
+    render(<EditTimeboxes {...makeProps({
+      mode: 'editing',
+      items: [tb('tb1', 'planned')],
+      selectedId: 'tb1',
+      prefill: { title: '晨会' }, // 不含 activityArchetypeId
+      status: 'planned',
+      onConfirm,
+    })} />)
+    fireEvent.click(screen.getByText('保存'))
+    const payload = onConfirm.mock.calls[0][0]
+    expect(payload.fields).not.toHaveProperty('activityArchetypeId')
+  })
 })

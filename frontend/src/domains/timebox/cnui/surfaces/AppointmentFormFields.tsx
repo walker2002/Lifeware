@@ -109,9 +109,12 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
       </div>
 
       {/* [026.01] archetype picker 嵌入（对齐 CreateTimebox.tsx:107-117）
-        *  [026.02.4] TD-022 #6: picker emits undefined on clear.
-        *  Appointment surface converts to null (= "explicit clear" semantics).
-        *  Timebox surface 用不同语义（undefined=clear），此处只在 appointment 域转换。 */}
+        *  [026.02.4-r3-preland] doc fix: Appointment surface 把 picker undefined → null
+        *  (explicit clear semantics). Timebox surface 在 [026.02.4] 已同步对齐 —— 其
+        *  server action `updateTimebox` 在 [026.02.4] I-1 收紧为 `value !== undefined`
+        *  (timebox.ts:255),所以 picker undefined 在 timebox 域语义为「skip」(不传字段)
+        *  ——与 appointment 域「undefined→null→显式清除」的语义不同。本 surface 仅在
+        *  appointment 域做 undefined → null 转换,timebox 域维持 undefined=skip。 */}
       <ArchetypePickerCard
         value={draft.activityArchetypeId ?? undefined}
         onChange={(archetypeId) => onChange({
