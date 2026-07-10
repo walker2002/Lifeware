@@ -87,7 +87,8 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
   const [editPriority, setEditPriority] = useState('medium')
   const [editDuration, setEditDuration] = useState('60')
   const [editThreadId, setEditThreadId] = useState<string | null>(null)
-  const [editArchetypeId, setEditArchetypeId] = useState<string | undefined>(undefined)
+  // [027-A] Phase A: state 类型改为 string | null，支持清除 wiring（undefined→null）
+  const [editArchetypeId, setEditArchetypeId] = useState<string | null>(null)
   const [showSubtaskInput, setShowSubtaskInput] = useState(false)
   const [subtaskTitle, setSubtaskTitle] = useState('')
 
@@ -127,7 +128,7 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
     setEditPriority(task.priority)
     setEditDuration(String(task.estimatedDuration ?? 60))
     setEditThreadId(task.threadId ?? null)
-    setEditArchetypeId(task.activityArchetypeId ?? undefined)
+    setEditArchetypeId(task.activityArchetypeId ?? null)
     setShowSubtaskInput(false)
     setSubtaskTitle('')
   }
@@ -225,9 +226,12 @@ export function TaskEditCard({ dataModel, onConfirm, onCancel, isLoading, isDone
         {/* 活动原型 */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs text-body">活动原型</label>
+          {/* [027-A] Phase A: state→picker value 转 null→undefined；onChange: undefined→null 清除 wiring */}
           <ArchetypePicker
-            value={editArchetypeId}
-            onChange={id => setEditArchetypeId(id)}
+            value={editArchetypeId || undefined}
+            onChange={id => setEditArchetypeId(id === undefined ? null : id)}
+            enableAiMatch
+            title={editTitle}
           />
         </div>
 

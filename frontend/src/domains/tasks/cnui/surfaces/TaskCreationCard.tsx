@@ -225,6 +225,8 @@ export function TaskCreationCard({
               setActivityArchetypeId(id)
               onDataChange({ ...dataModel, activityArchetypeId: id })
             }}
+            enableAiMatch
+            title={title}
           />
         </div>
 

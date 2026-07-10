@@ -31,4 +31,9 @@ describe('[023] A3.2 HabitForm archetype 接入', () => {
     render(<HabitForm initial={{ title: '晨跑', activityArchetypeId: 'a1' } as any} onSubmit={() => {}} onCancel={() => {}} />)
     expect(await screen.findByText('深度专注')).toBeInTheDocument()
   })
+
+  it('[027-A] 传入 title 时渲染「AI 匹配」按钮', async () => {
+    render(<HabitForm initial={{ title: '晨跑' }} onSubmit={() => {}} onCancel={() => {}} />)
+    expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
+  })
 })
