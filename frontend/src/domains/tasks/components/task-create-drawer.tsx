@@ -19,6 +19,7 @@ import type { Task, Thread } from '../../../usom/types/objects'
 import type { USOM_ID } from '../../../usom/types/primitives'
 import type { Priority } from '../../../usom/types/primitives'
 import { Button } from '@/components/ui/button'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 
 /** 新建任务预填项 */
 export interface TaskCreateDefaults {
@@ -61,6 +62,7 @@ export function TaskCreateDrawer({ defaults, onClose, onCreated }: TaskCreateDra
   const [threadId, setThreadId] = useState<string>(defaults.threadId ?? '')
   const [threads, setThreads] = useState<Thread[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(undefined)
 
   const { errors: fieldErrors, validateField } = useManifestRules(taskRuleRegistry)
 
@@ -84,6 +86,7 @@ export function TaskCreateDrawer({ defaults, onClose, onCreated }: TaskCreateDra
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         threadId: threadId || undefined,
         parentId: defaults.parentId || undefined,
+        activityArchetypeId: activityArchetypeId || undefined,
       })
       toast.success(defaults.parentId ? '子任务已创建' : '任务已创建')
       onCreated(created)
@@ -202,6 +205,16 @@ export function TaskCreateDrawer({ defaults, onClose, onCreated }: TaskCreateDra
             {defaults.parentId && (
               <p className="text-xs text-body/70 mt-0.5">子任务归属父任务所在主线</p>
             )}
+          </div>
+
+          <div>
+            <label className="text-xs text-body mb-1 block">活动原型</label>
+            <ArchetypePicker
+              value={activityArchetypeId}
+              onChange={id => setActivityArchetypeId(id)}
+              enableAiMatch
+              title={title}
+            />
           </div>
         </div>
 
