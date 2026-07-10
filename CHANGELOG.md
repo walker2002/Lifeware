@@ -556,6 +556,55 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ---
 
+## [026.02.4-r3] pre-land-review 抓 P0 + P1（2026-07-09）
+
+> [026.02.4-r2] ship 后跑 `/pre-land-review`（specialist army + Claude adversarial + **Codex adversarial**），抓出 1 P0 + 1 P1 + 3 P2 + 3 P3。这是 [[feedback_post-ship-review-meta-pattern]] 模式在项目内**第 4 次验证**——前 3 轮 (Opus 2x) + 1 轮 (Sonnet 4 specialists) 都漏了 EditTimeboxes Site 5 与 useAutoTrigger double-fire 的真实 production 影响。
+
+### 决策摘要
+
+- **P0 useAutoTrigger double-fire 真修**：r2 登记 TD-031 但未真修，r3 Codex 抓出同 cycle 双 fire start+overtime → server-action storm（40 overdue timeboxes × 2 round-trips/min = ~80 failures/min/user）。**用 `else if` 互斥修复**，单周期单 fire
+- **P1 EditTimeboxes.tsx:195 truthy-collapse 真修**：r2 defer 的 "Site 5 doesn't go through server DB.write same field" rationale 错误（r3 Codex 抓出：payload 实际流向 updateTimebox，server-side mapper 写 DB 字段）。`?` → `!== undefined` + type widening 完整闭合 TD-022 #6
+- **P1 AppointmentFormFields.tsx 注释修正**："Timebox surface 用不同语义（undefined=clear）" 在本 PR 已被 timebox server mapper 改为 `!== undefined` 后**事实上错误**——timebox 现在也用 undefined=skip。注释会误导未来 maintainer
+- **3 P2 + 3 P3**：findRunning IRON RULE 不绑列 / newDurationMin typeof 拒 stringified / UUID v4 锁定 legacy / setInterval reset bug / clock-source 分歧（DB NOW() vs JS new Date()）/ 误导注释。**全部 defer 到下个 session**
+
+### 改动清单（2 commits on main，fix + fix+docs）
+
+- **Commit 1** `83d5740` fix(026.02.4-r3-preland)：TD-031 actual fix — useAutoTrigger double-fire (else if mutual exclusion)
+  - `use-auto-trigger.ts:44-59` 第二分支 `if` → `else if`（分支互斥）
+  - 新建 `use-auto-trigger.test.ts`（207 行，6 cases）：覆盖 overdue planned timebox 仅 fire 一次、pre-PR 死分支（planned + future start）零 fire、边界条件
+- **Commit 2** `b209cd4` fix+docs(026.02.4-r3-preland)：TD-022 #6 site 5 + EditTimeboxes.tsx truthy-collapse + AppointmentFormFields doc accuracy
+  - `EditTimeboxes.tsx:195` `?` → `!== undefined`（3-state 修复）
+  - `timebox.ts:115` type widening（`string` → `string | null`）支持 null 透传
+  - `AppointmentFormFields.tsx:111-114` 注释改为 "Timebox surface 也用 undefined=skip"
+  - 新建 `edit-timeboxes.test.tsx`（56 行，3 cases）：覆盖 clearing archetype 透传 null + skip 路径
+
+### 验证结果
+
+- vitest baseline=head：+9 net cases（6 useAutoTrigger + 3 EditTimeboxes）0 回归
+- tsc：0 新增错误（199 = baseline）
+- pre-push hooks：validate:manifest 0 errors + validate:structure ✓ + validate:rules-registry 6 项一致
+- useAutoTrigger 临时 revert 验证 bug 复现 + fix 后消失（impl 自验）
+
+### 关联
+
+- 上游：[026.02.4-r2] ship（db8f150）
+- 关联 TD：TD-031（`useAutoTrigger double-fire` — 升级为已修复）+ TD-022 #6 Site 5（`EditTimeboxes.tsx:195` — 已修）
+- 关联 spec：`docs/superpowers/specs/2026-07-09-026-02-4-follow-up-fixes-design.md`（不再修订，r3 为 post-push audit）
+- 4 specialist findings + Claude adversarial 2 findings + Codex adversarial 2 P1 + 3 P2 + 3 P3 — 全部 documented in `task-026-02-4-r3-fix-report.md`
+
+### 仍未 ship 的 follow-ups (P2/P3 from r3)
+
+- **P2**: findRunning IRON RULE 不绑列（lte/gte 调换 bug 不被捕获）— test gap
+- **P2**: newDurationMin `typeof !== 'number'` 拒 stringified 数字（LLM contract 决策）
+- **P2**: use-auto-trigger setInterval reset bug（ref refactor）
+- **P2**: UUID v4 regex 锁定 legacy/v7/uppercase（保守防御，defer）
+- **P3**: clock-source 分歧（DB NOW() vs JS new Date()）
+- **P3**: misleading handler comments at Sites 3/4
+- **P3**: EditAppointment `surfaceType` dead prop
+- **P3**: design polish（archetype picker "未选择" identical for undefined/null, hardcoded "计划" badge）
+
+---
+
 ## 项目宪章（.specify/memory/constitution.md）
 
 - v2.1.1 (2026_07_01) — PATCH：version tracking 职责由 manifest.md 迁至 CHANGELOG.md（Tier 3 清单 + 修订流程第 5 步）
