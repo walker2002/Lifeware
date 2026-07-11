@@ -125,9 +125,21 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
     }
     // [027-B] OV-B：保存前校验全部行（兜底「未 blur 直接点保存」路径）。
     // 行级 onBlur 通常先触发 RowEditor 提示（Task 5）；此 gate 与之呼应拦截。
-    const rowErrors = editing.rows.flatMap((r) => validateTemplateRow(r))
-    if (rowErrors.length > 0) {
-      toast.error('时间字段有误，请修正标红项后再保存')
+    // [PLR] M5：收集每行错误 + 行 ID/标签 + 错误信息，弹首条 + 总数（让用户知道是哪行哪个字段出错）。
+    const perRowErrors: Array<{ rowId: string; rowLabel: string; errors: string[] }> = []
+    editing.rows.forEach((r) => {
+      const errs = validateTemplateRow(r)
+      if (errs.length > 0) {
+        perRowErrors.push({
+          rowId: r.id,
+          rowLabel: r.activityName || '(未命名)',
+          errors: errs,
+        })
+      }
+    })
+    if (perRowErrors.length > 0) {
+      const first = perRowErrors[0]!
+      toast.error(`${first.rowLabel}：${first.errors[0]}（共 ${perRowErrors.length} 行有问题）`)
       return
     }
     setSaving(true)

@@ -98,6 +98,12 @@ describe('normalizeTemplateRow', () => {
     expect(out.source).toBe('custom')
     expect(out.defaultStart).toBe('09:00')
   })
+  // [PLR] F-03：null 表示 DB 损坏（partial migration 写入 JSONB 的非法值），抛错暴露而非静默兜底。
+  it('legacy 形状 start=null 抛错暴露 DB 损坏', () => {
+    expect(() =>
+      normalizeTemplateRow({ id: 'r', activityName: 'x', start: null, end: null, source: 'custom' }),
+    ).toThrow(/malformed legacy row/)
+  })
 })
 
 describe('validateTemplateRow', () => {

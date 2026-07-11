@@ -128,6 +128,11 @@ export function normalizeTemplateRow(raw: unknown): TemplateRow {
     }
   }
   // 旧形状 {start, end}
+  // [PLR] F-03：null 表示 DB 损坏（partial migration 写入 JSONB 的非法值），抛错暴露而非静默兜底。
+  // typeof === 'string' 兜底保留（undefined/空串视为缺字段，走 '09:00' 兼容路径）。
+  if (r.start === null || r.end === null) {
+    throw new Error(`[normalizeTemplateRow] malformed legacy row: start=${String(r.start)} end=${String(r.end)} id=${String(r.id)}`)
+  }
   const start = typeof r.start === 'string' ? r.start : '09:00'
   const end = typeof r.end === 'string' ? r.end : start
   return {

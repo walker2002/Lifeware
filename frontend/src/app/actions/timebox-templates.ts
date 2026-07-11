@@ -117,3 +117,8 @@ export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionR
     return { success: false, error: err instanceof Error ? err.message : '拉取订阅源失败' }
   }
 }
+
+/** [PLR] F-12 测试钩子：清空 sources in-memory cache（仅测试用，prod 不调） */
+export function __resetForTesting(): void {
+  _sourcesCache = null
+}

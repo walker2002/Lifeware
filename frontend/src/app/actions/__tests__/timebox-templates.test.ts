@@ -32,11 +32,12 @@ vi.mock('@/domains/tasks/repository/thread', () => ({
   }),
 }))
 
-const { fetchSubscriptionSources } = await import('../timebox-templates')
+const { fetchSubscriptionSources, __resetForTesting } = await import('../timebox-templates')
 
 describe('fetchSubscriptionSources — archetypeId', () => {
   beforeEach(() => {
     vi.resetModules()
+    __resetForTesting()
   })
   it('habits 项带 activityArchetypeId + start/duration', async () => {
     const r = await fetchSubscriptionSources()

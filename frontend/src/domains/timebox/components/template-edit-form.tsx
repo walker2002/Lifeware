@@ -37,7 +37,7 @@
  */
 'use client'
 
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { Plus, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ArchetypePicker } from '@/components/archetype/archetype-picker'
@@ -305,53 +305,74 @@ export function TemplateEditForm({
     onChange({ ...template, daysOfWeek: arr })
   }, [template, onChange])
 
+  // [PLR] F-18：ref-based callback 稳定化——RowEditor 用 React.memo 包裹但 callback 因依赖 template 每次都换引用，
+  // memo 失效。把 template/sources/onChange 放进 ref，callback 自身用空 deps，引用稳定；ref 在每次渲染时更新。
+  const stateRef = useRef({ template, sources, onChange })
+  stateRef.current = { template, sources, onChange }
+
   const updateRow = useCallback((id: string, patch: Partial<TemplateRow>) => {
-    onChange({
-      ...template,
-      rows: template.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    const { template: t, onChange: cb } = stateRef.current
+    cb({
+      ...t,
+      rows: t.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     })
-  }, [template, onChange])
+  }, [])
 
   const deleteRow = useCallback((id: string) => {
-    onChange({ ...template, rows: template.rows.filter((r) => r.id !== id) })
-  }, [template, onChange])
+    const { template: t, onChange: cb } = stateRef.current
+    cb({ ...t, rows: t.rows.filter((r) => r.id !== id) })
+  }, [])
 
   const addRow = useCallback(() => {
     onChange({ ...template, rows: [...template.rows, newEmptyRow()] })
   }, [template, onChange])
 
   // [027-B] OV-C（DRY）：直接用 SubscriptionSources 子元素类型，消除本地 SourceHabit/SourceItem 重复定义
+  // [PLR] F-18：ref-based 稳定化（deps=[]），见上方 stateRef。
   const changeRowSource = useCallback((
     id: string,
     newSource: TemplateRowSource,
     newSourceId?: string,
   ) => {
-    const row = template.rows.find((r) => r.id === id)
+    const { template: t, sources: src, onChange: cb } = stateRef.current
+    const row = t.rows.find((r) => r.id === id)
     if (!row) return
 
-    if (newSource === 'habit' && newSourceId && sources) {
+    if (newSource === 'habit' && newSourceId && src) {
       const h: SubscriptionSources['habits'][number] | undefined =
-        sources.habits.find((x) => x.id === newSourceId)
+        src.habits.find((x) => x.id === newSourceId)
       if (h) {
-        onChange({
-          ...template,
-          rows: template.rows.map((r) =>
+        // [PLR] D2：切到 habit 时清零约束（旧值不再有意义，habit 时间/约束全锁）+ 派生 archetype。
+        cb({
+          ...t,
+          rows: t.rows.map((r) =>
             r.id === id
-              ? { ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, defaultStart: h.start, defaultDuration: hhmmDiffMinutes(h.start, h.end) }
+              ? {
+                  ...r,
+                  source: 'habit',
+                  sourceId: newSourceId,
+                  activityName: h.title,
+                  defaultStart: h.start,
+                  defaultDuration: hhmmDiffMinutes(h.start, h.end),
+                  earliestStart: null,
+                  latestStart: null,
+                  shortestDuration: null,
+                  activityArchetypeId: h.activityArchetypeId ?? null,
+                }
               : r,
           ),
         })
         return
       }
     }
-    if ((newSource === 'task' || newSource === 'thread') && newSourceId && sources) {
+    if ((newSource === 'task' || newSource === 'thread') && newSourceId && src) {
       const list: Array<SubscriptionSources['tasks'][number] | SubscriptionSources['threads'][number]> =
-        newSource === 'task' ? sources.tasks : sources.threads
+        newSource === 'task' ? src.tasks : src.threads
       const item = list.find((x) => x.id === newSourceId)
       if (item) {
-        onChange({
-          ...template,
-          rows: template.rows.map((r) =>
+        cb({
+          ...t,
+          rows: t.rows.map((r) =>
             r.id === id ? { ...r, source: newSource, sourceId: newSourceId, activityName: item.title } : r,
           ),
         })
@@ -359,13 +380,13 @@ export function TemplateEditForm({
       }
     }
     // custom 或 sources 未就绪：仅切来源，sourceId 清空，名称保留
-    onChange({
-      ...template,
-      rows: template.rows.map((r) =>
+    cb({
+      ...t,
+      rows: t.rows.map((r) =>
         r.id === id ? { ...r, source: newSource, sourceId: undefined, activityName: r.activityName } : r,
       ),
     })
-  }, [template, sources, onChange])
+  }, [])
 
   return (
     <div className="flex flex-col gap-4 mt-4 flex-1 overflow-y-auto">

@@ -250,13 +250,14 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
-      // [OQ-7 audit] 抓 raw rows 用作 audit log 的 oldValues.rows
-      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
+      // [PLR] P1：findById 先跑；owner-check 紧随其后（rows 引用变了才执行）；raw rows SELECT 最后
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // [027-B] rowToTemplate 归一化产生新数组 → old.rows !== input.rows → owner-check 触发
       // owner-check habits → 命中（rows 含 habit-1 引用）
       txSelect.mockReturnValueOnce(mockSelectWhere([{ id: 'habit-1' }]) as any)
+      // [OQ-7 audit] 抓 raw rows 用作 audit log 的 oldValues.rows
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
       // update returning → [FAKE_TEMPLATE_ROW 重命名后]
       txUpdate.mockReturnValueOnce(mockUpdateReturning([FAKE_TEMPLATE_ROW]) as any)
       // audit log insert → void
@@ -275,7 +276,7 @@ describe('TimeboxTemplateRepository', () => {
       )
 
       expect(result.id).toBe(FAKE_TEMPLATE_ROW.id)
-      // [OQ-7] + findById + habits：raw rows 1 + findById 1 + habits 1 = 3 次 select
+      // [PLR] P1：findById 1 + raw rows 1 + habits 1 = 3 次 select
       expect(txSelect).toHaveBeenCalledTimes(3)
       expect(txUpdate).toHaveBeenCalledTimes(1)
     })
@@ -294,12 +295,13 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
-      // [OQ-7 audit] 抓 raw rows
-      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
+      // [PLR] P1：findById 先跑；owner-check 紧随其后；raw rows 最后
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // owner-check habits → 命中（rows 引用变了 = 重新校验）
       txSelect.mockReturnValueOnce(mockSelectWhere([{ id: 'habit-1' }]) as any)
+      // [OQ-7 audit] 抓 raw rows
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
       // update returning → [FAKE_TEMPLATE_ROW]
       txUpdate.mockReturnValueOnce(mockUpdateReturning([FAKE_TEMPLATE_ROW]) as any)
       // audit log insert → void
@@ -329,7 +331,7 @@ describe('TimeboxTemplateRepository', () => {
         MVP_USER,
       )
 
-      // [OQ-7] + owner-check：raw rows 1 + findById 1 + habits 1 = 3 次 select
+      // [PLR] P1：findById 1 + raw rows 1 + habits 1 = 3 次 select
       expect(txSelect).toHaveBeenCalledTimes(3)
       expect(txUpdate).toHaveBeenCalledTimes(1)
     })
@@ -348,12 +350,13 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
-      // [OQ-7 audit] 抓 raw rows（在 owner-check 抛出前也会跑一次）
-      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
+      // [PLR] P1：findById 先跑；owner-check 紧随其后（rows 引用变了才执行）；raw rows 最后
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // owner-check habits → 空（跨用户 → 拒绝）
       txSelect.mockReturnValueOnce(mockSelectWhere([]) as any)
+      // [OQ-7 audit] raw rows 不会被消费（owner-check 先抛错），但仍 queue 以防
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
 
       const newRows = [
         {
