@@ -121,6 +121,8 @@ interface BatchMetadata {
 /**
  * Record a batch of accepted proposals. Persists to memory_episodes table via EpisodeRepository.
  * [F4 fold]: Replaces in-memory stub with real DB write.
+ * [028] T9: action 字段 'createSmartTimeboxes' → 'scheduleProposal'（与 manifest intent_triggers.action 同步）。
+ *   getRevertableBatches (line 233-242) filter 不读 action 字段，rename 不影响撤销路径。
  */
 export async function recordBatchProposals(input: RecordBatchInput): Promise<string> {
   const repo = new EpisodeRepository()
@@ -129,7 +131,7 @@ export async function recordBatchProposals(input: RecordBatchInput): Promise<str
     userId: input.userId,
     sessionId: input.sessionId,
     domainId: 'timebox',
-    action: 'createSmartTimeboxes',
+    action: 'scheduleProposal',
     episodeType: 'batch_proposals',
     summary: `batch_proposals:${input.proposals.length} items`,
     metadata: {

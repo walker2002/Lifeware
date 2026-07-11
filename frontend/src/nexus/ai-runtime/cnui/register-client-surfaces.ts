@@ -18,6 +18,8 @@ import { AdjustTimeboxes } from '@/domains/timebox/cnui/surfaces/AdjustTimeboxes
 import { EditTimeboxes } from '@/domains/timebox/cnui/surfaces/EditTimeboxes'
 // [023.08] T5 — CreateSmartTimebox CNUI surface 客户端注册（[cnui-surface-dual-registration] memory: server + client 双注册）
 import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
+// [028] T9 — ScheduleProposal CNUI surface 客户端注册（schedule-proposal surface；最高频陷阱 — server + client 双注册必须闭合）
+import { ScheduleProposal } from '@/domains/timebox/cnui/surfaces/ScheduleProposal'
 // [026.02] T1 — 约定 3 surface（[026.01] 漏注册 client，触发 IRON RULE）
 import { CreateAppointment } from '@/domains/timebox/cnui/surfaces/CreateAppointment'
 import { EditAppointment } from '@/domains/timebox/cnui/surfaces/EditAppointment'
@@ -34,6 +36,8 @@ cnuiRegistry.register('timebox', 'adjust-timeboxes', { component: AdjustTimeboxe
 cnuiRegistry.register('timebox', 'edit-timeboxes', { component: EditTimeboxes })
 // [023.08] T5 — CreateSmartTimebox CNUI surface（client 双注册 + manifest K-block create-smart-timebox）
 cnuiRegistry.register('timebox', 'create-smart-timebox', { component: CreateSmartTimebox })
+// [028] T9 — ScheduleProposal CNUI surface（client 双注册 + manifest K-block schedule-proposal）
+cnuiRegistry.register('timebox', 'schedule-proposal', { component: ScheduleProposal })
 // [026.02] T1 — 修复 [026.01] 回归（server 已注册 surfaceHandlers，client 漏 3 个 surface）
 //   per [[project-cnui-surface-dual-registration]]：server + client 双注册闭合。
 cnuiRegistry.register('timebox', 'create-appointment', { component: CreateAppointment })

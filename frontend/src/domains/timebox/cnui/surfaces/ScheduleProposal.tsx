@@ -1,16 +1,206 @@
 /**
  * @file schedule-proposal
- * @brief [028] T1 manifest 占位 surface — validate:manifest 需 .tsx 文件存在；T9 替换为完整实现
+ * @brief [028] T9 ScheduleProposal CNUI surface — 今日行动计划提案（四源归集 + needConfirm + batch 撤销）
  *
- * 占位策略：T9 改名/扩展自 CreateSmartTimebox.tsx 之前，T1 提供最小 surface 文件
- * 让 validate:manifest 的 K-component-not-found 检查通过。组件本身是空 stub，
- * 不会实际渲染（client-side register-client-surfaces.ts 在 T9 注册，本组件
- * 才进入 cnuiRegistry；T1 阶段未注册 = UI 永不调到此 stub）。
+ * 镜像 [023.08] CreateSmartTimebox 范式（[019.1] 手写化），不依赖 CnuiFormAdapter。
+ * 数据模型来自 cnui/handlers.ts:scheduleProposal branch（[028] T6 fold + T9 自含 batch recording）。
+ *
+ * [F5 fold] 暴露 data-testid selector 给 E2E + 验证测试：
+ *   - [data-testid=ai-orchestrate-button]（workspace 入口）
+ *   - [data-testid=proposal-card]（每个 proposal 卡片）
+ *   - [data-testid=reject-btn] / [data-testid=accept-all-btn]（accept/reject 操作）
+ *   - [data-testid=revert-batch-btn]（撤销按钮）
+ *   - [data-testid=need-confirm-card]（低置信 / Tier0 冲突时显示 ArchetypePicker 候选）
+ *
+ * [028] T9: action 字段发 'scheduleProposal'（与 manifest intent_triggers.action 同步，
+ *   handler submit 分支通过 action === 'scheduleProposal' 路由到自含 batch recording 路径）。
+ *
+ * 接受 → onConfirm({action:'scheduleProposal', fields:{items, date}})
+ * 撤销 → onConfirm({action:'revertSmartTimeboxes', fields:{batchId}})
+ *   （revertSmartTimeboxes 路径 K-block 仍复用 create-smart-timebox surface，保留不变）
  */
 
 'use client'
 
-/** [028] T9 占位：T9 替换为完整 ScheduleProposal 实现（[023.08] CreateSmartTimebox 范式 + 四源提案 + needConfirm + batch undo） */
-export function ScheduleProposal(): null {
-  return null
+import { useState } from 'react'
+import { AIOrchestratePanel } from '../../components/AIOrchestratePanel'
+
+interface Proposal {
+  id: string
+  title: string
+  startTime: string // HH:MM（orchestration 内部 human-friendly）
+  endTime: string
+}
+
+interface RevertableBatch {
+  batchId: string
+  acceptedAt: number
+  count: number
+}
+
+interface ArchetypeCandidate {
+  id: string
+  title: string
+  source: 'inferred' | 'appointment' | 'fallback'
+  reason: string
+}
+
+interface ScheduleProposalProps {
+  surfaceType: string
+  dataModel: {
+    proposals?: Proposal[]
+    revertableBatches?: RevertableBatch[]
+    // [028] T6 fold: NL 解析低置信 / Tier0 冲突时,onGenerate 返 needConfirm + 候选
+    needConfirm?: boolean
+    archetypeCandidates?: ArchetypeCandidate[]
+    confirmReason?: string
+    handoffHint?: string
+  }
+  onDataChange: (d: Record<string, unknown>) => void
+  onConfirm: (d: Record<string, unknown>) => void
+  onCancel?: () => void
+  isLoading?: boolean
+  isDone?: boolean
+}
+
+export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: ScheduleProposalProps) {
+  const proposals = dataModel.proposals ?? []
+  const revertableBatches = dataModel.revertableBatches ?? []
+  const needConfirm = dataModel.needConfirm ?? false
+  const archetypeCandidates = dataModel.archetypeCandidates ?? []
+  const confirmReason = dataModel.confirmReason ?? ''
+  const handoffHint = dataModel.handoffHint ?? ''
+
+  // [023.08] T5：rejected Set 跟踪用户拒绝的 proposal（默认全部接受；点「拒绝」加入 set）
+  const [rejected, setRejected] = useState<Set<string>>(new Set())
+
+  if (isDone) return <p className="py-2 text-center text-sm text-ink">✅ AI 编排已应用</p>
+
+  // [028] T6: needConfirm 路径 — NL 解析低置信 / Tier0 冲突 → 显示候选 + 提示
+  if (needConfirm) {
+    return (
+      <div className="space-y-4">
+        <div
+          data-testid="need-confirm-card"
+          className="rounded border border-amber-200 bg-amber-50 p-3"
+        >
+          <p className="text-sm text-amber-900">{confirmReason || '需要您确认候选'}</p>
+          {handoffHint && (
+            <p className="mt-1 text-xs text-amber-700/80">{handoffHint}</p>
+          )}
+        </div>
+
+        {archetypeCandidates.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wide text-body/60">候选活动</p>
+            {archetypeCandidates.map(c => (
+              <div
+                key={c.id}
+                className="rounded border border-canvas-subtle bg-canvas p-2"
+              >
+                <p className="text-sm font-medium text-ink">{c.title}</p>
+                <p className="text-xs text-body/70">{c.reason}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          {onCancel && (
+            <button
+              type="button"
+              className="px-4 py-2 text-sm text-body transition-colors hover:bg-canvas-subtle"
+              onClick={onCancel}
+            >
+              关闭
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const acceptedProposals = proposals.filter(p => !rejected.has(p.id))
+
+  // [028] T9 fold-in: dispatch 发 action: 'scheduleProposal'（与 manifest intent_triggers.action + handler submit 分支名一致）
+  const handleAcceptClick = () => {
+    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+    onConfirm({
+      action: 'scheduleProposal',
+      fields: {
+        items: acceptedProposals.map(p => ({
+          title: p.title,
+          date: todayLocal,
+          startTime: p.startTime,
+          endTime: p.endTime,
+        })),
+      },
+    })
+  }
+
+  // [023.08] T5：保留 onDataChange 钩子让父容器观测 rejected 集合变化（[019.1] 范式）
+  void onDataChange
+
+  return (
+    <div className="space-y-4">
+      {/* AI 编排建议面板 + 接受/拒绝按钮 */}
+      {proposals.length > 0 && (
+        <AIOrchestratePanel
+          proposals={proposals}
+          rejected={rejected}
+          onAccept={(id) => {
+            const next = new Set(rejected)
+            next.delete(id)
+            setRejected(next)
+          }}
+          onReject={(id) => {
+            const next = new Set(rejected)
+            next.add(id)
+            setRejected(next)
+          }}
+        />
+      )}
+
+      {/* [023.08] T5：5 分钟内显示的「撤销刚才创建的 N 个时间盒」 */}
+      {revertableBatches.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm text-amber-900">刚刚创建了 {revertableBatches[0].count} 个时间盒</p>
+          <button
+            type="button"
+            data-testid="revert-batch-btn"
+            className="mt-2 rounded bg-amber-600 px-3 py-1 text-sm text-white transition-colors hover:bg-amber-700"
+            onClick={() =>
+              onConfirm({
+                action: 'revertSmartTimeboxes',
+                fields: { batchId: revertableBatches[0].batchId },
+              })
+            }
+          >
+            撤销刚刚创建的 {revertableBatches[0].count} 个时间盒
+          </button>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <button
+            type="button"
+            className="px-4 py-2 text-sm text-body transition-colors hover:bg-canvas-subtle"
+            onClick={onCancel}
+          >
+            取消
+          </button>
+        )}
+        <button
+          type="button"
+          data-testid="accept-all-btn"
+          className="rounded bg-primary px-4 py-2 text-sm text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
+          disabled={isLoading || acceptedProposals.length === 0}
+          onClick={handleAcceptClick}
+        >
+          接受 {acceptedProposals.length} 个时间盒
+        </button>
+      </div>
+    </div>
+  )
 }

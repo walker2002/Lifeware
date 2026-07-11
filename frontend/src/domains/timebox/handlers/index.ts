@@ -28,14 +28,14 @@ export interface HandlerFactoryDeps {
  *   - 缺省 → handler 无 rule-engine，detectConflicts 走 [023.07] 谓词 fallback
  *
  * 返回 handler map 的 key 必与 manifest.intentTriggers.action 同名
- * （createSmartTimeboxes / adjustRemainingTimeboxes）。
+ * （scheduleProposal / adjustRemainingTimeboxes）。
  */
 export function createTimeboxHandlers(deps: HandlerFactoryDeps = {}) {
   const ruleEngine = deps.timeboxRepo && deps.userId
     ? createRuleEngine({ timeboxRepo: deps.timeboxRepo, userId: deps.userId })
     : undefined
   return {
-    createSmartTimeboxes: new TimeboxOrchestrationHandler({ ruleEngine, ...deps }),
+    scheduleProposal: new TimeboxOrchestrationHandler({ ruleEngine, ...deps }),
     adjustRemainingTimeboxes: new TimeboxOrchestrationHandler({ ruleEngine, ...deps }),
   }
 }

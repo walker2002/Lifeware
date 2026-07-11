@@ -5,10 +5,18 @@ vi.mock('@/app/actions/timebox', () => ({
   updateTimebox: vi.fn().mockResolvedValue({ status: 'ok' }),
   deleteTimebox: vi.fn().mockResolvedValue({ status: 'ok' }),
 }))
+vi.mock('@/nexus/ai-runtime/memory/batch-proposals', () => ({
+  recordBatchProposals: vi.fn().mockResolvedValue('batch-xyz'),
+  revertBatchProposals: vi.fn(),
+  getRevertableBatches: vi.fn().mockResolvedValue([]),
+}))
 
 import { timeboxCnuiHandler } from '@/domains/timebox/cnui/handlers'
 import { submitDynamicIntent } from '@/app/actions/intent'
 import { updateTimebox, deleteTimebox } from '@/app/actions/timebox'
+import { recordBatchProposals } from '@/nexus/ai-runtime/memory/batch-proposals'
+import { surfaceHandlers } from '@/domains/timebox/cnui/handlers'
+import { createTimeboxHandlers } from '@/domains/timebox/handlers'
 
 describe('[023] A2 createTimebox CNUI handler', () => {
   beforeEach(() => {
@@ -211,5 +219,59 @@ describe('[023] A2.7 logTimebox CNUI handler', () => {
         notes: '被打断',
       }),
     })
+  })
+})
+
+describe('[028] T9 scheduleProposal action registration + R12', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-9' } })
+    ;(recordBatchProposals as any).mockResolvedValue('batch-xyz')
+  })
+
+  it('surfaceHandlers 含 schedule-proposal surface (注册点 1+2)', () => {
+    expect(surfaceHandlers['schedule-proposal']).toBeDefined()
+  })
+
+  it('createTimeboxHandlers() 返回 scheduleProposal key (注册点 3 / R13)', () => {
+    const handlers = createTimeboxHandlers({})
+    expect(handlers.scheduleProposal).toBeDefined()
+    expect((handlers as { createSmartTimeboxes?: unknown }).createSmartTimeboxes).toBeUndefined()
+  })
+
+  // [028] T9-fix：scheduleProposal submit 自含 batch 落库（fold-in，不依赖 createTimebox 分支 _source === 'createSmartTimebox'）
+  it('submit scheduleProposal → 自含 batch 落库 + 不返 deprecated', async () => {
+    // [028] T9-fix：items 走 createTimebox 意图逐条提交 + 收 succeeded → recordBatchProposals
+    const r = await timeboxCnuiHandler.submit('scheduleProposal', {
+      items: [
+        { id: 'draft-1', title: '上午写作', date: '2026-07-11', startTime: '09:00', endTime: '11:00' },
+        { id: 'draft-2', title: '下午会议', date: '2026-07-11', startTime: '14:00', endTime: '15:00' },
+      ],
+    })
+    expect(r.success).toBe(true)
+    // 不返 deprecated 错（旧 createSmartTimeboxes 分支已退役）
+    expect(r.error ?? '').not.toContain('弃用')
+    // submitDynamicIntent 被调 2 次（每个 item 一次）
+    expect(submitDynamicIntent).toHaveBeenCalledTimes(2)
+    // recordBatchProposals 被调一次（自含 batch 落库），无 _source 分支依赖
+    expect(recordBatchProposals).toHaveBeenCalledTimes(1)
+    // batch 内 proposals 走真实 timeboxId（不是空占位）
+    const call = (recordBatchProposals as any).mock.calls[0][0]
+    expect(call.proposals).toHaveLength(2)
+    expect(call.proposals[0].timeboxId).toBe('tb-9')
+  })
+
+  it('R12：record/open/revert 用同一 SESSION_KEY（无单/复数不一致）', () => {
+    // [028] T9 R12 — 验证：handlers.ts 内 'timebox-createSmartTimebox' (单数) + 'timebox-createSmartTimeboxes' (复数) 均 0 hit
+    // sessionId 走 SESSION_KEY = 'timebox-scheduleProposal' 单一常量
+    const fs = require('fs')
+    const src = fs.readFileSync(require('path').resolve(__dirname, '../cnui/handlers.ts'), 'utf-8')
+    expect(src).not.toMatch(/'timebox-createSmartTimebox[^s]/)  // 单数 0 hit
+    expect(src).not.toMatch(/'timebox-createSmartTimeboxes'/)  // 复数 0 hit
+  })
+
+  it('R11：registry getHandler 复用 timeboxCnuiHandler（schedule-proposal 走 timeboxCnuiHandler）', () => {
+    expect(surfaceHandlers['schedule-proposal']).toBe(timeboxCnuiHandler)
+    expect(surfaceHandlers['create-smart-timebox']).toBe(timeboxCnuiHandler)
   })
 })

@@ -33,6 +33,12 @@ async function getTodayDate(): Promise<string> {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
 }
 
+// [028] T9 R12: 单一 SESSION_KEY 常量 — open / submit / record 三处统一引用，
+//   消除「timebox-createSmartTimebox」(单数, line 465) vs `timebox-${action}` (复数, line 119) 不一致。
+//   R12 实际是「dead parameter」：getRevertableBatches (batch-proposals.ts:233-242) filter
+//   不读 sessionId，撤销路径按 userId + windowMs 过滤。统一 SESSION_KEY 作代码一致性改进。
+const SESSION_KEY = 'timebox-scheduleProposal'
+
 /**
  * 获取今日时间盒列表
  * 
@@ -106,7 +112,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'createSmartTimeboxes') {
+    if (action === 'scheduleProposal') {
       const [timeboxes, tasks, habits] = await Promise.all([
         getTodayTimeboxes(),
         getActiveTasks(),
@@ -115,8 +121,9 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
 
       // [023.08] T4 — 列当前 session 5 分钟内可 revert 的 batches
       //  AI panel 据此显示「撤销刚才创建的 N 个时间盒」按钮
+      // [028] T9 R12: sessionId 改 SESSION_KEY 常量（与 submit / record 三处统一）
       const revertableBatches = await getRevertableBatches({
-        sessionId: `timebox-${action}`,
+        sessionId: SESSION_KEY,
         userId: MVP_USER_ID,
         windowMs: 5 * 60 * 1000,
       }).catch(() => [])
@@ -458,11 +465,12 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       // [023.08] T5：_source === 'createSmartTimebox' → 把 succeeded 转 BatchProposalItem
       //   喂给 recordBatchProposals，取代 T4 placeholder proposals:[] 占位。
       //   batch 内建议每个 succeeded.timeboxId 都不为空（防御性 fallback 到标题 hash）
+      // [028] T9 R12: sessionId 改 SESSION_KEY 常量（与 open / submit 三处统一）
       let batchId: string | undefined
       if (sourceTag === 'createSmartTimebox' && succeeded.length > 0) {
         try {
           batchId = await recordBatchProposals({
-            sessionId: 'timebox-createSmartTimebox',
+            sessionId: SESSION_KEY,
             userId: MVP_USER_ID,
             proposals: succeeded.map(s => ({
               id: s.timeboxId || `proposal-${s.title}`,
@@ -521,47 +529,97 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     }
 
     if (action === 'createSmartTimeboxes') {
-      // [023.08] T5：原 T4 placeholder 移除。
-      //   原占位 proposals:[] 会让 getRevertableBatches 返 batchId 但 0 count，
-      //   「撤销刚才创建的 N 个时间盒」按钮永远显示 0。
-      //   真实 submit 路径在 createTimebox 分支：
-      //   当 fields._source === 'createSmartTimebox' 时，循环内逐条成功后调
-      //   recordBatchProposals({proposals: realTimeboxIds}) 取代空占位。
-      //   本分支保持存在仅为兼容旧 manifest / 直调场景 — 不会真正被 create-smart-timebox
-      //   surface 触达（surface 走 createTimebox action）。
-      // [023.10] T5 — Codex #5 修订：保留 guard（不是死代码），改进 message。
-      //   旧 message 指错 API（"createTimebox" 单字面量），新 message 显 surface + 正确 intent，
-      //   避免下一个开发者找错 API。
+      // [028] T9：createSmartTimeboxes 退役 — manifest 已 rename 为 scheduleProposal，
+      //   本分支保留为显式 deprecated 守卫（捕获 direct calls / old code paths）。
+      //   scheduleProposal 真路径走「下方自含 batch recording」分支。
       return {
         success: false,
         error:
-          "createSmartTimeboxes intent 已弃用。改用 surface 'CreateSmartTimebox' + intent 'acceptProposals' + payload { items, date, _source: 'createSmartTimebox' }",
+          "createSmartTimeboxes intent 已退役。改用 scheduleProposal（manifest intent_triggers 已 rename，shortcut 仍为 /smartTimeboxes）",
       }
     }
 
-    // [028] T6 fold：scheduleProposal submit 分支处理 needConfirm 透传
-    //   - onGenerate 返 needConfirm=true 时，handler 不写库，只返 ArchetypePicker 候选
-    //   - submit 路径：用户可能 confirm 候选 archetype（继续走 handle 编排），或 cancel
-    //   - 当前 T6 仅镜像 createSmartTimeboxes 范式：实际写库逻辑由 schedule-proposal surface (T9) 接管
-    //   - Tier0 改时意图 → confirmReason 含「建议手动改约定」（不跨 surface 跳转，T6-UI-fix defer）
+    // [028] T9 fold-in T9-fix：scheduleProposal submit 自含 batch recording。
+    //   走「逐条 submitDynamicIntent('timebox', 'createTimebox', ...) + 收 succeeded → recordBatchProposals」
+    //   模式（与 createTimebox 分支 _source='createSmartTimebox' 等价语义，但独立分支 —
+    //   不依赖 _source 字符串 hack）。
+    //   - needConfirm 透传：onGenerate 返 needConfirm=true → submit 阶段不写库，仅透传 candidates
+    //   - 正常情况：items 逐条 createTimebox → succeeded → recordBatchProposals(proposals: realTimeboxIds)
+    //   - SESSION_KEY 统一（R12）：open / submit / record 三处用同一常量
     if (action === 'scheduleProposal') {
-      // needConfirm 透传：用户已在 open 阶段看到 NL 解析低置信/Tier0 冲突
-      // → submit 阶段再次 click 是「确认」或「取消」
-      // 当前 T6 提供最小响应：把 needConfirm + candidates + reason 透传给 surface
+      // needConfirm 透传：NL 解析低置信 / Tier0 冲突 → 不写库，仅透 ArchetypePicker 候选
       const needConfirm = (fields as { needConfirm?: boolean }).needConfirm ?? false
       const archetypeCandidates = (fields as { archetypeCandidates?: unknown[] }).archetypeCandidates ?? []
       const confirmReason = (fields as { confirmReason?: string }).confirmReason ?? ''
 
+      if (needConfirm) {
+        return {
+          success: false,
+          error: confirmReason || 'NL 解析低置信或涉及 Tier0 改时，需用户确认',
+          data: {
+            needConfirm,
+            archetypeCandidates,
+            confirmReason,
+            handoffHint: '建议手动改约定（CNUI 架构不支持跨 surface 跳转）',
+          },
+        }
+      }
+
+      // 正常路径：逐条 submit + 收 succeeded → recordBatchProposals
+      const { submitDynamicIntent } = await import('@/app/actions/intent')
+      const items = (fields.items as any[]) ?? []
+      const succeeded: { timeboxId: string; title: string }[] = []
+      const failed: { title: string; error: string }[] = []
+      for (const it of items) {
+        try {
+          // [023.08] T2：HH:MM + date → ISO UTC（与 createTimebox 分支同模式）
+          const normalized: Record<string, unknown> = { ...it }
+          if (typeof it.startTime === 'string' && /^\d{2}:\d{2}$/.test(it.startTime) && typeof it.date === 'string') {
+            normalized.startTime = hhmmToIso(it.startTime, it.date)
+          }
+          if (typeof it.endTime === 'string' && /^\d{2}:\d{2}$/.test(it.endTime) && typeof it.date === 'string') {
+            normalized.endTime = hhmmToIso(it.endTime, it.date)
+          }
+          const r = await submitDynamicIntent('timebox', 'createTimebox', normalized)
+          if (r.success) {
+            const id = (r.object as any)?.id ?? ''
+            succeeded.push({ timeboxId: id, title: it.title ?? '未命名' })
+          } else {
+            failed.push({ title: it.title ?? '未命名', error: r.error ?? '创建失败' })
+          }
+        } catch (e) {
+          failed.push({ title: it.title ?? '未命名', error: e instanceof Error ? e.message : '创建失败' })
+        }
+      }
+
+      // [028] T9 R12: 自含 batch 落库（不依赖 _source 分支），SESSION_KEY 统一
+      let batchId: string | undefined
+      if (succeeded.length > 0) {
+        try {
+          batchId = await recordBatchProposals({
+            sessionId: SESSION_KEY,
+            userId: MVP_USER_ID,
+            proposals: succeeded.map(s => ({
+              id: s.timeboxId || `proposal-${s.title}`,
+              timeboxId: s.timeboxId || undefined,
+              title: s.title,
+            })),
+          })
+        } catch (e) {
+          console.warn('[timeboxCnuiHandler] scheduleProposal recordBatchProposals 失败（不影响主流程）:', e)
+        }
+      }
+
       return {
-        success: false, // T6 不写库；T9 schedule-proposal surface 接通后改 success: true
-        error: confirmReason || 'NL 解析低置信或涉及 Tier0 改时，需用户确认',
+        success: failed.length === 0,
+        error: failed.length
+          ? `${failed.length} 条失败：${failed.map(f => `${f.title || '未命名'}（${f.error}）`).join('；')}`
+          : undefined,
         data: {
-          needConfirm,
-          archetypeCandidates,
-          confirmReason,
-          // Tier0 handoff 提示：CNUI 架构不支持跨 surface 跳转（surface 不持有 surface 引用），
-          // → 倾向 defer，建议用户在 UI 自行打开约定列表手动修改（[028] T6-UI-fix 评估结论）
-          handoffHint: '建议手动改约定（CNUI 架构不支持跨 surface 跳转）',
+          count: succeeded.length,
+          succeeded: succeeded.map(s => s.timeboxId),
+          failed,
+          ...(batchId ? { batchId } : {}),
         },
       }
     }
@@ -847,6 +905,8 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   'delete-appointment': timeboxCnuiHandler,
   // [023.04]：editTimeboxes 三合一（修改/取消/删除）
   'edit-timeboxes': timeboxCnuiHandler,
-  // [023.08] T5：createSmartTimeboxes 共用 timeboxCnuiHandler（按 action 分支，createSmartTimeboxes + revertSmartTimeboxes 双 action 均已实现）
+  // [023.08] T5：create-smart-timebox 共用 timeboxCnuiHandler（按 action 分支，revertSmartTimeboxes 双 action 均已实现）
   'create-smart-timebox': timeboxCnuiHandler,
+  // [028] T9：schedule-proposal 共用 timeboxCnuiHandler（scheduleProposal action 分支；自含 batch recording）
+  'schedule-proposal': timeboxCnuiHandler,
 }

@@ -65,16 +65,18 @@ intent_triggers:
       - 配置时间盒模板
     keywords: [模板, 时间盒模板, 模板管理]
     view_route: /timebox-templates
-  - action: createSmartTimeboxes
+  # [028] T9：rename createSmartTimeboxes → scheduleProposal；shortcut /smartTimeboxes 保留（T10 重定向）。
+  # K-block 仍保留 create-smart-timebox 入口（revertSmartTimeboxes 撤销历史 batch 引用不断）。
+  - action: scheduleProposal
     shortcut: /smartTimeboxes
-    description: AI 智能编排时间盒
+    description: AI 编排今日计划（四源归集 + 硬规则 + Tier0/1/2）
     response_type: cnui
-    cnui_surface: create-smart-timebox
+    cnui_surface: schedule-proposal
     examples:
       - 帮我智能安排今天的时间盒
       - 智能编排
       - 自动安排今天
-    keywords: [智能编排, smart, 自动安排, 智能时间盒]
+    keywords: [智能编排, smart, 自动安排, 智能时间盒, 今日计划, schedule]
   # [023.10] T1.5: 撤销最近一次 batch 创建的时间盒 — 共享 create-smart-timebox
   # surface handler（cnui/handlers.ts:459-481 按 action 分派到 revert 分支）。
   # 不开新 cnui_surface key，复用 K 区块已有条目。
