@@ -24,6 +24,8 @@
 
 import { useState } from 'react'
 import { AIOrchestratePanel } from '../../components/AIOrchestratePanel'
+// [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION 常量（防字符串漂移）
+import { SCHEDULE_PROPOSAL_ACTION } from '../../constants'
 
 interface Proposal {
   id: string
@@ -126,7 +128,8 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
   const handleAcceptClick = () => {
     const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
     onConfirm({
-      action: 'scheduleProposal',
+      // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量防字符串漂移
+      action: SCHEDULE_PROPOSAL_ACTION,
       fields: {
         items: acceptedProposals.map(p => ({
           title: p.title,

@@ -76,6 +76,8 @@
  *   一切现状与上方"决策 / WHY / 已知后果 / TODO"一致。
  */
 import { EpisodeRepository } from '@/lib/db/repositories/episode.repository'
+// [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION 常量（防字符串漂移；manifest intent_triggers.action SSOT）
+import { SCHEDULE_PROPOSAL_ACTION } from '@/domains/timebox/constants'
 
 export interface BatchProposalItem {
   id: string
@@ -131,7 +133,8 @@ export async function recordBatchProposals(input: RecordBatchInput): Promise<str
     userId: input.userId,
     sessionId: input.sessionId,
     domainId: 'timebox',
-    action: 'scheduleProposal',
+    // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量（manifest intent_triggers.action 同步）
+    action: SCHEDULE_PROPOSAL_ACTION,
     episodeType: 'batch_proposals',
     summary: `batch_proposals:${input.proposals.length} items`,
     metadata: {

@@ -50,6 +50,8 @@ import { createHabitsMutationService } from '@/app/actions/habits/mutation-servi
 import { createTasksMutationService } from '@/app/actions/tasks/mutation-service';
 import { matchArchetypesForTitles } from '@/domains/timebox/lib/archetype-matcher';
 import { deriveTimeboxDisplayStatus } from '@/domains/timebox/status/derive-display-status';
+// [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION 常量（防字符串漂移；manifest intent_triggers.action SSOT）
+import { SCHEDULE_PROPOSAL_ACTION } from '@/domains/timebox/constants';
 
 // ─── CNUI Handlers 注册 ───────────────────────────────────────────
 
@@ -1104,8 +1106,9 @@ export async function resolveShortcut(rawInput: string): Promise<{ domainId: str
   //   用精确等值匹配而非裸 substring，避免误伤未来同名 fragment。
   if (rawInput === '/smartTimeboxes') {
     const { getIntentTriggerViewRoute } = await import("@/domains/registry");
-    const view_route = getIntentTriggerViewRoute('timebox', 'scheduleProposal');
-    return { domainId: 'timebox', action: 'scheduleProposal', view_route };
+    // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量防字符串漂移
+    const view_route = getIntentTriggerViewRoute('timebox', SCHEDULE_PROPOSAL_ACTION);
+    return { domainId: 'timebox', action: SCHEDULE_PROPOSAL_ACTION, view_route };
   }
 
   const { matchShortcut } = await import("@/nexus/core/intent-engine/shortcut-matcher");

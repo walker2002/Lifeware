@@ -380,10 +380,13 @@ describe('scoreSchedule 5 维（fold-in T7-fix）', () => {
   // ─── 鲁棒性 ──────────────────────────────────────────────────
 
   it('鲁棒性：opts 缺省字段走 0/skip（不抛错）', () => {
-    // 最小 opts
+    // 最小 opts：空 proposals + 空 tier0 + 无 archetype data → 4 维 skip，只 noConflicts=10
     const r = scoreSchedule([], {})
     expect(r.score).toBeGreaterThanOrEqual(0)
     expect(r.score).toBeLessThanOrEqual(10)
+    // [028] I-5 polish: 锁死 value — 仅 noConflicts 计分（默认值无 overlap → 10），总分 10
+    expect(r.dimensions).toEqual({ noConflicts: 10 })
+    expect(r.score).toBe(10)
   })
 
   it('鲁棒性：dimensions 是 plain object（Object.fromEntries 行为）', () => {

@@ -53,6 +53,8 @@ import { sortByHardRules } from '../lib/schedule-rules'
 import { scheduleByTiers } from '../lib/tier-scheduler'
 import { parseNL, type NLCatalog, type NLParseResult, LOW_CONFIDENCE } from '../lib/nl-parser'
 import { scoreSchedule, SCORE_WARN_THRESHOLD } from '../lib/schedule-score'
+// [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION 常量（防字符串漂移）
+import { SCHEDULE_PROPOSAL_ACTION } from '../constants'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -158,7 +160,8 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     //   'scheduleProposal' → strategy='schedule'（4 源 + Tier0 提取）
     //   其他（含 'adjustRemainingTimeboxes'）→ strategy='legacy'（旧 2 源 IRON RULE）
     const action = request.intent.action
-    const strategy: 'schedule' | 'legacy' = action === 'scheduleProposal' ? 'schedule' : 'legacy'
+    // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量防字符串漂移（[023.08] 8+ 处硬编码教训）
+    const strategy: 'schedule' | 'legacy' = action === SCHEDULE_PROPOSAL_ACTION ? 'schedule' : 'legacy'
     const { items, tier0Slots } = this.buildTimeboxItems(materials, strategy)
     const sorted = this.sortItems(items, strategy)
     // [028] T2-fold: tier0Slots（来自 appointments）与 existingTimeboxes 合并为 occupied，

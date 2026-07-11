@@ -67,6 +67,19 @@ intent_triggers:
     view_route: /timebox-templates
   # [028] T10：canonical shortcut /ScheduleProposal；/smartTimeboxes 走 intent.ts 显式 redirect（兼容旧入口）。
   # K-block 仍保留 create-smart-timebox 入口（revertSmartTimeboxes 撤销历史 batch 引用不断）。
+  #
+  # [028] M-3 polish — R12 silent debt 文档化（whole-branch review）：
+  #   T9 rename `createSmartTimeboxes` → `scheduleProposal` 后，DB memory_episodes 表里
+  #   仍存在 [023.08] 历史 batch 记录（action='createSmartTimeboxes'）。revertSmartTimeboxes
+  #   通过 `getRevertableBatches` (batch-proposals.ts:233-242) 撤销时 filter 不含 action 字段
+  #   （R12 dead parameter），所以历史 batch 仍可被撤销（兼容）。
+  #
+  #   ⚠️ 注意：未来按 action 字段过滤的代码（audit / telemetry / analytics）会发现
+  #   历史 batch 用旧 action 名。如需 audit 一致性，可加 migration:
+  #     UPDATE memory_episodes SET action='scheduleProposal'
+  #       WHERE action='createSmartTimeboxes' AND domain_id='timebox';
+  #   （本 polish commit 不执行 migration — DB 一致性 vs 历史可读性权衡，
+  #   见 [028] whole-branch review M-3 建议）。
   - action: scheduleProposal
     shortcut: /ScheduleProposal
     description: AI 编排今日计划（四源归集 + 硬规则 + Tier0/1/2）

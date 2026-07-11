@@ -227,7 +227,8 @@ describe('sortByHardRules §04 词典序', () => {
     ]
     const sorted = sortByHardRules(items, {})
     expect(sorted).toHaveLength(2)
-    // 不抛错即过；具体顺序由 default rank 决定
+    // [028] I-5 polish: 锁死排序（P2 rank < P99 default rank → y 在前）
+    expect(sorted.map(i => i.id)).toEqual(['y', 'x'])
   })
 
   it('鲁棒性：archetypeMap 缺省 = {} 时不查 archetype（不抛错）', () => {

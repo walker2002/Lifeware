@@ -55,6 +55,8 @@ import { TimeboxDrawer, type DrawerMode } from './timebox-drawer'
 import { transitionTimebox, getTimeboxById, revertTimebox, deleteTimebox } from '@/app/actions/timebox'
 import { getTimeboxesByRange, getAppointmentsByRange } from '@/app/actions/intent'
 import { mergeEvents, type TimeboxesEvent } from './timeboxes-event'
+// [028] I-2 polish amend: SCHEDULE_PROPOSAL_SURFACE 常量（reviewer found missed JSX surfaceType site）
+import { SCHEDULE_PROPOSAL_SURFACE } from '@/domains/timebox/constants'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
@@ -650,7 +652,7 @@ export function TimeboxesWorkspace() {
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             <ScheduleProposal
-              surfaceType="schedule-proposal"
+              surfaceType={SCHEDULE_PROPOSAL_SURFACE}
               dataModel={{
                 proposals: aiProposals,
                 revertableBatches,

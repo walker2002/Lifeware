@@ -27,6 +27,8 @@ import { DeleteAppointment } from './cnui/surfaces/DeleteAppointment'
 import { CreateSmartTimebox } from './cnui/surfaces/CreateSmartTimebox'
 // [028] T9 — ScheduleProposal CNUI surface（[028] 替代 createSmartTimeboxes；四源归集 + needConfirm + 自含 batch recording）
 import { ScheduleProposal } from './cnui/surfaces/ScheduleProposal'
+// [028] I-2 polish: SCHEDULE_PROPOSAL_SURFACE 常量（防字符串漂移）
+import { SCHEDULE_PROPOSAL_SURFACE } from './constants'
 
 // Handler 模块相对路径（运行时动态加载）
 const handlerModulePath = './domains/timebox/cnui/handlers'
@@ -66,7 +68,7 @@ cnuiRegistry.register('timebox', 'create-smart-timebox', {
 })
 
 // [028] T9 — ScheduleProposal CNUI surface 服务端注册（schedule-proposal surface；handler 共用 timebox 模块）
-cnuiRegistry.register('timebox', 'schedule-proposal', {
+cnuiRegistry.register('timebox', SCHEDULE_PROPOSAL_SURFACE, {
   component: ScheduleProposal,
   handlerModulePath,
 })

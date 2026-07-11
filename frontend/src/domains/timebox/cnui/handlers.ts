@@ -15,6 +15,8 @@ import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
 import { hhmmToIso } from './surfaces/time-input-helpers'
 // [023.08] T4 — batch undo：AI session state 记录 + revert（revertSmartTimeboxes action）
 import { recordBatchProposals, revertBatchProposals, getRevertableBatches } from '@/nexus/ai-runtime/memory/batch-proposals'
+// [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION + SCHEDULE_PROPOSAL_SURFACE 常量（防字符串漂移）
+import { SCHEDULE_PROPOSAL_ACTION, SCHEDULE_PROPOSAL_SURFACE } from '../constants'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -112,7 +114,8 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
-    if (action === 'scheduleProposal') {
+    // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量防字符串漂移
+    if (action === SCHEDULE_PROPOSAL_ACTION) {
       const [timeboxes, tasks, habits] = await Promise.all([
         getTodayTimeboxes(),
         getActiveTasks(),
@@ -546,7 +549,7 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     //   - needConfirm 透传：onGenerate 返 needConfirm=true → submit 阶段不写库，仅透传 candidates
     //   - 正常情况：items 逐条 createTimebox → succeeded → recordBatchProposals(proposals: realTimeboxIds)
     //   - SESSION_KEY 统一（R12）：open / submit / record 三处用同一常量
-    if (action === 'scheduleProposal') {
+    if (action === SCHEDULE_PROPOSAL_ACTION) {
       // needConfirm 透传：NL 解析低置信 / Tier0 冲突 → 不写库，仅透 ArchetypePicker 候选
       const needConfirm = (fields as { needConfirm?: boolean }).needConfirm ?? false
       const archetypeCandidates = (fields as { archetypeCandidates?: unknown[] }).archetypeCandidates ?? []
@@ -908,5 +911,5 @@ export const surfaceHandlers: Record<string, CnuiSurfaceHandler> = {
   // [023.08] T5：create-smart-timebox 共用 timeboxCnuiHandler（按 action 分支，revertSmartTimeboxes 双 action 均已实现）
   'create-smart-timebox': timeboxCnuiHandler,
   // [028] T9：schedule-proposal 共用 timeboxCnuiHandler（scheduleProposal action 分支；自含 batch recording）
-  'schedule-proposal': timeboxCnuiHandler,
+  [SCHEDULE_PROPOSAL_SURFACE]: timeboxCnuiHandler,
 }
