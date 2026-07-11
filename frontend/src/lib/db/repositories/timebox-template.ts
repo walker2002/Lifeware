@@ -102,11 +102,11 @@ export class TimeboxTemplateRepository {
       const old = await this.findById(id, userId, client)
       if (!old) throw new Error(`TimeboxTemplate ${id} not found`)
 
-      // A.2：rows 引用相等时跳过 owner-check（编辑器 setState 总是给新数组，
-      // 所以引用相等 = rows 结构未变 = 不需校验 habits/tasks/threads 归属）
-      if (old.rows !== input.rows) {
-        await this.assertSubscriptionsOwned(input, userId, client)
-      }
+      // [027-B] 死短路已删：原「old.rows !== input.rows 引用相等 → 跳过 owner-check」
+      // 优化已失效（findById → rowToTemplate 总是产生新数组），owner-check 现在无条件跑。
+      // 这是 3 extra inArray SELECTs / update 的性能代价，正确性无影响。
+      // 优化重构需要深比较或传 rowsDirty 标记（[023-02] A.2），记录到 TD-022 后续 PR。
+      await this.assertSubscriptionsOwned(input, userId, client)
 
       const changedFields: string[] = []
       const setData: Record<string, unknown> = { updatedAt: new Date() }
