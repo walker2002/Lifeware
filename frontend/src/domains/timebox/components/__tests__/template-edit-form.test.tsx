@@ -18,6 +18,23 @@ import { TemplateEditForm } from '../template-edit-form'
 import type { TimeboxTemplate } from '@/lib/db/repositories/timebox-template'
 import type { SubscriptionSources } from '@/app/actions/timebox-templates'
 
+// [027-B] RowEditor 嵌入 ArchetypePicker → mock getArchetypes / matchArchetypeForTitle
+// 让 picker 能找到 a-1 / a-run / a-write 来显示「更换/未选择」
+vi.mock('@/app/actions/activity-archetype', () => ({
+  getArchetypes: vi.fn(() => Promise.resolve({
+    success: true,
+    data: [
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { id: 'a-1', l2Name: '阅读', l1Category: '学习', isSystem: true, energyCost: { physical: 1, mental: 7, emotional: 2, creative: 3 } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { id: 'a-run', l2Name: '跑步', l1Category: '健康', isSystem: true, energyCost: { physical: 9, mental: 2, emotional: 1, creative: 0 } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { id: 'a-write', l2Name: '写作', l1Category: '工作', isSystem: true, energyCost: { physical: 0, mental: 8, emotional: 2, creative: 7 } },
+    ],
+  })),
+  matchArchetypeForTitle: vi.fn(() => Promise.resolve({ matched: false })),
+}))
+
 // ─── 测试 fixtures ───────────────────────────────────────────────
 
 function makeTemplate(overrides: Partial<TimeboxTemplate> = {}): TimeboxTemplate {
@@ -39,11 +56,11 @@ function makeTemplate(overrides: Partial<TimeboxTemplate> = {}): TimeboxTemplate
 
 const mockSources: SubscriptionSources = {
   habits: [
-    { id: 'h-1', title: '晨跑', start: '06:00', end: '07:00' },
+    { id: 'h-1', title: '晨跑', start: '06:00', end: '07:00', activityArchetypeId: 'a-run' },
     { id: 'h-2', title: '冥想', start: '21:00', end: '21:30' },
   ],
   tasks: [
-    { id: 'tk-1', title: '写周报' },
+    { id: 'tk-1', title: '写周报', activityArchetypeId: 'a-write' },
   ],
   threads: [
     { id: 'th-1', title: '季度 OKR' },
@@ -154,7 +171,7 @@ describe('TemplateEditForm — 来源切换', () => {
 
     // 第 1 行（已切到 habit）的起止时间输入 disabled
     // 行模板只有 2 行；用 getAllByLabelText 取所有，取第一个即可
-    const startInputs = screen.getAllByLabelText('开始时间')
+    const startInputs = screen.getAllByLabelText('默认开始时间')
     const durationInputs = screen.getAllByLabelText('默认时长（分钟）')
     expect(startInputs[0]).toBeDisabled()
     expect(durationInputs[0]).toBeDisabled()
@@ -172,7 +189,7 @@ describe('TemplateEditForm — 来源切换', () => {
 
     expect(screen.getByDisplayValue('写周报')).toBeInTheDocument()
     // 时间输入不应被 disabled
-    const startInputs = screen.getAllByLabelText('开始时间')
+    const startInputs = screen.getAllByLabelText('默认开始时间')
     for (const i of startInputs) {
       expect(i).not.toBeDisabled()
     }
@@ -254,7 +271,7 @@ describe('TemplateEditForm — 名称输入', () => {
 describe('TemplateEditForm — 时间输入（custom 行）', () => {
   it('非 habit 行的起止时间可编辑（changeRowSource 不锁时）', () => {
     render(<Harness initialSources={mockSources} />)
-    const startInputs = screen.getAllByLabelText('开始时间')
+    const startInputs = screen.getAllByLabelText('默认开始时间')
     for (const i of startInputs) {
       expect(i).not.toBeDisabled()
     }
@@ -267,7 +284,7 @@ describe('TemplateEditForm — 时间输入（custom 行）', () => {
   it('输入新开始时间应出现在 input value 中', async () => {
     const user = userEvent.setup()
     render(<Harness initialSources={mockSources} />)
-    const startInput = screen.getAllByLabelText('开始时间')[0]!
+    const startInput = screen.getAllByLabelText('默认开始时间')[0]!
     await user.clear(startInput)
     await user.type(startInput, '08:15')
     expect(startInput).toHaveValue('08:15')
@@ -330,9 +347,9 @@ describe('TemplateEditForm — 行按 defaultStart 排序展示', () => {
       ],
     })
     const { container } = render(<Harness initialTemplate={tpl} />)
-    // 每个行容器有「开始时间」+「默认时长（分钟）」两个 input；按 row 顺序取每行第一个时间输入（start）
+    // 每个行容器有「默认开始时间」+「默认时长（分钟）」两个 input；按 row 顺序取每行第一个时间输入（start）
     const rowContainers = Array.from(
-      container.querySelectorAll('div.flex.flex-col.gap-1.rounded.border'),
+      container.querySelectorAll('div.flex.flex-col.gap-2.rounded.border'),
     )
     expect(rowContainers).toHaveLength(3)
     // 验证每行的 activityName 按 defaultStart 升序：晨间 07:30 → 午间 12:00 → 晚间 21:00
@@ -347,14 +364,74 @@ describe('TemplateEditForm — 行按 defaultStart 排序展示', () => {
     ).toBe('晚间')
     // defaultStart time 也按升序
     expect(
-      (rowContainers[0]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
+      (rowContainers[0]!.querySelector('input[aria-label="默认开始时间"]') as HTMLInputElement)?.value,
     ).toBe('07:30')
     expect(
-      (rowContainers[1]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
+      (rowContainers[1]!.querySelector('input[aria-label="默认开始时间"]') as HTMLInputElement)?.value,
     ).toBe('12:00')
     expect(
-      (rowContainers[2]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
+      (rowContainers[2]!.querySelector('input[aria-label="默认开始时间"]') as HTMLInputElement)?.value,
     ).toBe('21:00')
+  })
+})
+
+// ─── RowEditor 行为分叉（[027-B] Task 5）──────────────────────────
+
+describe('TemplateEditForm — RowEditor 行为分叉 [027-B]', () => {
+  it('custom 行渲原型选择器（可编辑）+ 5 个时间字段可编辑', async () => {
+    const tpl = makeTemplate({
+      rows: [{ id: 'rc', activityName: '读书', defaultStart: '09:00', defaultDuration: 60, source: 'custom', activityArchetypeId: 'a-1' }],
+    })
+    render(<Harness initialTemplate={tpl} initialSources={mockSources} />)
+    // 原型选择器出现「更换/清除」（非只读）—— picker 异步加载 archetypes，等落幕
+    expect(await screen.findByRole('button', { name: '更换活动原型' })).toBeInTheDocument()
+    // 约束字段可编辑
+    expect(screen.getByLabelText('最早开始时间')).not.toBeDisabled()
+    expect(screen.getByLabelText('最短时长（分钟）')).not.toBeDisabled()
+  })
+
+  it('habit 行原型只读 + 时间只读', async () => {
+    const user = userEvent.setup()
+    render(<Harness initialSources={mockSources} />)
+    await user.selectOptions(screen.getAllByLabelText('行来源')[0]!, 'habit')
+    await user.selectOptions(screen.getAllByLabelText('来源对象')[0]!, 'h-1')
+    // 习惯行不渲「更换活动原型」按钮（只读 picker）
+    expect(screen.queryByRole('button', { name: '更换活动原型' })).not.toBeInTheDocument()
+    // 时间字段只读
+    expect(screen.getAllByLabelText('默认开始时间')[0]).toBeDisabled()
+    expect(screen.getAllByLabelText('默认时长（分钟）')[0]).toBeDisabled()
+    // 约束字段只读
+    expect(screen.getAllByLabelText('最早开始时间')[0]).toBeDisabled()
+  })
+
+  it('task 行原型只读 + 时间/约束可编辑', async () => {
+    const user = userEvent.setup()
+    render(<Harness initialSources={mockSources} />)
+    await user.selectOptions(screen.getAllByLabelText('行来源')[0]!, 'task')
+    await user.selectOptions(screen.getAllByLabelText('来源对象')[0]!, 'tk-1')
+    expect(screen.queryByRole('button', { name: '更换活动原型' })).not.toBeInTheDocument()
+    expect(screen.getAllByLabelText('默认开始时间')[0]).not.toBeDisabled()
+    expect(screen.getAllByLabelText('最早开始时间')[0]).not.toBeDisabled()
+  })
+
+  it('thread 行原型只读（空）+ 时间/约束可编辑（对称 task，thread 无原型来源）', async () => {
+    const user = userEvent.setup()
+    render(<Harness initialSources={mockSources} />)
+    await user.selectOptions(screen.getAllByLabelText('行来源')[0]!, 'thread')
+    await user.selectOptions(screen.getAllByLabelText('来源对象')[0]!, 'th-1')
+    expect(screen.queryByRole('button', { name: '更换活动原型' })).not.toBeInTheDocument()
+    expect(screen.getAllByLabelText('默认开始时间')[0]).not.toBeDisabled()
+    expect(screen.getAllByLabelText('最早开始时间')[0]).not.toBeDisabled()
+  })
+
+  it('默认时长 <= 0 时 onBlur 显示错误', async () => {
+    const user = userEvent.setup()
+    render(<Harness initialSources={mockSources} />)
+    const dur = screen.getAllByLabelText('默认时长（分钟）')[0]!
+    await user.clear(dur)
+    await user.type(dur, '0')
+    dur.blur()
+    expect(await screen.findByText(/默认时长须大于 0/)).toBeInTheDocument()
   })
 })
 
