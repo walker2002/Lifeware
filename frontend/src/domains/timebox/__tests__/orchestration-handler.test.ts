@@ -1,4 +1,4 @@
-/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) + [023.10] T4 snapshot builder derive (3 tests) */
+/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) + [023.10] T4 snapshot builder derive (3 tests) + [028] T2 4 源归集 + Tier0 提取 + A1/A2 隔离 (3 tests) */
 
 import { describe, it, expect, vi } from 'vitest'
 import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
@@ -745,5 +745,123 @@ describe('[023.10] T4 snapshot builder derive (A2 stale-date fix)', () => {
     expect(['night', 'morning', 'afternoon', 'evening']).toContain(snapshot.timeOfDay)
     // 关键断言: 测试用例只跑一次，currentDate 通过；deriveTimeOfDay 必然不是恒定字符串
     // (snapshot 不应含硬编码常量 'morning' 单值)
+  })
+})
+
+// ─── [028] T2 buildTimeboxItems 四源归集 + Tier0 提取 + A1/A2 隔离 ───────
+//
+// 背景：[028] 用 scheduleProposal 替代 smartTimeboxes。
+// T1 已注入 appointments + templates contexts，本任务将 buildTimeboxItems 从 2 源
+// （habits+tasks）扩到 4 源（templates+appointments+habits+tasks）+ Tier0 提取。
+// A1/A2 隔离 IRON RULE：adjustRemainingTimeboxes（legacy）必须保持 2 源 + 词典序 +
+// 线性贪心行为不变，由 strategy 参数隔离。
+//
+// 测试策略：直接调 private buildTimeboxItems(materials, strategy)，验证：
+//   - schedule 策略：4 源（templates+habits+tasks 进 items，appointments 转 tier0Slots）
+//   - legacy 策略：仅 2 源（habits+tasks），tier0Slots=[]
+//   - earliestStart/latestStart/minDuration 字段类型是 UTC hour number（从 HH:MM 转）
+describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
+  it('schedule 策略：templates + habits + tasks 进 items，appointments 转 tier0 占用槽', () => {
+    const handler = new TimeboxOrchestrationHandler()
+    // [028] T1-fold: appointments 用 durationMin（USOM 无 endTime — T2 派生
+    // endTime = startTime + durationMin）。
+    const materials = {
+      pendingHabits: [{ id: 'h1', title: '冥想', todayLogged: false, frequency: { type: 'daily' } }] as any,
+      activeTasks: [{ id: 't1', title: '写报告', priority: 'P1', energyRequired: 'high' }] as any,
+      existingTimeboxes: [],
+      energyCurve: { peakHours: [9], lowHours: [14] },
+      // [026] D2-A USOM SSOT：appointments 只有 startTime + durationMin，无 endTime
+      // '2026-07-11T02:00:00Z' + 60min = [2:00 UTC, 3:00 UTC]
+      appointments: [{
+        id: 'a1', title: '牙医',
+        startTime: '2026-07-11T02:00:00Z',
+        durationMin: 60,
+        status: 'scheduled',
+      }] as any,
+      // fold-in T1-fix 形状：earliestStart/latestStart 是 HH:MM string|null
+      templates: [{
+        id: 'tm1', title: '深度工作', defaultStart: '09:00', defaultDuration: 120,
+        earliestStart: '08:00', latestStart: '11:00', shortestDuration: 60,
+        activityArchetypeId: 'ar1', source: 'custom',
+      }] as any,
+    }
+
+    const { items, tier0Slots } = (handler as any).buildTimeboxItems(materials, 'schedule')
+
+    // habits + tasks + templates 进 items（appointments 是 Tier0 不进 items）
+    expect(items).toHaveLength(3)
+    // GeneratedProposal.sourceType 枚举 = 'habit' | 'task' | 'planned' | 'adhoc'
+    // （usom/types/process.ts:310），templates 映射到 'planned'
+    expect(items.map((i: any) => i.sourceType).sort()).toEqual(['habit', 'planned', 'task'])
+
+    // Tier0 约定提取为硬占用槽（UTC hour，endTime 由 startTime + durationMin 派生）
+    expect(tier0Slots).toHaveLength(1)
+    expect(tier0Slots[0]).toMatchObject({ startHour: 2, endHour: 3 })
+
+    // fold-in T2-fix：earliestStart/latestStart/minDuration 字段存在且是 number（UTC hour）
+    const tmpl = items.find((i: any) => i.sourceType === 'planned')
+    expect(tmpl).toHaveProperty('earliestStart')   // 8（从 '08:00' 转）
+    expect(tmpl).toHaveProperty('latestStart')     // 11（从 '11:00' 转）
+    expect(tmpl).toHaveProperty('minDuration')     // 60（从 shortestDuration）
+    expect(tmpl!.earliestStart).toBe(8)
+    expect(tmpl!.latestStart).toBe(11)
+    expect(tmpl!.minDuration).toBe(60)
+  })
+
+  it('legacy 策略：仍只吃 2 源（habits+tasks），不含 templates/appointments（IRON RULE）', () => {
+    const handler = new TimeboxOrchestrationHandler()
+    const materials = {
+      pendingHabits: [{ id: 'h1', title: '冥想', todayLogged: false }] as any,
+      activeTasks: [{ id: 't1', title: '写报告', priority: 'P1' }] as any,
+      existingTimeboxes: [],
+      energyCurve: { peakHours: [9], lowHours: [14] },
+      // 即使传 appointments+templates，legacy 必须忽略（IRON RULE：A1/A2 隔离）
+      appointments: [{
+        id: 'a1', title: '牙医',
+        startTime: '2026-07-11T02:00:00Z',
+        durationMin: 60,
+      }] as any,
+      templates: [{
+        id: 'tm1', title: '深度工作',
+        defaultStart: '09:00', defaultDuration: 120,
+      }] as any,
+    }
+
+    const { items, tier0Slots } = (handler as any).buildTimeboxItems(materials, 'legacy')
+
+    // IRON RULE：legacy 只有 habits+tasks（2 源），无 template，无 tier0 提取
+    expect(items).toHaveLength(2)
+    expect(items.map((i: any) => i.sourceType).sort()).toEqual(['habit', 'task'])
+    expect(tier0Slots).toHaveLength(0)  // legacy 不提取 Tier0
+  })
+
+  it('appointments endTime 派生：startTime + durationMin → UTC hour tier0Slot（[026] D2-A USOM SSOT 兼容）', () => {
+    const handler = new TimeboxOrchestrationHandler()
+    // 验证「Appointment 无 endTime 字段，T2 必须派生」的核心契约
+    const materials = {
+      pendingHabits: [],
+      activeTasks: [],
+      existingTimeboxes: [],
+      energyCurve: { peakHours: [], lowHours: [] },
+      // 三种边界：纯小时 / 小时+分 / 跨日（durationMin 大于剩余当日时长）
+      appointments: [
+        // '2026-07-11T10:00:00Z' + 90min = [10:00 UTC, 11:30 UTC]
+        { id: 'a1', title: '会议', startTime: '2026-07-11T10:00:00Z', durationMin: 90 },
+        // '2026-07-11T14:30:00Z' + 30min = [14:30 UTC, 15:00 UTC]
+        { id: 'a2', title: '咖啡', startTime: '2026-07-11T14:30:00Z', durationMin: 30 },
+      ] as any,
+      templates: [],
+    }
+
+    const { tier0Slots } = (handler as any).buildTimeboxItems(materials, 'schedule')
+
+    expect(tier0Slots).toHaveLength(2)
+    // 关键：endHour/Minute 必由 startTime + durationMin 推导（非依赖 endTime 字段）
+    expect(tier0Slots[0]).toMatchObject({
+      startHour: 10, startMinute: 0, endHour: 11, endMinute: 30,
+    })
+    expect(tier0Slots[1]).toMatchObject({
+      startHour: 14, startMinute: 30, endHour: 15, endMinute: 0,
+    })
   })
 })

@@ -60,6 +60,13 @@ interface TimeboxItem {
   energyRequired?: string
   /** 关联对象 ID */
   relatedObjectId: string
+  // [028] T2 加（fold-in T2-fix 类型）：T4 Tier2 窗口调度依赖
+  /** 最早可开始时间（UTC hour，0-24）；默认 0 */
+  earliestStart?: number
+  /** 最晚可开始时间（UTC hour，0-24）；默认 22 */
+  latestStart?: number
+  /** 最小可接受时长（分钟）；默认 = durationMinutes */
+  minDuration?: number
 }
 
 /**
@@ -125,13 +132,21 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   async handle(request: GenerationRequest): Promise<GenerationResult> {
     const date = this.resolveDate(request)
     const materials = this.collectMaterials(request.contexts)
-    const items = this.buildTimeboxItems(materials)
-    const sorted = this.sortItems(items)
-    const occupied = this.extractOccupiedSlots(materials.existingTimeboxes)
+    // [028] T2-fold: A1/A2 隔离 — 读 request.intent.action 注入 strategy 贯穿
+    // buildTimeboxItems / sortItems / generateProposals。
+    //   'scheduleProposal' → strategy='schedule'（4 源 + Tier0 提取）
+    //   其他（含 'adjustRemainingTimeboxes'）→ strategy='legacy'（旧 2 源 IRON RULE）
+    const action = request.intent.action
+    const strategy: 'schedule' | 'legacy' = action === 'scheduleProposal' ? 'schedule' : 'legacy'
+    const { items, tier0Slots } = this.buildTimeboxItems(materials, strategy)
+    const sorted = this.sortItems(items, strategy)
+    // [028] T2-fold: tier0Slots（来自 appointments）与 existingTimeboxes 合并为 occupied，
+    // 防止 proposal 占到已约定的时段。
+    const occupied = [...this.extractOccupiedSlots(materials.existingTimeboxes), ...tier0Slots]
     // [023.07] #3 — 解构新 shape：generateProposals 现返回 { proposals, warnings }，
     // warnings 携带 SCHEDULER_BOUND_EXCEEDED（detection in deep loop），与 detectConflicts 并列追加。
     // 顺序：bound warnings 在前，conflict warnings 在后。
-    const { proposals, warnings: boundWarnings } = this.generateProposals(sorted, occupied, materials.energyCurve, date)
+    const { proposals, warnings: boundWarnings } = this.generateProposals(sorted, occupied, materials.energyCurve, date, strategy)
     // [023.08] T3 [F3 fold]: detectConflicts 现 async（rule-engine.evaluate 是异步），
     // handle() 必须 await，否则 conflictWarnings 是 Promise<Warning[]> 与后续 spread 类型冲突。
     const conflictWarnings = await this.detectConflicts(proposals, materials.existingTimeboxes)
@@ -187,16 +202,59 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     const activeTasks = (contexts.activeTasks ?? []) as TaskSummary[]
     const existingTimeboxes = (contexts.existingTimeboxes ?? []) as TimeboxSummary[]
     const energyCurve = (contexts.energyCurve ?? DEFAULT_ENERGY_CURVE) as EnergyCurve
+    // [028] T1-fold：appointments + templates 上下文由 [028] T1 provider 注入；
+    // shape 详见 appointments-provider.ts:22-25 与 templates-provider.ts:21-31。
+    // appointments 用 startTime + durationMin（[026] D2-A USOM SSOT 无 endTime）。
+    // templates 用 HH:MM string 表示 earliestStart/latestStart（schema.ts:734-751）。
+    const appointments = (contexts.appointments ?? []) as Array<{
+      id: string
+      title: string
+      startTime: string
+      durationMin: number
+      status?: string
+    }>
+    const templates = (contexts.templates ?? []) as Array<{
+      id: string
+      title: string
+      defaultStart: string
+      defaultDuration: number
+      earliestStart?: string | null
+      latestStart?: string | null
+      shortestDuration?: number | null
+      activityArchetypeId?: string | null
+      source?: string
+    }>
 
-    return { pendingHabits, activeTasks, existingTimeboxes, energyCurve }
+    return {
+      pendingHabits,
+      activeTasks,
+      existingTimeboxes,
+      energyCurve,
+      appointments,
+      templates,
+    }
   }
 
   // ─── buildTimeboxItems: 将 4 个来源统一为 TimeboxItem ────
+  //
+  // [028] T2 fold：strategy 参数隔离 A1/A2。
+  //   - 'schedule'（scheduleProposal）：4 源归集 + Tier0 提取
+  //     sources: templates + habits + tasks → items；appointments → tier0Slots
+  //   - 'legacy'（adjustRemainingTimeboxes）：IRON RULE——只吃 habits+tasks，
+  //     不读 templates/appointments，tier0Slots=[]，行为完全等同 pre-T2 实现。
+  //
+  // 返回 shape：{ items: TimeboxItem[], tier0Slots: TimeSlot[] }
+  //   - items 进 generateProposals（沿用现有线性贪心）
+  //   - tier0Slots 与 existingTimeboxes 一起进 occupied（阻止 proposal 占时段）
 
-  private buildTimeboxItems(materials: ReturnType<typeof this.collectMaterials>): TimeboxItem[] {
+  private buildTimeboxItems(
+    materials: ReturnType<typeof this.collectMaterials>,
+    strategy: 'schedule' | 'legacy' = 'legacy',
+  ): { items: TimeboxItem[]; tier0Slots: TimeSlot[] } {
     const items: TimeboxItem[] = []
+    const tier0Slots: TimeSlot[] = []
 
-    // 来源 1: pendingHabits
+    // 来源 1: pendingHabits（schedule + legacy 都读，旧 2 源行为保留）
     for (const habit of materials.pendingHabits) {
       if (habit.todayLogged) continue
 
@@ -208,28 +266,109 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         durationMinutes: 30,
         energyRequired: 'low',
         relatedObjectId: habit.id,
+        // [028] T2：defaults 兜底，Tier2 调度（[028] T4）会读这些字段
+        earliestStart: 0,
+        latestStart: 22,
+        minDuration: 30,
       })
     }
 
-    // 来源 2: activeTasks
+    // 来源 2: activeTasks（schedule + legacy 都读，旧 2 源行为保留）
     for (const task of materials.activeTasks) {
+      const dur = 60
       items.push({
         id: crypto.randomUUID(),
         title: task.title,
         sourceType: 'task',
         priority: this.normalizePriority(task.priority),
-        durationMinutes: 60,
+        durationMinutes: dur,
         energyRequired: task.energyRequired,
         relatedObjectId: task.id,
+        // [028] T2：defaults 兜底，Tier2 调度（[028] T4）会读这些字段
+        earliestStart: 0,
+        latestStart: 22,
+        minDuration: dur,
       })
     }
 
-    return items
+    // 来源 3 & 4 仅 schedule 策略走；legacy IRON RULE 完全跳过这两块。
+    if (strategy === 'schedule') {
+      // 来源 3: templates — [028] T1-fold 形状：HH:MM string → UTC hour number
+      for (const tmpl of materials.templates) {
+        const earliestStart = this.hhmmToHour(tmpl.earliestStart) ?? 0
+        const latestStart = this.hhmmToHour(tmpl.latestStart) ?? 22
+        const minDuration = tmpl.shortestDuration ?? tmpl.defaultDuration
+
+        items.push({
+          id: crypto.randomUUID(),
+          title: tmpl.title,
+          sourceType: 'planned',  // templates 映射到 'planned'（与 SOURCE_WEIGHT 兼容）
+          priority: 'P2',         // templates 默认中优先级（用户日常规律）
+          durationMinutes: tmpl.defaultDuration,
+          energyRequired: 'medium',  // 模板未标能量时默认 medium
+          relatedObjectId: tmpl.id,
+          // [028] T2-fold: 从 HH:MM string 转 UTC hour number，null → default
+          earliestStart,
+          latestStart,
+          minDuration,
+        })
+      }
+
+      // 来源 4: appointments — 不进 items，转 tier0 硬占用
+      // [026] D2-A USOM SSOT：appointments 无 endTime 字段，必须派生
+      // endTime = startTime + durationMin。tier0Slots 与 existingTimeboxes 合并进 occupied。
+      for (const appt of materials.appointments) {
+        const slot = this.appointmentToTier0Slot(appt)
+        if (slot) tier0Slots.push(slot)
+      }
+    }
+
+    return { items, tier0Slots }
+  }
+
+  /**
+   * [028] T2-fold: HH:MM("09:00") → UTC hour number(9)；支持 "09:30"→9.5。
+   * null/undefined → undefined（caller 决定 fallback default）。
+   * T4 Tier2 窗口调度依赖此类型转换。
+   */
+  private hhmmToHour(hhmm: string | null | undefined): number | undefined {
+    if (!hhmm) return undefined
+    const parts = hhmm.split(':')
+    if (parts.length < 2) return undefined
+    const h = Number(parts[0])
+    const m = Number(parts[1])
+    if (!Number.isFinite(h)) return undefined
+    return h + (Number.isFinite(m) ? m : 0) / 60
+  }
+
+  /**
+   * [028] T2-fold: Appointment（startTime + durationMin）→ TimeSlot。
+   * [026] D2-A USOM SSOT 无 endTime 字段；T2 派生 endTime = startTime + durationMin。
+   * 跨日 / 异常数据：返回 undefined（不进 occupied，避免坏数据污染）。
+   */
+  private appointmentToTier0Slot(appt: {
+    startTime: string
+    durationMin: number
+  }): TimeSlot | undefined {
+    if (!appt.startTime || !Number.isFinite(appt.durationMin)) return undefined
+    const start = new Date(appt.startTime)
+    if (Number.isNaN(start.getTime())) return undefined
+    const end = new Date(start.getTime() + appt.durationMin * 60_000)
+    return {
+      startHour: start.getUTCHours(),
+      startMinute: start.getUTCMinutes(),
+      endHour: end.getUTCHours(),
+      endMinute: end.getUTCMinutes(),
+    }
   }
 
   // ─── sortItems: 按优先级 + sourceType 排序 ─────────────────
+  //
+  // [028] T2-fold：strategy 参数（plumbing 透传；T3 §04 硬规则词典序替换此处的
+  // PRIORITY_WEIGHT + SOURCE_WEIGHT 实现，但保留签名兼容 + IRON RULE：legacy 走旧
+  // 词典序逻辑不变）。
 
-  private sortItems(items: TimeboxItem[]): TimeboxItem[] {
+  private sortItems(items: TimeboxItem[], strategy: 'schedule' | 'legacy' = 'legacy'): TimeboxItem[] {
     return [...items].sort((a, b) => {
       const pa = PRIORITY_WEIGHT[a.priority] ?? 9
       const pb = PRIORITY_WEIGHT[b.priority] ?? 9
@@ -268,6 +407,9 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     occupied: TimeSlot[],
     energyCurve: EnergyCurve,
     date: string,
+    // [028] T2-fold: strategy 参数（plumbing 透传；T4 Tier0/1/2 替换此处的
+    // 线性贪心，但保留签名兼容 + IRON RULE：legacy 走旧线性贪心不变）
+    _strategy: 'schedule' | 'legacy' = 'legacy',
   ): { proposals: GeneratedProposal[]; warnings: Warning[] } {
     const proposals: GeneratedProposal[] = []
     const warnings: Warning[] = []
