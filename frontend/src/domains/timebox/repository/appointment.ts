@@ -47,6 +47,13 @@ export class AppointmentRepository {
     tx: DbClient = db,
   ): Promise<Appointment> {
     const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
+    // [FIX] Drizzle PgTimestamp.mapToDriverValue 期望 Date 对象；对 ISO 字符串调
+    //   .toISOString() 抛 TypeError。handler.ts /editAppointment 等上游 patch
+    //   直接传 USOM startTime（ISO 字符串），与 save 路径（appointmentUSOMToRow
+    //   显式 `new Date()`）不一致。归一化保证 timestamp 列正确落库。
+    if (typeof setPayload.startTime === 'string') {
+      setPayload.startTime = new Date(setPayload.startTime)
+    }
     await tx.update(s.appointments).set(setPayload)
       .where(and(eq(s.appointments.id, id as any), eq(s.appointments.userId, userId as any)))
     const updated = await this.findById(id, userId, tx)

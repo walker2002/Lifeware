@@ -181,6 +181,19 @@ describe('AppointmentRepository（[023.12] T5: 3 态收敛）', () => {
     expect(list.length).toBe(1)
     expect(list[0].id).toBe(idIn)
   })
+
+  // [FIX] Phase 3 failing test: updateFields 透传 ISO string 给 Drizzle timestamp 列触发
+  //   `value.toISOString is not a function`。期望 updateFields 内部归一化 string→Date。
+  it('updateFields 把 ISO 字符串 startTime 归一化为 Date（Drizzle timestamp 列期望）', async () => {
+    const repo = new AppointmentRepository()
+    const id = crypto.randomUUID() as any
+    await repo.save(baseIt({ id, startTime: '2026-12-20T14:00:00.000Z' }), USER)
+
+    const updated = await repo.updateFields(id, {
+      startTime: '2026-12-21T15:00:00.000Z',
+    }, USER)
+    expect(updated.startTime).toBe('2026-12-21T15:00:00.000Z')
+  })
 })
 
 // [026.01] mapper 双向读写 archetype 单元测试（不入库，纯映射逻辑）
