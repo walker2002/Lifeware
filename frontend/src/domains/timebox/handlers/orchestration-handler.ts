@@ -39,6 +39,8 @@ import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
 import type { USOM_ID } from '@/usom/types/primitives'
 import { createRuleEngine, type RuleEngine } from '@/nexus/core/rule-engine'
 import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
+import { sortByHardRules } from '../lib/schedule-rules'
+import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
 
@@ -120,6 +122,9 @@ export interface TimeboxOrchestrationHandlerDeps {
   ruleEngine?: RuleEngine
   timeboxRepo?: ITimeboxRepository
   userId?: USOM_ID
+  // [028] T3: archetype lookup map for sortByHardRules（schedule 策略用）。
+  // 缺省 = {}（无 archetype 标签信息时视作「无标签」，sortByHardRules 鲁棒）。
+  archetypeMap?: Record<string, ActivityArchetype>
 }
 
 export class TimeboxOrchestrationHandler implements DomainHandler {
@@ -369,6 +374,16 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   // 词典序逻辑不变）。
 
   private sortItems(items: TimeboxItem[], strategy: 'schedule' | 'legacy' = 'legacy'): TimeboxItem[] {
+    if (strategy === 'schedule') {
+      // [028] T3: schedule 策略走 §04 硬规则词典序（4 层：截止紧迫 > 能量 > lock > OKR）。
+      // archetype 标签通过 deps.archetypeMap 注入（纯函数，避免直读 DB）。
+      return sortByHardRules(items, {
+        archetypeMap: this.deps.archetypeMap ?? {},
+        priorityWeight: PRIORITY_WEIGHT,
+        sourceWeight: SOURCE_WEIGHT,
+      })
+    }
+    // legacy（IRON RULE）：adjustRemainingTimeboxes 保留旧 PRIORITY_WEIGHT + SOURCE_WEIGHT 词典序
     return [...items].sort((a, b) => {
       const pa = PRIORITY_WEIGHT[a.priority] ?? 9
       const pb = PRIORITY_WEIGHT[b.priority] ?? 9
