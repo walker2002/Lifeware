@@ -51,7 +51,6 @@ spec §3.4 原文「habit/task/thread 行：时间字段只读展示来源锁定
 | `frontend/src/domains/timebox/components/timebox-template-editor.tsx` | 拉 archetype Map 传给 card | 改 |
 | `docs/database-design.md` / `docs/usom-design.md` | Tier 2 字段表 | 改 |
 | `CHANGELOG.md` / `manifest.md` | 版本入口 | 改 |
-| `frontend/src/lib/db/migrations/0037_optional_backfill_timebox_template_rows.sql` | 可选 prod DML 回填（不登 journal） | 新建（可选） |
 
 测试文件（同步改 + 新增 case）：
 - `frontend/src/domains/timebox/lib/__tests__/template-row-helpers.test.ts`
@@ -173,10 +172,9 @@ describe('normalizeTemplateRow', () => {
     expect(out.defaultDuration).toBe(480)
     expect(out.activityArchetypeId).toBeNull()
   })
-  it('旧形状保留 archetypeId 若已存在', () => {
-    const out = normalizeTemplateRow({ id: 'r3', start: '09:00', end: '10:00', source: 'custom', activityArchetypeId: 'a-1' }) as Record<string, unknown>
-    // 旧形状分支不读取 activityArchetypeId（历史数据无此字段），置 null
-    expect(out.activityArchetypeId).toBeNull()
+  it('旧形状若带 archetypeId 则保留（OV-A 防御性读取，防部分迁移丢字段）', () => {
+    const out = normalizeTemplateRow({ id: 'r3', start: '09:00', end: '10:00', source: 'custom', activityArchetypeId: 'a-1' })
+    expect(out.activityArchetypeId).toBe('a-1')
   })
   it('空对象兜底为 custom 09:00/0', () => {
     const out = normalizeTemplateRow({})
@@ -384,7 +382,9 @@ export function normalizeTemplateRow(raw: unknown): TemplateRow {
     earliestStart: null,
     latestStart: null,
     shortestDuration: null,
-    activityArchetypeId: null,
+    // OV-A 防御性读取：旧形状理论上不含 archetypeId（与 defaultStart 同迁移引入），
+    // 但若出现部分迁移行（有 start/end 又带 archetypeId），保留而非丢零。
+    activityArchetypeId: typeof r.activityArchetypeId === 'string' ? r.activityArchetypeId : null,
   }
 }
 
@@ -426,7 +426,7 @@ export function validateTemplateRow(row: TemplateRow): string[] {
 - [ ] **Step 6: 改 `template-edit-form.tsx` 字段（多行重构留 Task 5）**
 
 `template-edit-form.tsx`：
-- import（行 40-44）：把 `sortRowsByStart` 改为 `sortRowsByDefaultStart`；调用处（行 316）同步改名。
+- import（行 40-44）：把 `sortRowsByStart` 改为 `sortRowsByDefaultStart`；调用处（行 316）同步改名。**OV-C**：同步更新文件头注释（行 12「不调 sortRowsByStart」→「sortRowsByDefaultStart」）+ `seedTemplateRows`/`newEmptyRow` 相关描述，保持注释与代码一致（`docs/code-commenting-guide.md`）。
 - `changeRowSource` 的 habit 分支（行 230-238）：
   - 旧：`{ ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, start: h.start, end: h.end }`
   - 新：`{ ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, defaultStart: h.start, defaultDuration: hhmmDiffMinutes(h.start, h.end) }`
@@ -794,6 +794,18 @@ Expected: FAIL（徽章未实现）。
   ```
   （需在顶部 `import { useState, useCallback, useEffect } from 'react'`）
 - `<TemplateCard>`（行 197-202）加 `archetypeMap={archetypeMap}`。
+- **OV-B（保存前校验全部行）**：`handleSave`（行 105-139）在 `setSaving(true)` 前，对 `editing.rows` 逐行跑 `validateTemplateRow`，任一有错则 toast 拦截（兜底「未 blur 直接点保存」路径；onBlur 通常先触发，此为保险）：
+  ```ts
+  // 顶部 import 补：
+  import { validateTemplateRow } from '@/domains/timebox/lib/template-row-helpers'
+  // handleSave 内、setSaving(true) 之前插入：
+  const rowErrors = editing.rows.flatMap((r) => validateTemplateRow(r))
+  if (rowErrors.length > 0) {
+    toast.error('时间字段有误，请修正标红项后再保存')
+    return
+  }
+  ```
+  并在 Task 5 的 RowEditor 校验错误 UI 落地后，此 gate 与之呼应（行级 onBlur 提示 + 保存级兜底拦截）。
 
 - [ ] **Step 5: 跑确认绿 + tsc**
 
@@ -874,6 +886,15 @@ describe('TemplateEditForm — RowEditor 行为分叉 [027-B]', () => {
     expect(screen.getAllByLabelText('默认开始时间')[0]).not.toBeDisabled()
     expect(screen.getByLabelText('最早开始时间')).not.toBeDisabled()
   })
+  it('thread 行原型只读（空）+ 时间/约束可编辑（对称 task，thread 无原型来源）', async () => {
+    const user = userEvent.setup()
+    render(<Harness initialSources={mockSources} />)
+    await user.selectOptions(screen.getAllByLabelText('行来源')[0]!, 'thread')
+    await user.selectOptions(screen.getAllByLabelText('来源对象')[0]!, 'th-1')
+    expect(screen.queryByRole('button', { name: '更换活动原型' })).not.toBeInTheDocument()
+    expect(screen.getAllByLabelText('默认开始时间')[0]).not.toBeDisabled()
+    expect(screen.getByLabelText('最早开始时间')).not.toBeDisabled()
+  })
   it('默认时长 <= 0 时 onBlur 显示错误', async () => {
     const user = userEvent.setup()
     render(<Harness initialSources={mockSources} />)
@@ -899,6 +920,7 @@ Expected: FAIL（新 label/分叉未实现）。
   import { ArchetypePicker } from '@/components/archetype/archetype-picker'
   import { validateTemplateRow } from '@/domains/timebox/lib/template-row-helpers'
   ```
+- **OV-C（DRY）**：删掉文件顶部冗余的本地 `SourceHabit`/`SourceItem` interface（行 47-49，Task 3 后 `SubscriptionSources` 已是唯一真相源），`changeRowSource` 内 `h`/`list` 改用 `SubscriptionSources['habits'][number]` / `SubscriptionSources['tasks'][number]` 直接类型，消除重复定义。
 - `RowEditor` 内：时间锁按本计划矩阵——habit 锁时（`isHabit`），task/thread/custom 可编辑。原型按 source 分叉。新增约束字段输入（custom/task/thread 可编辑，habit 只读）。
 - 把 `RowEditor` 返回的 JSX（当前行 91-176）替换为下面的多行卡片结构（保留 `来源/活动名称/来源对象/删除` 顶行逻辑不变，仅调整布局与新增字段）：
 
@@ -1126,53 +1148,6 @@ git commit -m "docs(027-B): Tier 2 同步（database-design/usom-design/CHANGELO
 
 ---
 
-## Task 7: 可选 prod 回填 SQL（deferred）
-
-**Files:**
-- Create: `frontend/src/lib/db/migrations/0037_optional_backfill_timebox_template_rows.sql`
-
-> **可选**：dev 库靠自愈覆盖，无需跑。仅供 prod 用 psql 跑一次做数据整洁。**不登 journal**（纯幂等 DML，非 schema 迁移）。若 reviewer 认为不必要可整任务删除。
-
-- [ ] **Step 1: 写幂等回填脚本**
-
-```sql
--- [027-B] 可选 prod 回填：把 timebox_templates.rows 旧形状 {start,end} 转为新形状。
--- 纯 DML，幂等，不登 __drizzle_migrations。dev 库无需运行（仓储读时自愈）。
--- 仅处理仍含 "start" 且无 "defaultStart" 的 rows 元素。
-
--- 守护：仅当存在旧形状行时执行（避免无谓写）。
-UPDATE timebox_templates
-SET rows = (
-  SELECT jsonb_agg(
-    CASE
-      WHEN elem ? 'start' AND NOT (elem ? 'defaultStart') THEN
-        elem
-          - 'start' - 'end'
-          || jsonb_build_object(
-               'defaultStart', elem->>'start',
-               'defaultDuration',
-                 (extract(epoch FROM (to_timestamp(elem->>'end','HH24:MI') - to_timestamp(elem->>'start','HH24:MI'))) / 60)::int
-               )
-          || jsonb_build_object('earliestStart', null, 'latestStart', null, 'shortestDuration', null, 'activityArchetypeId', null)
-      ELSE elem
-    END
-  )
-  FROM jsonb_array_elements(rows) AS t(elem)
-)
-WHERE rows::text LIKE '%"start"%';
-```
-
-> 注：跨午夜时长（如 23:00→07:00）在 SQL 里 `to_timestamp` 减法得负，需 implementer 现场用 `(diff + 1440) % 1440` 包一层；此处留作 implementer 按实际 PG 行为校准（自愈层已正确处理，回填仅整洁用，宁可跳过跨午夜行也不要写错）。implementer 在提交前用一个跨午夜样例验证，或在脚本注释里标注「跨午夜行留给自愈」。
-
-- [ ] **Step 2: 不跑迁移，仅登记 + Commit**
-
-```bash
-git add frontend/src/lib/db/migrations/0037_optional_backfill_timebox_template_rows.sql
-git commit -m "chore(027-B): 可选 prod 回填脚本（旧 rows 形状→新，幂等 DML，不登 journal）"
-```
-
----
-
 ## 收尾验证（全分支 ship 前必跑）
 
 - [ ] `cd frontend && npx tsc --noEmit` — 0 新增错误
@@ -1187,13 +1162,38 @@ git commit -m "chore(027-B): 可选 prod 回填脚本（旧 rows 形状→新，
 
 **1. Spec 覆盖**（spec §3.1–§3.5 + §4.1）：
 - §3.1 形状 → Task 1 ✓
-- §3.2 迁移自愈 → Task 1（normalizeTemplateRow）+ Task 2（repo 接线）+ Task 7（可选回填）✓
+- §3.2 迁移自愈 → Task 1（normalizeTemplateRow，含 OV-A 防御性读取）+ Task 2（repo 接线）✓（无 DDL；原 Task 7 可选回填 SQL 因跨午夜 buggy + 冗余于自愈，评审删除）
 - §3.3 列表展示 → Task 4 ✓
 - §3.4 编辑抽屉分叉 → Task 5（含精炼标记）✓
 - §3.5 校验 → Task 1（validateTemplateRow）+ Task 5（onBlur 接线）✓
 - §4.1 文档同步 → Task 6 ✓
 - §4.3 manifest/注册 → 无新 CNUI surface，仅 Task 6 manifest 入口 ✓
 
-**2. 占位扫描**：无 TBD/TODO；每步含可执行代码或精确 before→after。Task 7 跨午夜 SQL 已显式标注 implementer 校准（非占位，是诚实边界）。
+**2. 占位扫描**：无 TBD/TODO；每步含可执行代码或精确 before→after。（原 Task 7 回填 SQL 因跨午夜 `to_timestamp` buggy + 冗余于自愈，评审删除。）
 
 **3. 类型一致**：`TemplateRow` 字段名（defaultStart/defaultDuration/earliestStart/latestStart/shortestDuration/activityArchetypeId）在 Task 1–5 一致；`sortRowsByDefaultStart`、`normalizeTemplateRow`、`validateTemplateRow`、`hhmmDiffMinutes` 在定义处与所有调用处签名一致；`SubscriptionSources`（habits/tasks 带 activityArchetypeId、threads 无）在 Task 3 定义、Task 5 消费一致。
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 6 issues, 0 critical gaps, 全部 fold/dropped/deferred |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**OUTSIDE VOICE**（Claude subagent；codex CLI 连接 `127.0.0.1:15721` 失败回退）：3 条真发现已折入——
+- **OV-A (P2)**：`normalizeTemplateRow` 旧形状分支防御性读取 `activityArchetypeId`（防部分迁移丢字段）→ Task 1 ✓
+- **OV-B (P2)**：`handleSave` 保存前对全部行跑 `validateTemplateRow` 兜底拦截 → Task 4 ✓
+- **OV-C (P3)**：更新 edit-form 头注释 `sortRowsByStart`→`sortRowsByDefaultStart` + 删冗余 `SourceHabit`/`SourceItem` 本地接口 → Task 1/5 ✓
+- 3 条 FALSE POSITIVE（经 grep 验证）：「Task 1 漏 editor」（editor 无 `.start`/`.end` 访问）、「`SourceHabit` 需加 archetypeId」（派生用 `sources` 非本地接口）、「§3.4 数据完整性」（模板行即 task 时间真相源，by-design）。
+- 1 条用户决定不处理：RowEditor ArchetypePicker N+1（Phase A 组件不支持注入数据，跨范围；用户选「完全不管」，不登记 TODO）。
+
+**ENG REVIEW 决议汇总**：§3.4 行为精炼接受（archetype 仅 custom 可编辑，时间仅 habit 锁）；Task 7 回填 SQL 删除；thread 行为单测补齐；OV-A/B/C 全折入。Plan 终态 = 6 任务（形状重构/仓储自愈/sources archetypeId/card 徽章+editor Map/RowEditor 分叉+校验/Tier 2 文档）。
+
+**VERDICT:** ENG CLEARED — ready to implement（plan-eng-review 过，6 任务 ship-ready 候选，下一步 superpowers:subagent-driven-development）。
+
+NO UNRESOLVED DECISIONS
