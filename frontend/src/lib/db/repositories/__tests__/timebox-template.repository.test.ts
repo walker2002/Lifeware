@@ -250,6 +250,8 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
+      // [OQ-7 audit] 抓 raw rows 用作 audit log 的 oldValues.rows
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // [027-B] rowToTemplate 归一化产生新数组 → old.rows !== input.rows → owner-check 触发
@@ -273,8 +275,8 @@ describe('TimeboxTemplateRepository', () => {
       )
 
       expect(result.id).toBe(FAKE_TEMPLATE_ROW.id)
-      // [027-B] owner-check 现在会被触发：findById 1 + habits 1 = 2 次 select
-      expect(txSelect).toHaveBeenCalledTimes(2)
+      // [OQ-7] + findById + habits：raw rows 1 + findById 1 + habits 1 = 3 次 select
+      expect(txSelect).toHaveBeenCalledTimes(3)
       expect(txUpdate).toHaveBeenCalledTimes(1)
     })
 
@@ -292,6 +294,8 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
+      // [OQ-7 audit] 抓 raw rows
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // owner-check habits → 命中（rows 引用变了 = 重新校验）
@@ -325,8 +329,8 @@ describe('TimeboxTemplateRepository', () => {
         MVP_USER,
       )
 
-      // owner-check 触发：findById 1 + habits 1 = 2 次 select
-      expect(txSelect).toHaveBeenCalledTimes(2)
+      // [OQ-7] + owner-check：raw rows 1 + findById 1 + habits 1 = 3 次 select
+      expect(txSelect).toHaveBeenCalledTimes(3)
       expect(txUpdate).toHaveBeenCalledTimes(1)
     })
 
@@ -344,6 +348,8 @@ describe('TimeboxTemplateRepository', () => {
         }),
       )
 
+      // [OQ-7 audit] 抓 raw rows（在 owner-check 抛出前也会跑一次）
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ rows: FAKE_TEMPLATE_ROW.rows }]) as any)
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
       // owner-check habits → 空（跨用户 → 拒绝）

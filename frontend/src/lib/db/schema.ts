@@ -757,7 +757,7 @@ export const timeboxTemplates = pgTable('timebox_templates', {
   name: text('name').notNull(),
   /** 应用范围：0=周日..6=周六；空数组=不限 [023-02] */
   daysOfWeek: jsonb('days_of_week').$type<number[]>().notNull().default([0, 1, 2, 3, 4, 5, 6]),
-  /** 有序行列表 [023-02]；每行 {id, activityName, start, end, source, sourceId?} */
+  /** 有序行列表 [023-02] / [027-B]；每行 {id, activityName, defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?, source, sourceId?} */
   rows: jsonb('rows').$type<TemplateRow[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

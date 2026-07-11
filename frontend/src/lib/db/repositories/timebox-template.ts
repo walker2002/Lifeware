@@ -99,6 +99,15 @@ export class TimeboxTemplateRepository {
 
   async update(id: USOM_ID, input: TimeboxTemplateInput, userId: USOM_ID, tx?: DbClient): Promise<TimeboxTemplate> {
     const exec = async (client: DbClient) => {
+      // OQ-7 audit fidelity：先抓 DB 原生 rows（可能是旧 {start,end} 形状），
+      // 留待 audit log 的 oldValues.rows 使用——避免 rowToTemplate 归一后丢失原貌。
+      // 单行 result 即可（PK + userId 联合唯一，findById 也不用 .limit()）。
+      const rawOldRowsResult = await client
+        .select({ rows: s.timeboxTemplates.rows })
+        .from(s.timeboxTemplates)
+        .where(and(eq(s.timeboxTemplates.id, id), eq(s.timeboxTemplates.userId, userId)))
+      const rawOldRows: TemplateRow[] = (rawOldRowsResult[0]?.rows ?? []) as TemplateRow[]
+
       const old = await this.findById(id, userId, client)
       if (!old) throw new Error(`TimeboxTemplate ${id} not found`)
 
@@ -136,10 +145,17 @@ export class TimeboxTemplateRepository {
 
       const template = rowToTemplate(updated)
 
+      // OQ-7 audit fidelity：rows 字段的 oldValues 用原生 DB rows（保留旧 {start,end} 形状），
+      // 其他字段沿用归一化的 old。newValues 总是归一化后的形态（与 DB 落库后一致）。
+      const oldPick = this._pickFields(old, changedFields)
+      if (changedFields.includes('rows')) {
+        oldPick.rows = rawOldRows
+      }
+
       // OQ-7：写 audit log（同一事务）
       await this._logAudit(client, userId, 'update', id, {
         changedFields,
-        oldValues: this._pickFields(old, changedFields),
+        oldValues: oldPick,
         newValues: this._pickFields(template, changedFields),
       })
 
