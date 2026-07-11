@@ -1,20 +1,25 @@
 /**
  * @file template-edit-form
- * @brief 时间盒模板 Sheet 抽屉内的行编辑器（[023-02]）
+ * @brief 时间盒模板 Sheet 抽屉内的行编辑器（[023-02] / [027-B] 形状重构 + 多行卡片）
  *
  * 从 timebox-template-editor.tsx 抽出（决议 C.3），便于独立单测 + 关注点分离。
  * 父组件 TimeboxTemplateEditor 通过 props 传入 template / sources / 回调；
  * 本组件本身不持有持久状态，所有变更通过 onChange(template) 冒泡给父。
  *
- * 设计要点（[023-02] 决议 B.1 / B.2 / B.3 / D.1）：
+ * 设计要点（[023-02] 决议 B.1 / B.2 / B.3 / D.1 + [027-B] 形状重构 + 行为分叉）：
  * - B.1：所有「来源」<select> 在 sources === null 时禁用，避免 fire-and-forget
  *   竞态导致用户切到 habit 看到空下拉。
- * - B.2：行按用户编辑顺序展示（template.rows 直接渲染），不调 sortRowsByStart；
- *   [2026-07-04 用户调整] 改为按 start 时间排序展示，每次新增/修改行后自动重排
- *   TemplateCard 仍排序用于展示。
- * - B.3：DEFAULT_SEGMENT_SEED 单点维护见 lib/template-row-helpers.ts:DEFAULT_SEGMENT_SEED。
+ * - B.2：行按 defaultStart 时间排序展示，每次新增/修改行后自动重排；
+ *   TemplateCard 仍用 sortRowsByDefaultStart 排序用于展示。
+ * - B.3：DEFAULT_SEGMENT_SEED / newEmptyRow 单点维护见 lib/template-row-helpers.ts。
  * - D.1：行编辑器抽为 RowEditor 子组件，React.memo 包裹；name 输入变化时不会
  *   触发单行 re-render。
+ * - [027-B] 形状：行字段由 {start, end} 改为 {defaultStart, defaultDuration}；
+ *   「结束时间」time input 改为「默认时长（分钟）」number input。
+ * - [027-B] 多行卡片：RowEditor 返回 4 段卡片布局——顶行（来源/名称-对象/删除）、
+ *   原型行（ArchetypePicker inline）、时间+约束行（5 字段）、错误提示行。
+ * - [027-B] 行为分叉（计划「设计精炼标记」）：archetype 仅 custom 可编辑（其余
+ *   只读派生）；时间/约束仅 habit 只读（其余可编辑，task/thread 无时间来源）。
  *
  * 数据流 ASCII（A.3）：
  *   PageBanner
@@ -32,21 +37,20 @@
  */
 'use client'
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { Plus, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 import type { TimeboxTemplate } from '@/lib/db/repositories/timebox-template'
 import type { TemplateRow, TemplateRowSource } from '@/lib/db/schema'
 import {
   WEEKDAY_LABELS,
   newEmptyRow,
-  sortRowsByStart,
+  sortRowsByDefaultStart,
+  hhmmDiffMinutes,
+  validateTemplateRow,
 } from '@/domains/timebox/lib/template-row-helpers'
 import type { SubscriptionSources } from '@/app/actions/timebox-templates'
-
-/** 视图层 SourceItem 类型（habits 含 start/end；tasks/threads 仅 id+title） */
-interface SourceHabit { id: string; title: string; start: string; end: string }
-interface SourceItem { id: string; title: string }
 
 export interface TemplateEditFormProps {
   template: TimeboxTemplate
@@ -68,7 +72,10 @@ interface RowEditorProps {
 }
 
 /**
- * 单行编辑器：来源下拉 + 名称/对象选择 + 起止时间 + 删除。
+ * 单行编辑器（[027-B] 多行卡片）：顶行 + 原型行 + 时间约束行 + 错误提示。
+ * - archetype：custom 行可编辑（ArchetypePicker inline + AI match）；来源行只读派生
+ * - 时间 + 约束：habit 行全只读（锁定到 habit 默认起止）；其余可编辑
+ * - onBlur 触发 validateTemplateRow，错误信息展示在卡片底部
  * 用 React.memo 避免父组件 name 字段输入时整张表单 re-render 风暴。
  */
 const RowEditor = React.memo(function RowEditor({
@@ -88,21 +95,36 @@ const RowEditor = React.memo(function RowEditor({
     row.source === 'task' ? sources.tasks :
     row.source === 'thread' ? sources.threads : []
 
+  // [027-B] 来源行 archetype id 派生：habit/task 从 sources 取，thread 无（=null）
+  const sourceArchetypeId: string | null = (() => {
+    if (row.source === 'habit' && row.sourceId && sources) {
+      return sources.habits.find((h) => h.id === row.sourceId)?.activityArchetypeId ?? null
+    }
+    if (row.source === 'task' && row.sourceId && sources) {
+      return sources.tasks.find((t) => t.id === row.sourceId)?.activityArchetypeId ?? null
+    }
+    return null
+  })()
+
+  // [027-B] onBlur 校验
+  const [errors, setErrors] = useState<string[]>([])
+  const validateOnBlur = () => setErrors(validateTemplateRow(row))
+
   return (
-    <div className="flex flex-col gap-1 rounded border border-hairline bg-surface-card p-2">
+    <div className="flex flex-col gap-2 rounded border border-hairline bg-surface-card p-2">
+      {/* 顶行：来源 / 名称或对象 / 删除 */}
       <div className="flex items-center gap-1 flex-wrap">
-        {/* 来源下拉（B.1：sources 未就绪时禁用 + 显示加载态） */}
         <select
           aria-label="行来源"
           value={row.source}
           disabled={!sourcesReady}
           onChange={(e) => {
             const v = e.target.value
-            if (v === 'habit' || v === 'task' || v === 'thread' || v === 'custom') {
-              onSourceChange(row.id, v)
-            }
+            if (v === 'habit' || v === 'task' || v === 'thread' || v === 'custom') onSourceChange(row.id, v)
           }}
-          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
         >
           <option value="custom">自定义</option>
           <option value="habit">习惯</option>
@@ -110,7 +132,6 @@ const RowEditor = React.memo(function RowEditor({
           <option value="thread">主线</option>
         </select>
 
-        {/* 活动名称 / 来源对象选择 */}
         {isObjectSource && sourceList ? (
           <select
             aria-label="来源对象"
@@ -133,25 +154,6 @@ const RowEditor = React.memo(function RowEditor({
           />
         )}
 
-        {/* 起止时间（habit 时禁用：起止由习惯 defaultTime/duration 锁定） */}
-        <input
-          aria-label="开始时间"
-          type="time"
-          value={row.start}
-          disabled={isHabit}
-          onChange={(e) => onUpdate(row.id, { start: e.target.value })}
-          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
-        />
-        <span className="text-xs text-muted-foreground">—</span>
-        <input
-          aria-label="结束时间"
-          type="time"
-          value={row.end}
-          disabled={isHabit}
-          onChange={(e) => onUpdate(row.id, { end: e.target.value })}
-          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
-        />
-
         <Button
           size="sm"
           variant="ghost"
@@ -162,6 +164,108 @@ const RowEditor = React.memo(function RowEditor({
           <Trash2 className="size-3" />
         </Button>
       </div>
+
+      {/* 活动原型行：custom 可编辑；来源行只读派生 */}
+      <div className="rounded border border-hairline bg-canvas px-2 py-1">
+        {row.source === 'custom' ? (
+          <ArchetypePicker
+            variant="inline"
+            enableAiMatch
+            title={row.activityName}
+            value={row.activityArchetypeId ?? undefined}
+            onChange={(id) => onUpdate(row.id, { activityArchetypeId: id ?? null })}
+          />
+        ) : (
+          <ArchetypePicker variant="inline" readOnly value={sourceArchetypeId ?? undefined} />
+        )}
+      </div>
+
+      {/* 时间 + 约束行：habit 只读，其余可编辑 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          默认开始
+          <input
+            aria-label="默认开始时间"
+            type="time"
+            value={row.defaultStart}
+            disabled={isHabit}
+            onChange={(e) => onUpdate(row.id, { defaultStart: e.target.value })}
+            onBlur={validateOnBlur}
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          默认时长
+          <input
+            aria-label="默认时长（分钟）"
+            type="number"
+            min={1}
+            value={row.defaultDuration}
+            disabled={isHabit}
+            onChange={(e) => onUpdate(row.id, { defaultDuration: Number(e.target.value) || 0 })}
+            onBlur={validateOnBlur}
+            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
+          />
+          分钟
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          最早开始
+          <input
+            aria-label="最早开始时间"
+            type="time"
+            value={row.earliestStart ?? ''}
+            disabled={isHabit}
+            onChange={(e) => onUpdate(row.id, { earliestStart: e.target.value || null })}
+            onBlur={validateOnBlur}
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          最迟开始
+          <input
+            aria-label="最迟开始时间"
+            type="time"
+            value={row.latestStart ?? ''}
+            disabled={isHabit}
+            onChange={(e) => onUpdate(row.id, { latestStart: e.target.value || null })}
+            onBlur={validateOnBlur}
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          最短时长
+          <input
+            aria-label="最短时长（分钟）"
+            type="number"
+            min={0}
+            value={row.shortestDuration ?? ''}
+            disabled={isHabit}
+            onChange={(e) => onUpdate(row.id, { shortestDuration: e.target.value === '' ? null : Number(e.target.value) })}
+            onBlur={validateOnBlur}
+            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
+          />
+          分钟
+        </label>
+      </div>
+
+      {/* 校验错误提示（aria-describedby 目标） */}
+      {errors.length > 0 && (
+        <ul id={`row-errors-${row.id}`} className="flex flex-col gap-0.5">
+          {errors.map((e) => (
+            <li key={e} className="text-[10px] text-error">{e}</li>
+          ))}
+        </ul>
+      )}
 
       {/* sources 加载态指示（B.1） */}
       {!sourcesReady && (
@@ -201,50 +305,74 @@ export function TemplateEditForm({
     onChange({ ...template, daysOfWeek: arr })
   }, [template, onChange])
 
+  // [PLR] F-18：ref-based callback 稳定化——RowEditor 用 React.memo 包裹但 callback 因依赖 template 每次都换引用，
+  // memo 失效。把 template/sources/onChange 放进 ref，callback 自身用空 deps，引用稳定；ref 在每次渲染时更新。
+  const stateRef = useRef({ template, sources, onChange })
+  stateRef.current = { template, sources, onChange }
+
   const updateRow = useCallback((id: string, patch: Partial<TemplateRow>) => {
-    onChange({
-      ...template,
-      rows: template.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    const { template: t, onChange: cb } = stateRef.current
+    cb({
+      ...t,
+      rows: t.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     })
-  }, [template, onChange])
+  }, [])
 
   const deleteRow = useCallback((id: string) => {
-    onChange({ ...template, rows: template.rows.filter((r) => r.id !== id) })
-  }, [template, onChange])
+    const { template: t, onChange: cb } = stateRef.current
+    cb({ ...t, rows: t.rows.filter((r) => r.id !== id) })
+  }, [])
 
   const addRow = useCallback(() => {
     onChange({ ...template, rows: [...template.rows, newEmptyRow()] })
   }, [template, onChange])
 
+  // [027-B] OV-C（DRY）：直接用 SubscriptionSources 子元素类型，消除本地 SourceHabit/SourceItem 重复定义
+  // [PLR] F-18：ref-based 稳定化（deps=[]），见上方 stateRef。
   const changeRowSource = useCallback((
     id: string,
     newSource: TemplateRowSource,
     newSourceId?: string,
   ) => {
-    const row = template.rows.find((r) => r.id === id)
+    const { template: t, sources: src, onChange: cb } = stateRef.current
+    const row = t.rows.find((r) => r.id === id)
     if (!row) return
 
-    if (newSource === 'habit' && newSourceId && sources) {
-      const h: SourceHabit | undefined = sources.habits.find((x) => x.id === newSourceId)
+    if (newSource === 'habit' && newSourceId && src) {
+      const h: SubscriptionSources['habits'][number] | undefined =
+        src.habits.find((x) => x.id === newSourceId)
       if (h) {
-        onChange({
-          ...template,
-          rows: template.rows.map((r) =>
+        // [PLR] D2：切到 habit 时清零约束（旧值不再有意义，habit 时间/约束全锁）+ 派生 archetype。
+        cb({
+          ...t,
+          rows: t.rows.map((r) =>
             r.id === id
-              ? { ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, start: h.start, end: h.end }
+              ? {
+                  ...r,
+                  source: 'habit',
+                  sourceId: newSourceId,
+                  activityName: h.title,
+                  defaultStart: h.start,
+                  defaultDuration: hhmmDiffMinutes(h.start, h.end),
+                  earliestStart: null,
+                  latestStart: null,
+                  shortestDuration: null,
+                  activityArchetypeId: h.activityArchetypeId ?? null,
+                }
               : r,
           ),
         })
         return
       }
     }
-    if ((newSource === 'task' || newSource === 'thread') && newSourceId && sources) {
-      const list: SourceItem[] = newSource === 'task' ? sources.tasks : sources.threads
+    if ((newSource === 'task' || newSource === 'thread') && newSourceId && src) {
+      const list: Array<SubscriptionSources['tasks'][number] | SubscriptionSources['threads'][number]> =
+        newSource === 'task' ? src.tasks : src.threads
       const item = list.find((x) => x.id === newSourceId)
       if (item) {
-        onChange({
-          ...template,
-          rows: template.rows.map((r) =>
+        cb({
+          ...t,
+          rows: t.rows.map((r) =>
             r.id === id ? { ...r, source: newSource, sourceId: newSourceId, activityName: item.title } : r,
           ),
         })
@@ -252,13 +380,13 @@ export function TemplateEditForm({
       }
     }
     // custom 或 sources 未就绪：仅切来源，sourceId 清空，名称保留
-    onChange({
-      ...template,
-      rows: template.rows.map((r) =>
+    cb({
+      ...t,
+      rows: t.rows.map((r) =>
         r.id === id ? { ...r, source: newSource, sourceId: undefined, activityName: r.activityName } : r,
       ),
     })
-  }, [template, sources, onChange])
+  }, [])
 
   return (
     <div className="flex flex-col gap-4 mt-4 flex-1 overflow-y-auto">
@@ -313,7 +441,7 @@ export function TemplateEditForm({
           <p className="text-xs text-muted-foreground">暂无行，点击「新增一行」开始添加</p>
         )}
 
-        {sortRowsByStart(template.rows).map((r) => (
+        {sortRowsByDefaultStart(template.rows).map((r) => (
           <RowEditor
             key={r.id}
             row={r}

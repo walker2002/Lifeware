@@ -5,7 +5,7 @@
  * 包装 TimeboxTemplateRepository（CRUD + audit），供客户端编辑器调用。
  * 订阅源（habits/tasks/threads）按用户可订阅的状态筛选：habits=active, tasks=active, threads=active。
  *
- * MVP 性能优化（[023-02] 决议 D.2）：fetchSubscriptionSources 走 1 分钟 in-memory cache。
+ * MVP 性能优化（[023-02] 决议 D.2 / [027-B] 收紧到 10s）：fetchSubscriptionSources 走 in-memory cache。
  * 后续接入 SWR 替代（cross-tab 同步）。
  */
 'use server'
@@ -28,16 +28,16 @@ export interface TimeboxTemplateActionResult<T = void> {
   error?: string
 }
 
-/** 订阅源汇总（[023-02]：habit 多带 start/end；tasks/threads 仅 id+title） */
+/** 订阅源汇总（[023-02]：habit 多带 start/end；tasks/threads 仅 id+title。[027-B]：habits/tasks 补带 activityArchetypeId，供编辑器按来源派生） */
 export interface SubscriptionSources {
-  habits: Array<{ id: string; title: string; start: string; end: string }>
-  tasks: Array<{ id: string; title: string }>
+  habits: Array<{ id: string; title: string; start: string; end: string; activityArchetypeId?: string | null }>
+  tasks: Array<{ id: string; title: string; activityArchetypeId?: string | null }>
   threads: Array<{ id: string; title: string }>
 }
 
-/** 1 分钟 in-memory cache（[023-02] 决议 D.2） */
+/** 10s in-memory cache（[023-02] 决议 D.2，[027-B] 防御性收紧：MVP 单租户 UX 在 archetype 编辑后不宜 60s 过期） */
 let _sourcesCache: { at: number; data: SubscriptionSources } | null = null
-const SOURCES_CACHE_TTL_MS = 60_000
+const SOURCES_CACHE_TTL_MS = 10_000
 
 // ─── CRUD ────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ export async function fetchTimeboxTemplates(): Promise<TimeboxTemplateActionResu
  * - tasks: status='todo' 或 'planned' 或 'in_progress'（活跃任务）
  * - threads: status='active'
  *
- * 1 分钟 in-memory cache（决议 D.2）；MVP 用，后续接 SWR 替代。
+ * 10s in-memory cache（决议 D.2；[027-B] 防御性收紧到 10s 以缩短 archetype 编辑后的感知延迟）；MVP 用，后续接 SWR 替代。
  */
 export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionResult<SubscriptionSources>> {
   try {
@@ -106,8 +106,9 @@ export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionR
         title: h.title,
         start: h.defaultTime,
         end: addMinutesToHHMM(h.defaultTime, h.defaultDuration),
+        activityArchetypeId: h.activityArchetypeId ?? null,
       })),
-      tasks: tasks.map((t) => ({ id: t.id, title: t.title })),
+      tasks: tasks.map((t) => ({ id: t.id, title: t.title, activityArchetypeId: t.activityArchetypeId ?? null })),
       threads: threads.map((th) => ({ id: th.id, title: th.name })),
     }
     _sourcesCache = { at: Date.now(), data }
@@ -115,4 +116,11 @@ export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionR
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : '拉取订阅源失败' }
   }
+}
+
+/** [PLR] F-12 测试钩子：清空 sources in-memory cache（仅测试用，prod 不调）
+ * [QA] 必须 async — 'use server' 文件 Next.js 要求所有 export 是 async function
+ */
+export async function __resetForTesting(): Promise<void> {
+  _sourcesCache = null
 }

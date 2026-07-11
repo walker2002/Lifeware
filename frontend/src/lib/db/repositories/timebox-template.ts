@@ -15,6 +15,7 @@ import type { DbClient } from '@/lib/db'
 import * as s from '@/lib/db/schema'
 import type { TemplateRow } from '@/lib/db/schema'
 import type { USOM_ID } from '@/usom/types/primitives'
+import { normalizeTemplateRow } from '@/domains/timebox/lib/template-row-helpers'
 
 /** TimeboxTemplate（USOM 形状，DB 行 → 业务对象的映射目标） */
 export interface TimeboxTemplate {
@@ -37,14 +38,14 @@ export interface TimeboxTemplateInput {
 }
 
 /** DB 行 → USOM TimeboxTemplate */
-function rowToTemplate(row: typeof s.timeboxTemplates.$inferSelect): TimeboxTemplate {
+export function rowToTemplate(row: typeof s.timeboxTemplates.$inferSelect): TimeboxTemplate {
   return {
     id: row.id,
     userId: row.userId,
     schemaVersion: row.schemaVersion,
     name: row.name,
     daysOfWeek: row.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6],
-    rows: row.rows ?? [],
+    rows: (row.rows ?? []).map(normalizeTemplateRow),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -101,11 +102,11 @@ export class TimeboxTemplateRepository {
       const old = await this.findById(id, userId, client)
       if (!old) throw new Error(`TimeboxTemplate ${id} not found`)
 
-      // A.2：rows 引用相等时跳过 owner-check（编辑器 setState 总是给新数组，
-      // 所以引用相等 = rows 结构未变 = 不需校验 habits/tasks/threads 归属）
-      if (old.rows !== input.rows) {
-        await this.assertSubscriptionsOwned(input, userId, client)
-      }
+      // [027-B] 死短路已删：原「old.rows !== input.rows 引用相等 → 跳过 owner-check」
+      // 优化已失效（findById → rowToTemplate 总是产生新数组），owner-check 现在无条件跑。
+      // 这是 3 extra inArray SELECTs / update 的性能代价，正确性无影响。
+      // 优化重构需要深比较或传 rowsDirty 标记（[023-02] A.2），记录到 TD-022 后续 PR。
+      await this.assertSubscriptionsOwned(input, userId, client)
 
       const changedFields: string[] = []
       const setData: Record<string, unknown> = { updatedAt: new Date() }
@@ -135,10 +136,26 @@ export class TimeboxTemplateRepository {
 
       const template = rowToTemplate(updated)
 
+      // OQ-7 audit fidelity：rows 字段的 oldValues 用原生 DB rows（保留旧 {start,end} 形状），
+      // 其他字段沿用归一化的 old。newValues 总是归一化后的形态（与 DB 落库后一致）。
+      // [PLR] P1：仅当 rows 在 changedFields 中时拉取 raw，避免每次 update 多一次 SELECT。
+      let rawOldRows: TemplateRow[] = []
+      if (changedFields.includes('rows')) {
+        const rawOldRowsResult = await client
+          .select({ rows: s.timeboxTemplates.rows })
+          .from(s.timeboxTemplates)
+          .where(and(eq(s.timeboxTemplates.id, id), eq(s.timeboxTemplates.userId, userId)))
+        rawOldRows = (rawOldRowsResult[0]?.rows ?? []) as TemplateRow[]
+      }
+      const oldPick = this._pickFields(old, changedFields)
+      if (changedFields.includes('rows')) {
+        oldPick.rows = rawOldRows
+      }
+
       // OQ-7：写 audit log（同一事务）
       await this._logAudit(client, userId, 'update', id, {
         changedFields,
-        oldValues: this._pickFields(old, changedFields),
+        oldValues: oldPick,
         newValues: this._pickFields(template, changedFields),
       })
 

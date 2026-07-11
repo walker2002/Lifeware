@@ -730,12 +730,22 @@ export const activityArchetypes = pgTable('activity_archetypes', {
 /** 模板行来源类型 [023-02] */
 export type TemplateRowSource = 'habit' | 'task' | 'thread' | 'custom'
 
-/** 模板中一条时间安排行 [023-02] */
+/** 模板中一条时间安排行 [023-02] / [027-B] 形状重构：固定时段→带约束可调度活动 */
 export interface TemplateRow {
   id: string
   activityName: string
-  start: string
-  end: string
+  /** 默认开始时间 HH:MM（[027-B] 原 start 改名） */
+  defaultStart: string
+  /** 默认时长（分钟，替代原 end） */
+  defaultDuration: number
+  /** 最早开始时间 HH:MM，可选约束 [027-B] */
+  earliestStart?: string | null
+  /** 最迟开始时间 HH:MM，可选约束 [027-B] */
+  latestStart?: string | null
+  /** 最短时长（分钟），可选约束 [027-B] */
+  shortestDuration?: number | null
+  /** 关联 Activity Archetype（custom 行可编辑；来源行读时从来源对象派生）[027-B] */
+  activityArchetypeId?: string | null
   source: TemplateRowSource
   sourceId?: string
 }
@@ -747,7 +757,7 @@ export const timeboxTemplates = pgTable('timebox_templates', {
   name: text('name').notNull(),
   /** 应用范围：0=周日..6=周六；空数组=不限 [023-02] */
   daysOfWeek: jsonb('days_of_week').$type<number[]>().notNull().default([0, 1, 2, 3, 4, 5, 6]),
-  /** 有序行列表 [023-02]；每行 {id, activityName, start, end, source, sourceId?} */
+  /** 有序行列表 [023-02] / [027-B]；每行 {id, activityName, defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?, source, sourceId?} */
   rows: jsonb('rows').$type<TemplateRow[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

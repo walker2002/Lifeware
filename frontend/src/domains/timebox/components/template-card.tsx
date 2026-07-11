@@ -1,10 +1,10 @@
 /**
  * @file template-card
- * @brief 时间盒模板卡片（[023-02]，仿 HabitCard 风格）
+ * @brief 时间盒模板卡片（[023-02] / [027-B] 形状重构）
  *
  * 顶栏：模板名 + 星期 chips
- * 主体：起–止：活动名称 逐行（按 start 升序）
- * 截断：> 4 行时显示前 4 行 + "还有 N 条"；点击「还有 N 条」弹 Popover 完整列表
+ * 主体：默认开始 · 默认时长分钟：活动名称 逐行（按 defaultStart 升序）
+ * 截断：> MAX_VISIBLE_ROWS 行时显示前 N 行 + "还有 N 条"；点击「还有 N 条」弹 Popover 完整列表
  * 操作：编辑 / 删除
  */
 
@@ -17,18 +17,38 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { TimeboxTemplate } from '@/lib/db/repositories/timebox-template'
-import { sortRowsByStart, WEEKDAY_LABELS } from '@/domains/timebox/lib/template-row-helpers'
+import { sortRowsByDefaultStart, WEEKDAY_LABELS } from '@/domains/timebox/lib/template-row-helpers'
 
 interface TemplateCardProps {
   template: TimeboxTemplate
+  /** [027-B] 原型 id → l2Name 映射（custom 行命中即显示原型标签）。未传则不显示。 */
+  archetypeMap?: Map<string, string>
   onEdit: () => void
   onDelete: () => void
 }
 
 const MAX_VISIBLE_ROWS = 10
 
-export function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
-  const sorted = useMemo(() => sortRowsByStart(template.rows), [template.rows])
+/** [027-B] 来源 → 显示文本（列表行徽章） */
+const SOURCE_BADGE: Record<string, string> = { habit: '习惯', task: '任务', thread: '主线' }
+
+/** [027-B] 单行展示文本：默认开始 · 默认时长分钟 · 活动名 [+ 原型标签或来源徽章] */
+function rowLabel(
+  r: TimeboxTemplate['rows'][number],
+  archetypeMap?: Map<string, string>,
+): string {
+  const parts = [`${r.defaultStart} · ${r.defaultDuration}分钟`, r.activityName || '(未命名)']
+  if (r.source === 'custom' && r.activityArchetypeId) {
+    const label = archetypeMap?.get(r.activityArchetypeId)
+    if (label) parts.push(label)
+  } else if (r.source !== 'custom') {
+    parts.push(`[${SOURCE_BADGE[r.source] ?? r.source}]`)
+  }
+  return parts.join(' · ')
+}
+
+export function TemplateCard({ template, archetypeMap, onEdit, onDelete }: TemplateCardProps) {
+  const sorted = useMemo(() => sortRowsByDefaultStart(template.rows), [template.rows])
   const visible = sorted.slice(0, MAX_VISIBLE_ROWS)
   const hidden = sorted.slice(MAX_VISIBLE_ROWS)
   const hiddenCount = hidden.length
@@ -66,7 +86,7 @@ export function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) 
                 data-testid="row-line"
                 className="text-xs text-muted-foreground tabular-nums"
               >
-                {r.start}–{r.end}：{r.activityName || '(未命名)'}
+                {rowLabel(r, archetypeMap)}
               </div>
             ))}
             {hiddenCount > 0 && (
@@ -85,7 +105,7 @@ export function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) 
                   <div className="flex flex-col gap-1">
                     {sorted.map((r) => (
                       <div key={r.id} className="text-xs text-ink tabular-nums">
-                        {r.start}–{r.end}：{r.activityName || '(未命名)'}
+                        {rowLabel(r, archetypeMap)}
                       </div>
                     ))}
                   </div>
