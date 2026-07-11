@@ -1,9 +1,10 @@
 /**
  * @file timebox-template.repository.test
- * @brief TimeboxTemplateRepository 单元测试（[023-02] 行列表 + daysOfWeek 形态）
+ * @brief TimeboxTemplateRepository 单元测试（[023-02] 行列表 + daysOfWeek 形态；[027-B] rowToTemplate 读时自愈）
  *
  * 覆盖：CRUD + audit log 写入 + A3 owner-check 拒绝跨用户订阅 id。
  * [023-02] 决议 C.1：update() 三场景——rows 未变跳过 owner-check、rows 变化触发 owner-check、跨用户 habit。
+ * [027-B] rowToTemplate 读时自愈：旧形状 {start,end} → 新形状 {defaultStart,defaultDuration}。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -186,7 +187,10 @@ describe('TimeboxTemplateRepository', () => {
       )
 
       expect(result.id).toBe(FAKE_TEMPLATE_ROW.id)
-      expect(result.rows).toEqual(FAKE_TEMPLATE_ROW.rows)
+      // [027-B] 读时自愈：rows 经 rowToTemplate 归一为新形状 {defaultStart, defaultDuration}
+      expect(result.rows[0]).toMatchObject({ defaultStart: '06:00', defaultDuration: 60, source: 'habit' })
+      expect(result.rows[1]).toMatchObject({ defaultStart: '07:00', defaultDuration: 30, source: 'custom' })
+      expect(result.rows).toHaveLength(2)
       expect(txInsert).toHaveBeenCalledTimes(2)
     })
 
@@ -232,7 +236,7 @@ describe('TimeboxTemplateRepository', () => {
 
   // ─── update（[023-02] 决议 C.1：rows 引用相等跳过 owner-check） ──
   describe('update', () => {
-    it('应在 rows 引用未变时只改 name 且不触发 owner-check', async () => {
+    it('rows 引用未变时 [027-B] 归一读出触发 owner-check（行列表总是新数组引用）', async () => {
       const { db } = await import('@/lib/db')
       const txSelect = vi.fn()
       const txUpdate = vi.fn()
@@ -248,7 +252,9 @@ describe('TimeboxTemplateRepository', () => {
 
       // findById → 返回 FAKE_TEMPLATE_ROW
       txSelect.mockReturnValueOnce(mockSelectWhere([FAKE_TEMPLATE_ROW]) as any)
-      // owner-check 跳过：不调任何 select
+      // [027-B] rowToTemplate 归一化产生新数组 → old.rows !== input.rows → owner-check 触发
+      // owner-check habits → 命中（rows 含 habit-1 引用）
+      txSelect.mockReturnValueOnce(mockSelectWhere([{ id: 'habit-1' }]) as any)
       // update returning → [FAKE_TEMPLATE_ROW 重命名后]
       txUpdate.mockReturnValueOnce(mockUpdateReturning([FAKE_TEMPLATE_ROW]) as any)
       // audit log insert → void
@@ -267,8 +273,8 @@ describe('TimeboxTemplateRepository', () => {
       )
 
       expect(result.id).toBe(FAKE_TEMPLATE_ROW.id)
-      // owner-check 跳过：txSelect 只被 findById 调 1 次（不再有 habits/tasks/threads 校验）
-      expect(txSelect).toHaveBeenCalledTimes(1)
+      // [027-B] owner-check 现在会被触发：findById 1 + habits 1 = 2 次 select
+      expect(txSelect).toHaveBeenCalledTimes(2)
       expect(txUpdate).toHaveBeenCalledTimes(1)
     })
 
@@ -419,6 +425,37 @@ describe('TimeboxTemplateRepository', () => {
       txSelect.mockReturnValueOnce(mockSelectWhere([]) as any)
 
       await expect(repo.delete('missing', MVP_USER)).rejects.toThrow(/not found/)
+    })
+  })
+
+  // ─── [027-B] rowToTemplate 读时自愈 ────────────────────────
+  // 直接单测 rowToTemplate：旧形状 rows 读出后应已归一为新形状。
+  // 不连真实 DB（rowToTemplate 是纯映射函数）。
+  describe('rowToTemplate — 读时自愈', () => {
+    it('旧形状 {start,end} 行归一为 defaultStart + defaultDuration', async () => {
+      const mod = await import('../timebox-template')
+      const out = mod.rowToTemplate({
+        id: 't1', userId: 'u1', schemaVersion: 1, name: '旧模板',
+        daysOfWeek: [1, 2, 3, 4, 5],
+        rows: [
+          { id: 'r1', activityName: '起床', start: '07:00', end: '07:30', source: 'custom' },
+          { id: 'r2', activityName: '睡眠', start: '23:00', end: '07:00', source: 'custom' },
+        ],
+        createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-02'),
+      } as never)
+      expect(out.rows[0]).toMatchObject({ defaultStart: '07:00', defaultDuration: 30 })
+      expect(out.rows[1]).toMatchObject({ defaultStart: '23:00', defaultDuration: 480 })
+      expect(out.rows[0]).not.toHaveProperty('start')
+    })
+    it('新形状行直通', async () => {
+      const mod = await import('../timebox-template')
+      const out = mod.rowToTemplate({
+        id: 't2', userId: 'u1', schemaVersion: 1, name: '新模板',
+        daysOfWeek: [],
+        rows: [{ id: 'r', activityName: 'x', defaultStart: '09:00', defaultDuration: 60, source: 'custom' }],
+        createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01'),
+      } as never)
+      expect(out.rows[0]).toMatchObject({ defaultStart: '09:00', defaultDuration: 60, earliestStart: null })
     })
   })
 })

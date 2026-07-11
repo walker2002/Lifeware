@@ -15,6 +15,7 @@ import type { DbClient } from '@/lib/db'
 import * as s from '@/lib/db/schema'
 import type { TemplateRow } from '@/lib/db/schema'
 import type { USOM_ID } from '@/usom/types/primitives'
+import { normalizeTemplateRow } from '@/domains/timebox/lib/template-row-helpers'
 
 /** TimeboxTemplate（USOM 形状，DB 行 → 业务对象的映射目标） */
 export interface TimeboxTemplate {
@@ -37,14 +38,14 @@ export interface TimeboxTemplateInput {
 }
 
 /** DB 行 → USOM TimeboxTemplate */
-function rowToTemplate(row: typeof s.timeboxTemplates.$inferSelect): TimeboxTemplate {
+export function rowToTemplate(row: typeof s.timeboxTemplates.$inferSelect): TimeboxTemplate {
   return {
     id: row.id,
     userId: row.userId,
     schemaVersion: row.schemaVersion,
     name: row.name,
     daysOfWeek: row.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6],
-    rows: row.rows ?? [],
+    rows: (row.rows ?? []).map(normalizeTemplateRow),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
