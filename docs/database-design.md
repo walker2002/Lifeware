@@ -1407,7 +1407,7 @@ CREATE INDEX idx_timebox_templates_user ON timebox_templates(user_id);
 | schema_version | integer | NOT NULL DEFAULT 1 | USOM 版本号 |
 | name | text | NOT NULL | 模板名称 |
 | days_of_week | jsonb | NOT NULL DEFAULT `[0,1,2,3,4,5,6]` | 模板级星期，0=周日..6=周六；`[]`=不限 |
-| rows | jsonb | NOT NULL DEFAULT `[]` | 有序行列表，每行 `{id, activityName, start, end, source, sourceId?}` |
+| rows | jsonb | NOT NULL DEFAULT `[]` | 有序行列表，每行 `TemplateRow`（见 §3.12 USOM）：`{id, activityName, defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?, source, sourceId?}`（[027-B]） |
 | created_at | timestamptz | NOT NULL DEFAULT now() | 创建时间 |
 | updated_at | timestamptz | NOT NULL DEFAULT now() | 更新时间 |
 
@@ -1422,13 +1422,30 @@ CREATE INDEX idx_timebox_templates_user ON timebox_templates(user_id);
 - 行 id 用 `md5('seg-<key>')::text` 生成稳定值，便于后续 row 级引用。
 
 **行来源（`rows[].source`）**：
-- `custom`：用户手填活动名 + 起止时间。
-- `habit`：行 `activityName` / `start` / `end` 由 server action `fetchSubscriptionSources` 从 `defaultTime` + `defaultDuration` 推算，UI 端起止锁时。
-- `task` / `thread`：行 `activityName` 由对象 title resolve；起止时间由用户手填。
+- `custom`：用户手填 `activityName` + `defaultStart` + `defaultDuration` + 约束（`earliestStart` / `latestStart` / `shortestDuration`） + 可选 `activityArchetypeId`。
+- `habit`：行 `activityName` / `defaultStart` / `defaultDuration` / `activityArchetypeId` 由 server action `fetchSubscriptionSources` 从 `defaultTime` + `defaultDuration` + `activityArchetypeId` 推算，UI 端时间/约束锁时（按 §3.12 行为矩阵精炼，来源行原型只读派生）。
+- `task` / `thread`：行 `activityName` + `activityArchetypeId`（task only）由对象 title resolve；时间/约束由用户手填（thread 无 archetype）。
 
 **A3 owner-check**：`create`/`update` 写入前遍历 `rows` 收集 `source∈{habit,task,thread}` 的 `sourceId`，按来源分组去重后分别校验归属（habits / tasks / threads 三张表）。任一 id 不归属或不存在则抛错。`update()` 在 `old.rows === input.rows`（引用相等）时跳过 owner-check，避免无谓的全表 inArray。
 
 **配置管理权限（OQ-7）**：TimeboxTemplate 修改是配置变更（非业务执行写入口），走 Intent Engine 路由 + Repository 直写 + `user_audit_log`。不走 SM（无 lifecycle），无需 Rule Engine 校验。
+
+**[027-B] TemplateRow 行 schema（无 DDL，JSONB 内自描述）**：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | string | 行 id |
+| activityName | string | 活动名称 |
+| defaultStart | HH:MM | 默认开始时间（[027-B] 原 `start`） |
+| defaultDuration | number(分钟) | 默认时长（替代原 `end`） |
+| earliestStart | HH:MM? | 最早开始约束（可选）[027-B] |
+| latestStart | HH:MM? | 最迟开始约束（可选）[027-B] |
+| shortestDuration | number? | 最短时长约束（可选，分钟）[027-B] |
+| activityArchetypeId | string? | 关联原型（custom 可编辑；来源行读时派生）[027-B] |
+| source | enum | `habit` / `task` / `thread` / `custom` |
+| sourceId | string? | 来源对象 id |
+
+**[027-B] 旧形状自愈**：无 DDL 迁移。旧形状 `{id, activityName, start, end, source, sourceId?}` 由仓储 `rowToTemplate` 在读取时 lazy 自愈为新形状：`defaultStart = start`、`defaultDuration = hhmmDiffMinutes(end, start)`、约束字段默认空、archetype 派生（见 §7.8 行为精炼 + USOM §3.12）。
 
 ---
 

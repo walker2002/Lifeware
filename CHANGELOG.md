@@ -39,6 +39,27 @@
 
 ---
 
+## [027-B] 时间盒模板增强（template enhance）— 2026-07-11
+
+### 改动
+
+- `TemplateRow` JSONB 形状重构：`{start,end}` → `{defaultStart, defaultDuration, earliestStart, latestStart, shortestDuration, activityArchetypeId}`，**无 DDL**。
+- 仓储 `rowToTemplate` 读时 lazy 自愈旧形状（defaultStart=start、defaultDuration=hhmmDiffMinutes）。
+- `TemplateCard` 列表行显示原型标签（custom）/来源徽章（习惯/任务/主线）。
+- `RowEditor` 多行卡片化 + 行为分叉：custom 可编辑原型与全部时间/约束字段；来源行原型只读派生；habit 时间/约束只读、task/thread 可编辑（详见 plan「设计精炼」）。
+- `validateTemplateRow` 纯函数 onBlur 校验。
+
+### 决策
+
+- 行为矩阵精炼 spec §3.4：task/thread 无时间来源，时间/约束保持可编辑（仅 habit 锁定）。
+- 原型取值：来源行**读时派生**自来源对象 activityArchetypeId（非快照）。
+
+### 验证
+
+- vitest baseline=head 零新增；tsc 0 新增错误；pre-push hooks 全过。
+
+---
+
 ## [neat-2026_07_08] /lifeware-neat 数据库设计补 CREATE 段（2026-07-08）
 
 > 2026_07_08 — `/lifeware-neat` 检测到 §二 总览有 4 张表 (`activity_archetypes` / `user_audit_log` / `user_settings` / `memory_episodes`) **缺 CREATE TABLE 段**（历史累积 drift）。补 4 段 `\`\`\`sql\`\`\`` 块（与 schema.ts pgTable 一一对齐），§二 总览 33 表 vs CREATE 31 表，剩 2 张差异 (`ai_sessions` / `external_events`) 是 §十二 阶段二预留，合法。

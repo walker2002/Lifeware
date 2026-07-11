@@ -950,16 +950,27 @@ export interface ActivityLabel {
 /** [023-02] 模板行来源类型 */
 type TemplateRowSource = 'habit' | 'task' | 'thread' | 'custom'
 
-/** [023-02] 模板中一条时间安排行 */
+/** [027-B] 模板中一条时间安排行（重构自 [023-02]） */
 interface TemplateRow {
   id: string              // 稳定行 key（前端生成，随 jsonb 持久化）
   activityName: string    // 创建/编辑时快照；source='habit/task/thread' 时由 server action resolve
-  start: string           // HH:MM
-  end: string             // HH:MM
+  defaultStart: string    // HH:MM 默认开始时间（[027-B] 原 `start`）
+  defaultDuration: number // 默认时长（分钟，替代原 `end`；[027-B]）
+  earliestStart?: string  // HH:MM? 最早开始约束（可选）[027-B]
+  latestStart?: string    // HH:MM? 最迟开始约束（可选）[027-B]
+  shortestDuration?: number // number? 最短时长约束（可选，分钟）[027-B]
+  activityArchetypeId?: string  // 关联原型（custom 可编辑；来源行读时派生）[027-B]
   source: TemplateRowSource
   sourceId?: string       // habit/task/thread 的 USOM_ID；custom 时为空
 }
 ```
+
+**自愈（[027-B] 无 DDL）**：旧形状 `{id, activityName, start, end, source, sourceId?}` 由 `TimeboxTemplateRepository.rowToTemplate` 在读取时 lazy 自愈为新形状（`defaultStart = start`、`defaultDuration = hhmmDiffMinutes(end, start)`、约束字段默认空、archetype 派生）。
+
+**行为矩阵精炼（[027-B] spec §3.4）**：
+- `custom` 行：原型可编辑，时间/约束字段全可编辑。
+- `habit` 行：原型只读派生；时间/约束只读（由来源对象 `defaultTime`/`defaultDuration` 锁定）。
+- `task` / `thread` 行：原型只读派生（task 派生 `task.activityArchetypeId`；thread 无 archetype）；时间/约束可编辑（无来源时间真相源）。
 
 ```ts
 interface TimeboxTemplate {
@@ -2015,10 +2026,11 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_07_09*
+*文档版本：2026_07_11*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
 
+*变更：[027-B] (2026_07_11) — §3.12 TimeboxTemplate `TemplateRow` 形状重构：`{start,end}` → `{defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?}`；行为矩阵精炼（custom 可编辑原型/全部时间/约束，habit 时间/约束锁时，task/thread 原型只读派生+时间可编辑）；`rowToTemplate` 仓储读时 lazy 自愈旧形状，无 DDL*
 *变更：[027-A] (2026_07_11) — Task/Habit `activityArchetypeId` widen 到 `USOM_ID | null`（3-state clear：undefined=skip/null=clear/string=set），对齐 DB nullable FK；Timebox/Appointment 暂未 widen（pre-existing imprecision，登记 neat/后续）*
 *变更：[026.02.3.1] (2026_07_09) — T1 AISessionStatus 三向一致 (USOM 扩 6 值 + 删局部 SessionStatus 别名)；T2 v_running_timeboxes 派生语义重写（migration 0036）*
 *变更：[026.02.3] (2026_07_09) — /editAppointment selecting→编辑视图 Runtime TypeError 双层防御（handlers.ts todayAppointments 5→8 字段 + AppointmentFormFields ?? fallback + IRON RULE 测试）*
