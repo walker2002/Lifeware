@@ -88,16 +88,22 @@ vi.mock('@/domains/habits/repository/habit', () => ({
 
 vi.mock('@/domains/habits/repository/habit-log', () => ({
   HabitLogRepository: class {
-    async findByDate() {
+    // [028] T10 fold-in：handlers.ts:77 实际调用 findByUserAndDate(date, userId)，
+    //   原 mock 的 findByDate() 是方法名漂移 → 触发 .catch(() => []) 兜底 → pendingHabits 为空。
+    //   修正为真实方法签名，让 getPendingHabits 走 happy path（active habits 不在 logged set 内 → 返回）。
+    async findByUserAndDate() {
       return []
     }
   },
 }))
 
 describe('timeboxCnuiHandler', () => {
-  describe('open - createSmartTimeboxes', () => {
+  // [028] T10 fold-in：原 'createSmartTimeboxes' 已在 T9 rename 为 'scheduleProposal'，
+  //   旧 action 走 handler.ts:531 的 deprecated 分支返回「createSmartTimeboxes intent 已退役」错误。
+  //   守护测试断言新 action 名 + 新 branch 真路径。
+  describe('open - scheduleProposal', () => {
     it('应返回智能编排所需的数据', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
+      const result = await timeboxCnuiHandler.open('scheduleProposal')
 
       expect(result.content).toContain('智能编排时间盒')
       expect(result.dataSnapshot).toHaveProperty('existingTimeboxes')
@@ -119,7 +125,7 @@ describe('timeboxCnuiHandler', () => {
     })
 
     it('应包含未关联到 timebox 的任务', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
+      const result = await timeboxCnuiHandler.open('scheduleProposal')
 
       const tasks = result.dataSnapshot.activeTasks
       expect(tasks.length).toBeGreaterThan(0)
@@ -128,7 +134,7 @@ describe('timeboxCnuiHandler', () => {
     })
 
     it('应包含未打卡的习惯', async () => {
-      const result = await timeboxCnuiHandler.open('createSmartTimeboxes')
+      const result = await timeboxCnuiHandler.open('scheduleProposal')
 
       const habits = result.dataSnapshot.pendingHabits
       expect(habits.length).toBeGreaterThan(0)
@@ -329,16 +335,17 @@ describe('timeboxCnuiHandler', () => {
     })
   })
 
-  describe('submit - createSmartTimeboxes', () => {
-    // [023.10] T5 — Codex #5 修订：guard 不是 dead code，保留并改进 message
-    //   旧 message: '请通过 createTimebox (with _source=createSmartTimebox) 提交'
-    //   新 message: 含 surface name + 显式 redirect（acceptProposals），避免下一个开发者找错 API
-    it('应返回明确 message（指明正确 surface/intent，含 CreateSmartTimebox + acceptProposals）', async () => {
+  describe('submit - createSmartTimeboxes（[028] T9 退役守护）', () => {
+    // [028] T9 fold-in：createSmartTimeboxes action 已在 T9 rename 为 scheduleProposal，
+    //   handler.ts:531 的 deprecated 分支显式返回「createSmartTimeboxes intent 已退役」错误，
+    //   引导用户改用 scheduleProposal。守护测试断言 deprecated 路径不静默走错路。
+    it('createSmartTimeboxes submit → 显式返回 deprecated 错误（含 scheduleProposal 引导）', async () => {
       const result = await timeboxCnuiHandler.submit('createSmartTimeboxes', {})
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('CreateSmartTimebox')
-      expect(result.error).toContain('acceptProposals')
+      expect(result.error).toContain('createSmartTimeboxes')
+      expect(result.error).toContain('scheduleProposal')
+      expect(result.error).toContain('已退役')
     })
   })
 

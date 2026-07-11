@@ -1098,6 +1098,16 @@ export async function updateHabit(
 }
 
 export async function resolveShortcut(rawInput: string): Promise<{ domainId: string; action: string; view_route?: string } | null> {
+  // [028] T10 兼容重定向：manifest canonical shortcut 是 /ScheduleProposal，
+  //   旧 /smartTimeboxes 是 [023.08] ship 时的入口名，保留为兼容旧入口 →
+  //   显式重定向到 timebox/scheduleProposal（forward-compat 守护）。
+  //   用精确等值匹配而非裸 substring，避免误伤未来同名 fragment。
+  if (rawInput === '/smartTimeboxes') {
+    const { getIntentTriggerViewRoute } = await import("@/domains/registry");
+    const view_route = getIntentTriggerViewRoute('timebox', 'scheduleProposal');
+    return { domainId: 'timebox', action: 'scheduleProposal', view_route };
+  }
+
   const { matchShortcut } = await import("@/nexus/core/intent-engine/shortcut-matcher");
   // [023-01+ v2] RC-1 修复：取首个空白前的 command token 再 matchShortcut，
   //   使 /createTimebox [payload] 也能解析出 domain/action（路由用）。

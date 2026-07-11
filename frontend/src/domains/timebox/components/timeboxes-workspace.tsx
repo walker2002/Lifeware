@@ -64,8 +64,9 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { Plus, CalendarOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-// [023.08] T5：workspace 入口 — AI 智能推荐 surface 组件（data-testid 用于 E2E）
-import { CreateSmartTimebox } from '@/domains/timebox/cnui/surfaces/CreateSmartTimebox'
+// [028] T9：workspace 入口 — ScheduleProposal surface 组件（替代 [023.08] CreateSmartTimebox；
+//   CreateSmartTimebox 仅保留为 client 注册 `create-smart-timebox` surface 用作 revertSmartTimeboxes 撤销面板）
+import { ScheduleProposal } from '@/domains/timebox/cnui/surfaces/ScheduleProposal'
 import { submitDynamicIntent, submitCnuiSurface } from '@/app/actions/intent'
 // [023.06] C1 fix: getDateRange/navigateDate 复用 hooks/use-timebox.ts 的 export，
 // 删本地副本避免行为漂移（plan T1 Step 3 约束）。
@@ -648,8 +649,8 @@ export function TimeboxesWorkspace() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            <CreateSmartTimebox
-              surfaceType="createSmartTimebox"
+            <ScheduleProposal
+              surfaceType="schedule-proposal"
               dataModel={{
                 proposals: aiProposals,
                 revertableBatches,

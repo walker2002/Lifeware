@@ -231,6 +231,37 @@ describe('resolveShortcut（[023-01+ v2] /cmd [payload] 须能解析出 domain/a
   })
 })
 
+// [028] T10: scheduleProposal manifest-driven 接线守护
+//   manifest A-block intent_triggers 声明：
+//     - action: scheduleProposal, shortcut: /smartTimeboxes
+//   resolveShortcut manifest-driven 自动解析（无需 intent.ts 手写 action map）。
+//   旧 /smartTimeboxes shortcut 必须保留为兼容入口（fold-in T10-fix），
+//   也走同一 scheduleProposal action（manifest 已声明）。
+describe('resolveShortcut（[028] T10 manifest-driven scheduleProposal）', () => {
+  it('/ScheduleProposal（长格式）→ timebox/scheduleProposal', async () => {
+    const r = await resolveShortcut('/ScheduleProposal')
+    expect(r).not.toBeNull()
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('scheduleProposal')
+  })
+
+  it('/smartTimeboxes（短格式兼容入口）→ timebox/scheduleProposal', async () => {
+    // fold-in T10-fix：/smartTimeboxes 兼容旧入口，manifest A-block 已声明
+    //   shortcut: /smartTimeboxes for action: scheduleProposal
+    const r = await resolveShortcut('/smartTimeboxes')
+    expect(r).not.toBeNull()
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('scheduleProposal')
+  })
+
+  it('/timebox:scheduleProposal（长格式含域前缀）→ timebox/scheduleProposal', async () => {
+    const r = await resolveShortcut('/timebox:scheduleProposal')
+    expect(r).not.toBeNull()
+    expect(r?.domainId).toBe('timebox')
+    expect(r?.action).toBe('scheduleProposal')
+  })
+})
+
 // [023.11] parseTimeboxBatchIntentOnly 被动推断 archetype
 //   createTimebox dry-run 后再过 archetype-matcher 填 activityArchetypeId
 //   （仅字段为空时填；degrade gracefully）

@@ -65,10 +65,10 @@ intent_triggers:
       - 配置时间盒模板
     keywords: [模板, 时间盒模板, 模板管理]
     view_route: /timebox-templates
-  # [028] T9：rename createSmartTimeboxes → scheduleProposal；shortcut /smartTimeboxes 保留（T10 重定向）。
+  # [028] T10：canonical shortcut /ScheduleProposal；/smartTimeboxes 走 intent.ts 显式 redirect（兼容旧入口）。
   # K-block 仍保留 create-smart-timebox 入口（revertSmartTimeboxes 撤销历史 batch 引用不断）。
   - action: scheduleProposal
-    shortcut: /smartTimeboxes
+    shortcut: /ScheduleProposal
     description: AI 编排今日计划（四源归集 + 硬规则 + Tier0/1/2）
     response_type: cnui
     cnui_surface: schedule-proposal

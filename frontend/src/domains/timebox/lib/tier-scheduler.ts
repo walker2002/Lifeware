@@ -234,8 +234,10 @@ function tryFitInWindow(
   let sM = Math.round((earliest - sH) * 60)
 
   // latest 边界：startTime + minDuration 不能超过 latest
-  // latest 是「最晚可开始时间」，意味着 startTime ≤ latest
-  while (sH < latest) {
+  // latest 是「最晚可开始时间」（含），意味着 startTime ≤ latest
+  // [028] whole-branch I-4: 原 `sH < latest` 边界排除 latest hour 的整点 0 分起点，
+  // 改为 `sH < latest || (sH === latest && sM === 0)` 让 latest hour 整点可作为合法起点
+  while (sH < latest || (sH === latest && sM === 0)) {
     if (!deps.isSlotOccupied(sH, sM, minDuration, occupied)) {
       // 成功：算出 endHour/endMinute
       const endTotalMin = sH * 60 + sM + minDuration
