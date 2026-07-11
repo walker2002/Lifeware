@@ -1,9 +1,10 @@
 /**
  * @file task-detail-drawer.test
- * @brief [023] A3.2 TaskDetailDrawer archetype 只读行 render 守护（H2）
+ * @brief TaskDetailDrawer archetype 去重验证（[027-A] 修复）
  *
- * - activityArchetypeId 非空时渲染只读 archetype 区（l2Name + 无「选择」按钮）
- * - activityArchetypeId 为 undefined 时整块不渲染（M3：FK ON DELETE SET NULL → undefined → 不渲染）
+ * [027-A] 前：drawer 渲染 archetype 两处（TaskEditZone 编辑 + 独立只读块）
+ * [027-A] 修：移除冗余只读块，archetype 仅由 TaskEditZone 渲染（可编辑）
+ * 本测试验证 archetype 只渲染一次（无重复）
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -49,8 +50,8 @@ const baseTask = (activityArchetypeId: string | undefined) => ({
   activityArchetypeId,
 })
 
-describe('[023] A3.2 TaskDetailDrawer archetype 只读行', () => {
-  it('activityArchetypeId 非空时渲染只读 archetype 区（无「选择」按钮）', async () => {
+describe('[027-A] TaskDetailDrawer archetype 去重', () => {
+  it('activityArchetypeId 非空时 archetype 仅渲染一次（无重复）', async () => {
     getTaskByIdMock.mockResolvedValue(baseTask('a1'))
     getTaskAncestorsMock.mockResolvedValue([])
     getThreadByIdMock.mockResolvedValue(null)
@@ -86,37 +87,10 @@ describe('[023] A3.2 TaskDetailDrawer archetype 只读行', () => {
       />,
     )
 
-    // 等待 archetype 拉取 + 渲染
+    // 等待 archetype 渲染（TaskEditZone 内的 ArchetypePicker）
     await waitFor(() => {
-      expect(screen.getByText('深度专注')).toBeInTheDocument()
+      const matches = screen.getAllByText('深度专注')
+      expect(matches.length).toBe(1) // 仅一处，无重复
     })
-    // readOnly：ArchetypePicker 在选中态不渲染「选择」按钮
-    expect(screen.queryByText('选择')).not.toBeInTheDocument()
-    // 「活动原型」label 渲染
-    expect(screen.getByText('活动原型')).toBeInTheDocument()
-  })
-
-  it('activityArchetypeId 为 undefined 时整块不渲染（M3: SET NULL→undefined→不渲染）', async () => {
-    getTaskByIdMock.mockResolvedValue(baseTask(undefined))
-    getTaskAncestorsMock.mockResolvedValue([])
-    getThreadByIdMock.mockResolvedValue(null)
-    getArchetypesMock.mockResolvedValue({ success: true, data: [] })
-
-    render(
-      <TaskDetailDrawer
-        taskId={'task-1' as never}
-        userId={'user-1' as never}
-        onClose={vi.fn()}
-      />,
-    )
-
-    // 等待任务加载（标题出现即表示抽屉已渲染）
-    await waitFor(() => {
-      expect(screen.getAllByText('写论文').length).toBeGreaterThan(0)
-    })
-    // 整块不渲染：既不显示 label，也不显示 picker
-    expect(screen.queryByText('活动原型')).not.toBeInTheDocument()
-    expect(screen.queryByText('深度专注')).not.toBeInTheDocument()
-    expect(screen.queryByText('未选择（可选）')).not.toBeInTheDocument()
   })
 })

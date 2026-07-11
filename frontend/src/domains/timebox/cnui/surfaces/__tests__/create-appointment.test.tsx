@@ -165,7 +165,7 @@ describe('[026] T17 <CreateAppointment> 渲染稳定性', () => {
         onConfirm={vi.fn()}
       />,
     )
-    // AppointmentFormFields 嵌入 ArchetypePickerCard → 渲染「活动原型」标题 + AI 匹配按钮
+    // AppointmentFormFields 嵌入 ArchetypePicker variant="card" → 渲染「活动原型」标题 + AI 匹配按钮
     expect(screen.getByRole('heading', { name: '活动原型', level: 3 })).toBeInTheDocument()
   })
 })

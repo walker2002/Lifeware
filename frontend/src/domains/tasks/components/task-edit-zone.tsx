@@ -16,6 +16,7 @@ import type { TrackingMode } from '../../../usom/types/primitives'
 import { cn } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
 import { parseDurationToMinutes, durationHours, durationMinutes } from '@/lib/format-duration'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 
 // [018-G3] R3：page-level realtime blur 校验
 import { useManifestRules } from '@/nexus/rules/use-manifest-rules'
@@ -387,6 +388,20 @@ export function TaskEditZone({ task, onTaskUpdate, onDirtyChange }: TaskEditZone
             <p className="text-xs text-error mt-0.5">{fieldErrors.dueDate}</p>
           )}
         </div>
+      </div>
+
+      {/* ── 活动原型（批量 draft，随 saveAll 一起 updateTask）── */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-body">活动原型</label>
+        <ArchetypePicker
+          // [027-A] Finding 1: 用 key-presence 区分「清除（null）」vs「未编辑（key absent）」
+          //   draft 有该 key → 已触摸（包括 null=清除），用 draft 值 → coerce null→undefined → picker 显示「未选择」
+          //   draft 无该 key → 未编辑，用 task 已保存值 → coerce null→undefined
+          value={('activityArchetypeId' in draft ? (draft.activityArchetypeId as string | null) : task.activityArchetypeId) ?? undefined}
+          onChange={id => updateDraft('activityArchetypeId', id === undefined ? null : id)}
+          enableAiMatch
+          title={task.title}
+        />
       </div>
 
       {/* ── 保存按钮 ── */}

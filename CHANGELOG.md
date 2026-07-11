@@ -8,6 +8,37 @@
 
 ---
 
+## [027-A] activityArchetype 界面规范处理 — Phase A：原型选择器统一（2026-07-11）
+
+> **Phase A ship-ready**：5 task (T1-T5) 全完成 + grep 闭环 + vitest/tsc 零新增。**核心**：统一为单一 `ArchetypePicker` + `variant` prop（card=带盒+h3 / inline=裸版），删除 `ArchetypePickerCard`；补齐 AI 匹配（TaskCreationCard / TaskEditCard / habit-form）+ `/tasks` 页面编辑入口（task-create-drawer / task-edit-zone）。
+
+### 决策
+
+- **D1** 单一组件 + variant：合并 `ArchetypePicker`（裸版）+ `ArchetypePickerCard`（带盒）→ 单一 `ArchetypePicker` + `variant?: 'card' | 'inline'` prop
+- **D2** AI 匹补全：TaskCreationCard / TaskEditCard / habit-form 传 `enableAiMatch + title`（TaskEditCard 用 `editTitle` 非 `title`）
+- **D3** 清除入口：所有消费方（含 /tasks 编辑）均支持 `onChange(undefined)` → 3-state 语义真正可达（undefined=skip / null=clear / string=set）
+- **D4** `/tasks` 页面补齐：task-create-drawer（创建）+ task-edit-zone（inline 编辑），两个入口均支持 archetype 选择 + AI 匹配 + 清除
+- **D5** Phase B 延后：Timebox 模板增强另起分支（避免对着未重构 API 空想）
+
+### 改动（本任务）
+
+- **T1** `ArchetypePicker` 加 `variant` prop（card/inline）+「清除」按钮 + TDD（variant=card 渲染 h3 + bg-surface-card）
+- **T2** 迁移 Card 消费方：AppointmentFormFields / timebox-drawer → `variant="card"`（/browse 视觉验证 DOM 合并）
+- **T3** 补 AI 匹配：TaskCreationCard / TaskEditCard / habit-form 传 `enableAiMatch + title` + CNUI 冒烟
+- **T4** `/tasks` 页面补原型字段：task-create-drawer（创建）+ task-edit-zone（inline 编辑）+ 测试 + 持久化回归
+- **T5** 删 `ArchetypePickerCard` + grep 闭环（3 注释文件更新）+ 测试清理（删重复 describe 块）
+
+### 文档同步
+
+- `docs/usom-design.md` — Task/Habit `activityArchetypeId` widen 到 `USOM_ID | null`（3-state clear：undefined=skip / null=clear / string=set，对齐 DB nullable FK；Timebox/Appointment 暂未 widen，pre-existing imprecision 登记 neat/后续）
+
+### 验证
+
+- 执行细节（vitest/tsc/grep/测试用例数）见 git + plan `docs/superpowers/plans/2026-07-11-027-a-archetype-unify.md` + memory；本文件只记文档级里程碑。
+- /qa 发现并修复 TaskCreateDrawer `handleSubmit` 闭包漏 `activityArchetypeId` deps（选原型不落库），见 commit 1b0e971 + 回归测试 24aea05。
+
+---
+
 ## [neat-2026_07_08] /lifeware-neat 数据库设计补 CREATE 段（2026-07-08）
 
 > 2026_07_08 — `/lifeware-neat` 检测到 §二 总览有 4 张表 (`activity_archetypes` / `user_audit_log` / `user_settings` / `memory_episodes`) **缺 CREATE TABLE 段**（历史累积 drift）。补 4 段 `\`\`\`sql\`\`\`` 块（与 schema.ts pgTable 一一对齐），§二 总览 33 表 vs CREATE 31 表，剩 2 张差异 (`ai_sessions` / `external_events`) 是 §十二 阶段二预留，合法。

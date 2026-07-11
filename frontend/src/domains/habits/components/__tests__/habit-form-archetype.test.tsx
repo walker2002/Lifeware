@@ -31,4 +31,22 @@ describe('[023] A3.2 HabitForm archetype 接入', () => {
     render(<HabitForm initial={{ title: '晨跑', activityArchetypeId: 'a1' } as any} onSubmit={() => {}} onCancel={() => {}} />)
     expect(await screen.findByText('深度专注')).toBeInTheDocument()
   })
+
+  it('[027-A] 传入 title 时渲染「AI 匹配」按钮', async () => {
+    render(<HabitForm initial={{ title: '晨跑' }} onSubmit={() => {}} onCancel={() => {}} />)
+    expect(await screen.findByText('AI 匹配')).toBeInTheDocument()
+  })
+
+  it('[027-A] 清除 archetype 按钮传递 null（持久化 clear）', async () => {
+    const onSubmit = vi.fn()
+    // 编辑模式：已有 archetype
+    render(<HabitForm initial={{ title: '晨跑', activityArchetypeId: 'a1' } as any} onSubmit={onSubmit} onCancel={() => {}} />)
+    // 点击「清除」按钮
+    fireEvent.click(await screen.findByText('清除'))
+    // 填必填字段 + 提交
+    fireEvent.change(screen.getByPlaceholderText('例如：晨跑、午休冥想'), { target: { value: '晨跑' } })
+    fireEvent.click(screen.getByText('保存'))
+    // 验证 onSubmit 被调用，且 activityArchetypeId 为 null（不是 undefined）
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ activityArchetypeId: null }))
+  })
 })

@@ -73,7 +73,7 @@ function habitToItem(h: Habit): HabitItem {
     startDate: h.startDate,
     endDate: h.endDate,
     daysOfWeek: h.frequency.daysOfWeek,
-    activityArchetypeId: h.activityArchetypeId,
+    activityArchetypeId: h.activityArchetypeId ?? undefined,
   }
 }
 
@@ -175,6 +175,7 @@ export function HabitListPage({ autoOpenCreate, initialFields }: HabitListPagePr
         daysOfWeek: fields.daysOfWeek,
         startDate: fields.startDate,
         endDate: fields.endDate,
+        activityArchetypeId: fields.activityArchetypeId,
       }
       const result = await updateHabit(id, input)
       return { success: result.success, error: result.error }

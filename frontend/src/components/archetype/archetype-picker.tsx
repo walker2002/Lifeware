@@ -1,10 +1,11 @@
 /**
  * @file archetype-picker
- * @brief Activity Archetype 选择器（裸版，[023] A3.2 公共化）
+ * @brief Activity Archetype 选择器（支持 card/inline 双模式，[027-A] variant 统一）
  *
- * 裸版：无自带视觉盒（bg-surface-card/p-5）、无静态标题——守 UI-DESIGN-SPEC §11.10
+ * 默认 inline（裸版）：无自带视觉盒（bg-surface-card/p-5）、无静态标题——守 UI-DESIGN-SPEC §11.10
  * CUC-01/02。消费方自带 label（CNUI surface 用 text-xs label，Card 版用 h3）。
- * readOnly 模式（详情只读）：隐藏「选择/更换」按钮 + 下拉，仅展示选中态。
+ * variant=card：渲染带盒容器 + h3「活动原型」标题，用于 appointment 等场景。
+ * readOnly 模式（详情只读）：隐藏「选择/更换/清除」按钮 + 下拉，仅展示选中态。
  * 数据源：server action getArchetypes()（Repository server-only，不可在客户端直引）。
  */
 'use client'
@@ -26,9 +27,11 @@ interface ArchetypePickerProps {
   enableAiMatch?: boolean
   /** [023.11] 当前标题 */
   title?: string
+  /** [027-A] 视觉模式：card=带盒+h3（appointment 参照）；inline=裸版（默认，消费方自包 label） */
+  variant?: 'card' | 'inline'
 }
 
-export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMatch, title }: ArchetypePickerProps) {
+export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMatch, title, variant = 'inline' }: ArchetypePickerProps) {
   const [archetypes, setArchetypes] = useState<ActivityArchetype[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   // [023] M-1: 区分 "无 archetype"（空态）vs "加载失败"（error 态）。失败时给用户 retry 入口。
@@ -101,7 +104,8 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
   )
 
   return (
-    <div>
+    <div className={variant === 'card' ? 'rounded-md bg-surface-card p-5' : undefined}>
+      {variant === 'card' && <h3 className="mb-2 text-sm font-medium text-ink">活动原型</h3>}
       {selected ? (
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -124,6 +128,15 @@ export function ArchetypePicker({ value, onChange, readOnly = false, enableAiMat
                 className="text-xs text-primary"
               >
                 更换
+              </button>
+              {/* [027-A] 清除原型：emit undefined，消费方按域语义转 null（编辑态落库清除） */}
+              <button
+                type="button"
+                onClick={() => onChange?.(undefined)}
+                aria-label="清除活动原型"
+                className="text-xs text-body"
+              >
+                清除
               </button>
               {aiMatchBtn}
             </div>

@@ -357,8 +357,8 @@ export interface Task {
   complexity: ComplexityTag[]
   decomposition?: DecompositionLevel
   captureMode: CaptureMode
-  /** [023] A3: 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId） */
-  activityArchetypeId?: USOM_ID
+  /** [023] A3: 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId；[027-A] 3-state clear 允许 null） */
+  activityArchetypeId?: USOM_ID | null
   schedulingConstraint?: SchedulingConstraint
   tracking: TrackingMode
   aiTags: Record<string, unknown>
@@ -472,8 +472,8 @@ export interface Habit {
   updatedAt: Timestamp
   suspendedAt?: Timestamp
   archivedAt?: Timestamp
-  /** [023] A3: 关联 Activity Archetype（nullable） */
-  activityArchetypeId?: USOM_ID
+  /** [023] A3: 关联 Activity Archetype（nullable；[027-A] 3-state clear 允许 null） */
+  activityArchetypeId?: USOM_ID | null
   notes?: Notes
 }
 

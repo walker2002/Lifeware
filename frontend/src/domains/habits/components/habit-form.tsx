@@ -36,8 +36,8 @@ export interface HabitFormFields {
   daysOfWeek?: number[]
   startDate: string
   endDate?: string
-  // [023] A3.2：archetypeId 是可选 nullable ContentField（标签式）
-  activityArchetypeId?: string
+  // [027-A] Phase A: archetypeId 可选 nullable（支持 clear 按钮传递 null）
+  activityArchetypeId?: string | null
 }
 
 interface HabitFormProps {
@@ -105,7 +105,8 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
   const [endDate, setEndDate] = useState(initial?.endDate ?? "")
   const [autoFilled, setAutoFilled] = useState(false)
   // [023] A3.2：archetype 选择（编辑模式由 initial 回填）
-  const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(initial?.activityArchetypeId)
+  // [027-A] Phase A: state 类型改为 string | null，支持清除 wiring（undefined→null）
+  const [activityArchetypeId, setActivityArchetypeId] = useState<string | null>(initial?.activityArchetypeId ?? null)
   // [020] registry 即 SSOT：realtime meta 从 registry 派生，直传 registry（删 getRealtimeRules 中转）
   const { errors: fieldErrors, validateField, validateAll } = useManifestRules(habitRuleRegistry)
   const { serverFieldErrors, formErrors } = useServerErrorBackfill(serverErrors, habitRuleRegistry)
@@ -164,6 +165,7 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       daysOfWeek: frequencyType !== "daily" ? daysOfWeek : undefined,
       startDate,
       endDate: endDate || undefined,
+      // [027-A] Phase A: 传递 null（clear 按钮需要持久化 null 值）
       activityArchetypeId,
     }
 
@@ -382,9 +384,12 @@ export function HabitForm({ initial, onSubmit, onCancel, isLoading, onDirtyChang
       {/* 活动原型 */}
       <div className="flex flex-col gap-1.5">
         <Label>活动原型</Label>
+        {/* [027-A] Phase A: state→picker value 转 null→undefined；onChange: undefined→null 清除 wiring */}
         <ArchetypePicker
-          value={activityArchetypeId}
-          onChange={id => { setActivityArchetypeId(id); onDirtyChange?.(true) }}
+          value={activityArchetypeId || undefined}
+          onChange={id => { setActivityArchetypeId(id === undefined ? null : id); onDirtyChange?.(true) }}
+          enableAiMatch
+          title={title}
         />
       </div>
 

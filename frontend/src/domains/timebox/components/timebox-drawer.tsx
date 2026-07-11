@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArchetypePickerCard } from '@/components/archetype/archetype-picker-card'
+import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 import {
   ExecutionDetailFields,
   type ExecutionDetailDraft,
@@ -84,7 +84,8 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
   // [023] A2 final review hot-fix: editTarget 来自 getTimeboxById（runtime USOM 携带 activityArchetypeId），
   // 但 usom/types/objects.ts Timebox 接口本轮未声明该字段（intentional, local change），
   // 运行时数据实际有该字段，用 type narrow 读取而非 cast。
-  const [activityArchetypeId, setActivityArchetypeId] = useState<string | undefined>(
+  // [027-A] Finding 2a: widening type to support null (clear) vs undefined (skip)
+  const [activityArchetypeId, setActivityArchetypeId] = useState<string | null | undefined>(
     editTarget ? (editTarget as unknown as { activityArchetypeId?: string }).activityArchetypeId : undefined,
   )
   const [startTime, setStartTime] = useState(() => {
@@ -280,9 +281,12 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
               />
             </div>
 
-            <ArchetypePickerCard
-              value={activityArchetypeId}
-              onChange={id => setActivityArchetypeId(id)}
+            <ArchetypePicker
+              variant="card"
+              // [027-A] Finding 2a: coerce null→undefined for picker value (picker only accepts string | undefined)
+              //   onChange preserves null so it reaches DB
+              value={activityArchetypeId ?? undefined}
+              onChange={id => setActivityArchetypeId(id === undefined ? null : id)}
               enableAiMatch
               title={title}
             />
