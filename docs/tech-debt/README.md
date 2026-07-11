@@ -1,6 +1,6 @@
 ---
 title: 技术债务跟踪
-last_updated: 2026-07-09
+last_updated: 2026-07-11
 ---
 
 # 技术债务跟踪（Tech Debt Ledger）
@@ -29,6 +29,9 @@ last_updated: 2026-07-09
 | TD-014 | Claude Code settings.json schema 顶层严格,自定义 key 整个文件加载失败 | 🟢 | infra | N/A（工具链债） | 暂未指派 |
 | TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 暂未指派 |
 | TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 → [026.02.4-r3] closed | 暂未指派 |
+| TD-033 | TimeboxRepository.updateFields 同模式未修：startTime/endTime 也是 timestamp 列（[026.02.4] 后系统性调试发现） | 🟠 | lifeware-timebox | [026.02.4] 后 hot-fix 债 | 暂未指派 |
+| TD-034 | TaskRepository/ObjectiveRepository updateFields 同模式未验证：dateOnly 列 Drizzle 行为待实测 | ⚪ | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
+| TD-035 | updateFields 通用归一化 helper 缺失：4 域 repo 各自分散归一化，新域必再踩同坑 | 🟡 | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
@@ -71,6 +74,7 @@ last_updated: 2026-07-09
 | TD-031 | use-auto-trigger 双分支 planned gate 同 cycle 双 fire start + overtime (else if 互斥修复) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 | [026.02.4-r3] | 2026-07-09 |
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 5 处残留 (Site 0 repository findRunning root source + Sites 1-4 callers) | 🟠 → ✅ | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | [026.02.4] | 2026-07-09 |
 | TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (4 sites 全修) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T2 | [026.02.4-r2] round 2 | 2026-07-09 |
+| TD-032 | AppointmentRepository.updateFields 缺 timestamp 列 string→Date 归一化,editAppointment 保存触发 Drizzle TypeError（加 startTime 归一化 + failing test 守护） | 🟠 → ✅ | lifeware-appointments | [026.02.4] 后 hot-fix | main hot-fix | 2026-07-11 |
 
 ## 按领域视图
 
@@ -99,12 +103,13 @@ last_updated: 2026-07-09
 - [[TD-017]] · [023.12] 生产代码漏跟 status 收窄（timebox.ts + intent.ts） · 🔴 Critical
 - [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix + A1/A2 已落地 [023.13])
 - [[TD-023]] · timebox 写入口绕过 mutation service (AM3 reuse updateFields) · 🟡 Medium
+- [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列） · 🟠 High
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status 4 处 JS literals 残留 (Site 0 root source) · 🟠 High · ✅ [026.02.4]
 - ~~[[TD-030]]~~ · [026.02.4] post-T2 review:timebox.ts createAppointment truthy-check 4 sites · 🟡 Medium · ✅ [026.02.4-r2] round 2
 
 ### `lifeware-appointments`
 
-*(暂无)*
+- ~~[[TD-032]]~~ · AppointmentRepository.updateFields 缺 timestamp 归一化（editAppointment 保存 TypeError） · 🟠 High · ✅ main hot-fix 2026-07-11
 
 ### `cross-domain`
 
@@ -112,6 +117,8 @@ last_updated: 2026-07-09
 - [[TD-008]] · lifecycle-configs require 多键域债 · 🟡 Medium
 - [[TD-016]] · [023.12] 测试 fixture 漏改：3 域 status 收窄后 9 错 · 🟠 High
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债：hooks + adapter test · 🟡 Medium
+- [[TD-034]] · Task/Objective updateFields 同模式未验证（dateOnly 列 Drizzle 行为待实测） · ⚪ Trivial
+- [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理，新域必再踩） · 🟡 Medium
 
 ### `infra`
 
@@ -133,7 +140,9 @@ last_updated: 2026-07-09
 - [[TD-003]] · editTimeboxes TOCTOU
 - [[TD-004]] · R4 timebox/okrs 写入口债
 - [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
+- [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列）
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status JS literals 残留 (Site 0 root source) · ✅ [026.02.4]
+- ~~[[TD-032]]~~ · AppointmentRepository.updateFields 缺 timestamp 归一化（editAppointment 保存 TypeError） · ✅ main hot-fix 2026-07-11
 
 ### 🟡 Medium（下次大重构顺手解决）
 
@@ -143,6 +152,7 @@ last_updated: 2026-07-09
 - [[TD-008]] · lifecycle-configs require 多键域债
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
 - [[TD-023]] · timebox 写入口绕过 mutation service → 架构治理修复时关闭
+- [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理） → 下次大重构顺手
 
 ### 🟢 Low（有精力再说）
 
@@ -156,6 +166,7 @@ last_updated: 2026-07-09
 
 - [[TD-011]] · I-3 _dayStart/_dayEnd unused params
 - [[TD-012]] · [023.05-1] PR1 Polish 3 Minor
+- [[TD-034]] · Task/Objective updateFields 同模式未验证（dateOnly 列 Drizzle 行为待实测）
 
 ## 与其他文档的关系
 
@@ -188,7 +199,8 @@ last_updated: 2026-07-09
 | 第 7 批(🟠) | 2026-07-09 | TD-028(1 条) | `[026.02.3.1]` post-review:JS 层 4 处 'running' status literals 残留 (Site 0 root source 仓库 findRunning) |
 | 第 8 批(🟠→✅) | 2026-07-09 | TD-028 关闭(1 条) | `[026.02.4]` Site 0 repository findRunning rewrite (T4) + Sites 1-4 caller updates (T5) |
 | 第 9 批(🟡→✅) | 2026-07-09 | TD-030 关闭(1 条) | `[026.02.4-r2]` round 2 second-opinion 抓 truthy-check drift 类 — timebox.ts:110/346 + handlers.ts:309/384 共 4 sites 全修 |
+| 第 10 批(🟠+🟡+⚪+🟠→✅) | 2026-07-11 | TD-032 closed + TD-033/034/035 新建(4 条) | 系统性调试 session 发现 `AppointmentRepository.updateFields` ISO string startTime → Drizzle TypeError；hot-fix appointment.ts:49-54 + failing test；同模式扫描发现 Timebox/Task/Objective 都有同坑；抽通用归一化 helper 列入架构治理债 |
 
 ---
 
-**最后更新**: 2026-07-09 · 共 25 条（本批关闭 TD-030 → 已修复;TD-031 仍登记）· 🔴0 / 🟠5 / 🟡6 / 🟢5 / ⚪2
+**最后更新**: 2026-07-11 · 共 29 条（本批：TD-032 关闭 + TD-033/034/035 新建）· 🔴0 / 🟠5 / 🟡7 / 🟢5 / ⚪3
