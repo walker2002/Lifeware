@@ -307,7 +307,7 @@ export interface GeneratedProposal {
   id: string
   action: string
   payload: Record<string, unknown>
-  sourceType: 'habit' | 'task' | 'planned' | 'adhoc'
+  sourceType: 'habit' | 'task' | 'planned' | 'adhoc' | 'nl_event'
   priority: string
   energyMatch?: {
     required: string

@@ -539,6 +539,33 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       }
     }
 
+    // [028] T6 fold：scheduleProposal submit 分支处理 needConfirm 透传
+    //   - onGenerate 返 needConfirm=true 时，handler 不写库，只返 ArchetypePicker 候选
+    //   - submit 路径：用户可能 confirm 候选 archetype（继续走 handle 编排），或 cancel
+    //   - 当前 T6 仅镜像 createSmartTimeboxes 范式：实际写库逻辑由 schedule-proposal surface (T9) 接管
+    //   - Tier0 改时意图 → confirmReason 含「建议手动改约定」（不跨 surface 跳转，T6-UI-fix defer）
+    if (action === 'scheduleProposal') {
+      // needConfirm 透传：用户已在 open 阶段看到 NL 解析低置信/Tier0 冲突
+      // → submit 阶段再次 click 是「确认」或「取消」
+      // 当前 T6 提供最小响应：把 needConfirm + candidates + reason 透传给 surface
+      const needConfirm = (fields as { needConfirm?: boolean }).needConfirm ?? false
+      const archetypeCandidates = (fields as { archetypeCandidates?: unknown[] }).archetypeCandidates ?? []
+      const confirmReason = (fields as { confirmReason?: string }).confirmReason ?? ''
+
+      return {
+        success: false, // T6 不写库；T9 schedule-proposal surface 接通后改 success: true
+        error: confirmReason || 'NL 解析低置信或涉及 Tier0 改时，需用户确认',
+        data: {
+          needConfirm,
+          archetypeCandidates,
+          confirmReason,
+          // Tier0 handoff 提示：CNUI 架构不支持跨 surface 跳转（surface 不持有 surface 引用），
+          // → 倾向 defer，建议用户在 UI 自行打开约定列表手动修改（[028] T6-UI-fix 评估结论）
+          handoffHint: '建议手动改约定（CNUI 架构不支持跨 surface 跳转）',
+        },
+      }
+    }
+
     // [023.08] T4 — revertSmartTimeboxes action：撤销最近一次 batch 创建
     //   走 revertBatchProposals（memory_episodes 持久化记录 + deleteTimebox 逐条删除 + 状态机容错）
     if (action === 'revertSmartTimeboxes') {

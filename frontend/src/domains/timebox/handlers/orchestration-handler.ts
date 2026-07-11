@@ -19,6 +19,16 @@
  * [023.10] T4 A2 fold: snapshot builder 派生自 proposal.date + deriveDayOfWeek/TimeOfDay，
  *   废除当前硬编码 currentDate='2026-07-05' / dayOfWeek=0 / timeOfDay='morning'。
  *   resolveDate 复用 [023.08] T1 ship 版（line 545），本任务未新增同名方法。
+ *
+ * [028] T6 fold: onGenerate 接 NL（fold-in T5/T6-fix：不在 handle）
+ *   - onGenerate 持有 aiRuntime，调 parseNL（[028] T5 纯函数）→ 注入 contexts.nlResult
+ *   - 低置信（<0.6）或 Tier0 冲突 → 短路返 needConfirm（ArchetypePicker 候选 + 建议手动改约定）
+ *   - handle() 仍无 aiRuntime（纯编排 IRON RULE：T6-fix 回归保护）
+ *   - buildTimeboxItems 消费 nlResult.newEvents → sourceType='nl_event' items；
+ *     timeExpressions 标 fixedTime 标记（供 T3 sortByHardRules 层 1 截止紧迫）
+ *
+ * [028] T6-UI-fix fold: Tier0 约定改时 handoff 评估 → defer（CNUI 架构不支持跨 surface 跳转）。
+ *   - needConfirm 文案「建议手动改约定」返回，不跳 editAppointment surface。
  */
 
 import type {
@@ -41,6 +51,7 @@ import { createRuleEngine, type RuleEngine } from '@/nexus/core/rule-engine'
 import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
 import { sortByHardRules } from '../lib/schedule-rules'
 import { scheduleByTiers } from '../lib/tier-scheduler'
+import { parseNL, type NLCatalog, type NLParseResult, LOW_CONFIDENCE } from '../lib/nl-parser'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -70,6 +81,9 @@ interface TimeboxItem {
   latestStart?: number
   /** 最小可接受时长（分钟）；默认 = durationMinutes */
   minDuration?: number
+  // [028] T6：NL newEvent 的口述时间（UTC hour, 0-23）；非 undefined → 标 fixedTime
+  //  → T3 sortByHardRules 层 1「截止紧迫」权重最高（fixedTime 不可改期）
+  fixedTimeHour?: number
 }
 
 /**
@@ -171,6 +185,33 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   }
 
   async onGenerate(request: GenerationRequest, aiRuntime: AIRuntime): Promise<GenerationResult> {
+    // [028] T6 fold-in T5/T6-fix：NL 解析在 onGenerate（handle 无 aiRuntime，IRON RULE）。
+    //   1) 若 request.intent.fields.nlText 有值 → 先 parseNL（注入 aiRuntime）
+    //   2) catalog 从 request.contexts 提取 tasks/templates/appointments id+title
+    //   3) 低置信（< 0.6）或 Tier0 冲突（LLM 标 conflictsTier0=true）→ 短路返 needConfirm
+    //   4) 否则注入 nlResult 到 request.contexts → handle() 消费
+    //
+    // [028] T6-UI-fix fold: Tier0 约定改时意图 → 「建议手动改约定」文案，不跨 surface 跳转
+    //   （CNUI 架构不支持 needConfirm → editAppointment surface 直跳）
+    const nlText = request.intent.fields.nlText
+    if (typeof nlText === 'string' && nlText.trim()) {
+      const catalog = this.buildCatalog(request.contexts)
+      const nlResult = await parseNL(nlText, catalog, aiRuntime)
+
+      // [T6] 低置信（< 0.6，含 LOW_CONFIDENCE=0.3 Tier0 撞 + FALLBACK_CONFIDENCE=0.2）
+      // → 短路返 needConfirm（不调 handle）；供 [027-A] ArchetypePicker 复用 + 用户文案提示
+      if (nlResult.confidence < 0.6) {
+        return this.buildNeedConfirmResult(nlResult, request)
+      }
+
+      // 注入 NL 结果到 contexts（newEvents 作第 4 源 → buildTimeboxItems 消费；
+      //   timeExpressions 标 fixedTime 标记 → T3 sortByHardRules 层 1 截止紧迫）
+      request = {
+        ...request,
+        contexts: { ...request.contexts, nlResult },
+      }
+    }
+
     const baseResult = await this.handle(request)
 
     const response = await aiRuntime.generate({
@@ -199,6 +240,138 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     }
 
     return baseResult
+  }
+
+  // ─── [028] T6 helpers: NL catalog + needConfirm payload ─────────
+
+  /**
+   * [028] T6：从 request.contexts 提取 tasks/templates/appointments 的 id+title 目录，
+   * 供 parseNL 的 LLM 参考 + deriveConfidence 校验（matched.id 必须在 catalog）。
+   *
+   * 形状对齐 nl-parser.ts:25 NLCatalog 接口；未知来源（缺字段）→ 空数组（不报错）。
+   */
+  private buildCatalog(contexts: Record<string, unknown>): NLCatalog {
+    const tasks = (contexts.activeTasks ?? []) as Array<{ id?: unknown; title?: unknown }>
+    const templates = (contexts.templates ?? []) as Array<{ id?: unknown; title?: unknown }>
+    const appointments = (contexts.appointments ?? []) as Array<{ id?: unknown; title?: unknown }>
+
+    const pick = (arr: Array<{ id?: unknown; title?: unknown }>): Array<{ id: string; title?: string }> => {
+      const out: Array<{ id: string; title?: string }> = []
+      for (const item of arr) {
+        if (!item || typeof item !== 'object') continue
+        if (typeof item.id !== 'string') continue
+        out.push({
+          id: item.id,
+          title: typeof item.title === 'string' ? item.title : undefined,
+        })
+      }
+      return out
+    }
+
+    return {
+      tasks: pick(tasks),
+      templates: pick(templates),
+      appointments: pick(appointments),
+    }
+  }
+
+  /**
+   * [028] T6：从 NL 解析结果推导 ArchetypePicker 候选（[027-A] 复用范式）。
+   *
+   * 规则：
+   *   - 引用 appointment 且 conflictsTier0=true → 「约定改时」类候选（不改 archetype）
+   *   - newEvent 标题含能量特征词 → AI 匹配返回 archetypeId
+   *   - 兜底：从 appointments 中前 N 个作为「可挂载候选」
+   *
+   * 返回数组元素：{ id, title, source: 'inferred'|'appointment'|'fallback', reason }
+   */
+  private deriveArchetypeCandidates(nlResult: NLParseResult): Array<{
+    id: string
+    title: string
+    source: 'inferred' | 'appointment' | 'fallback'
+    reason: string
+  }> {
+    const candidates: Array<{
+      id: string
+      title: string
+      source: 'inferred' | 'appointment' | 'fallback'
+      reason: string
+    }> = []
+
+    // 规则 1：引用且撞 Tier0 → 提示「建议手动改约定」
+    const tier0Conflict = [...nlResult.matchedTasks, ...nlResult.matchedTemplates, ...nlResult.matchedAppointments]
+      .some(m => m.conflictsTier0 === true)
+    if (tier0Conflict) {
+      candidates.push({
+        id: '__manual_appointment__',
+        title: '手动改约定',
+        source: 'fallback',
+        reason: 'NL 涉及 Tier0 约定改时意图，现有 CNUI 架构不支持跨 surface 跳转，建议手动打开约定列表修改',
+      })
+    }
+
+    // 规则 2：newEvents 标题含能量特征词 → AI 匹配候选占位（[023.11] runAiMatch 路径）
+    for (const ev of nlResult.newEvents) {
+      candidates.push({
+        id: `__inferred_${ev.title}__`,
+        title: ev.title,
+        source: 'inferred',
+        reason: 'NL 解析新事件，可由 ArchetypePicker AI 匹配活动原型',
+      })
+    }
+
+    return candidates
+  }
+
+  /**
+   * [028] T6：构造 needConfirm 短路返回结果（type-punned 到 GenerationResult 扩展字段）。
+   *
+   * 路径：
+   *   - proposalSet 留空（不调 handle）
+   *   - presentation 写「建议手动改约定」文案 + NL 置信度提示
+   *   - needConfirm=true + archetypeCandidates + confirmReason 由 cnui/handlers submit 分支透传
+   */
+  private buildNeedConfirmResult(
+    nlResult: NLParseResult,
+    request: GenerationRequest,
+  ): GenerationResult & { needConfirm?: boolean; archetypeCandidates?: unknown[]; confirmReason?: string } {
+    const archetypeCandidates = this.deriveArchetypeCandidates(nlResult)
+    const tier0Conflict = [...nlResult.matchedTasks, ...nlResult.matchedTemplates, ...nlResult.matchedAppointments]
+      .some(m => m.conflictsTier0 === true)
+    const reason = tier0Conflict
+      ? `NL 涉及 Tier0 约定改时（置信度 ${nlResult.confidence.toFixed(2)}），建议手动改约定`
+      : `NL 解析置信度低（${nlResult.confidence.toFixed(2)} < 0.6），请补充明确描述`
+
+    const date = this.resolveDate(request)
+
+    return {
+      proposalSet: {
+        id: crypto.randomUUID(),
+        label: `${date} 智能编排方案`,
+        proposals: [],
+        tags: ['need-confirm', 'low-confidence'],
+      },
+      presentation: {
+        type: 'markdown',
+        content: [
+          `# ${date} 智能编排方案`,
+          '',
+          `> ${reason}`,
+          '',
+          tier0Conflict
+            ? '> 现有 CNUI 架构不支持跨 surface 跳转，建议您打开约定列表手动修改。'
+            : '> 请补充更具体的描述（明确任务名 / 时间 / 对象）。',
+        ].join('\n'),
+      },
+      warnings: [{
+        code: 'NL_LOW_CONFIDENCE',
+        message: reason,
+        severity: 'confirm',
+      }],
+      needConfirm: true,
+      archetypeCandidates,
+      confirmReason: reason,
+    } as unknown as GenerationResult & { needConfirm?: boolean; archetypeCandidates?: unknown[]; confirmReason?: string }
   }
 
   // ─── collectMaterials: 从通用 contexts 提取类型化数据 ──────
@@ -230,6 +403,11 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       activityArchetypeId?: string | null
       source?: string
     }>
+    // [028] T6 fold：NL 解析结果由 onGenerate 注入（handle 内直接读 materials.nlResult）。
+    //   - newEvents：第 4 源 → items（sourceType='nl_event'）
+    //   - timeExpressions：标 fixedTime 标记（T3 sortByHardRules 层 1 截止紧迫）
+    //   - 旧路径（无 nlText）→ undefined（不破坏现有 [023.08] handle 行为）
+    const nlResult = contexts.nlResult as NLParseResult | undefined
 
     return {
       pendingHabits,
@@ -238,6 +416,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       energyCurve,
       appointments,
       templates,
+      nlResult,
     }
   }
 
@@ -326,6 +505,33 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       for (const appt of materials.appointments) {
         const slot = this.appointmentToTier0Slot(appt)
         if (slot) tier0Slots.push(slot)
+      }
+
+      // 来源 5（[028] T6 fold）：NL newEvents → items（sourceType='nl_event'）。
+      //   - time 字段（HH:MM）→ 转 UTC hour → 标 fixedTimeHour（T3 sortByHardRules 层 1 截止紧迫）
+      //   - 无 time → 默认 60min slot + 不标 fixedTime（NL 解析未给时间时退化为灵活编排）
+      //   - 注入的最早/最晚窗口以 fixedTimeHour 为中心 ±2h（容忍 ±30min 拖动余地）
+      //   IRON RULE: legacy 策略完全跳过（adjustRemainingTimeboxes 不消费 NL；NL 仅 schedule 走）
+      if (materials.nlResult) {
+        for (const ev of materials.nlResult.newEvents) {
+          const fixedHour = ev.time ? this.hhmmToHour(ev.time) : undefined
+          const earliestStart = fixedHour !== undefined ? Math.max(0, fixedHour - 2) : 0
+          const latestStart = fixedHour !== undefined ? Math.min(22, fixedHour + 2) : 22
+          items.push({
+            id: crypto.randomUUID(),
+            title: ev.title,
+            sourceType: 'nl_event',
+            priority: 'P1',         // NL 解析的新事件 → 高优先级（用户当下关注）
+            durationMinutes: 60,    // 默认 1h（与 activeTasks 60min 同）
+            energyRequired: 'medium',
+            relatedObjectId: `nl-${crypto.randomUUID()}`,
+            earliestStart,
+            latestStart,
+            minDuration: 60,
+            // [028] T6：固定时间标记（供 T3 sortByHardRules 层 1「截止紧迫」用）
+            ...(fixedHour !== undefined ? { fixedTimeHour: Math.floor(fixedHour) } : {}),
+          })
+        }
       }
     }
 

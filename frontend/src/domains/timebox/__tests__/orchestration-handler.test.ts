@@ -1,4 +1,4 @@
-/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) + [023.10] T4 snapshot builder derive (3 tests) + [028] T2 4 源归集 + Tier0 提取 + A1/A2 隔离 (3 tests) */
+/** @file orchestration-handler.test @brief TimeboxOrchestrationHandler 单测 — handle() integration (5 tests) + [023.07] 谓词一致性/bound (4 tests) + [023.09] TZ UTC fragility (3 tests) + [023.08] T3 rule-engine integration (3 + 4 + 1 G11 = 8 tests) + [023.10] T3 normalizeTimeField proposal.date (2 tests) + [023.10] T4 snapshot builder derive (3 tests) + [028] T2 4 源归集 + Tier0 提取 + A1/A2 隔离 (3 tests) + [028] T6 onGenerate NL 注入 + needConfirm + IRON RULE (3 tests) */
 
 import { describe, it, expect, vi } from 'vitest'
 import { TimeboxOrchestrationHandler } from '../handlers/orchestration-handler'
@@ -7,6 +7,7 @@ import type { GenerationRequest } from '@/usom/types/process'
 import type { StructuredIntent } from '@/usom/types/objects'
 import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
 import type { USOM_ID } from '@/usom/types/primitives'
+import type { AIRuntime } from '@/nexus/ai-runtime'
 
 /** [023.08] T3 test fixture：mock timeboxRepo，返回 fixture 指定列表（仅依赖 findByDateRange） */
 function makeMockTimeboxRepo(existing: Array<{
@@ -863,5 +864,111 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
     expect(tier0Slots[1]).toMatchObject({
       startHour: 14, startMinute: 30, endHour: 15, endMinute: 0,
     })
+  })
+})
+
+// ─── [028] T6 onGenerate 接 NL（fold-in：不在 handle）+ needConfirm + IRON RULE ───────
+//
+// 背景：T5 落地 parseNL + deriveConfidence 后，T6 在 onGenerate 注入 aiRuntime 调 parseNL
+// 并把 NL 结果塞进 contexts.nlResult 供 handle/buildTimeboxItems 消费。低置信（<0.6）
+// 或引用撞 Tier0 → 直接返 needConfirm（带 ArchetypePicker 候选 + 建议手动改约定）。
+// 关键 IRON RULE：handle() 不接 aiRuntime（handle 是纯编排；aiRuntime 仅 onGenerate 持有）。
+//
+// 测试策略：直接 mock aiRuntime.generate 返 NL JSON，spy handle 验证：
+//   - onGenerate 前置 parseNL + 注入 contexts.nlResult（newEvents 进 items，fixedTime 标记）
+//   - 置信度低（mock parseNL 返 confidence < 0.6）→ needConfirm 短路返回
+//   - handle 签名稳定（无 aiRuntime 参数）
+describe('[028] T6 onGenerate 接 NL（fold-in：不在 handle）', () => {
+  // 最小 mock AIRuntime — 仅 generate 被 parseNL 调
+  function makeAiRuntime(content: object): AIRuntime {
+    return {
+      generate: vi.fn().mockResolvedValue({ content: JSON.stringify(content) }),
+    } as unknown as AIRuntime
+  }
+
+  it('onGenerate(request, aiRuntime) 在 handle 前调 parseNL，NL 结果注入 contexts（newEvents → items，timeExpressions → fixedTime 标记）', async () => {
+    const handler = new TimeboxOrchestrationHandler()
+
+    // 关键 spy：handle 收到的 request.contexts.nlResult 应含 NL 解析结果；
+    // buildTimeboxItems 消费 materials.nlResult.newEvents → 进 items（sourceType='nl_event'）；
+    // timeExpressions → 标 fixedTime 标记（[028] T6 spec：T3 sortByHardRules 层 1 截止紧迫）。
+    // 这里通过 spy onGenerate 内部 handle 调用（onGenerate 是公开方法，可直接调）；
+    // 我们 verify result.proposalSet.proposals 含 nl_event 源即满足集成 contract。
+    const aiRuntime = makeAiRuntime({
+      matchedTasks: [], matchedTemplates: [], matchedAppointments: [],
+      newEvents: [{ title: '下午与客户沟通', time: '15:00' }],
+      timeExpressions: [{ raw: '下午3点', hour: 15 }],
+    })
+
+    const request: GenerationRequest = {
+      intent: {
+        targetDomain: 'timebox',
+        action: 'scheduleProposal',
+        fields: { date: '2026-07-11', nlText: '下午3点与客户沟通' },
+      },
+      contexts: {
+        activeTasks: [],
+        pendingHabits: [],
+        existingTimeboxes: [],
+        energyCurve: { peakHours: [9, 10], lowHours: [14, 15] },
+        appointments: [],
+        templates: [],
+      },
+    } as unknown as GenerationRequest
+
+    const result = await handler.onGenerate(request, aiRuntime)
+
+    // aiRuntime.generate 必被 parseNL 调用一次
+    expect((aiRuntime.generate as any).mock.calls.length).toBeGreaterThanOrEqual(1)
+    // 编排结果：proposalSet 应含 sourceType='nl_event' 的项（newEvents 进 items）
+    const nlEvent = result.proposalSet.proposals.find(p => p.sourceType === 'nl_event')
+    expect(nlEvent).toBeDefined()
+    expect(nlEvent?.payload.title).toBe('下午与客户沟通')
+  })
+
+  it('NL 置信度 < 0.6 → onGenerate 返回 needConfirm（ArchetypePicker 候选 + 建议手动改约定）', async () => {
+    const handler = new TimeboxOrchestrationHandler()
+
+    // 故意构造 matchedAppointments + conflictsTier0 → deriveConfidence 返 LOW_CONFIDENCE=0.3
+    // （[028] T5 deriveConfidence 规则 1：引用实体 + 任一 conflictsTier0=true → 强制 0.3）
+    const aiRuntime = makeAiRuntime({
+      matchedTasks: [], matchedTemplates: [],
+      matchedAppointments: [{ id: 'appt-1', conflictsTier0: true }],
+      newEvents: [],
+      timeExpressions: [],
+    })
+
+    const request: GenerationRequest = {
+      intent: {
+        targetDomain: 'timebox',
+        action: 'scheduleProposal',
+        fields: { date: '2026-07-11', nlText: '改下午的牙医约定到三点' },
+      },
+      contexts: {
+        activeTasks: [], pendingHabits: [], existingTimeboxes: [],
+        energyCurve: { peakHours: [], lowHours: [] },
+        appointments: [{ id: 'appt-1', title: '牙医', startTime: '2026-07-11T02:00:00Z', durationMin: 60 }],
+        templates: [],
+      },
+    } as unknown as GenerationRequest
+
+    const result: any = await handler.onGenerate(request, aiRuntime)
+
+    // needConfirm 短路返回：proposalSet 可能为空，but needConfirm 必须 true
+    expect(result.needConfirm).toBe(true)
+    // archetypeCandidates 至少 1 个（供 ArchetypePicker 复用 [027-A] 范式）
+    expect(Array.isArray(result.archetypeCandidates)).toBe(true)
+    expect(result.archetypeCandidates.length).toBeGreaterThan(0)
+    // 低置信原因文案（用户视角）
+    expect(result.confirmReason).toBeDefined()
+    expect(result.confirmReason).toMatch(/建议手动改约定|置信度/)
+  })
+
+  it('handle() 仍无 aiRuntime（纯编排，回归 IRON RULE）', () => {
+    // 反射读 handle 方法的 length（参数个数）：应 = 1（只 request）
+    const handler = new TimeboxOrchestrationHandler()
+    const handleFn = handler.handle as unknown as Function
+    // handle.length = 形参个数（不含 optional/rest）；必须是 1
+    expect(handleFn.length).toBe(1)
   })
 })
