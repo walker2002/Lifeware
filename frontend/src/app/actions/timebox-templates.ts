@@ -28,10 +28,10 @@ export interface TimeboxTemplateActionResult<T = void> {
   error?: string
 }
 
-/** 订阅源汇总（[023-02]：habit 多带 start/end；tasks/threads 仅 id+title） */
+/** 订阅源汇总（[023-02]：habit 多带 start/end；tasks/threads 仅 id+title。[027-B]：habits/tasks 补带 activityArchetypeId，供编辑器按来源派生） */
 export interface SubscriptionSources {
-  habits: Array<{ id: string; title: string; start: string; end: string }>
-  tasks: Array<{ id: string; title: string }>
+  habits: Array<{ id: string; title: string; start: string; end: string; activityArchetypeId?: string | null }>
+  tasks: Array<{ id: string; title: string; activityArchetypeId?: string | null }>
   threads: Array<{ id: string; title: string }>
 }
 
@@ -106,8 +106,9 @@ export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionR
         title: h.title,
         start: h.defaultTime,
         end: addMinutesToHHMM(h.defaultTime, h.defaultDuration),
+        activityArchetypeId: h.activityArchetypeId ?? null,
       })),
-      tasks: tasks.map((t) => ({ id: t.id, title: t.title })),
+      tasks: tasks.map((t) => ({ id: t.id, title: t.title, activityArchetypeId: t.activityArchetypeId ?? null })),
       threads: threads.map((th) => ({ id: th.id, title: th.name })),
     }
     _sourcesCache = { at: Date.now(), data }
