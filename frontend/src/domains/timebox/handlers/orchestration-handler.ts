@@ -52,6 +52,7 @@ import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manage
 import { sortByHardRules } from '../lib/schedule-rules'
 import { scheduleByTiers } from '../lib/tier-scheduler'
 import { parseNL, type NLCatalog, type NLParseResult, LOW_CONFIDENCE } from '../lib/nl-parser'
+import { scoreSchedule, SCORE_WARN_THRESHOLD } from '../lib/schedule-score'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -172,6 +173,21 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     const conflictWarnings = await this.detectConflicts(proposals, materials.existingTimeboxes)
     const presentation = this.renderMarkdown(proposals, date)
 
+    // [028] T7: 5 维评分（fold-in T7-fix 数学定义 + 三态语义区分）。
+    // - 必跑：scoreSchedule 是纯函数，对结果做 5 维评估；<6 分追加 warn（不 block）。
+    // - 注意：onGenerate 路径会读 baseResult.proposalSet.proposals 拼 AI 文案，
+    //   所以 proposals 必须保持原序（不在 handle 末尾改）。
+    const scoreResult = this.evaluateScore(proposals, items, materials, conflictWarnings)
+
+    const warnings: Warning[] = [...boundWarnings, ...conflictWarnings]
+    if (scoreResult.score < SCORE_WARN_THRESHOLD) {
+      warnings.push({
+        code: 'LOW_SCHEDULE_SCORE',
+        message: `今日编排评分 ${scoreResult.score.toFixed(1)}/10（维度: ${Object.entries(scoreResult.dimensions).map(([k, v]) => `${k}=${(v as number).toFixed(1)}`).join(', ')}），建议检查候选设置`,
+        severity: 'warn',
+      })
+    }
+
     return {
       proposalSet: {
         id: crypto.randomUUID(),
@@ -180,7 +196,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
         tags: ['auto-schedule', 'smart'],
       },
       presentation,
-      warnings: [...boundWarnings, ...conflictWarnings],
+      warnings,
     }
   }
 
@@ -913,6 +929,80 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     // legacy 路径：HH:MM + server today UTC（与 orchestration cursor zone-consistent）
     const today = new Date().toISOString().slice(0, 10)
     return `${today}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
+  }
+
+  // ─── [028] T7: evaluateScore — 5 维评分入参计算 ──────────────────
+  //
+  // scoreSchedule 纯函数（lib/schedule-score.ts）需要 caller 预先计算 5 个数值：
+  //   - totalCandidates, scheduledP0P1 / totalP0P1
+  //   - hasOverlap（来自 conflictWarnings 含 SCHEDULE_OVERLAP）
+  //   - hasArchetypeData + restMealScheduled（基于 archetypeMap 查 templates 的睡眠/饮食）
+  //
+  // 本方法把所有派生逻辑收到一处，保持 handle() 干净。
+
+  private evaluateScore(
+    proposals: GeneratedProposal[],
+    items: TimeboxItem[],
+    materials: ReturnType<typeof this.collectMaterials>,
+    conflictWarnings: Warning[],
+  ): { score: number; dimensions: Record<string, number> } {
+    // totalCandidates = items 数（不含 appointments；appointments 走 Tier0）
+    // 注：items 含 templates + habits + tasks + NL events（4 源）；
+    // strategy='legacy' 时不含 templates/NL（IRON RULE），totalCandidates 自然小。
+    const totalCandidates = items.length
+
+    // 高优命中率：从 proposals / items 中数 priority in {P0, P1, critical, high}
+    //   items.priority 已 normalize 到 PRIORITY_WEIGHT 兼容值（含 P0/P1/critical/high）
+    const p0p1Set = new Set(['P0', 'P1', 'critical', 'high'])
+    const totalP0P1 = items.filter(i => p0p1Set.has(i.priority)).length
+    const scheduledP0P1 = proposals.filter(p => p0p1Set.has(p.priority)).length
+
+    // 冲突：detectConflicts 返回的 SCHEDULE_OVERLAP warnings
+    const hasOverlap = conflictWarnings.some(w => w.code === 'SCHEDULE_OVERLAP')
+
+    // archetype 数据可得性 + restMealScheduled：
+    //   - 数据可得：deps.archetypeMap 已注入
+    //   - restMeal 已安排：templates 含睡眠/饮食 archetypeId 且对应 proposal 在 proposals 中
+    const archetypeMap = this.deps.archetypeMap
+    const hasArchetypeData = !!archetypeMap && Object.keys(archetypeMap).length > 0
+    let restMealScheduled = false
+    if (hasArchetypeData) {
+      // 收集 sleep/meal archetypeId（templates 持有 activityArchetypeId）
+      const restMealArchetypeIds = new Set<string>()
+      for (const tmpl of materials.templates) {
+        const aid = tmpl.activityArchetypeId
+        if (!aid) continue
+        const arch = archetypeMap[aid]
+        if (arch && arch.l1Category === '生存' && (arch.l2Name === '睡眠' || arch.l2Name === '饮食')) {
+          restMealArchetypeIds.add(aid)
+        }
+      }
+      // 检查 proposals 是否命中这些 archetype（payload.sourceObjectId == archetypeId
+      // 不成立 — sourceObjectId == templateId；此处用 templates 自身 id 作 key）
+      if (restMealArchetypeIds.size > 0) {
+        const scheduledTemplateIds = new Set<string>()
+        for (const p of proposals) {
+          const sid = p.payload.sourceObjectId
+          if (typeof sid === 'string') scheduledTemplateIds.add(sid)
+        }
+        for (const tmpl of materials.templates) {
+          if (tmpl.activityArchetypeId && restMealArchetypeIds.has(tmpl.activityArchetypeId)
+              && scheduledTemplateIds.has(tmpl.id)) {
+            restMealScheduled = true
+            break
+          }
+        }
+      }
+    }
+
+    return scoreSchedule(proposals, {
+      totalCandidates,
+      hasOverlap,
+      totalP0P1,
+      scheduledP0P1,
+      hasArchetypeData,
+      restMealScheduled,
+    })
   }
 
   // ─── renderMarkdown: 将提案转为可读 Markdown ──────────────
