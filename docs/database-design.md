@@ -1854,9 +1854,10 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_07_09*
+*文档版本：2026_07_11*
 *关联上游文档：docs/usom-design.md*
 
+*变更：[027-B] (2026_07_11) — §7.8 timebox_templates.rows JSONB 内 `TemplateRow` 形状重构（`{start,end}` → `{defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?}`）+ 仓储 `rowToTemplate` 读时 lazy 自愈旧形状（无需 DDL：`[027-B] TemplateRow 行 schema（无 DDL，JSONB 内自描述）`段已记录自愈逻辑）*
 *变更：[026.02.3.1] (2026_07_09) — T1 AISessionStatus 三向一致（schema.ts ai_sessions CHECK 6 值与 USOM 对齐）+ T2 v_running_timeboxes 视图重写（迁移 0036 派生 planned AND now∈[start,end]）+ T3 §8.x ai_sessions 表格式 Markdown→SQL block 统一*
 *变更：[026.02.3] (2026_07_09) — /editAppointment selecting→编辑视图 Runtime TypeError 双层防御（handlers.ts:268-274 todayAppointments mapper 补 3 字段）*
 *变更：[026.02.2] (2026_07_09) — 7 项 polish 收口（架构影响限于 timebox/cnui/filter 等域，无 schema/db 变更）*

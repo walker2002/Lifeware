@@ -8,6 +8,30 @@
 
 ---
 
+## [neat-2026_07_11] /lifeware-neat 三项 drift 收口（2026-07-11）
+
+> 2026_07_11 — `/lifeware-neat` 收 3 项 drift：(1) `[027-A]` 缺 `manifest.md` 索引条目；(2) `docs/database-design.md` 文档版本 `2026_07_09` 应 bump 至 `2026_07_11`（[027-B] §7.8 自愈说明未登记版本变更）；(3) `database-design.md` 缺 `[027-B]` 变更记录。
+
+### 改动
+
+- `manifest.md` — 追加 `[027-A] activityArchetype 界面规范处理 — Phase A：原型选择器统一` 索引条目（带 plan/spec/CHANGELOG/usom-design §3.4/§3.7 交叉引用），归档 [027-A] ship-ready
+- `docs/database-design.md` — 文档版本 `2026_07_09 → 2026_07_11`；追加变更记录 `[027-B] (2026_07_11)`（§7.8 TemplateRow JSONB 形状重构 + `rowToTemplate` 读时 lazy 自愈旧形状）
+
+### 验证
+
+- 2A 枚举对齐：TaskStatus / HabitStatus / TimeboxStatus USOM ↔ DB CHECK 一致
+- 2B 表结构总览：33 表 / 32 CREATE TABLE（`external_events` 是 §十二 阶段二预留，合法）
+- 2E 版本号：`usom-design 2026_07_11`、`database-design 2026_07_11`（自洽）
+- UI C-01~C-07（[027-B] PR）：PASS — PR-affected 12 TS/TSX 文件无 raw tailwind 颜色
+- Constitution 约束 ID：[027-B] 无新约束引入，仅 schema.ts 既有 R-01~R-04 / T-01~T-04 头注引用
+- mydocs/ 只读：本次会话未动 `mydocs/core/` 任一文件
+
+### 未处理
+
+- `specs/001~010` 共 10 个 speckit feature 目录仍在 active 状态（未归档 `specs/_archived/`）—— 历史遗留，超出本次 scope，待用户决策
+
+---
+
 ## [027-A] activityArchetype 界面规范处理 — Phase A：原型选择器统一（2026-07-11）
 
 > **Phase A ship-ready**：5 task (T1-T5) 全完成 + grep 闭环 + vitest/tsc 零新增。**核心**：统一为单一 `ArchetypePicker` + `variant` prop（card=带盒+h3 / inline=裸版），删除 `ArchetypePickerCard`；补齐 AI 匹配（TaskCreationCard / TaskEditCard / habit-form）+ `/tasks` 页面编辑入口（task-create-drawer / task-edit-zone）。
