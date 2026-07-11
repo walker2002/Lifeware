@@ -42,16 +42,19 @@ export function genRowId(): string {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-/** HH:MM + 分钟数 = HH:MM（跨午夜 mod 24h 归一） */
+/** HH:MM + 分钟数 = HH:MM（跨午夜 mod 24h 归一）。无效输入/非有限 minutes 透传原值。 */
 export function addMinutesToHHMM(hhmm: string, minutes: number): string {
+  if (!isValidHHMM(hhmm)) return hhmm
+  if (!Number.isFinite(minutes)) return hhmm
   const [h, m] = hhmm.split(':').map(Number)
   const total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`
 }
 
-/** [027-B] 两 HH:MM 之差（分钟）；end<start 视作跨午夜次日（+24h）。 */
+/** [027-B] 两 HH:MM 之差（分钟）；end<start 视作跨午夜次日（+24h）。无效输入回退 0。 */
 export function hhmmDiffMinutes(start: string, end: string): number {
+  if (!isValidHHMM(start) || !isValidHHMM(end)) return 0
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)
   let diff = eh * 60 + em - (sh * 60 + sm)

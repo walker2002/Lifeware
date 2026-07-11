@@ -122,7 +122,9 @@ const RowEditor = React.memo(function RowEditor({
             const v = e.target.value
             if (v === 'habit' || v === 'task' || v === 'thread' || v === 'custom') onSourceChange(row.id, v)
           }}
-          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
         >
           <option value="custom">自定义</option>
           <option value="habit">习惯</option>
@@ -189,7 +191,9 @@ const RowEditor = React.memo(function RowEditor({
             disabled={isHabit}
             onChange={(e) => onUpdate(row.id, { defaultStart: e.target.value })}
             onBlur={validateOnBlur}
-            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -202,7 +206,9 @@ const RowEditor = React.memo(function RowEditor({
             disabled={isHabit}
             onChange={(e) => onUpdate(row.id, { defaultDuration: Number(e.target.value) || 0 })}
             onBlur={validateOnBlur}
-            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
           />
           分钟
         </label>
@@ -215,7 +221,9 @@ const RowEditor = React.memo(function RowEditor({
             disabled={isHabit}
             onChange={(e) => onUpdate(row.id, { earliestStart: e.target.value || null })}
             onBlur={validateOnBlur}
-            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -227,7 +235,9 @@ const RowEditor = React.memo(function RowEditor({
             disabled={isHabit}
             onChange={(e) => onUpdate(row.id, { latestStart: e.target.value || null })}
             onBlur={validateOnBlur}
-            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+            className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -240,15 +250,17 @@ const RowEditor = React.memo(function RowEditor({
             disabled={isHabit}
             onChange={(e) => onUpdate(row.id, { shortestDuration: e.target.value === '' ? null : Number(e.target.value) })}
             onBlur={validateOnBlur}
-            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+            className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            aria-invalid={errors.length > 0 || undefined}
+            aria-describedby={errors.length > 0 ? `row-errors-${row.id}` : undefined}
           />
           分钟
         </label>
       </div>
 
-      {/* 校验错误提示 */}
+      {/* 校验错误提示（aria-describedby 目标） */}
       {errors.length > 0 && (
-        <ul className="flex flex-col gap-0.5">
+        <ul id={`row-errors-${row.id}`} className="flex flex-col gap-0.5">
           {errors.map((e) => (
             <li key={e} className="text-[10px] text-error">{e}</li>
           ))}

@@ -433,6 +433,20 @@ describe('TemplateEditForm — RowEditor 行为分叉 [027-B]', () => {
     dur.blur()
     expect(await screen.findByText(/默认时长须大于 0/)).toBeInTheDocument()
   })
+
+  // [PLR] T4: 最短时长 onBlur 回归（之前漏接 validateOnBlur；[027-B] 防御性补）
+  it('shortestDuration > defaultDuration 时 onBlur 显示错误', async () => {
+    const user = userEvent.setup()
+    const tpl = makeTemplate({
+      rows: [{ id: 'rc', activityName: 'x', defaultStart: '09:00', defaultDuration: 60, source: 'custom' }],
+    })
+    render(<Harness initialTemplate={tpl} initialSources={mockSources} />)
+    const shortest = screen.getByLabelText('最短时长（分钟）')
+    await user.clear(shortest)
+    await user.type(shortest, '999')
+    shortest.blur()
+    expect(await screen.findByText(/最短时长不能大于默认时长/)).toBeInTheDocument()
+  })
 })
 
 // ─── within 用法验证（仅 sanity check）─────────────────────────
