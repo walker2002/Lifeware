@@ -28,13 +28,14 @@
 - **T4** `/tasks` 页面补原型字段：task-create-drawer（创建）+ task-edit-zone（inline 编辑）+ 测试 + 持久化回归
 - **T5** 删 `ArchetypePickerCard` + grep 闭环（3 注释文件更新）+ 测试清理（删重复 describe 块）
 
+### 文档同步
+
+- `docs/usom-design.md` — Task/Habit `activityArchetypeId` widen 到 `USOM_ID | null`（3-state clear：undefined=skip / null=clear / string=set，对齐 DB nullable FK；Timebox/Appointment 暂未 widen，pre-existing imprecision 登记 neat/后续）
+
 ### 验证
 
-- vitest：`archetype-picker.test.tsx` 20/20 PASS（删 Card import + 重复 describe，保留 variant=card 用例）
-- tsc：0 新增错误（无 ArchetypePickerCard 残留引用）
-- grep：`cd frontend && grep -rn "ArchetypePickerCard" src` → 空（生产 + 测试 + 注释全清）
-- 3 注释文件：appointment-form-fields.test.tsx（文件头 + 内联）/ create-appointment.test.tsx（内联）/ parse-appointments.ts（文件头）/ AppointmentFormFields.tsx（内联）→ 全改为 `ArchetypePicker variant="card"`
-- Phase B：Timebox 模板增强另起分支（不混入 Phase A）
+- 执行细节（vitest/tsc/grep/测试用例数）见 git + plan `docs/superpowers/plans/2026-07-11-027-a-archetype-unify.md` + memory；本文件只记文档级里程碑。
+- /qa 发现并修复 TaskCreateDrawer `handleSubmit` 闭包漏 `activityArchetypeId` deps（选原型不落库），见 commit 1b0e971 + 回归测试 24aea05。
 
 ---
 
