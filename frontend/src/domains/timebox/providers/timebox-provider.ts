@@ -36,7 +36,12 @@ export class TimeboxProvider implements ContextProvider {
 
     const timeboxes = await this.repo.findByDateRange(dayStart, dayEnd, userId)
 
-    return timeboxes.map(t => ({
+    // [028] T1（R14）：TimeboxRepository.findByDateRange 不在 DB 层过滤 cancelled
+    // （跨域读时合并的语义包含全部 status，由调用方按需过滤）。[028] 生成型路径
+    // 只需要「活的」时间盒作 Tier0 占用提示——cancelled 不参与占用计算。
+    const active = timeboxes.filter(t => t.status !== 'cancelled')
+
+    return active.map(t => ({
       id: t.id,
       title: t.title,
       startTime: t.startTime,

@@ -312,8 +312,10 @@ templates:
 
 # ─── 区块 I: generation_actions（生成型路径声明）────────────────
 generation_actions:
-  createSmartTimeboxes:
-    description: 智能编排时间盒，根据任务/习惯/能量曲线自动生成时间盒方案
+  # [028] T1：rename createSmartTimeboxes → scheduleProposal + 补 appointments/templates contexts
+  # （fold-in T1-manifest-fix — codex 第7个静默失败：不加则 4 源变 2 源无报错退化）
+  scheduleProposal:
+    description: 今日行动计划提案，四源归集（模板+约定+任务+NL）+ §04 硬规则 + Tier0/1/2 编排
     contexts:
       - id: existingTimeboxes
         query: timeboxes_for_date
@@ -327,8 +329,15 @@ generation_actions:
       - id: energyCurve
         query: energy_curve
         params: []
+      # [028] T1：fold-in T1-manifest-fix — 补 appointments + templates（否则 4 源变 2 源静默退化）
+      - id: appointments
+        query: appointments_for_date
+        params: [date, userId]
+      - id: templates
+        query: templates_for_date
+        params: [date, userId]
     response_mode: cnui
-    cnui_surface_type: create-smart-timebox
+    cnui_surface_type: schedule-proposal   # 新 surface（K-block T9 加）
     session_enabled: true
   adjustRemainingTimeboxes:
     description: 根据已完成项目调整剩余时间盒
@@ -358,7 +367,11 @@ cnui_surfaces:
   # [023.08] T5 — AI 智能推荐 surface（proposals 接受/拒绝 + 撤销 batch）
   #   替代原 timebox-list（[023.08] 前 generation_actions.cnui_surface_type=timebox-list 是初始占位）
   create-smart-timebox:
-    description: AI 智能编排时间盒（proposals 接受/拒绝 + batch 撤销）
+    description: AI 智能编排时间盒（proposals 接受/拒绝 + batch 撤销，revertSmartTimeboxes 引用不断）
+    handler: ./cnui/handlers
+  # [028] T1 manifest 占位：schedule-proposal surface（复用 cnui/handlers；T9 接 ScheduleProposal.tsx + scheduleProposal action 分支）
+  schedule-proposal:
+    description: 今日行动计划提案 surface（[028] 替代 createSmartTimeboxes；四源归集 + §04 硬规则 + Tier0/1/2）
     handler: ./cnui/handlers
   create-timebox:
     description: 多条 timebox 草稿创建（AI 解析→左右翻页→逐条提交）

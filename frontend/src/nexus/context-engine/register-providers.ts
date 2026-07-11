@@ -1,9 +1,15 @@
 import { z } from 'zod'
 import { registerContextCapability } from './registry'
-import { TimeboxProvider, EnergyCurveProvider } from '@/domains/timebox/providers'
+import { TimeboxProvider, EnergyCurveProvider, AppointmentsProvider, TemplatesProvider } from '@/domains/timebox/providers'
 import { ActiveTasksProvider, CompletedTasksProvider } from '@/domains/tasks/providers'
 import { PendingHabitsProvider, ActiveHabitsProvider } from '@/domains/habits/providers'
 import type { ITimeboxRepository, ITaskRepository, IHabitRepository } from '@/usom/interfaces/irepository'
+import { TimeboxRepository } from '@/domains/timebox/repository'
+import { TaskRepository } from '@/domains/tasks/repository'
+import { HabitRepository } from '@/domains/habits/repository/habit'
+// [028] T1：fold-in T1-fix — appointments + templates 仓储（裸 class）
+import { AppointmentRepository } from '@/domains/timebox/repository/appointment'
+import { TimeboxTemplateRepository } from '@/lib/db/repositories/timebox-template'
 
 const TimeboxArraySchema = z.array(z.object({
   id: z.string(),
@@ -41,7 +47,7 @@ const HabitArraySchema = z.array(z.object({
 /**
  * EnergyCurve Schema（F3 [023] A0 post-review）
  *
- * 原始 `z.array(z.number())` 接受 NaN/Infinity/负数/&gt;23/小数——
+ * 原始 `z.array(z.number())` 接受 NaN/Infinity/负数/>23/小数——
  * 静默污染 routing 与 energy match 计算。
  *
  * 守卫：每个 hour 必须为 [0, 23] 区间内的整数（z.number().int() 已
@@ -60,6 +66,9 @@ export interface ProviderDeps {
   timeboxRepo?: ITimeboxRepository
   taskRepo?: ITaskRepository
   habitRepo?: IHabitRepository
+  // [028] T1：fold-in T1-fix — ProviderDeps 用裸 class 类型
+  appointmentRepo?: InstanceType<typeof AppointmentRepository>
+  templateRepo?: InstanceType<typeof TimeboxTemplateRepository>
 }
 
 export function registerAllProviders(deps: ProviderDeps): void {
@@ -112,6 +121,36 @@ export function registerAllProviders(deps: ProviderDeps): void {
     })
   }
 
+  // [028] T1：fold-in T1-fix — ProviderDeps 用裸 class 类型
+  if (deps.appointmentRepo) {
+    registerContextCapability({
+      id: 'appointments',
+      visibility: 'planning',
+      schema: z.array(z.object({
+        id: z.string(), title: z.string(),
+        startTime: z.string(), durationMin: z.number(), status: z.string(),
+      })),
+      description: '当日约定（Tier0 硬占用）',
+      provider: new AppointmentsProvider(deps.appointmentRepo),
+    })
+  }
+  if (deps.templateRepo) {
+    registerContextCapability({
+      id: 'templates',
+      visibility: 'planning',
+      // [028] T1：fold-in T1-fix — schema 对齐 TemplateRow 字段名
+      schema: z.array(z.object({
+        id: z.string(), title: z.string(),
+        defaultStart: z.string(), defaultDuration: z.number(),
+        earliestStart: z.string().nullable(), latestStart: z.string().nullable(),
+        shortestDuration: z.number().nullable(),
+        activityArchetypeId: z.string().nullable(), source: z.string(),
+      })),
+      description: '时间盒模板行（flatMapped）',
+      provider: new TemplatesProvider(deps.templateRepo),
+    })
+  }
+
   registerContextCapability({
     id: 'energyCurve',
     visibility: 'planning',
@@ -120,10 +159,6 @@ export function registerAllProviders(deps: ProviderDeps): void {
     provider: new EnergyCurveProvider(),
   })
 }
-
-import { TimeboxRepository } from '@/domains/timebox/repository'
-import { TaskRepository } from '@/domains/tasks/repository'
-import { HabitRepository } from '@/domains/habits/repository/habit'
 
 /**
  * [023-01] 幂等保证 capability 已注册。
@@ -145,6 +180,9 @@ export function ensureProvidersRegistered(): void {
     timeboxRepo: new TimeboxRepository(),
     taskRepo: new TaskRepository(),
     habitRepo: new HabitRepository(),
+    // [028] T1：fold-in T1-fix — 兜底注册 appointments + templates
+    appointmentRepo: new AppointmentRepository(),
+    templateRepo: new TimeboxTemplateRepository(),
   })
   _providersRegistered = true
 }
