@@ -51,6 +51,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet'
 import { TemplateCard } from '@/domains/timebox/components/template-card'
 import { TemplateEditForm } from '@/domains/timebox/components/template-edit-form'
@@ -245,6 +246,7 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
         <SheetContent side="right" className="sm:max-w-[560px] px-6 py-6 flex flex-col">
           <SheetHeader>
             <SheetTitle>{editing?.id ? '编辑模板' : '新建模板'}</SheetTitle>
+            <SheetDescription>设置时间安排行，每行可关联习惯/任务/主线/自定义活动，并指定原型与时间约束。</SheetDescription>
           </SheetHeader>
           {editing && (
             <TemplateEditForm

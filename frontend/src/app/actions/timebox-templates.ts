@@ -118,7 +118,9 @@ export async function fetchSubscriptionSources(): Promise<TimeboxTemplateActionR
   }
 }
 
-/** [PLR] F-12 测试钩子：清空 sources in-memory cache（仅测试用，prod 不调） */
-export function __resetForTesting(): void {
+/** [PLR] F-12 测试钩子：清空 sources in-memory cache（仅测试用，prod 不调）
+ * [QA] 必须 async — 'use server' 文件 Next.js 要求所有 export 是 async function
+ */
+export async function __resetForTesting(): Promise<void> {
   _sourcesCache = null
 }
