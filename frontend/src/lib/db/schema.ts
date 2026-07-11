@@ -730,12 +730,22 @@ export const activityArchetypes = pgTable('activity_archetypes', {
 /** 模板行来源类型 [023-02] */
 export type TemplateRowSource = 'habit' | 'task' | 'thread' | 'custom'
 
-/** 模板中一条时间安排行 [023-02] */
+/** 模板中一条时间安排行 [023-02] / [027-B] 形状重构：固定时段→带约束可调度活动 */
 export interface TemplateRow {
   id: string
   activityName: string
-  start: string
-  end: string
+  /** 默认开始时间 HH:MM（[027-B] 原 start 改名） */
+  defaultStart: string
+  /** 默认时长（分钟，替代原 end） */
+  defaultDuration: number
+  /** 最早开始时间 HH:MM，可选约束 [027-B] */
+  earliestStart?: string | null
+  /** 最迟开始时间 HH:MM，可选约束 [027-B] */
+  latestStart?: string | null
+  /** 最短时长（分钟），可选约束 [027-B] */
+  shortestDuration?: number | null
+  /** 关联 Activity Archetype（custom 行可编辑；来源行读时从来源对象派生）[027-B] */
+  activityArchetypeId?: string | null
   source: TemplateRowSource
   sourceId?: string
 }

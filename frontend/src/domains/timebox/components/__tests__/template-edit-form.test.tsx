@@ -28,8 +28,8 @@ function makeTemplate(overrides: Partial<TimeboxTemplate> = {}): TimeboxTemplate
     name: '测试模板',
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
     rows: [
-      { id: 'r1', activityName: '起床', start: '07:00', end: '07:30', source: 'custom' },
-      { id: 'r2', activityName: '晨间', start: '07:30', end: '09:00', source: 'custom' },
+      { id: 'r1', activityName: '起床', defaultStart: '07:00', defaultDuration: 30, source: 'custom' },
+      { id: 'r2', activityName: '晨间', defaultStart: '07:30', defaultDuration: 90, source: 'custom' },
     ],
     createdAt: '',
     updatedAt: '',
@@ -147,17 +147,17 @@ describe('TemplateEditForm — 来源切换', () => {
     const habitSelect = screen.getAllByLabelText('来源对象')[0]!
     await user.selectOptions(habitSelect, 'h-1')
 
-    // activityName 应为 '晨跑'（习惯标题）；start='06:00'；end='07:00'
+    // activityName 应为 '晨跑'（习惯标题）；defaultStart='06:00'；defaultDuration=60（06:00→07:00）
     expect(screen.getByDisplayValue('晨跑')).toBeInTheDocument()
     expect(screen.getByDisplayValue('06:00')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('07:00')).toBeInTheDocument()
+    expect(screen.getByDisplayValue(60)).toBeInTheDocument()
 
     // 第 1 行（已切到 habit）的起止时间输入 disabled
     // 行模板只有 2 行；用 getAllByLabelText 取所有，取第一个即可
     const startInputs = screen.getAllByLabelText('开始时间')
-    const endInputs = screen.getAllByLabelText('结束时间')
+    const durationInputs = screen.getAllByLabelText('默认时长（分钟）')
     expect(startInputs[0]).toBeDisabled()
-    expect(endInputs[0]).toBeDisabled()
+    expect(durationInputs[0]).toBeDisabled()
   })
 
   it('切到 task 并选具体 task 时：activityName 填 task.title，但时间可编辑', async () => {
@@ -216,9 +216,9 @@ describe('TemplateEditForm — 行增删', () => {
     expect(sourceSelects).toHaveLength(3)
     // 新行的 source 应该是 'custom'（默认值）
     expect((sourceSelects[2] as HTMLSelectElement).value).toBe('custom')
-    // 时间默认值 09:00–10:00 应出现
+    // 时间默认值 09:00 / 60 分钟应出现
     expect(screen.getAllByDisplayValue('09:00').length).toBeGreaterThan(0)
-    expect(screen.getAllByDisplayValue('10:00').length).toBeGreaterThan(0)
+    expect(screen.getAllByDisplayValue(60).length).toBeGreaterThan(0)
   })
 })
 
@@ -258,8 +258,8 @@ describe('TemplateEditForm — 时间输入（custom 行）', () => {
     for (const i of startInputs) {
       expect(i).not.toBeDisabled()
     }
-    const endInputs = screen.getAllByLabelText('结束时间')
-    for (const i of endInputs) {
+    const durationInputs = screen.getAllByLabelText('默认时长（分钟）')
+    for (const i of durationInputs) {
       expect(i).not.toBeDisabled()
     }
   })
@@ -318,24 +318,24 @@ describe('TemplateEditForm — save / cancel 回调', () => {
   })
 })
 
-// ─── 行按 start 时间排序展示（2026-07-04 用户调整）────────────────
+// ─── 行按 defaultStart 时间排序展示（[027-B] 形状重构）────────────────
 
-describe('TemplateEditForm — 行按 start 排序展示', () => {
-  it('按 start 升序展示，与 template.rows 输入顺序无关', () => {
+describe('TemplateEditForm — 行按 defaultStart 排序展示', () => {
+  it('按 defaultStart 升序展示，与 template.rows 输入顺序无关', () => {
     const tpl = makeTemplate({
       rows: [
-        { id: 'late',  activityName: '晚间', start: '21:00', end: '22:00', source: 'custom' },
-        { id: 'noon',  activityName: '午间', start: '12:00', end: '13:00', source: 'custom' },
-        { id: 'morn',  activityName: '晨间', start: '07:30', end: '09:00', source: 'custom' },
+        { id: 'late',  activityName: '晚间', defaultStart: '21:00', defaultDuration: 60, source: 'custom' },
+        { id: 'noon',  activityName: '午间', defaultStart: '12:00', defaultDuration: 60, source: 'custom' },
+        { id: 'morn',  activityName: '晨间', defaultStart: '07:30', defaultDuration: 90, source: 'custom' },
       ],
     })
     const { container } = render(<Harness initialTemplate={tpl} />)
-    // 每个行容器有「开始时间」+「结束时间」两个 input；按 row 顺序取每行第一个时间输入（start）
+    // 每个行容器有「开始时间」+「默认时长（分钟）」两个 input；按 row 顺序取每行第一个时间输入（start）
     const rowContainers = Array.from(
       container.querySelectorAll('div.flex.flex-col.gap-1.rounded.border'),
     )
     expect(rowContainers).toHaveLength(3)
-    // 验证每行的 activityName 按 start 升序：晨间 07:30 → 午间 12:00 → 晚间 21:00
+    // 验证每行的 activityName 按 defaultStart 升序：晨间 07:30 → 午间 12:00 → 晚间 21:00
     expect(
       (rowContainers[0]!.querySelector('input[aria-label="活动名称"]') as HTMLInputElement)?.value,
     ).toBe('晨间')
@@ -345,7 +345,7 @@ describe('TemplateEditForm — 行按 start 排序展示', () => {
     expect(
       (rowContainers[2]!.querySelector('input[aria-label="活动名称"]') as HTMLInputElement)?.value,
     ).toBe('晚间')
-    // start time 也按升序
+    // defaultStart time 也按升序
     expect(
       (rowContainers[0]!.querySelector('input[aria-label="开始时间"]') as HTMLInputElement)?.value,
     ).toBe('07:30')

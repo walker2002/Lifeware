@@ -16,8 +16,8 @@ const baseTemplate: TimeboxTemplate = {
   name: '工作日模板',
   daysOfWeek: [1, 2, 3, 4, 5],
   rows: [
-    { id: 'r1', activityName: '起床', start: '07:00', end: '07:30', source: 'custom' },
-    { id: 'r2', activityName: '晨跑', start: '06:00', end: '07:00', source: 'habit', sourceId: 'h-1' },
+    { id: 'r1', activityName: '起床', defaultStart: '07:00', defaultDuration: 30, source: 'custom' },
+    { id: 'r2', activityName: '晨跑', defaultStart: '06:00', defaultDuration: 60, source: 'habit', sourceId: 'h-1' },
   ],
   createdAt: '',
   updatedAt: '',
@@ -52,13 +52,13 @@ describe('TemplateCard', () => {
     const t = {
       ...baseTemplate,
       rows: [
-        { id: 'a', activityName: 'A', start: '01:00', end: '02:00', source: 'custom' as const },
-        { id: 'b', activityName: 'B', start: '03:00', end: '04:00', source: 'custom' as const },
+        { id: 'a', activityName: 'A', defaultStart: '01:00', defaultDuration: 60, source: 'custom' as const },
+        { id: 'b', activityName: 'B', defaultStart: '03:00', defaultDuration: 60, source: 'custom' as const },
       ],
     }
     render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)
-    expect(screen.getByText(/01:00.*02:00.*A/)).toBeInTheDocument()
-    expect(screen.getByText(/03:00.*04:00.*B/)).toBeInTheDocument()
+    expect(screen.getByText(/01:00.*A/)).toBeInTheDocument()
+    expect(screen.getByText(/03:00.*B/)).toBeInTheDocument()
     expect(screen.queryByText(/还有/)).not.toBeInTheDocument()
   })
 
@@ -66,18 +66,18 @@ describe('TemplateCard', () => {
     const t = {
       ...baseTemplate,
       rows: [
-        { id: '1', activityName: 'A', start: '01:00', end: '02:00', source: 'custom' as const },
-        { id: '2', activityName: 'B', start: '03:00', end: '04:00', source: 'custom' as const },
-        { id: '3', activityName: 'C', start: '05:00', end: '06:00', source: 'custom' as const },
-        { id: '4', activityName: 'D', start: '07:00', end: '08:00', source: 'custom' as const },
-        { id: '5', activityName: 'E', start: '09:00', end: '10:00', source: 'custom' as const },
-        { id: '6', activityName: 'F', start: '11:00', end: '12:00', source: 'custom' as const },
-        { id: '7', activityName: 'G', start: '13:00', end: '14:00', source: 'custom' as const },
-        { id: '8', activityName: 'H', start: '15:00', end: '16:00', source: 'custom' as const },
-        { id: '9', activityName: 'I', start: '17:00', end: '18:00', source: 'custom' as const },
-        { id: '10', activityName: 'J', start: '19:00', end: '20:00', source: 'custom' as const },
-        { id: '11', activityName: 'K', start: '21:00', end: '22:00', source: 'custom' as const },
-        { id: '12', activityName: 'L', start: '23:00', end: '23:59', source: 'custom' as const },
+        { id: '1', activityName: 'A', defaultStart: '01:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '2', activityName: 'B', defaultStart: '03:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '3', activityName: 'C', defaultStart: '05:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '4', activityName: 'D', defaultStart: '07:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '5', activityName: 'E', defaultStart: '09:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '6', activityName: 'F', defaultStart: '11:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '7', activityName: 'G', defaultStart: '13:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '8', activityName: 'H', defaultStart: '15:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '9', activityName: 'I', defaultStart: '17:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '10', activityName: 'J', defaultStart: '19:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '11', activityName: 'K', defaultStart: '21:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '12', activityName: 'L', defaultStart: '23:00', defaultDuration: 60, source: 'custom' as const },
       ],
     }
     render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)
@@ -94,8 +94,8 @@ describe('TemplateCard', () => {
     const t = {
       ...baseTemplate,
       rows: [
-        { id: '1', activityName: 'B', start: '09:00', end: '10:00', source: 'custom' as const },
-        { id: '2', activityName: 'A', start: '06:00', end: '07:00', source: 'custom' as const },
+        { id: '1', activityName: 'B', defaultStart: '09:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '2', activityName: 'A', defaultStart: '06:00', defaultDuration: 60, source: 'custom' as const },
       ],
     }
     const { container } = render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)
@@ -125,18 +125,18 @@ describe('TemplateCard', () => {
     const t = {
       ...baseTemplate,
       rows: [
-        { id: '1', activityName: 'Alpha', start: '01:00', end: '02:00', source: 'custom' as const },
-        { id: '2', activityName: 'Beta', start: '03:00', end: '04:00', source: 'custom' as const },
-        { id: '3', activityName: 'Gamma', start: '05:00', end: '06:00', source: 'custom' as const },
-        { id: '4', activityName: 'Delta', start: '07:00', end: '08:00', source: 'custom' as const },
-        { id: '5', activityName: 'Epsilon', start: '09:00', end: '10:00', source: 'custom' as const },
-        { id: '6', activityName: 'Zeta', start: '11:00', end: '12:00', source: 'custom' as const },
-        { id: '7', activityName: 'Eta', start: '13:00', end: '14:00', source: 'custom' as const },
-        { id: '8', activityName: 'Theta', start: '15:00', end: '16:00', source: 'custom' as const },
-        { id: '9', activityName: 'Iota', start: '17:00', end: '18:00', source: 'custom' as const },
-        { id: '10', activityName: 'Kappa', start: '19:00', end: '20:00', source: 'custom' as const },
-        { id: '11', activityName: 'Lambda', start: '21:00', end: '22:00', source: 'custom' as const },
-        { id: '12', activityName: 'Mu', start: '23:00', end: '23:59', source: 'custom' as const },
+        { id: '1', activityName: 'Alpha', defaultStart: '01:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '2', activityName: 'Beta', defaultStart: '03:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '3', activityName: 'Gamma', defaultStart: '05:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '4', activityName: 'Delta', defaultStart: '07:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '5', activityName: 'Epsilon', defaultStart: '09:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '6', activityName: 'Zeta', defaultStart: '11:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '7', activityName: 'Eta', defaultStart: '13:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '8', activityName: 'Theta', defaultStart: '15:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '9', activityName: 'Iota', defaultStart: '17:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '10', activityName: 'Kappa', defaultStart: '19:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '11', activityName: 'Lambda', defaultStart: '21:00', defaultDuration: 60, source: 'custom' as const },
+        { id: '12', activityName: 'Mu', defaultStart: '23:00', defaultDuration: 60, source: 'custom' as const },
       ],
     }
     render(<TemplateCard template={t} onEdit={vi.fn()} onDelete={vi.fn()} />)

@@ -1,20 +1,21 @@
 /**
  * @file template-edit-form
- * @brief 时间盒模板 Sheet 抽屉内的行编辑器（[023-02]）
+ * @brief 时间盒模板 Sheet 抽屉内的行编辑器（[023-02] / [027-B] 形状重构）
  *
  * 从 timebox-template-editor.tsx 抽出（决议 C.3），便于独立单测 + 关注点分离。
  * 父组件 TimeboxTemplateEditor 通过 props 传入 template / sources / 回调；
  * 本组件本身不持有持久状态，所有变更通过 onChange(template) 冒泡给父。
  *
- * 设计要点（[023-02] 决议 B.1 / B.2 / B.3 / D.1）：
+ * 设计要点（[023-02] 决议 B.1 / B.2 / B.3 / D.1 + [027-B] 形状重构）：
  * - B.1：所有「来源」<select> 在 sources === null 时禁用，避免 fire-and-forget
  *   竞态导致用户切到 habit 看到空下拉。
- * - B.2：行按用户编辑顺序展示（template.rows 直接渲染），不调 sortRowsByStart；
- *   [2026-07-04 用户调整] 改为按 start 时间排序展示，每次新增/修改行后自动重排
- *   TemplateCard 仍排序用于展示。
- * - B.3：DEFAULT_SEGMENT_SEED 单点维护见 lib/template-row-helpers.ts:DEFAULT_SEGMENT_SEED。
+ * - B.2：行按 defaultStart 时间排序展示，每次新增/修改行后自动重排；
+ *   TemplateCard 仍用 sortRowsByDefaultStart 排序用于展示。
+ * - B.3：DEFAULT_SEGMENT_SEED / newEmptyRow 单点维护见 lib/template-row-helpers.ts。
  * - D.1：行编辑器抽为 RowEditor 子组件，React.memo 包裹；name 输入变化时不会
  *   触发单行 re-render。
+ * - [027-B]：行字段由 {start, end} 改为 {defaultStart, defaultDuration}；
+ *   「结束时间」time input 改为「默认时长（分钟）」number input。
  *
  * 数据流 ASCII（A.3）：
  *   PageBanner
@@ -40,7 +41,8 @@ import type { TemplateRow, TemplateRowSource } from '@/lib/db/schema'
 import {
   WEEKDAY_LABELS,
   newEmptyRow,
-  sortRowsByStart,
+  sortRowsByDefaultStart,
+  hhmmDiffMinutes,
 } from '@/domains/timebox/lib/template-row-helpers'
 import type { SubscriptionSources } from '@/app/actions/timebox-templates'
 
@@ -133,24 +135,25 @@ const RowEditor = React.memo(function RowEditor({
           />
         )}
 
-        {/* 起止时间（habit 时禁用：起止由习惯 defaultTime/duration 锁定） */}
+        {/* 开始时间（habit 时禁用：起止由习惯 defaultTime/duration 锁定） */}
         <input
           aria-label="开始时间"
           type="time"
-          value={row.start}
+          value={row.defaultStart}
           disabled={isHabit}
-          onChange={(e) => onUpdate(row.id, { start: e.target.value })}
+          onChange={(e) => onUpdate(row.id, { defaultStart: e.target.value })}
           className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
         />
-        <span className="text-xs text-muted-foreground">—</span>
         <input
-          aria-label="结束时间"
-          type="time"
-          value={row.end}
+          aria-label="默认时长（分钟）"
+          type="number"
+          min={1}
+          value={row.defaultDuration}
           disabled={isHabit}
-          onChange={(e) => onUpdate(row.id, { end: e.target.value })}
-          className="h-7 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
+          onChange={(e) => onUpdate(row.id, { defaultDuration: Number(e.target.value) || 0 })}
+          className="h-7 w-20 rounded border border-hairline bg-canvas px-1 text-xs text-ink disabled:opacity-60"
         />
+        <span className="text-xs text-muted-foreground">分钟</span>
 
         <Button
           size="sm"
@@ -231,7 +234,7 @@ export function TemplateEditForm({
           ...template,
           rows: template.rows.map((r) =>
             r.id === id
-              ? { ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, start: h.start, end: h.end }
+              ? { ...r, source: 'habit', sourceId: newSourceId, activityName: h.title, defaultStart: h.start, defaultDuration: hhmmDiffMinutes(h.start, h.end) }
               : r,
           ),
         })
@@ -313,7 +316,7 @@ export function TemplateEditForm({
           <p className="text-xs text-muted-foreground">暂无行，点击「新增一行」开始添加</p>
         )}
 
-        {sortRowsByStart(template.rows).map((r) => (
+        {sortRowsByDefaultStart(template.rows).map((r) => (
           <RowEditor
             key={r.id}
             row={r}
