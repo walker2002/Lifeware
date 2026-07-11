@@ -93,6 +93,9 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
   const [archetypeMap, setArchetypeMap] = useState<Map<string, string>>(() => new Map())
 
   useEffect(() => {
+    // 注：archetype 标签仅用于卡片显示兜底，非阻塞；与 ensureSources 不同——
+    // sources 缺失会令抽屉不可用，故 toast；archetypes 缺失只是少个显示标签，
+    // 静默降级（已有默认空 Map）。
     let cancelled = false
     void getArchetypes().then((r) => {
       if (cancelled) return

@@ -20,7 +20,7 @@ describe('TemplateCard — 行徽章', () => {
   it('custom 行无原型不显示空徽章', () => {
     const tpl = makeTpl([{ id: 'r', activityName: '读书', defaultStart: '09:00', defaultDuration: 60, source: 'custom' }])
     const { getAllByTestId } = render(<TemplateCard template={tpl} archetypeMap={new Map()} onEdit={() => {}} onDelete={() => {}} />)
-    expect(getAllByTestId('row-line')[0]?.textContent).not.toContain('·  ·')
+    expect(getAllByTestId('row-line')[0]?.textContent).toBe('09:00 · 60分钟 · 读书')
   })
   it('habit 行显示「习惯」来源徽章', () => {
     const tpl = makeTpl([{ id: 'r', activityName: '晨跑', defaultStart: '06:00', defaultDuration: 60, source: 'habit', sourceId: 'h1' }])
