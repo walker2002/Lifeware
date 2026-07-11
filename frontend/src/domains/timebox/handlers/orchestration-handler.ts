@@ -40,6 +40,7 @@ import type { USOM_ID } from '@/usom/types/primitives'
 import { createRuleEngine, type RuleEngine } from '@/nexus/core/rule-engine'
 import { DEFAULT_ENERGY_CURVE } from '@/nexus/context-engine/energy-state-manager'
 import { sortByHardRules } from '../lib/schedule-rules'
+import { scheduleByTiers } from '../lib/tier-scheduler'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
@@ -422,10 +423,21 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     occupied: TimeSlot[],
     energyCurve: EnergyCurve,
     date: string,
-    // [028] T2-fold: strategy 参数（plumbing 透传；T4 Tier0/1/2 替换此处的
-    // 线性贪心，但保留签名兼容 + IRON RULE：legacy 走旧线性贪心不变）
-    _strategy: 'schedule' | 'legacy' = 'legacy',
+    // [028] T4: strategy 隔离 — 'schedule' 委托 scheduleByTiers（Tier0/1/2），
+    // 'legacy' 保留原线性贪心 body 不变（IRON RULE，adjustRemainingTimeboxes 行为对齐）。
+    strategy: 'schedule' | 'legacy' = 'legacy',
   ): { proposals: GeneratedProposal[]; warnings: Warning[] } {
+    if (strategy === 'schedule') {
+      // [028] T4: Tier0 已合并进 occupied（Tier0 slots from appointments，T2-fold）；
+      // Tier1 主游标 + Tier2 窗口兜底 + ITEM_UNSCHEDULABLE warning + SCHEDULER_BOUND_EXCEEDED 复刻 [023.07]
+      return scheduleByTiers(items, occupied, { dayStart: 8, dayEnd: 22 }, {
+        isSlotOccupied: (h, m, d, occ) => this.isSlotOccupied(h, m, d, occ),
+        findOccupyingSlot: (h, m, d, occ) => this.findOccupyingSlot(h, m, d, occ),
+        formatTime: (h, m) => this.formatTime(h, m),
+        computeEnergyMatch: (h, e) => this.computeEnergyMatch(h, e, energyCurve),
+      })
+    }
+    // legacy（IRON RULE）：adjustRemainingTimeboxes 保留原线性贪心 body 不变
     const proposals: GeneratedProposal[] = []
     const warnings: Warning[] = []
     let cursorHour = 8  // 从 08:00 开始
