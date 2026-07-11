@@ -30,7 +30,7 @@
  */
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Plus, LayoutTemplate, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -60,8 +60,9 @@ import {
   fetchSubscriptionSources,
   type SubscriptionSources,
 } from '@/app/actions/timebox-templates'
+import { getArchetypes } from '@/app/actions/activity-archetype'
 import type { TimeboxTemplate } from '@/lib/db/repositories/timebox-template'
-import { seedTemplateRows } from '@/domains/timebox/lib/template-row-helpers'
+import { seedTemplateRows, validateTemplateRow } from '@/domains/timebox/lib/template-row-helpers'
 
 interface EditorProps {
   initialTemplates: TimeboxTemplate[]
@@ -88,6 +89,17 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
   const [sourcesLoaded, setSourcesLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  /** [027-B] archetype id → l2Name 映射（列表行徽章用）。挂载即拉取一次。 */
+  const [archetypeMap, setArchetypeMap] = useState<Map<string, string>>(() => new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    void getArchetypes().then((r) => {
+      if (cancelled) return
+      if (r.success && r.data) setArchetypeMap(new Map(r.data.map((a) => [a.id, a.l2Name])))
+    })
+    return () => { cancelled = true }
+  }, [])
 
   /** 懒加载订阅源（仅首次打开编辑时拉取；server action 端有 1min cache） */
   const ensureSources = useCallback(async () => {
@@ -106,6 +118,13 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
     if (!editing) return
     if (!editing.name.trim()) {
       toast.error('请输入模板名称')
+      return
+    }
+    // [027-B] OV-B：保存前校验全部行（兜底「未 blur 直接点保存」路径）。
+    // 行级 onBlur 通常先触发 RowEditor 提示（Task 5）；此 gate 与之呼应拦截。
+    const rowErrors = editing.rows.flatMap((r) => validateTemplateRow(r))
+    if (rowErrors.length > 0) {
+      toast.error('时间字段有误，请修正标红项后再保存')
       return
     }
     setSaving(true)
@@ -197,6 +216,7 @@ export function TimeboxTemplateEditor({ initialTemplates }: EditorProps) {
               <TemplateCard
                 key={t.id}
                 template={t}
+                archetypeMap={archetypeMap}
                 onEdit={() => openEdit(t)}
                 onDelete={() => setPendingDeleteId(t.id)}
               />
