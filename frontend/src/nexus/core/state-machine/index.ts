@@ -89,9 +89,19 @@ export interface GenericRepo {
    * 单条 UPDATE，**禁止读后写**（消除 N+1）：直接以 `update().set(fields).where(id 且 userId)`
    * 一次完成，不先 findById。多租户 T-02：where 子句必含 userId 过滤。
    *
+   * [TD-003] T2：OCC 乐观并发控制扩展（timebox 域生效，其余域暂接受参数但
+   * 不强制 WHERE 谓词）。expectedOccVersion 用于仓储层 OCC 谓词：
+   * - timebox 域：WHERE 加 occ_version = expectedOccVersion；0 rows → ConflictError
+   * - 其他域：参数透传，运行时未强制（TD-037 P6 deferred）
+   *
+   * 参数顺序说明：expectedOccVersion 放在 tx **之前**（timebox 域 OCC 必填位置），
+   * 与 ITimeboxRepository.updateFields 5 参位置一致。Optional 是为了不破坏 tasks/
+   * habits/okrs 等非 timebox 域 adapter 当前 4 参调用（adapter 内默认 0 → 不强制）。
+   *
    * @param id - 对象 ID
    * @param fields - 待更新字段（驼峰键，与 schema 列属性名一致）
    * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（timebox 必填；其余域可选，默认 0）
    * @param tx - 可选事务句柄（缺省回退到 db 单例）
    * @returns 更新后的完整对象（更新后回读一次以返回最新 USOM 对象）
    */
@@ -99,6 +109,7 @@ export interface GenericRepo {
     id: USOM_ID,
     fields: Record<string, unknown>,
     userId: USOM_ID,
+    expectedOccVersion?: number,
     tx?: DbClient,
   ): Promise<Record<string, unknown>>
 
@@ -295,10 +306,16 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
         //   updateFields 单独路径）；executionRecord 类型断言避免 TS 联合过严。
         const executionRecord = proposal.payload['executionRecord']
         if (executionRecord !== undefined && transition.to === 'logged') {
+          // [TD-003] T2 临时兼容：state-machine 内部 caller 暂未传 OCC（Task 4 处理）；
+          // 当前从 object 读 occVersion（若有）或传 0。timebox 域走 updateFields 时
+          // expectedOccVersion=0 会必抛 ConflictError，故此处仅当 object 已有
+          // occVersion 字段时透传。详细 Task 4 重构请见 plan §IV。
+          const currentOccVersion = (object as { occVersion?: number })?.occVersion
           object = await repo.updateFields(
             objectId!,
             { executionRecord },
             userId,
+            currentOccVersion ?? 0,
             tx,
           )
         }

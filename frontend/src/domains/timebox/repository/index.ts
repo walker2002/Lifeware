@@ -17,6 +17,7 @@ import type { ITimeboxRepository } from '@/usom/interfaces/irepository'
 import type { Timebox, ExecutionRecord } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp, TimeboxStatus } from '@/usom/types/primitives'
 import { timeboxRowToUSOM, timeboxUSOMToRow } from '@/lib/db/repositories/mappers'
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 
 /**
  * 加载时间盒关联的任务和习惯 ID
@@ -106,22 +107,66 @@ export class TimeboxRepository implements ITimeboxRepository {
   /**
    * 局部字段更新（FactField 字段写的统一通道）。
    *
-   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId) 一次完成。
+   * [TD-003] T2：OCC 乐观并发控制 — 单条 UPDATE WHERE id AND userId AND
+   * occ_version = expectedOccVersion 一次完成：
+   * - 0 rows affected → 抛 ConflictError(currentOccVersion, attemptedOccVersion)
+   * - 1 row → 返回更新后的 Timebox（occVersion 自动 +1）
+   *
+   * 为什么 OCC 在 Repository 层：plan-eng-review Codex P0+P1+P2 fix
+   * (multi-field atomic update + READ COMMITTED atomic UPDATE + 避开
+   * nexus blanket catch swallowing)。field-executor (Task 3) 重构后
+   * 走 single batch updateFields 调用，OCC 在此 single atomic UPDATE 内关掉。
+   *
    * 仅更新 timeboxes 主表字段；junction（taskIds/habitIds）不在字段写范围内。
-   * fields 的键为 schema 列属性名（驼峰）。多租户 T-02：where 必含 userId 过滤。
+   * fields 的键为 schema 列属性名（驼峰）。
+   * 多租户 T-02：where 必含 userId 过滤。
+   *
+   * 抛错场景：
+   * - ConflictError：occVersion stale（外部已修改）或行 id/userId 不匹配
+   * - 「Timebox not found after updateFields」：理论不会触发（0 rows 走 ConflictError 分支），
+   *   仅当 row 在 UPDATE 与 findById 之间被删（极小窗口）
+   *
+   * @param id - 时间盒 ID
+   * @param fields - 待更新字段
+   * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（OCC 必填）
+   * @param tx - 可选事务句柄
    */
   async updateFields(
     id: USOM_ID,
     fields: Record<string, unknown>,
     userId: USOM_ID,
+    expectedOccVersion: number,
     tx: DbClient = db,
   ): Promise<Timebox> {
-    const setPayload: Record<string, unknown> = { ...fields, updatedAt: new Date() }
-    await tx.update(s.timeboxes)
+    // OCC atomic UPDATE：SET occ_version = occ_version + 1 同时校验 expectedOccVersion
+    const setPayload: Record<string, unknown> = {
+      ...fields,
+      occVersion: sql`${s.timeboxes.occVersion} + 1`,
+      updatedAt: new Date(),
+    }
+    const result = await tx.update(s.timeboxes)
       .set(setPayload)
-      .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+      .where(and(
+        eq(s.timeboxes.id, id),
+        eq(s.timeboxes.userId, userId),
+        eq(s.timeboxes.occVersion, expectedOccVersion),
+      ))
+      .returning({ id: s.timeboxes.id })
+
+    if (result.length === 0) {
+      // 0 rows：要么 occVersion stale，要么 id/userId 不匹配
+      // 读 current occVersion 给 caller（retry / UX 用）
+      const [currentRow] = await tx.select({ occVersion: s.timeboxes.occVersion })
+        .from(s.timeboxes)
+        .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+      const currentOccVersion = currentRow?.occVersion ?? -1
+      throw new ConflictError(currentOccVersion, expectedOccVersion)
+    }
     const updated = await this.findById(id, userId, tx)
-    if (!updated) throw new Error(`Timebox ${id} not found after updateFields`)
+    if (!updated) {
+      throw new Error(`Timebox ${id} not found after updateFields`)
+    }
     return updated
   }
 

@@ -625,6 +625,12 @@ export interface Timebox {
   tags: Tag[]
   /** [023] A2: 关联 Activity Archetype（nullable，logTimebox 时带入能量消耗源） */
   activityArchetypeId?: USOM_ID
+  /** [TD-003] T1: OCC 乐观并发版本号。Repository.updateFields WHERE 谓词用；
+   *  0 rows affected → ConflictError(currentOccVersion, attemptedOccVersion)。
+   *  USOM ↔ schema timeboxes.occ_version 列同步。 */
+  occVersion: number
+  /** USOM schema 迁移版本号（与 occVersion 语义不同：schema 迁移 vs 业务 OCC） */
+  schemaVersion: number
   createdAt: Timestamp
   updatedAt: Timestamp
   loggedAt?: Timestamp

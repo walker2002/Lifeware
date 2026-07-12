@@ -77,7 +77,8 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
         await repos.objectiveRepo.save(objective, userId, tx)
         return objective
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
+        // [TD-003] T2: OKRs 域暂未实施 OCC，_expectedOccVersion 忽略（TD-037 P6 deferred）
         return repos.objectiveRepo.updateFields(id, fields, userId, tx)
       },
     },
@@ -108,7 +109,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
         await repos.keyResultRepo.save(kr, userId, tx)
         return kr
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
         return repos.keyResultRepo.updateFields(id, fields, userId, tx)
       },
       async findByParent(parentId, userId, tx) {
@@ -153,7 +154,7 @@ export function createOkrsGenericRepo(repos: OkrsRepoPair): Record<string, Gener
           tx,
         ) as Promise<Record<string, unknown>>
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
         return repos.cycleRepo.updateFields(id, fields, userId, tx)
       },
     },

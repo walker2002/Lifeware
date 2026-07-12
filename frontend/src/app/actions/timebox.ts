@@ -211,10 +211,13 @@ export async function revertTimebox(
   // [023.13] P3：确认清空分支——UI 弹窗确认后传 clearExecutionRecord=true
   if (opts?.clearExecutionRecord) {
     // AM3 复用 updateFields：单条 UPDATE，T-02 userId 过滤，与持久化修复同通道
+    // [TD-003] T2 临时兼容：clearExecutionRecord 走 updateFields OCC 必填——传
+    // 当前 row 的 occVersion。Task 4 重构会引入 retry 回路。
     await repo.updateFields(
       timeboxId as USOM_ID,
       { executionRecord: null },
       MVP_USER_ID as USOM_ID,
+      tb.occVersion ?? 0,
     )
   } else if (tb.executionRecord != null) {
     // [AM7] 守卫保留（默认路径不变）

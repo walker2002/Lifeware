@@ -89,7 +89,7 @@ describe('domainMutationService — update() 单字段写', () => {
     await service.update('task-1', 'title', '新标题', 'user-1', 'tasks', 'task')
 
     // 直走 repo，不经 submitDynamicIntent，也不经字段执行器
-    expect(repo.updateFields).toHaveBeenCalledWith('task-1', { title: '新标题' }, 'user-1')
+    expect(repo.updateFields).toHaveBeenCalledWith('task-1', { title: '新标题' }, 'user-1', 0)
     expect(submitDynamicIntent).not.toHaveBeenCalled()
     expect(executor.execute).not.toHaveBeenCalled()
   })
