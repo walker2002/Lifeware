@@ -41,7 +41,7 @@ last_updated: 2026-07-12
 | TD-004 | R4 timebox/okrs 写入口债(跨域规则未落地) | 🟠 | cross-domain | [023.10] | 暂未指派 |
 | TD-005 | MVP_USER_ID 硬码(占位用户身份未走认证) | 🟡 | infra | [023.10] | 暂未指派 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环(双注册缺一层)" → 描述与代码脱节,tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口 | 🟡 → ✅ | lifeware-tasks | [023.10] | 关闭（误记） |
-| TD-008 | lifecycle-configs require('@/...') 多键域债(resolve/transition 仍动态) | 🟡 | cross-domain | [023.10] | 暂未指派 |
+| TD-008 | lifecycle-configs require('@/...') 多键域债 → [022.01] 已全量迁 ESM import,债自动清 | 🟡 → ✅ | cross-domain | [023.10] | 关闭（已治本） |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
@@ -84,6 +84,7 @@ last_updated: 2026-07-12
 | TD-018 | [023.12] pre-existing 写入口连锁债 (4 tsc 错 [019.1]+[023.13] 自动清) | 🟡 → ✅ | cross-domain | [023.12] | [019.1]+[023.13] follow-up | 2026-07-12 |
 | TD-006 | orchestration N+1 sequential ([023.08]+[028] T1 已用 Promise.all 优化 4 源归集 + collectMaterials) | 🟡 → ✅ | lifeware-timebox | [023.10] | [023.08]+[028] 已有改动 | 2026-07-12 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环" → 描述与代码脱节（tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口;暂停主线 = pauseThread,结束任务 = archiveTask,均 4 路全闭合） | 🟡 → ✅ | lifeware-tasks | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
+| TD-008 | "lifecycle-configs require('@/...') 多键域债" → [022.01] 已全量迁 ESM import（5 路 grep 验证 0 实际 require 调用,顶部 3 个 ESM static import;多键域 PascalCase longest-match 防护已就位） | 🟡 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 
 ## 按领域视图
 
@@ -123,7 +124,7 @@ last_updated: 2026-07-12
 ### `cross-domain`
 
 - [[TD-004]] · R4 timebox/okrs 写入口债 · 🟠 High
-- [[TD-008]] · lifecycle-configs require 多键域债 · 🟡 Medium
+- ~~[[TD-008]]~~ · "lifecycle-configs require 多键域债" · 🟡 Medium · ✅ [022.01] 已治本
 - ~~[[TD-016]]~~ · [023.12] 测试 fixture 漏改: 9 tsc 错 (8 [023.13] 自动清 + 1 fixture) · ✅
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债：hooks + adapter test · 🟡 Medium
 - [[TD-034]] · Task/Objective updateFields 同模式未验证（dateOnly 列 Drizzle 行为待实测） · ⚪ Trivial
@@ -158,7 +159,7 @@ last_updated: 2026-07-12
 - [[TD-005]] · MVP_USER_ID 硬码
 - ~~[[TD-006]]~~ · orchestration N+1 sequential → ✅ [023.08]+[028] T1 自动优化
 - ~~[[TD-007]]~~ · "Suspend action CNUI 回环未闭环" · ✅ 描述与代码脱节(5 路 grep 0 缺口)
-- [[TD-008]] · lifecycle-configs require 多键域债
+- ~~[[TD-008]]~~ · "lifecycle-configs require 多键域债" · ✅ [022.01] 已治本
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
 - [[TD-023]] · timebox 写入口绕过 mutation service → 架构治理修复时关闭
 - [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理） → 下次大重构顺手
@@ -220,7 +221,8 @@ last_updated: 2026-07-12
 | 第 20 批(🟡→✅) | 2026-07-12 | TD-018 关闭(1 条) | pre-existing 4 条 tsc 错(hooks.ts:139/149/159 + 2 generic-repo-adapter.test.ts:84/138/92/151)被 [019.1]+[023.13] follow-up 自动清;npx tsc --noEmit 全项目 0 error — TD-018 完全自动闭环(runtime dead string 清理留 follow-up,本会话不 scope) |
 | 第 21 批(🟡→✅) | 2026-07-12 | TD-006 关闭(1 条) | orchestration-handler 14 处 for 循环全是 CPU 内存操作,DB 入口统一到 collectMaterials + Promise.all 并行取 4 源,N+1 性能债已闭环 |
 | 第 22 批(🟡→✅) | 2026-07-12 | TD-007 关闭(1 条) | 「Suspend action CNUI 回环未闭环」描述与代码脱节：tasks 域 manifest 从未含 suspendTask action（5 路 grep + 4 文件精读证实 0 缺口）;Suspend 字面量专属 habits 域（suspendHabit 4 路全闭合）;tasks 域真实「暂停主线」= pauseThread、「结束任务」= completeTask/archiveTask 全部 4 路闭合;**模式记录** = 「债目录与代码脱节自查」——任何债关闭前必 5 路 grep + Read 验证,不只看描述就关（类似 [[feedback_post-ship-review-meta-pattern]] 第 N 次）;无代码改动,纯文档调研 |
+| 第 23 批(🟡→✅) | 2026-07-12 | TD-008 关闭(1 条) | 「lifecycle-configs require('@/...') 多键域债」已治本：[022.01] 已全量 require → ESM static import（5 路 grep 验证 0 实际 require 调用,文件顶部 3 个 ESM import）;多键域(okrs: objective/key_result)走 Object.keys(lifecycle) + PascalCase longest-match 防护（[Habits Bug 2]）;TD-008 创建时（2026-07-06）描述已过期;**模式记录** = TD-007/008 连续 2 条「描述与代码脱节」型债,印证债目录与代码漂移自查模式 |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-007 关闭）· 🔴0 / 🟠2 / 🟡3 / 🟢2 / ⚪1 / ✅17
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-008 关闭）· 🔴0 / 🟠2 / 🟡2 / 🟢2 / ⚪1 / ✅18
