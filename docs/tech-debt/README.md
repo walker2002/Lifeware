@@ -1,6 +1,6 @@
 ---
 title: 技术债务跟踪
-last_updated: 2026-07-11
+last_updated: 2026-07-12
 ---
 
 # 技术债务跟踪（Tech Debt Ledger）
@@ -32,6 +32,7 @@ last_updated: 2026-07-11
 | TD-033 | TimeboxRepository.updateFields 同模式未修：startTime/endTime 也是 timestamp 列（[026.02.4] 后系统性调试发现） | 🟠 | lifeware-timebox | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-034 | TaskRepository/ObjectiveRepository updateFields 同模式未验证：dateOnly 列 Drizzle 行为待实测 | ⚪ | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-035 | updateFields 通用归一化 helper 缺失：4 域 repo 各自分散归一化，新域必再踩同坑 | 🟡 | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
+| TD-036 | [028.2] 9 项 ship-then-polish backlog + 3 项 meta-pattern 债（I-3 + 7 Minor + M-qa-1 + mock-vs-real + GenerationResult type-pun + ISO↔HH:MM 抽象） | 🟠 | lifeware-timebox | [028.2] 2026-07-12 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
