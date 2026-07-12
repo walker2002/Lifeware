@@ -125,6 +125,10 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
   const acceptedProposals = proposals.filter(p => !rejected.has(p.id))
 
   // [028] T9 fold-in: dispatch 发 action: 'scheduleProposal'（与 manifest intent_triggers.action + handler submit 分支名一致）
+  // [028] /qa ISSUE-001 fix: items 必带 duration + sourceObjectId（orchestration-handler.ts:716-722
+  //   在 proposal.payload 里给 createTimebox 必备字段；ScheduleProposal 之前只发 4 字段 → validator 静默拒，
+  //   UI 不关、不刷新、不报错）。
+  //   修：spread `p.payload` 保留全部服务端 set 的字段，仅 override 客户端知道的 date（= 目标日）。
   const handleAcceptClick = () => {
     const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
     onConfirm({
@@ -132,10 +136,9 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
       action: SCHEDULE_PROPOSAL_ACTION,
       fields: {
         items: acceptedProposals.map(p => ({
-          title: p.title,
+          ...p.payload,
+          // override date 为「目标日」客户端明确解析；其它字段保留 server-set 的 duration/sourceObjectId
           date: todayLocal,
-          startTime: p.startTime,
-          endTime: p.endTime,
         })),
       },
     })
