@@ -102,7 +102,7 @@ describe('G2 createDomainMutationServiceFactory', () => {
     const res = await service.update('t-1', 'title', '新标题', 'u-1', 'tasks', 'task')
 
     expect(res.success).toBe(true)
-    expect(repo.updateFields).toHaveBeenCalledWith('t-1', { title: '新标题' }, 'u-1')
+    expect(repo.updateFields).toHaveBeenCalledWith('t-1', { title: '新标题' }, 'u-1', 0)
     expect(executorExecuteMock).not.toHaveBeenCalled()
   })
 })

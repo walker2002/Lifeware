@@ -88,7 +88,8 @@ describe('GenericRepo tx 管道 — 集成测试（真实 PostgreSQL）', () => 
       // 2. 在事务内 updateFields 改标题（成功），随后人为抛错
       await expect(
         db.transaction(async (tx: DbClient) => {
-          await taskRepoAdapter.updateFields(taskId, { title: '事务内修改的标题' }, TEST_USER, tx)
+          // [TD-003] T2 临时兼容：tasks 域未实施 OCC，传 0 即可（透传给底层 repo）
+          await taskRepoAdapter.updateFields(taskId, { title: '事务内修改的标题' }, TEST_USER, 0, tx)
           // 模拟后续状态转换步骤失败
           throw new Error('模拟后续步骤失败，触发整体回滚')
         }),
@@ -122,6 +123,7 @@ describe('GenericRepo tx 管道 — 集成测试（真实 PostgreSQL）', () => 
         taskId,
         { title: '已更新', description: '新描述' },
         TEST_USER,
+        0,
       )
       expect(updated.title).toBe('已更新')
       expect(updated.description).toBe('新描述')

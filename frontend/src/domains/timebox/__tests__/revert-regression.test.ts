@@ -90,6 +90,7 @@ describe('TD-019 回退回归（[023.13] §2 — 集成层：A1 派生 + A3 upda
       TB_ID,
       { executionRecord: null },
       MVP,
+      expect.any(Number), // [TD-003] T2: expectedOccVersion（来自 tb.occVersion）
     )
     // 清空后才走 SM revert（顺序：updateFields → submit）
     expect(mockSubmit).toHaveBeenCalledTimes(1)

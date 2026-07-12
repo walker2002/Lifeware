@@ -148,7 +148,9 @@ export function createFieldExecutor() {
       }
 
       // 写库：单条 UPDATE，透传 tx（顶层事务子操作时）
-      await ctx.repo.updateFields(id, { [field]: value }, userId, ctx.tx)
+      // [TD-003] T2 临时兼容：field-executor 内部 caller 暂未传 OCC（Task 3 重构）
+      // 当前 expectedOccVersion=0：timebox 域会必抛 ConflictError，其他域透传。
+      await ctx.repo.updateFields(id, { [field]: value }, userId, 0, ctx.tx)
 
       // 发域配置的字段更新事件（F-6：type 取自 ctx.fieldUpdatedEventType）
       const event: SystemEvent = {

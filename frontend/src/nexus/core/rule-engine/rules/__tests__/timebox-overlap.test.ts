@@ -64,6 +64,9 @@ function makeTimebox(overrides: Partial<Timebox> = {}): Timebox {
     habitIds: [],
     isRecurring: false,
     tags: [],
+    // [TD-003] T2: OCC 乐观并发版本号（USOM Timebox 接口新增字段）
+    occVersion: 1,
+    schemaVersion: 1,
     createdAt: '2026-05-03T08:00:00Z' as Timestamp,
     updatedAt: '2026-05-03T08:00:00Z' as Timestamp,
     ...overrides,
@@ -79,6 +82,8 @@ function createMockTimeboxRepo(timeboxes: Timebox[] = []) {
     findByDateRange: vi.fn().mockResolvedValue(timeboxes),
     findByStatus: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
+    // [TD-003] T2: ITimeboxRepository.updateFields（OCC 必填）mock stub
+    updateFields: vi.fn().mockResolvedValue(null),
     archive: vi.fn().mockResolvedValue(undefined),
   }
 }

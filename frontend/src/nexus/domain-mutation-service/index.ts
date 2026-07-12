@@ -274,8 +274,9 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
       }
 
       // ContentField：直走仓储（不经全链路、不发业务事件）
+      // [TD-003] T2 临时兼容：domain-mutation-service 内部 caller 暂未传 OCC（Task 3 重构）
       try {
-        const object = await repo.updateFields(id, { [field]: value }, userId)
+        const object = await repo.updateFields(id, { [field]: value }, userId, 0)
         return { success: true, object }
       } catch (err) {
         return {
