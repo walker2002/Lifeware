@@ -83,6 +83,13 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-12 · 「技术债清除会话」systematic-debugging Phase 1-3 调研:
+  - **实际代码形态**: `frontend/src/domains/timebox/cnui/handlers.ts:465` `editTimeboxes` open 路径走 `parseTimeboxesIntent` → prefill 用 snapshot;`frontend/src/app/actions/timebox.ts:246` `updateTimebox` 直走 `createTimeboxMutationService().execute()` (无 read-before-write,但**无 OCC**)。`timeboxes` 表无 version/etag 列(仅 `schemaVersion` 字段记 schema 迁移版本)。
+  - **跨域 OCC 缺位**: cross-domain grep `schema.ts` 22 表均只有 `schemaVersion` int(USOM schema migration 用),无 OCC version/lastModified TS/etag 字段。修 timebox 单域会出现跨域不一致(habits/tasks/appointments/cycles/okrs 等 6+ 表仍可静默覆盖)。
+  - **产品决策 5 选项 + 投票**: A 单域 / B 跨域 OCC / C 接受风险 / D 轻量检测 / E 暂停。用户选 **B 跨域 OCC**(合并提交, 架构变更, 5-7 人日估算)。
+  - **新决议**：本次会话暂停,另开 session 启 `/office-hours` design session + 写 spec → 转 SDD → 跨 PR 实施。
+  - **下 session 待办**: (1) 选定 OCC strategy(version 字段 vs updatedAt 检测 vs 锁) (2) 4 域 POC 设计(timeboxes/habits/appointments/tasks, 先排除 cycles/okrs 低频) (3) backward compat 策略(现有 row 无 version 列,迁移策略) (4) UI 提示范式(toast 报 conflict + 「合并」 / 「覆盖」选择) (5) 宪章补「OCC 写入事务契约」条款 (6) 文档分层(宪章 > usom-design > database-design)
+  - **避免的 quick fix**: 满足"B 方向 = 完整跨域" 不走单点 A;不跳 design 直接走 B1。
 
 ## 关联
 
