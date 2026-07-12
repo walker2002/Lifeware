@@ -340,6 +340,11 @@ export interface GenerationResult {
   alternatives?: ProposalSet[]
   presentation?: PresentationPayload
   warnings?: Warning[]
+  // [028.2] T2-fix: 5 维评分透传（[028] T7 scoreSchedule 暴露），
+  // optional 以兼容不评分的 domain handler；[028] ship 时遗漏 result 注入,
+  // 这里补回 result shape 不动评分算法本身。
+  score?: number
+  dimensions?: Record<string, number>
 }
 
 export interface DomainHandler {

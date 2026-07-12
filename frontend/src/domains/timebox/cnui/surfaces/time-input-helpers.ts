@@ -78,3 +78,34 @@ export function isoToHhmmInShanghai(iso: string): string {
     timeZone: 'Asia/Shanghai',
   })
 }
+
+/**
+ * [028.2] T2-fix: ISO OR HH:MM → "HH:MM" 字符串（按 Asia/Shanghai 时区显示）。
+ *
+ * **路径区分**（[028.2] /browse 抓的 P0 root cause）：
+ *   - orchestration handler `generateProposals` 直接调 `this.formatTime(cursorHour, cursorMinute)`
+ *     写 `payload.startTime/endTime = "HH:MM"`（[023.08] + [028] 全段保留的 internal contract）。
+ *   - `hhmmToIso` 把 "HH:MM" 转成 ISO 是落库侧（onConfirm submit 走规则校验）,
+ *     不调 open 路径。
+ *   - 旧 `isoToHhmmInShanghai` 直接套 "HH:MM" 串 → `new Date("09:00")` Invalid → 返 ''，
+ *     让 AIOrchestratePanel 顶部 proposal 卡片显示 ` – `（空时间）。
+ *
+ * **修法**：
+ *   - "HH:MM"（如 `09:00`、`9:30`）→ 直接 passthrough（format HH:MM 不带秒/时区）。
+ *   - ISO 8601（包含 'T' 或 'Z' 或 '+HH:MM'）→ 走 `isoToHhmmInShanghai` 转 Asia/Shanghai。
+ *   - 空串/非法 → 返空串（不抛，保留原 fallback 语义）。
+ *
+ * 注意：本函数不动 [023.08] `formatTime(h,m)` 内 `'HH:MM'` 契约（避免 ripple 到
+ * onConfirm submit 路径 rules-registry validation 链）；只修 open 路径 surface 渲染。
+ */
+export function isoOrHhmmToHhmmInShanghai(value: string): string {
+  if (!value) return ''
+  // [028.2] T2-fix: HH:MM 直觉判断 — 仅含冒号 + 不含 T/Z/+/-,如 '09:00' / '9:30'
+  if (/^\d{1,2}:\d{2}$/.test(value)) {
+    // 规范化为两位数（'9:30' → '09:30'）保持与 helper 输出格式一致
+    const [h, m] = value.split(':')
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  // ISO / 含时区 / 含 T 分隔符 → 走原 isoToHhmmInShanghai
+  return isoToHhmmInShanghai(value)
+}

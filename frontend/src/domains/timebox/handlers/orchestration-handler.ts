@@ -200,6 +200,11 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       },
       presentation,
       warnings,
+      // [028.2] T2-fix: 暴露 5 维评分到 GenerationResult([028] ship 时漏注入 result)。
+      // 不动 evaluateScore / scoreSchedule 算法本身,仅 result shape 完善。
+      // cnui handlers.ts + AIOrchestratePanel 据此渲染 score 徽章 + 维度细目。
+      score: scoreResult.score,
+      dimensions: scoreResult.dimensions,
     }
   }
 

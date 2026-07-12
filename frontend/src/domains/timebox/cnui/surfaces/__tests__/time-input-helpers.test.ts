@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { isoToLocalDatetimeInput, localDatetimeInputToIso, hhmmToIso } from '../time-input-helpers'
+import {
+  isoToLocalDatetimeInput,
+  localDatetimeInputToIso,
+  hhmmToIso,
+  isoToHhmmInShanghai,
+  isoOrHhmmToHhmmInShanghai,
+} from '../time-input-helpers'
 
 describe('[023.08] T2 hhmmToIso（HH:MM + date → ISO UTC）', () => {
   it('converts HH:MM on a date to UTC ISO 8601', () => {
@@ -84,6 +90,65 @@ describe('[023-01+ v2] time-input-helpers（用户本地时区输入/显示）',
       const original = '2026-07-01T13:00:00.000Z'
       const roundTrip = localDatetimeInputToIso(isoToLocalDatetimeInput(original))
       expect(roundTrip).toBe(original)
+    })
+  })
+})
+
+// ─── [028.2] T2-fix: isoToHhmmInShanghai + isoOrHhmmToHhmmInShanghai ─────────
+// /browse 抓 P0:AIOrchestratePanel proposal 卡片显示「 – 」空时间,根因是
+// generateProposals payload.startTime 实际是 HH:MM(非 ISO),旧 isoToHhmmInShanghai
+// 把 "09:00" 当 ISO 解析 → Invalid Date → 返 '' → 显示空。
+// 新增 isoOrHhmmToHhmmInShanghai 同时支持 HH:MM 直通 + ISO 转 Asia/Shanghai。
+
+describe('[028.2] T2-fix isoToHhmmInShanghai + isoOrHhmmToHhmmInShanghai', () => {
+  describe('isoToHhmmInShanghai', () => {
+    it('UTC ISO → Asia/Shanghai HH:MM（08:00Z → 16:00）', () => {
+      expect(isoToHhmmInShanghai('2026-07-12T08:00:00.000Z')).toBe('16:00')
+    })
+
+    it('空串 → 空串', () => {
+      expect(isoToHhmmInShanghai('')).toBe('')
+    })
+
+    it('非法 ISO → 空串(不抛)', () => {
+      expect(isoToHhmmInShanghai('not-a-date')).toBe('')
+    })
+
+    it('HH:MM(非 ISO) 被当 ISO 解析 → 返空(P0 根因演示)', () => {
+      // [028.2] /browse 抓的 bug: '09:00' 走 new Date('09:00') → Invalid Date → 返 ''
+      // 这条测试锁定旧行为作为对照,新 helper 修这个。
+      expect(isoToHhmmInShanghai('09:00')).toBe('')
+    })
+  })
+
+  describe('isoOrHhmmToHhmmInShanghai', () => {
+    it('HH:MM 直通(两位数)— generateProposals payload 实际格式', () => {
+      expect(isoOrHhmmToHhmmInShanghai('08:00')).toBe('08:00')
+      expect(isoOrHhmmToHhmmInShanghai('22:30')).toBe('22:30')
+    })
+
+    it('HH:MM 规范化(一位数补零)— 兼容 formatTime 边界', () => {
+      expect(isoOrHhmmToHhmmInShanghai('9:30')).toBe('09:30')
+      expect(isoOrHhmmToHhmmInShanghai('9:00')).toBe('09:00')
+    })
+
+    it('ISO UTC → Asia/Shanghai(与 isoToHhmmInShanghai 一致)— 兼容含 T/LLM mock 路径', () => {
+      expect(isoOrHhmmToHhmmInShanghai('2026-07-12T01:00:00.000Z')).toBe('09:00')
+      expect(isoOrHhmmToHhmmInShanghai('2026-07-12T03:00:00.000Z')).toBe('11:00')
+    })
+
+    it('空串 → 空串', () => {
+      expect(isoOrHhmmToHhmmInShanghai('')).toBe('')
+    })
+
+    it('非法输入 → 空串(不抛)', () => {
+      expect(isoOrHhmmToHhmmInShanghai('not-a-date')).toBe('')
+    })
+
+    it('与 isoToHhmmInShanghai 反向差异:HH:MM 不被空吃掉', () => {
+      // 这是 [028.2] T2-fix 核心:旧行为返 '',新行为返 '08:00'
+      expect(isoToHhmmInShanghai('08:00')).toBe('')
+      expect(isoOrHhmmToHhmmInShanghai('08:00')).toBe('08:00')
     })
   })
 })

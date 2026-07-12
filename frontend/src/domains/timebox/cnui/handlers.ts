@@ -12,7 +12,7 @@ import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
 import type { Timebox, Task, Habit, StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
-import { hhmmToIso, isoToHhmmInShanghai } from './surfaces/time-input-helpers'
+import { hhmmToIso, isoToHhmmInShanghai, isoOrHhmmToHhmmInShanghai } from './surfaces/time-input-helpers'
 // [023.08] T4 — batch undo：AI session state 记录 + revert（revertSmartTimeboxes action）
 import { recordBatchProposals, revertBatchProposals, getRevertableBatches } from '@/nexus/ai-runtime/memory/batch-proposals'
 // [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION + SCHEDULE_PROPOSAL_SURFACE 常量（防字符串漂移）
@@ -210,8 +210,8 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
               id: p.id ?? `prop-${payload.title ?? 'unknown'}-${isoStart ?? 'x'}`,
               // GeneratedProposal 没有顶层 title 字段（[usom]）；title 走 payload.title
               title: payload.title ?? '未命名',
-              startTime: isoStart ? isoToHhmmInShanghai(isoStart) : '',
-              endTime: isoEnd ? isoToHhmmInShanghai(isoEnd) : '',
+              startTime: isoStart ? isoOrHhmmToHhmmInShanghai(isoStart) : '',
+              endTime: isoEnd ? isoOrHhmmToHhmmInShanghai(isoEnd) : '',
             }
           })
           // [028] T7：5 维评分通过 type-pun 注入 result
