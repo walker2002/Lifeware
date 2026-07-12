@@ -94,6 +94,11 @@ last_updated: 2026-07-06
 
 - 2026-07-06 · N/A · 创建条目，关联发现于本项目 `/review` 冲突调查
 - 2026-07-06 · N/A · memory `feedback_claude-settings-schema-additionalprops` 建立
+- 2026-07-12 · 「技术债清除会话[001-002]」重新评估:
+  - **TD-014 是**等上游债**（Anthropic Claude Code schema）**:本项目无法独立修。验收标准 = "Anthropic 改 schema 让顶层支持 `_comment` / `$comment` JSONC"。
+  - **当前 workaround 已就绪**:不往 settings.json 顶层加自定义 key;需要文档注释写到项目 NOTES.md / CLAUDE.md 章节 / skill SHADOW-NOTES.md / 项目 memory(已建立 `feedback_claude-settings-schema-additionalprops`)。
+  - **本会话语境**:无需实施代码改动。把 status 从「新建」移至「⏸ 搁置（等上游）」反映实际情况。
+  - **后续监听**:Anthropic Claude Code 后续 release notes 关注 "settings.json JSONC / comments support" — 落地即关闭本债。
 
 ## 关联
 

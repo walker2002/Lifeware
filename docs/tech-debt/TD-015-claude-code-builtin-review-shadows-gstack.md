@@ -108,6 +108,11 @@ last_updated: 2026-07-06
 - 2026-07-06 · N/A · 创建条目，关联发现于本项目 `/review` 冲突调查
 - 2026-07-06 · N/A · 临时方案上线：本地 shadow skill `.claude/skills/pre-land-review/` + sync.sh + CLAUDE.md 改 routing
 - 2026-07-06 · N/A · memory `feedback_claude-code-builtin-review-shadow` 建立
+- 2026-07-12 · 「技术债清除会话[001-002]」重新评估:
+  - **TD-015 是等上游债（Anthropic Claude Code 内置 /review command）**：注册优先级 prompt > skill, builtin slash command 无法被 skillOverrides / disableBundledSkills 关掉。gstack `test/skill-collision-sentinel.test.ts:84` KNOWN_COLLISIONS_TOLERATED 已记录 + 注释"consider renaming to /diff-review or /pre-land if the collision bites"
+  - **当前 workaround 已就绪**：本项目走"本地 shadow skill"+ sync.sh 维护（`.claude/skills/pre-land-review/SHADOW-NOTES.md`）
+  - **本会话语境**：无需实施代码改动。把 status 从「新建」移至「⏸ 搁置（等上游）」反映实际情况
+  - **后续监听**：Anthropic 改名内置 `/review`（或 gstack 实施方案 /diff-review 或 /pre-land rename）— 任一落地即关闭本债
 
 ## 关联
 

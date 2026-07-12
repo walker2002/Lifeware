@@ -26,8 +26,7 @@ last_updated: 2026-07-12
 
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 负责人 |
 |---|---|---|---|---|---|
-| TD-014 | Claude Code settings.json schema 顶层严格,自定义 key 整个文件加载失败 | 🟢 | infra | N/A（工具链债） | 暂未指派 |
-| TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 暂未指派 |
+| TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 → [026.02.4-r3] closed | 暂未指派 |
 | TD-031 | [026.02.4] post-T5 review:use-auto-trigger.ts 双分支 planned gate 可能同 cycle 双 fire start + overtime | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 → [026.02.4-r3] closed | 暂未指派 |
 | TD-033 | TimeboxRepository.updateFields 同模式未修：startTime/endTime 也是 timestamp 列（[026.02.4] 后系统性调试发现） | 🟠 | lifeware-timebox | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-034 | TaskRepository/ObjectiveRepository updateFields 同模式未验证：dateOnly 列 Drizzle 行为待实测 | ⚪ | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
@@ -60,6 +59,9 @@ last_updated: 2026-07-12
 ### ⏸ 搁置（暂不修）
 
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 搁置原因 |
+|---|---|---|---|---|---|
+| TD-014 | Claude Code settings.json schema 顶层严格,自定义 key 整个文件加载失败 | 🟢 | infra | N/A（工具链债） | 等上游 Anthropic 改 schema（项目无法独立修；workaround = NOTES.md / SHADOW-NOTES.md / memory） |
+| TD-015 | Claude Code 内置 /review shadow gstack /review skill | 🟢 | infra | N/A（工具链债） | 等上游 Anthropic 改 schema 或 gstack 实施 rename（项目已用本地 shadow + sync.sh 兜底） |
 |---|---|---|---|---|---|
 
 ### 🟢 已修复
@@ -127,8 +129,8 @@ last_updated: 2026-07-12
 
 - [[TD-005]] · MVP_USER_ID 硬码 · 🟡 Medium
 - ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · 🟢 Low · ✅ docs/manifest-rules.md
-- [[TD-014]] · settings.json schema 顶层严格 · 🟢 Low
-- [[TD-015]] · Claude Code 内置 /review shadow gstack /review · 🟢 Low
+- ~~[[TD-014]]~~ · settings.json schema 顶层严格 → ⏸ 搁置（等 Anthropic schema 更新） · 🟢 Low
+- ~~[[TD-015]]~~ · Claude Code 内置 /review shadow gstack /review → ⏸ 搁置（等上游 rename 或 schema 更新） · 🟢 Low
 
 ## 按严重性视图
 
@@ -162,8 +164,8 @@ last_updated: 2026-07-12
 - ~~[[TD-009]]~~ · logTimebox 重复 filter · ✅ TD-002 重构闭环
 - ~~[[TD-010]]~~ · I-1 synthesized action update_timebox · ✅ cnui/handlers.ts 注释 (rule-probe action, 不入 manifest by design)
 - ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · ✅ docs/manifest-rules.md
-- [[TD-014]] · settings.json schema 顶层严格
-- [[TD-015]] · Claude Code 内置 /review shadow gstack /review
+- ~~[[TD-014]]~~ · settings.json schema 顶层严格 → ⏸ 搁置
+- ~~[[TD-015]]~~ · Claude Code 内置 /review shadow gstack /review → ⏸ 搁置
 
 ### ⚪ Trivial（无影响但已知）
 
@@ -208,6 +210,7 @@ last_updated: 2026-07-12
 | 第 14 批(🟢→✅) | 2026-07-12 | TD-013 关闭(1 条) | 新增 docs/manifest-rules.md 13 节 (360 行) + validate-manifest.ts K-component-not-found 错误信息附 §4.2 链接 + 文件头加 [TD-013] 指引;validate:manifest 0 错 2 警告 2 info 无 regression |
 | 第 15 批(🟢→✅) | 2026-07-12 | TD-009 关闭(1 条) | TD-009 「重复 filter」性能债被 TD-002 (cnui/handlers.ts 重构) 主任务的副效应消除 — 单 filter + loop continue 已是 O(N);印证「债升级为另一债的主任务时顺手清」模式 |
 | 第 16 批(🟢→✅) | 2026-07-12 | TD-010 关闭(1 条) | 「synthesized action 不在 manifest」看似漂移,实际「有意未注册」(字段写路径非 SM transition);cnui/handlers.ts:990 加 3 行 [TD-010] 注释固化理由;vitest 34/34 PASS (1 pre-existing flake 与本改动无关) |
+| 第 17 批(⏸ 搁置 2) | 2026-07-12 | TD-014 + TD-015 状态移至 ⏸ 搁置(等上游) | 两债都依赖 Anthropic Claude Code 上游 schema/command 改动,本项目无法独立修;workarounds 已就绪(NOTES.md + 本地 shadow + sync.sh) |
 
 ---
 
