@@ -8,6 +8,41 @@
 
 ---
 
+## [TZ-2.3] currentDate 链路 tz-aware（use-timebox 范围查询）（2026-07-12）
+
+> 2026_07_12 — `[TZ-2.1]` 把 rbc `WeekView` / `MonthView` 渲染按 user_tz 算（用 `@date-fns/tz:tz()` 包装 localizer），但**调用方传给 rbc 的 `currentDate` 仍按浏览器本地时区解读** — `use-timebox.ts:61` `useState(new Date())` 是 Shanghai 浏览器绝对时刻；`getDateRange` 用 `startOfDay / startOfWeek / startOfMonth` 默认浏览器本地 TZ 计算日/周/月界；`navigateDate` 用 `addDays / addWeeks / addMonths` 默认浏览器本地 TZ 步进。Tokyo user 在 Shanghai 浏览器下：rbc 按 Tokyo 周界，`getDateRange` 按 Shanghai 周界，**跨日/跨月边界事件漏报**。本步统一 `use-timebox` 链路全部按 user_tz 算。
+
+### 改动
+
+- **`frontend/src/hooks/use-timebox.ts`**：
+  - `getDateRange(mode, date, tzName='Asia/Shanghai')` — 加 `tzName` 参数，所有 `startOfDay / endOfDay / startOfWeek / endOfWeek / startOfMonth / endOfMonth` 通过 `{ in: tz(tzName) }` 按 user_tz 算
+  - `navigateDate(mode, date, direction, tzName='Asia/Shanghai')` — `addDays / addWeeks / addMonths` 通过 `{ in: tz(tzName) }` 按 user_tz "自然日"步进
+  - `useTimebox()` hook — 用 `useUserTz()` 拿 tz，传给两个 helper；deps 加 `userTz`
+- **`frontend/src/domains/timebox/components/timeboxes-workspace.tsx`**：
+  - `useUserTz()` 拿 tz；`loadRange` 调 `getDateRange(mode, d, userTz)`；`handleNavigate` 调 `navigateDate(mode, prev, direction, userTz)`
+- **Fixture 更新** 3 个 workspace fixture 补 `renderWithTz` import + `render(<TimeboxesWorkspace />)` → `renderWithTz(...)`（timeboxes-workspace.error / timeboxes-workspace.openai / timeboxes-workspace.range）
+
+### 验证
+
+- ✅ vitest 全 timebox: **669/672 pass**（baseline 668/669；TZ-2.3 +1 pass；剩余 2 failed = pre-existing handlers-edit-appointment + parse-appointment）
+- ✅ tsc: **净 -1 error**（baseline 208 → 207；TZ-2.3 不引入新错误）
+- ✅ dev server `/timeboxes` HTTP 200, 0 RSC 错误
+- ✅ Node 验证 date-fns v4 `in` option：`startOfDay(d, { in: tz('Asia/Shanghai') })` → `2026-07-12T00:00:00.000+08:00`；`addDays(d, 1, { in: tz('Asia/Tokyo') })` → `2026-07-13T17:00:00.000+09:00`
+
+### 设计依据
+
+- **`@date-fns/tz` v1.4.1`** 已在 `[TZ-2.1]` 装为 date-fns v4 peer dep，无需 `npm install`
+- **`in: tz(tzName)` option**：date-fns v4 所有时间函数（`startOfDay / startOfWeek / startOfMonth / addDays / addWeeks / addMonths` 等）都支持
+- **默认值 `'Asia/Shanghai'`**：保持向后兼容 + 与 schema default + 系统 TZ 一致
+- **`currentDate` 仍为 absolute moment**：不强制转 user_tz wall clock — rbc 内部 `format(date, str, { in: tz(userTz) })` 自动按 user_tz 显示；`getDateRange` / `navigateDate` 用 `in` option 在 date-fns 层做 tz-aware arithmetic
+- **commit 边界合并**：1 commit（use-timebox + workspace 改造 + 3 fixture 补 import；与 TZ-2 / TZ-2.1 风格一致）
+
+### 遗留（明确登记）
+
+1. **`localDayKey`（reconcile 调度）接受 IANA TZ** → `[TZ-2.2]`（[026] OQ-6 defer；最后一个 tz 边界未收口）
+
+---
+
 ## [TZ-2.1] react-big-calendar tz 注入 — week-view / month-view（2026-07-12）
 
 > 2026_07_12 — `[TZ-2]` 落地 4 个显示端组件（timebox-card / appointment-locked-card / timebox-timeline）按 user_tz 显示，但 **`react-big-calendar` 的 `dateFnsLocalizer.format` 仍按浏览器本地时区渲染** — Tokyo user 在 Shanghai 浏览器下，`WeekView` / `MonthView` 仍显示 Shanghai 时间而非 Tokyo 时间。本步通过 `@date-fns/tz` v1.4.1（date-fns v4 官方 tz 包，已装为 peer dep）的 `tz(timeZone)` 工厂函数把 user_tz 注入 dateFnsLocalizer 的 `format` / `startOfWeek`，让 rbc 按 user_tz 渲染事件时间与周界。
