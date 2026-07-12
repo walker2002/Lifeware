@@ -15,6 +15,8 @@
  *   无时区后缀（如 '2026-07-15T12:00:00'），now 用 Date(yyyy, m, d, 12, 0, 0)
  *   构造，保证任意 TZ 下 localDayKey 与日期字面值一致。startTime 取本地正午
  *   → 任意 TZ 下都落在 2026-07-15 本地日。
+ *
+ * [TZ-2.2] tz 必传：测试默认用 Asia/Shanghai（与 schema default + 系统 TZ 一致）
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -53,21 +55,24 @@ const today = new Date(2026, 6, 15, 12, 0, 0)
 //   startTime=2026-07-15, now=2026-07-16 → 20260716 > 20260715
 const yesterday = new Date(2026, 6, 16, 12, 0, 0)
 
-describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () => {
+// [TZ-2.2] tz 必传：测试默认用 Asia/Shanghai（与 schema default + 系统 TZ 一致）
+const TZ = 'Asia/Shanghai'
+
+describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生 + [TZ-2.2] tz 必传）', () => {
   it('未来约定：badge=null', () => {
-    expect(deriveAppointmentBadges([base()], future)).toEqual([
+    expect(deriveAppointmentBadges([base()], future, TZ)).toEqual([
       { appointmentId: 'i1', badge: null },
     ])
   })
 
   it('当日约定：scheduled → badge=in_progress', () => {
-    expect(deriveAppointmentBadges([base()], today)).toEqual([
+    expect(deriveAppointmentBadges([base()], today, TZ)).toEqual([
       { appointmentId: 'i1', badge: 'in_progress' },
     ])
   })
 
   it('过日约定：scheduled → badge=expired', () => {
-    expect(deriveAppointmentBadges([base()], yesterday)).toEqual([
+    expect(deriveAppointmentBadges([base()], yesterday, TZ)).toEqual([
       { appointmentId: 'i1', badge: 'expired' },
     ])
   })
@@ -77,6 +82,7 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       deriveAppointmentBadges(
         [base({ status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' })],
         today,
+        TZ,
       ),
     ).toEqual([
       { appointmentId: 'i1', badge: null },
@@ -88,6 +94,7 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       deriveAppointmentBadges(
         [base({ status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' })],
         yesterday,
+        TZ,
       ),
     ).toEqual([
       { appointmentId: 'i1', badge: null },
@@ -99,6 +106,7 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       deriveAppointmentBadges(
         [base({ status: 'completed', completedAt: '2026-07-14T12:00:00' })],
         today,
+        TZ,
       ),
     ).toEqual([
       { appointmentId: 'i1', badge: null },
@@ -110,6 +118,7 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       deriveAppointmentBadges(
         [base({ status: 'completed', completedAt: '2026-07-14T12:00:00' })],
         yesterday,
+        TZ,
       ),
     ).toEqual([
       { appointmentId: 'i1', badge: null },
@@ -123,7 +132,7 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       base({ id: 'c', startTime: '2026-07-10T12:00:00' }), // scheduled, 过日 → expired
       base({ id: 'd', status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' }), // 终态 → null
     ]
-    const badges = deriveAppointmentBadges(list, today)
+    const badges = deriveAppointmentBadges(list, today, TZ)
     expect(badges).toEqual([
       { appointmentId: 'a', badge: 'in_progress' },
       { appointmentId: 'b', badge: null },
@@ -140,11 +149,11 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       base({ id: 'b', startTime: '2026-07-20T12:00:00' }),
       base({ id: 'c', startTime: '2026-07-10T12:00:00' }),
     ]
-    expect(findExpiredAppointmentIds(list, today)).toEqual(['c'])
+    expect(findExpiredAppointmentIds(list, today, TZ)).toEqual(['c'])
   })
 
   it('findExpiredAppointmentIds：空数组（无 expired）', () => {
-    expect(findExpiredAppointmentIds([base()], future)).toEqual([])
+    expect(findExpiredAppointmentIds([base()], future, TZ)).toEqual([])
   })
 
   // ── helper: findInProgressAppointmentIds ──
@@ -155,17 +164,53 @@ describe('deriveAppointmentBadges（[023.12] T5 改造：badge 派生）', () =>
       base({ id: 'b', startTime: '2026-07-20T12:00:00' }),
       base({ id: 'c', startTime: '2026-07-10T12:00:00' }),
     ]
-    expect(findInProgressAppointmentIds(list, today)).toEqual(['a'])
+    expect(findInProgressAppointmentIds(list, today, TZ)).toEqual(['a'])
   })
 
   it('findInProgressAppointmentIds：空数组（无 in_progress）', () => {
-    expect(findInProgressAppointmentIds([base()], future)).toEqual([])
+    expect(findInProgressAppointmentIds([base()], future, TZ)).toEqual([])
   })
 
   it('纯函数性质：相同输入多次调用结果一致', () => {
     const list = [base({ id: 'x', startTime: '2026-07-10T12:00:00' })]
-    expect(deriveAppointmentBadges(list, today)).toEqual(
-      deriveAppointmentBadges(list, today),
+    expect(deriveAppointmentBadges(list, today, TZ)).toEqual(
+      deriveAppointmentBadges(list, today, TZ),
     )
+  })
+
+  // ── [TZ-2.2] 跨 TZ list batch ──
+
+  it('[TZ-2.2] TZ=Asia/Tokyo：UTC 16:00 startTime（Tokyo 7/13 01:00）+ now Tokyo 7/13 02:00 → batch 跨 TZ 同日判定', () => {
+    const list = [
+      base({ id: 'tokyo-today', startTime: '2026-07-12T16:00:00.000Z' }), // Tokyo 7/13 01:00
+    ]
+    const now = new Date('2026-07-12T17:00:00.000Z') // Tokyo 7/13 02:00
+    expect(deriveAppointmentBadges(list, now, 'Asia/Tokyo')).toEqual([
+      { appointmentId: 'tokyo-today', badge: 'in_progress' },
+    ])
+  })
+
+  it('[TZ-2.2] TZ=America/New_York：UTC 12:00 startTime（NY 7/12 08:00 EDT）+ now NY 7/12 09:00 → batch 同日判定', () => {
+    const list = [
+      base({ id: 'ny-today', startTime: '2026-07-12T12:00:00.000Z' }), // NY 7/12 08:00 (EDT)
+    ]
+    const now = new Date('2026-07-12T13:00:00.000Z') // NY 7/12 09:00
+    expect(deriveAppointmentBadges(list, now, 'America/New_York')).toEqual([
+      { appointmentId: 'ny-today', badge: 'in_progress' },
+    ])
+  })
+
+  it('[TZ-2.2] 同一 list + 不同 tz → 不同判定（Tokyo in_progress / NY expired 反例）', () => {
+    // startTime UTC 14:00 = Tokyo 7/12 23:00（同日）vs NY 7/12 10:00（EDT 同日）
+    //   - Tokyo now=UTC 18:00 (= Tokyo 7/13 03:00) → start 7/12 < now 7/13 → expired
+    //   - NY    now=UTC 18:00 (= NY 7/12 14:00 EDT) → start 7/12 = now 7/12 → in_progress
+    const list = [base({ id: 'cross', startTime: '2026-07-12T14:00:00.000Z' })]
+    const now = new Date('2026-07-12T18:00:00.000Z')
+    expect(deriveAppointmentBadges(list, now, 'Asia/Tokyo')).toEqual([
+      { appointmentId: 'cross', badge: 'expired' },
+    ])
+    expect(deriveAppointmentBadges(list, now, 'America/New_York')).toEqual([
+      { appointmentId: 'cross', badge: 'in_progress' },
+    ])
   })
 })
