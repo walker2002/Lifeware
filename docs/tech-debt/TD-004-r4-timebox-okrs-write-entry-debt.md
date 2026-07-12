@@ -91,6 +91,24 @@ timebox 和 okrs 两个域之间的规则联动仍按"各自独立"实现,无统
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 [018] followup 历史遗留
+- 2026-07-12 · 「技术债清除会话[001-002]」调研:
+  - **R3 现状**: git log 显示 habits+tasks R3 已修(d12215f ff-merge),`completeTask` 已走 orchestrator(参 [project-025-cascade-decisions])。OKR 写入口 grep 守卫已实装(cbb7ea9 [022] 1B-T14)。
+  - **R4 现状**: 无 `docs/superpowers/specs/*-018-r4-*` design doc;TD-023 (timebox 写入口绕 mutation service AM3 reuse `repo.updateFields` 列写) 已识别为单具体点但非根本跨域设计。
+  - **5-10 人日** 评估仍成立 — 跨域事务边界设计 + orchestrator 加 cross-domain dispatch + manifest schema_version + DDL (cross_domain_events 表) + 宪章补"跨域写边界"条款。
+  - **user 决策路线**: 与 TD-003 类似 — 暂停,等下 session 启 `R4 design session` brainstorming。
+  - **关键交叉引用**:
+    - [[TD-008]] lifecycle-configs require 多键域债(同根因:写入口未统一)
+    - [[project-018-followup-todos]] "R4 timebox 写入口债" 已 memo
+    - [[project-025-cascade-decisions]] 25 已部分触及 cross-domain 级联但未根治
+    - [[project-019-domain-paradigm]] cross-domain 表单范式债 — 与 R4 治理正交但同议题
+  - **下 session 待办**:
+    (1) 启 `/office-hours` skill 启 R4 design session
+    (2) 写 spec 到 `~/.gstack/.../*.md` + 拷到 `docs/superpowers/specs/*-018-r4-design.md`
+    (3) `/plan-eng-review` 评审
+    (4) SDD 多 task 实施(migration + orchestrator dispatch + manifest + handler 改造 + UI)
+    (5) 宪章补「跨域写边界」条款
+    (6) 文档分层同步(usom-design + database-design)
+- 2026-07-12 · **TD-004 状态维持登记**: 大议题等 R4 design session 启动(类似 TD-003);不在「技术债清除会话[001-002]」scope 内实施。
 - 2026-06-XX · R3 habits+tasks 已修(d12215f)
 - 2026-05-XX · R2 orchestrator dispatch 落地
 - 2026-04-XX · R1 rule-engine 落地
