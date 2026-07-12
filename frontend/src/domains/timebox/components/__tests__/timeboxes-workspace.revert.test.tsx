@@ -20,6 +20,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 
 const submitCnuiSurfaceMock = vi.fn()
@@ -133,7 +134,7 @@ describe('[023.10] T1 — workspace handleAiConfirm revert 真 wire', () => {
 
   it('点 revert 后 submitCnuiSurface 被以 (timebox, revertSmartTimeboxes, { batchId }) 调用', async () => {
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     // 1) 打开 AI 智能推荐 panel
     await user.click(screen.getByTestId('ai-orchestrate-button'))
@@ -167,7 +168,7 @@ describe('[023.10] T1 — workspace handleAiConfirm revert 真 wire', () => {
 
   it('revert 后 UI 不再显 placeholder toast "撤销状态已重置"', async () => {
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     await user.click(screen.getByTestId('ai-orchestrate-button'))
     await waitFor(() => expect(screen.getByTestId('ai-panel-overlay')).toBeInTheDocument())
@@ -219,7 +220,7 @@ describe('[023.13] T7 — workspace handleAction("revert") 走 AlertDialog 二�
     const { getTimeboxesByRange } = await import('@/app/actions/intent')
     vi.mocked(getTimeboxesByRange).mockResolvedValue([loggedSample])
 
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     // 等 DayView 渲染出 logged 卡的「回退」按钮
     const revertBtn = await screen.findByRole('button', { name: /回退/ })
@@ -258,7 +259,7 @@ describe('[023.13] T7 — workspace handleAction("revert") 走 AlertDialog 二�
     const { getTimeboxesByRange } = await import('@/app/actions/intent')
     vi.mocked(getTimeboxesByRange).mockResolvedValue([loggedSample])
 
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     const revertBtn = await screen.findByRole('button', { name: /回退/ })
     await user.click(revertBtn)
@@ -282,7 +283,7 @@ describe('[023.13] T7 — workspace handleAction("revert") 走 AlertDialog 二�
     const { getTimeboxesByRange } = await import('@/app/actions/intent')
     vi.mocked(getTimeboxesByRange).mockResolvedValue([cancelledSample])
 
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     const revertBtn = await screen.findByRole('button', { name: /回退/ })
     await user.click(revertBtn)

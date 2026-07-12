@@ -18,6 +18,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { render } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import { TimeboxList } from '../timebox-list'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { TimeboxesEvent } from '../timeboxes-event'
@@ -68,7 +69,7 @@ function makeSamples(): TimeboxesEvent[] {
 
 describe('[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归', () => {
   it('纯 kind: timebox 输入：渲染 3 个 TimeboxSummary 数据正确', () => {
-    const { container } = render(<TimeboxList events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxList events={makeSamples()} />)
     // 时间盒标题必须出现在 DOM（timebox 路径）
     expect(container.textContent).toContain('晨会')
     expect(container.textContent).toContain('深度工作')
@@ -78,7 +79,7 @@ describe('[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归', () => {
   })
 
   it('纯 kind: timebox 输入：不含 appointment 独有的 border-l-primary + MapPin 标记', () => {
-    const { container } = render(<TimeboxList events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxList events={makeSamples()} />)
     // AppointmentLockedCard 用 `border-l-primary`（TimeboxCard 来自 executionRecord 走 coral/amber/gray/transparent）
     const polluted = container.querySelectorAll('.border-l-primary')
     expect(polluted.length).toBe(0)
@@ -89,12 +90,12 @@ describe('[026] T15 IRON RULE — TimeboxList 纯 timebox 渲染回归', () => {
   })
 
   it('纯 kind: timebox 输入：snapshot 锁（方案 A 防御）', () => {
-    const { container } = render(<TimeboxList events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxList events={makeSamples()} />)
     expect(container).toMatchSnapshot()
   })
 
   it('空 events 数组：渲染空状态，不分支到 timebox/appointment', () => {
-    const { container } = render(<TimeboxList events={[]} />)
+    const { container } = renderWithTz(<TimeboxList events={[]} />)
     expect(container.textContent).toContain('还没有时间盒')
     expect(container.querySelectorAll('.border-l-primary').length).toBe(0)
   })

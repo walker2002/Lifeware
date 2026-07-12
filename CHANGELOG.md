@@ -8,6 +8,38 @@
 
 ---
 
+## [TZ-2] 显示端 user_tz 透传 — React Context + Provider 注入（2026-07-12）
+
+> 2026_07_12 — `[TZ-1]` Step 1 落地后，写路径 + handler internal arithmetic 已切 user_tz，但**前端显示端仍是浏览器本地时区或硬编码 `Asia/Shanghai`**。MVP Shanghai-only 下巧合 OK，但 Tokyo user 切到 `timebox-card` / `appointment-locked-card` 会显示错（硬编码 Shanghai 而非 user_tz）。Step 2 通过 React Context 把 server-side `getEffectiveTimezone(MVP_USER_ID)` 透传到所有显示端组件，让组件按 user_tz 显示。
+
+### 改动
+
+- **新增** `frontend/src/contexts/user-timezone-context.tsx` — `'use client'` `UserTimezoneProvider` + `useUserTz()` hook（套用 `app-context.tsx` 既有模式：`createContext<T | null>(null)` + `if (!ctx) throw` 硬失败守卫）
+- **新增** `frontend/src/contexts/__tests__/test-utils.tsx` — `renderWithTz(ui, { tz? })` 测试 helper（默认 `Asia/Shanghai`，避免每个 fixture 手写 Provider）
+- **修改** `frontend/src/app/layout.tsx` — server component 入口 `async`，调 `getEffectiveTimezone(MVP_USER_ID)` 拿 user_tz，注入 `<UserTimezoneProvider initialTz={userTz}>`
+- **改造** 4 个显示端组件（[TZ-1] 硬编码 `'Asia/Shanghai'` 或 `getHours()` 浏览器本地 → 接收 `tz` 参数）：
+  - `timebox-card.tsx:55-63` — `formatTime(iso, tz)` 加 tz 参数；`useUserTz()` 拿 tz
+  - `appointment-locked-card.tsx:35-44` — `formatTime(iso, tz)` 加 tz 参数；`useUserTz()` 拿 tz
+  - `timebox-timeline.tsx:33-34, 61-65, 76-91, 128` — `timestampToHours(ts, tz)` 加 tz 参数；`currentHour` 用 `getUserTzHour/Minute`；`useUserTz()` 拿 tz
+- **Fixture 更新** 5 个组件测试文件 import `renderWithTz` + `render(<X)` → `renderWithTz(<X)`（timebox-list.regression / timebox-timeline.overlap / timebox-timeline.regression / timeboxes-workspace.revert / timeboxes-workspace.view-mode）
+
+### 验证
+
+- ✅ timebox 组件测试 **135/135 pass**（含 TZ-2 涉及的 5 个 fixture）
+- ✅ 全 timebox 范围：**668/669 pass**（1 failed = pre-existing handlers-edit-appointment）
+- ✅ tsc: **0 新增错误**（201 baseline 全 pre-existing）
+- ✅ dev server `/timeboxes` HTTP 200, 0 RSC 错误
+- ⚠️ **week-view / month-view rbc tz 注入 defer**：[TZ-2.1]（rbc API 不直接接受 tz prop）
+- ⚠️ **`localDayKey` 接受 IANA TZ defer**：[TZ-2.2]（[026] OQ-6）
+
+### 设计依据
+
+- **MVP Shanghai-only + TZ-2 范围**：MVP 单用户，user_tz 实际值 = `Asia/Shanghai`（与 schema default + 系统 TZ 一致）。本步只是把硬编码 `'Asia/Shanghai'` 抽出成参数，让 Tokyo / UTC 等用户场景可正确工作。
+- **不引入 client-side timezone 切换**：layout server-side 拿一次即可；如需 client 实时切换可加 `router.refresh()` 触发 server re-render（[TZ-2] out-of-scope）
+- **Commit 边界合并**：1 commit（context + 4 个组件改造 + 5 fixture + docs；与 TZ-1 风格一致）
+
+---
+
 ## [TZ-1] 时区治本 — user_tz 抽象层（DB + 系统时区 + Asia/Shanghai 三级 fallback）
 
 > 2026_07_12 — `/ScheduleProposal` 添加的记录在 `/timeboxes` 显示 +8 小时根因：handler internal `[023.09] canonical UTC` arithmetic 与 `parse-timeboxes:36` "ISO=本地时刻字面读" 约定冲突；`hhmmToIso` 直接拼 `${date}T${hhmm}:00.000Z` 把 user 输入的 Shanghai 8:00 当 UTC 字面存（DB `2026-07-12T08:00:00Z`），Shanghai 浏览器 `getHours` 返 16（+8h）。架构治本方案（D）：DB 持久化 UTC + user_tz 配置 + UI 按 user_tz 显示；Step 1 落地核心抽象层（写路径 + handler internal arithmetic + DB 接线），显示端组件参数化留 [TZ-2]。MVP 单用户假设下 user_tz 默认 `Asia/Shanghai`（schema default + 系统时区兜底）。

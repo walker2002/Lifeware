@@ -30,6 +30,8 @@ import { computeOverlapLayout } from "@/domains/timebox/lib/overlap-layout"
 import {
   Tooltip, TooltipTrigger, TooltipContent,
 } from "@/components/ui/tooltip"
+import { getUserTzHour, getUserTzMinute } from "@/lib/tz"
+import { useUserTz } from "@/contexts/user-timezone-context"
 
 interface TimeboxTimelineProps {
   events: TimeboxesEvent[]
@@ -57,10 +59,10 @@ const APPOINTMENT_COLOR = "bg-primary/10 border-primary"
 const AXIS_LEFT_REM = 2.5
 const AXIS_RIGHT_REM = 0.5
 
-/** 将 ISO 时间戳转换为小时数（小数） */
-function timestampToHours(ts: string): number {
+/** 将 ISO 时间戳转换为小时数（小数，[TZ-2] 按 user_tz 显示，不再用浏览器本地） */
+function timestampToHours(ts: string, tz: string): number {
   const d = new Date(ts)
-  return d.getHours() + d.getMinutes() / 60
+  return getUserTzHour(d, tz) + getUserTzMinute(d, tz) / 60
 }
 
 /** 计算时长（小时） */
@@ -74,6 +76,8 @@ function formatHour(h: number): string {
 }
 
 export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
+  // [TZ-2] user_tz 注入（替代浏览器本地 getHours）
+  const { tz } = useUserTz()
   if (events.length === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-hairline bg-surface-card p-8">
@@ -82,7 +86,9 @@ export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
     )
   }
 
-  const currentHour = new Date().getHours() + new Date().getMinutes() / 60
+  // [TZ-2] 当前时刻红线也按 user_tz 算（Tokyo 用户看 Tokyo 红线位置）
+  const now = new Date()
+  const currentHour = getUserTzHour(now, tz) + getUserTzMinute(now, tz) / 60
   const nowPercent = Math.max(0, Math.min(100, ((currentHour - TIMELINE_START) / HOURS) * 100))
 
   // [023.03] T2：计算重叠布局
@@ -119,7 +125,7 @@ export function TimeboxTimeline({ events }: TimeboxTimelineProps) {
 
         {/* 事件色块（按 kind 分支） */}
         {events.map((e) => {
-          const startH = timestampToHours(e.start)
+          const startH = timestampToHours(e.start, tz)
           const durH = durationHours(e.start, e.end)
           const top = ((startH - TIMELINE_START) / HOURS) * 100
           const height = (durH / HOURS) * 100

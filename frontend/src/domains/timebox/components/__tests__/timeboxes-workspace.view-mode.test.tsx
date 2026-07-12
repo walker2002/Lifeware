@@ -14,6 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 import type { TimeboxSummary, AppointmentSummary } from '@/usom/types/summaries'
 
@@ -63,7 +64,7 @@ describe('[023.06] T3 — 周/月三向路由', () => {
 
   it('click 周 → workspace 切到 WeekView（.rbc-calendar 出现，week 范围被拉取）', async () => {
     const user = userEvent.setup()
-    const { container } = render(<TimeboxesWorkspace />)
+    const { container } = renderWithTz(<TimeboxesWorkspace />)
     // 等初次 loadRange 落定（day 模式）
     await waitFor(() =>
       expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(1),
@@ -87,7 +88,7 @@ describe('[023.06] T3 — 周/月三向路由', () => {
 
   it('click 月 → workspace 切到 MonthView（.rbc-calendar 出现，month 范围被拉取）', async () => {
     const user = userEvent.setup()
-    const { container } = render(<TimeboxesWorkspace />)
+    const { container } = renderWithTz(<TimeboxesWorkspace />)
     // 等初次 loadRange 落定（day 模式）
     await waitFor(() =>
       expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(1),

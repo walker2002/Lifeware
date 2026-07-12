@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { render } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import { TimeboxTimeline } from '../timebox-timeline'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { TimeboxesEvent } from '../timeboxes-event'
@@ -23,7 +24,7 @@ afterAll(() => {
 // Radix Tooltip 必须在 TooltipProvider 下使用——app/layout.tsx 全局包裹，
 // 测试单独 render 时需要手动套一层。
 const renderWithTooltip = (ui: React.ReactElement) =>
-  render(<TooltipProvider>{ui}</TooltipProvider>)
+  renderWithTz(<TooltipProvider>{ui}</TooltipProvider>)
 
 const tb = (id: string, start: string, end: string): TimeboxesEvent => {
   const s: TimeboxSummary = {
