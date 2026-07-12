@@ -1,6 +1,6 @@
 ---
 title: 技术债务跟踪
-last_updated: 2026-07-12
+last_updated: 2026-07-13
 ---
 
 # 技术债务跟踪（Tech Debt Ledger）
@@ -33,6 +33,7 @@ last_updated: 2026-07-12
 | TD-035 | updateFields 通用归一化 helper 缺失：4 域 repo 各自分散归一化，新域必再踩同坑 | 🟡 | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-036 | [028.2] 9 项 ship-then-polish backlog + 3 项 meta-pattern 债（I-3 + 7 Minor + M-qa-1 + mock-vs-real + GenerationResult type-pun + ISO↔HH:MM 抽象） | 🟠 | lifeware-timebox | [028.2] 2026-07-12 | 暂未指派 |
 | TD-038 | 跨域写边界预防性观察债(timebox↔{tasks,habits,appointments}),继承自 TD-004 关闭 | 🟢 | cross-domain | 2026-07-12 | 暂未指派(产品决策触发时启 R4 design) |
+| TD-039 | TZDate 在 RSC boundary 序列化丢失 class，server action 收到 plain object 报 start.toISOString（[TZ-2.2] /qa 抓漏，根因 [TZ-2.3]） | 🟠 | lifeware-timebox | [TZ-2.2] 2026-07-13 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
