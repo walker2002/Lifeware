@@ -543,7 +543,9 @@ export interface TransitionResult {
  */
 export async function transitionTimebox(
   timeboxId: string,
-  action: 'start' | 'end' | 'cancel' | 'log' | 'overtime',
+  // [TD-017] 2026-07-12: 收窄为 'cancel' | 'log'。'start'/'end'/'overtime' 均已
+  //   从 manifest lifecycle 删除 (commit 2ddd223 codex review)。详见 timebox.ts 版本注释。
+  action: 'cancel' | 'log',
   executionRecord?: import("@/usom/types/objects").ExecutionRecord,
   confirmed?: boolean,
 ): Promise<TransitionResult> {

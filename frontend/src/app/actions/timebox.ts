@@ -140,13 +140,15 @@ export async function createTimebox(
  */
 export async function transitionTimebox(
   timeboxId: string,
-  action: 'start' | 'end' | 'cancel' | 'log',
+  // [TD-017] 2026-07-12: 收窄为 'cancel' | 'log'。'start'/'end' 已从 manifest lifecycle
+  //   删除 (commit 2ddd223 codex review 删 startTimebox/endTimebox intent_trigger),
+  //   start/end 在 server action 层是 dead code — dispatch 到 manifest 会静默失败。
+  //   'overtime' 不在此 union: use-auto-trigger.ts 内部用 onTransition(签名自定义),不走 transitionTimebox。
+  action: 'cancel' | 'log',
   payload: Record<string, unknown> = {},
   confirmed?: boolean,
 ): Promise<TimeboxActionResult> {
   const ACTION_TO_INTENT: Record<string, string> = {
-    start: 'startTimebox',
-    end: 'endTimebox',
     cancel: 'cancelTimebox',
     log: 'logTimebox',
   }

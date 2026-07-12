@@ -1,9 +1,12 @@
 ---
 id: TD-017
-title: "[023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 仍读被删字段与死状态,2 处 production 路径错"
-status: 新建
+title: "[023.12] 生产代码漏跟 status 收窄 → dead union 收窄 (main 直接改 3 文件)
+status: ✅ 已修复
+severity: 🔴 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: app/actions/timebox.ts:143 + app/actions/intent.ts:546 + timebox-mutation.test.ts:59-64 (unions + test)
 ---
 
 # TD-017: [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 仍读被删字段与死状态,2 处 production 路径错

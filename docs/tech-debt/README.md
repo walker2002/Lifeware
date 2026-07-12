@@ -81,6 +81,7 @@ last_updated: 2026-07-12
 | TD-009 | logTimebox 重复 filter ([TD-002] 重构后已 O(N) 单 filter + loop continue) | 🟢 → ✅ | lifeware-timebox | [023.10] | TD-002 重构副效应 | 2026-07-12 |
 | TD-010 | synthesized action 'update_timebox' rule-probe 注释澄清 (不入 manifest by design — 字段写路径非 lifecycle SM) | 🟢 → ✅ | lifeware-timebox | [023.10] | cnui/handlers.ts:990 注释 | 2026-07-12 |
 | TD-016 | [023.12] 测试 fixture 漏改 (8/9 tsc 错 [023.13] 自动清 + 本次补 timebox-card fixture 完成 9/9) | 🟠 → ✅ | cross-domain | [023.12] | timebox-card.test.tsx:91 fixture 补全 | 2026-07-12 |
+| TD-017 | [023.12] 生产代码 dead union (5/9 [023.13] 自动清 + 4/9 dead union 收窄 + 测试改用 'log') | 🔴 → ✅ | lifeware-timebox | [023.12] | timebox.ts + intent.ts union 收窄 + test 'log' | 2026-07-12 |
 
 ## 按领域视图
 
@@ -213,7 +214,8 @@ last_updated: 2026-07-12
 | 第 16 批(🟢→✅) | 2026-07-12 | TD-010 关闭(1 条) | 「synthesized action 不在 manifest」看似漂移,实际「有意未注册」(字段写路径非 SM transition);cnui/handlers.ts:990 加 3 行 [TD-010] 注释固化理由;vitest 34/34 PASS (1 pre-existing flake 与本改动无关) |
 | 第 17 批(⏸ 搁置 2) | 2026-07-12 | TD-014 + TD-015 状态移至 ⏸ 搁置(等上游) | 两债都依赖 Anthropic Claude Code 上游 schema/command 改动,本项目无法独立修;workarounds 已就绪(NOTES.md + 本地 shadow + sync.sh) |
 | 第 18 批(🟠→✅) | 2026-07-12 | TD-016 关闭(1 条) | [023.13] follow-up 已清 8/9 tsc 错;剩 timebox-card.test.tsx:91 ExecutionRecord shape (原 fixture 缺 8 必填字段),本次补全 fixture (mode+completionStatus+actualDuration+plannedDuration+deviationMinutes+sourceType+loggedAt+completionRating+actualOutput) + tsc 0 新增 + vitest 16/16 PASS |
+| 第 19 批(🔴→✅) | 2026-07-12 | TD-017 关闭(1 条) | [023.13] follow-up 已清 5/9 tsc 错 + 'running' literal;剩 4/9 是 2 处 server action 含 'start'/'end'/'overtime' dead 字面量 union — 收窄为 'cancel' | 'log' + 测试改测 'log' + 删 ACTION_TO_INTENT 死项;tsc 0 新增 + vitest 8/8 PASS |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-016 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢2 / ⚪1 / ✅13
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-017 关闭）· 🔴0 / 🟠2 / 🟡7 / 🟢2 / ⚪1 / ✅14

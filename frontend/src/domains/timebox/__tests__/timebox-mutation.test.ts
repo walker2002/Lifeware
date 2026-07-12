@@ -56,11 +56,14 @@ describe('[023] A2 timebox server actions', () => {
     expect((r as any).message).toBe('时间重叠')
   })
 
-  it('transitionTimebox start → startTimebox intent（走 submitDynamicIntent）', async () => {
-    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-1', status: 'running' } })
-    const r = await transitionTimebox('tb-1', 'start')
+  it('transitionTimebox log → logTimebox intent（走 submitDynamicIntent）', async () => {
+    // [TD-017] 2026-07-12: 'start' 已从 manifest lifecycle 删(2ddd223 codex review);
+    //   action union 收窄到 'cancel' | 'log'。本测试改测 'log' 路径以验证
+    //   ACTION_TO_INTENT dispatch 仍是活的 (manifest logTimebox intent_trigger 已 ship)。
+    ;(submitDynamicIntent as any).mockResolvedValue({ success: true, object: { id: 'tb-1', status: 'logged' } })
+    const r = await transitionTimebox('tb-1', 'log')
     expect(r.status).toBe('ok')
-    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'startTimebox', expect.objectContaining({ objectId: 'tb-1' }), undefined)
+    expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'logTimebox', expect.objectContaining({ objectId: 'tb-1' }), undefined)
   })
 
   it('updateTimebox 字段写 → 直调 mutation service.execute（不经 submitDynamicIntent）', async () => {
