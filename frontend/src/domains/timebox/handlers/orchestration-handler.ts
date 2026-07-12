@@ -56,6 +56,9 @@ import { scoreSchedule, SCORE_WARN_THRESHOLD } from '../lib/schedule-score'
 // [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION 常量（防字符串漂移）
 import { SCHEDULE_PROPOSAL_ACTION } from '../constants'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
+// [TZ-1] Step 1: 时区分量 helper（user_tz arithmetic，跨 Node/browser 一致）
+import { getUserTzHour, getUserTzMinute } from '@/lib/tz'
+import { hhmmToIso } from '../cnui/surfaces/time-input-helpers'
 
 // ─── 从 contexts 提取的强类型材料 ──────────────────────────────
 
@@ -166,14 +169,14 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     const sorted = this.sortItems(items, strategy)
     // [028] T2-fold: tier0Slots（来自 appointments）与 existingTimeboxes 合并为 occupied，
     // 防止 proposal 占到已约定的时段。
-    const occupied = [...this.extractOccupiedSlots(materials.existingTimeboxes), ...tier0Slots]
+    const occupied = [...this.extractOccupiedSlots(materials.existingTimeboxes, materials.userTimezone), ...tier0Slots]
     // [023.07] #3 — 解构新 shape：generateProposals 现返回 { proposals, warnings }，
     // warnings 携带 SCHEDULER_BOUND_EXCEEDED（detection in deep loop），与 detectConflicts 并列追加。
     // 顺序：bound warnings 在前，conflict warnings 在后。
     const { proposals, warnings: boundWarnings } = this.generateProposals(sorted, occupied, materials.energyCurve, date, strategy)
     // [023.08] T3 [F3 fold]: detectConflicts 现 async（rule-engine.evaluate 是异步），
     // handle() 必须 await，否则 conflictWarnings 是 Promise<Warning[]> 与后续 spread 类型冲突。
-    const conflictWarnings = await this.detectConflicts(proposals, materials.existingTimeboxes)
+    const conflictWarnings = await this.detectConflicts(proposals, materials.existingTimeboxes, materials.userTimezone)
     const presentation = this.renderMarkdown(proposals, date)
 
     // [028] T7: 5 维评分（fold-in T7-fix 数学定义 + 三态语义区分）。
@@ -433,6 +436,13 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     //   - 旧路径（无 nlText）→ undefined（不破坏现有 [023.08] handle 行为）
     const nlResult = contexts.nlResult as NLParseResult | undefined
 
+    // [TZ-1] Step 1: user_tz 注入 — handler 内部 arithmetic 从"UTC canonical"
+    //   （[023.09] 治本）切到 "user_tz canonical"。context-engine 透传
+    //   userTimezone（来自 getEffectiveTimezone(userId)），缺省 'Asia/Shanghai'。
+    //   extractOccupiedSlots / appointmentToTier0Slot / detectConflictsViaPredicate
+    //   都用此 tz 分量，与 hhmmToIso 写路径对齐（双向 round-trip 一致）。
+    const userTimezone = (contexts.userTimezone as string | undefined) ?? 'Asia/Shanghai'
+
     return {
       pendingHabits,
       activeTasks,
@@ -441,6 +451,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       appointments,
       templates,
       nlResult,
+      userTimezone,
     }
   }
 
@@ -527,7 +538,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       // [026] D2-A USOM SSOT：appointments 无 endTime 字段，必须派生
       // endTime = startTime + durationMin。tier0Slots 与 existingTimeboxes 合并进 occupied。
       for (const appt of materials.appointments) {
-        const slot = this.appointmentToTier0Slot(appt)
+        const slot = this.appointmentToTier0Slot(appt, materials.userTimezone)
         if (slot) tier0Slots.push(slot)
       }
 
@@ -585,16 +596,18 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   private appointmentToTier0Slot(appt: {
     startTime: string
     durationMin: number
-  }): TimeSlot | undefined {
+  }, tz: string = 'Asia/Shanghai'): TimeSlot | undefined {
     if (!appt.startTime || !Number.isFinite(appt.durationMin)) return undefined
     const start = new Date(appt.startTime)
     if (Number.isNaN(start.getTime())) return undefined
     const end = new Date(start.getTime() + appt.durationMin * 60_000)
+    // [TZ-1] Step 1：与 extractOccupiedSlots 同 — 用 user_tz 分量而非 getUTCHours，
+    //   与 hhmmToIso 写路径对齐（Shanghai 22:00 → UTC 14:00 → getUserTzHour=22）。
     return {
-      startHour: start.getUTCHours(),
-      startMinute: start.getUTCMinutes(),
-      endHour: end.getUTCHours(),
-      endMinute: end.getUTCMinutes(),
+      startHour: getUserTzHour(start, tz),
+      startMinute: getUserTzMinute(start, tz),
+      endHour: getUserTzHour(end, tz),
+      endMinute: getUserTzMinute(end, tz),
     }
   }
 
@@ -627,21 +640,24 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
 
   // ─── extractOccupiedSlots: 提取已有 timebox 的时间区间 ─────
 
-  private extractOccupiedSlots(timeboxes: TimeboxSummary[]): TimeSlot[] {
+  private extractOccupiedSlots(timeboxes: TimeboxSummary[], tz: string = 'Asia/Shanghai'): TimeSlot[] {
     return timeboxes.map(tb => {
       const start = new Date(tb.startTime)
       const end = new Date(tb.endTime)
-      // [023.09] I-3 TZ fragility 治本：DB / USOM 存 UTC ISO timestamp，
-      // 过去用 .getHours()/.getMinutes() 读浏览器 local TZ（CST 浏览器下 UTC 22:00
-      // 被读成 6 = 次日 06:00），与 findOccupyingSlot/isSlotOccupied UTC-invariant
-      // 谓词（[023.07] 已统一）+ formatTime(HH:MM, UTC cursor) 错位。
-      // 改用 .getUTCHours()/.getUTCMinutes() 与 DB 储存 canonical 一致，
-      // arithmetic 与 proposal.payload.startTime zone-consistent。
+      // [TZ-1] Step 1：从 [023.09] UTC canonical 切到 user_tz canonical。
+      //   旧实现用 `getUTCHours/Minutes` 在 CST 浏览器下读 UTC 22:00 → startHour=22
+      //   （DB 语义 OK）但与 parse-timeboxes "ISO=本地时刻字面读" 约定冲突；
+      //   且 ScheduleProposal 用户在 Shanghai 看 "08:00"（cursor UTC 8）→ 接受 →
+      //   hhmmToIso 字面拼 → DB UTC 8 → 显示端 getHours Shanghai = 16 → +8h 偏移。
+      //   新实现：所有 internal arithmetic 用 user_tz 分量（与 hhmmToIso 写路径对齐）；
+      //   user_tz 默认 'Asia/Shanghai'（与系统其他位置硬编码一致；MVP 单用户）。
+      //   反向：DB UTC 14:00（=Shanghai 22:00）→ getUserTzHour=22 → 与 cursor 22:00
+      //   一致 → conflict detection 正确。
       return {
-        startHour: start.getUTCHours(),
-        startMinute: start.getUTCMinutes(),
-        endHour: end.getUTCHours(),
-        endMinute: end.getUTCMinutes(),
+        startHour: getUserTzHour(start, tz),
+        startMinute: getUserTzMinute(start, tz),
+        endHour: getUserTzHour(end, tz),
+        endMinute: getUserTzMinute(end, tz),
       }
     })
   }
@@ -660,6 +676,9 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     if (strategy === 'schedule') {
       // [028] T4: Tier0 已合并进 occupied（Tier0 slots from appointments，T2-fold）；
       // Tier1 主游标 + Tier2 窗口兜底 + ITEM_UNSCHEDULABLE warning + SCHEDULER_BOUND_EXCEEDED 复刻 [023.07]
+      // [TZ-1] Step 1：dayStart: 8 / dayEnd: 22 含义从 UTC hour 切到 user_tz hour
+      //   （与 occupied slot 来源 [extractOccupiedSlots/appointmentToTier0Slot] 一致）。
+      //   cursor 8:00 / 22:00 现在是 user_tz 8:00 / 22:00，对 Shanghai 用户 = 8 AM / 10 PM。
       return scheduleByTiers(items, occupied, { dayStart: 8, dayEnd: 22 }, {
         isSlotOccupied: (h, m, d, occ) => this.isSlotOccupied(h, m, d, occ),
         findOccupyingSlot: (h, m, d, occ) => this.findOccupyingSlot(h, m, d, occ),
@@ -668,9 +687,10 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       })
     }
     // legacy（IRON RULE）：adjustRemainingTimeboxes 保留原线性贪心 body 不变
+    //   [TZ-1] Step 1：cursor 起始 8:00 含义切到 user_tz（与 schedule strategy 对齐）。
     const proposals: GeneratedProposal[] = []
     const warnings: Warning[] = []
-    let cursorHour = 8  // 从 08:00 开始
+    let cursorHour = 8  // 从 user_tz 08:00 开始
     let cursorMinute = 0
 
     // [023.07] #3 — 动态 iteration bound（defense-in-depth）：
@@ -752,6 +772,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   private async detectConflicts(
     proposals: GeneratedProposal[],
     existingTimeboxes: TimeboxSummary[],
+    tz: string = 'Asia/Shanghai',
   ): Promise<Warning[]> {
     // [F9 fold / partial]: existingTimeboxes 已在 contexts 一次性传入（context-engine
     // pre-fetched），透传 rule-engine 作为 snapshot.upcomingTimeboxes context 字段。
@@ -761,13 +782,14 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     // 能复用 snapshot 提前到位而 wiring 已就绪），**不消解 N+1**。真正的 N+1 优化
     // 需 rule-engine 改造消费 snapshot.upcomingTimeboxes（[023.08] P1 backlog）。
     // 当前 handle() 调用上下文里 existingTimeboxes 即 context-engine 提供的同日快照。
+    // [TZ-1] Step 1: tz 透传到 fallback 谓词路径（rule-engine 路径内仍按 [023.09] UTC）。
     const preFetchedOccupied = existingTimeboxes
 
     if (this.deps.ruleEngine) {
       return this.detectConflictsViaRuleEngine(proposals, preFetchedOccupied)
     }
 
-    return this.detectConflictsViaPredicate(proposals, preFetchedOccupied)
+    return this.detectConflictsViaPredicate(proposals, preFetchedOccupied, tz)
   }
 
   /**
@@ -848,6 +870,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   private detectConflictsViaPredicate(
     proposals: GeneratedProposal[],
     existingTimeboxes: TimeboxSummary[],
+    tz: string = 'Asia/Shanghai',
   ): Warning[] {
     const warnings: Warning[] = []
 
@@ -859,17 +882,17 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
       for (const tb of existingTimeboxes) {
         const tbStart = new Date(tb.startTime)
         const tbEnd = new Date(tb.endTime)
-        // [023.09] I-3 TZ fragility 治本：与 extractOccupiedSlots 同 — UTC arithmetic。
-        // tStart/tEnd 单位 = UTC minute-of-day；与 pStart/pEnd 来自 formatTime(cursorHour, ..)
-        // (UTC cursor, [023.07] 已统一) zone-consistent。message 用 UTC hour 字符串，
-        // 跨 TZ 一致；UI 期望 user-local 显示留给 surface render layer (out-of-scope)。
-        const tStart = tbStart.getUTCHours() * 60 + tbStart.getUTCMinutes()
-        const tEnd = tbEnd.getUTCHours() * 60 + tbEnd.getUTCMinutes()
+        // [TZ-1] Step 1：从 [023.09] UTC arithmetic 切到 user_tz arithmetic。
+        //   tStart/tEnd 单位 = user_tz minute-of-day；与 pStart/pEnd 来自
+        //   formatTime(cursorHour, ..)（[023.07] UTC cursor，[TZ-1] 切 user_tz cursor）
+        //   zone-consistent。message 用 user_tz hour 字符串，与 UI 显示一致。
+        const tStart = getUserTzHour(tbStart, tz) * 60 + getUserTzMinute(tbStart, tz)
+        const tEnd = getUserTzHour(tbEnd, tz) * 60 + getUserTzMinute(tbEnd, tz)
 
         if (pStart < tEnd && pEnd > tStart) {
           warnings.push({
             code: 'SCHEDULE_OVERLAP',
-            message: `"${payload.title}" 与已有时间盒 "${tb.title}" (${this.formatTime(tbStart.getUTCHours(), tbStart.getUTCMinutes())}-${this.formatTime(tbEnd.getUTCHours(), tbEnd.getUTCMinutes())}) 存在时间重叠`,
+            message: `"${payload.title}" 与已有时间盒 "${tb.title}" (${this.formatTime(getUserTzHour(tbStart, tz), getUserTzMinute(tbStart, tz))}-${this.formatTime(getUserTzHour(tbEnd, tz), getUserTzMinute(tbEnd, tz))}) 存在时间重叠`,
             severity: 'warn',
             affectedProposalIds: [proposal.id],
           })
@@ -920,7 +943,7 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
    * （cursor date > server today）的 intent.startTime 被错算到 today，
    * TimeOverlapRule 拿错日期窗口查冲突。
    */
-  private normalizeTimeField(proposalDate: string | null | undefined, time: string): string {
+  private normalizeTimeField(proposalDate: string | null | undefined, time: string, tz: string = 'Asia/Shanghai'): string {
     if (!time) return time
     // ISO 串：含 'T' 或 'Z' 或 '+' 时区偏移 → 已是 ISO
     if (time.includes('T') || time.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(time)) {
@@ -929,12 +952,16 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
     // HH:MM → 必须配日期：proposalDate 优先；缺省回退 today UTC（向后兼容 legacy caller）
     const [h, m] = time.split(':').map(Number)
     if (proposalDate) {
-      const [y, mo, d] = proposalDate.split('-').map(Number)
-      // 手工拼接 YYYY-MM-DDTHH:MM:SSZ，与 legacy 路径格式一致（无 .000Z 后缀），
-      // 保证下游 Date.parse / string compare 不受毫秒表示差异影响。
-      return `${proposalDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
+      // [TZ-1] Step 1: 把 (HH:MM, date) 当 user_tz 本地时间转 UTC（与 hhmmToIso 同源）。
+      //   旧实现字面拼 `${date}T${hh}:${mm}:00Z` 把 08:00 当 UTC → rule-engine 拿到错位时间；
+      //   新实现经 tzLocalToUtcMs 转 UTC，Shanghai 08:00 → UTC 00:00 → 与 DB canonical 一致。
+      //   输出无 .000Z 后缀保持与 legacy 同格式（Date.parse / string compare 兼容）。
+      const utcIso = hhmmToIso(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, proposalDate, tz)
+      // hhmmToIso 返 'YYYY-MM-DDTHH:MM:00.000Z'（带 .000 后缀），legacy caller 要 'YYYY-MM-DDTHH:MM:00Z'（不带 .000）
+      // 兼容：去掉 .000 段，保持历史输出格式不变（rule-engine / Date.parse 都吃这两种格式）
+      return utcIso.replace(/\.000Z$/, 'Z')
     }
-    // legacy 路径：HH:MM + server today UTC（与 orchestration cursor zone-consistent）
+    // legacy 路径：HH:MM + server today UTC（向后兼容）
     const today = new Date().toISOString().slice(0, 10)
     return `${today}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`
   }
@@ -1147,6 +1174,9 @@ export class TimeboxOrchestrationHandler implements DomainHandler {
   }
 
   private formatTime(hour: number, minute: number): string {
+    // [TZ-1] Step 1：hour/minute 含义从 UTC hour 切到 user_tz hour（与 occupied/cursor 同源）。
+    //   输出"HH:MM"字符串由 hhmmToIso(it.startTime, it.date, tz) 在 handler.submit 阶段
+    //   当 user_tz 本地时间转 UTC 落库（[023.08] T2 fold 保留 + [TZ-1] 加 tz 参数）。
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
   }
 

@@ -8,6 +8,41 @@
 
 ---
 
+## [TZ-1] 时区治本 — user_tz 抽象层（DB + 系统时区 + Asia/Shanghai 三级 fallback）
+
+> 2026_07_12 — `/ScheduleProposal` 添加的记录在 `/timeboxes` 显示 +8 小时根因：handler internal `[023.09] canonical UTC` arithmetic 与 `parse-timeboxes:36` "ISO=本地时刻字面读" 约定冲突；`hhmmToIso` 直接拼 `${date}T${hhmm}:00.000Z` 把 user 输入的 Shanghai 8:00 当 UTC 字面存（DB `2026-07-12T08:00:00Z`），Shanghai 浏览器 `getHours` 返 16（+8h）。架构治本方案（D）：DB 持久化 UTC + user_tz 配置 + UI 按 user_tz 显示；Step 1 落地核心抽象层（写路径 + handler internal arithmetic + DB 接线），显示端组件参数化留 [TZ-2]。MVP 单用户假设下 user_tz 默认 `Asia/Shanghai`（schema default + 系统时区兜底）。
+
+### 改动
+
+- **`src/lib/tz.ts`（新）** — 跨 Node/browser 一致时区 helper：`tzLocalToUtcMs(y, mo, d, h, m, tz)` (Intl 反向求 tz offset) / `getUserTzHour(date, tz)` / `getUserTzMinute(date, tz)` / `isoToHhmmInUserTz(iso, tz)` / `isoToLocalDatetimeInputInTz(iso, tz)` / `getSystemTimezone()`（`Intl` 兜底 'Asia/Shanghai'）
+- **`src/lib/timezone-config.ts`（新）** — `getEffectiveTimezone(userId)`：DB `user_settings.timezone` → 系统时区 → 'Asia/Shanghai' 三级 fallback
+- **`src/app/actions/user-settings.ts`（新）** — Server Actions `saveUserTimezone(tz)` / `getUserTimezone()`：client → DB 持久化（`TimezonePicker` 从 localStorage 改接到 DB）
+- **`src/domains/timebox/cnui/surfaces/time-input-helpers.ts`** — `hhmmToIso(hhmm, date, tz='Asia/Shanghai')` 加 tz 参数；`(HH:MM, date)` 当 tz 本地时间转 UTC（Shanghai 8:00 → UTC 00:00）；新增 `isoOrHhmmToHhmmInTz(value, tz)`；`isoToLocalDatetimeInput(iso, tz)` 参数化
+- **`src/domains/timebox/handlers/orchestration-handler.ts`** — `extractOccupiedSlots` / `appointmentToTier0Slot` / `detectConflictsViaPredicate` 从 `getUTCHours` 切到 `getUserTzHour/Minute`；`dayStart: 8, dayEnd: 22` 含义从 UTC hour 切 user_tz hour；`normalizeTimeField(proposalDate, time, tz='Asia/Shanghai')` 切 user_tz（保持 legacy 输出格式 `YYYY-MM-DDTHH:MM:SSZ`）；`contexts.userTimezone` 注入（`collectMaterials` 提取）
+- **`src/domains/timebox/cnui/handlers.ts`** — submit 入口读 `getEffectiveTimezone(MVP_USER_ID)`，createTimebox + scheduleProposal 两分支 `hhmmToIso(it.startTime, it.date, tz)` 传 tz
+- **`src/components/settings/timezone-picker.tsx`** — mount 时调 `getUserTimezone()` 覆盖 detected；保存调 `saveUserTimezone(tz)` 落库（不再只写 localStorage）
+- **测试 fixture 更新（保留测试意图）** — `time-input-helpers.test.ts`:5 cases + 新增 4 cases 跨 tz（Tokyo/NY/UTC）+ 30/30 pass；`orchestration-handler.test.ts`:[023.09] 7 cases fixture 改 Shanghai 视角 UTC 串（如 `2026-07-05T22:00:00Z` → `2026-07-05T14:00:00Z` = Shanghai 22:00）+ `[023.10]` normalizeTimeField fixture 期望 `2026-07-05T00:00:00Z`；`cnui/__tests__/handlers.test.ts`:`[023.08] T2 G3` fixture 期望 `2026-07-05T00:00:00.000Z`
+
+### 验证
+
+- ✅ vitest base/head 对比：**0 净回归**（24 failed = 24 baseline failed，全部 pre-existing 与本分支无关）
+- ✅ tsc 0 新增错误（201 个 pre-existing，与本分支无关）
+- ✅ time-input-helpers.test.ts **30/30 pass**（含 4 个新增跨 tz 测试）
+- ✅ orchestration-handler.test.ts **31/31 pass**（含 [TZ-1] user_tz canonical fixture 更新）
+- ✅ cnui/handlers.test.ts **34/34 pass**（1 todo）
+- ✅ dev server smoke：`/timeboxes` HTTP 200, 0 RSC 编译错误
+- ⚠️ **数据迁移**：DB 中**既有 timebox 数据不修复**（用户决策 1）。Step 1 只防新 bug；旧脏数据需用户在 UI 看到偏差后手动调整（CreateTimebox 路径本就正确，ScheduleProposal 路径旧数据有 +8h 偏差需清理）
+- ⚠️ **显示端组件参数化留 [TZ-2]**：MVP Shanghai-only 假设下，浏览器本地时区 = Asia/Shanghai，显示端 `getHours` 已正确显示；Tokyo user 需 [TZ-2] 把 `getEffectiveTimezone` 透传到所有显示端组件（`appointment-locked-card` / `MonthView` / `WeekView` / `timebox-timeline` 等）
+
+### 关键决策
+
+- **D 方案治本**（用户确认）：DB UTC + user_tz 配置 + UI 按 user_tz 显示，三层一致性
+- **system timezone fallback**（用户确认）：未设置时区 → `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- **fixture 意图保留**（用户确认）：所有更新 fixture 保留测试意图（"Shanghai 22:00 在 DB 中怎么表示"），更新数据 + 期望
+- **commit 边界合并**：6 子任务合并为 1 commit（TZ-1.2 + 1.3 + 1.4 紧密耦合，写路径 + handler internal + fixture 同步）
+
+---
+
 ## [028.2] workspace.openAiPanel 真接 TimeboxOrchestrationHandler.onGenerate（2026-07-12）
 
 > 2026_07_12 — `[028]` 架构债收口：workspace.openAiPanel（`timeboxes-workspace.tsx`）静态 mock proposals → 真接 handler.onGenerate；`cnui/handlers.ts` open scheduleProposal 调 onGenerate → 4 源归集 + §04 硬规则 + Tier0/1/2 + 5 维评分 → 注入 dataSnapshot；surface dataModel 扩 `score?/dimensions?`；AIOrchestratePanel 顶部加 `[data-testid=score-badge]` 5 维评分徽章。SDD 1 task ship-ready + `/browse` 抓 2 P0（[028] ship 时 `score` 未暴露 GenerationResult + ISO UTC→HH:MM helper 缺口）独立 fix commit。
