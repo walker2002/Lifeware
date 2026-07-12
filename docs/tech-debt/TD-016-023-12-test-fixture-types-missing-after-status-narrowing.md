@@ -1,9 +1,12 @@
 ---
 id: TD-016
-title: "[023.12] 测试 fixture 漏改：status 收窄与字段删除后,3 处 test fixture 仍引用旧值/旧字段,tsc 累计 9 错"
-status: 新建
+title: "[023.12] 测试 fixture 漏改 (8/9 已 [023.13] 自动清,剩 1 处 main 直接补 fixture 修)
+status: ✅ 已修复
+severity: 🟠 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: [023.13] 自动清 8/9 + 本次补 1 fixture (timebox-card.test.tsx:91)
 ---
 
 # TD-016: [023.12] 测试 fixture 漏改：status 收窄与字段删除后,3 处 test fixture 仍引用旧值/旧字段,tsc 累计 9 错

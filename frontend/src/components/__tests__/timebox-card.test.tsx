@@ -88,8 +88,18 @@ describe("[023.12] T8 按钮分支", () => {
   it("logged 状态 + executionRecord：渲染「回退 / 查看记录」", () => {
     const tb = createMockTimebox({
       status: "logged",
+      // [TD-016] 补全 DetailedExecutionRecord 必填字段(原 fixture 只给 mode+notes,
+      // 缺 base 6 字段 + completionRating/actualOutput,与新 schema 不匹配导致 tsc TS2322)
       executionRecord: {
         mode: "detailed",
+        completionStatus: "completed",
+        actualDuration: 60,
+        plannedDuration: 60,
+        deviationMinutes: 0,
+        sourceType: "timebox",
+        loggedAt: "2026-07-12T12:00:00Z",
+        completionRating: 5,
+        actualOutput: "完成",
         notes: "完成",
       },
     });

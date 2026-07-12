@@ -80,6 +80,7 @@ last_updated: 2026-07-12
 | TD-013 | manifest validator PascalCase 约束文档化 + K-component-not-found 错误附 §4.2 链接 (manifest-rules.md 13 节) | 🟢 → ✅ | infra | [023.10] | docs/manifest-rules.md | 2026-07-12 |
 | TD-009 | logTimebox 重复 filter ([TD-002] 重构后已 O(N) 单 filter + loop continue) | 🟢 → ✅ | lifeware-timebox | [023.10] | TD-002 重构副效应 | 2026-07-12 |
 | TD-010 | synthesized action 'update_timebox' rule-probe 注释澄清 (不入 manifest by design — 字段写路径非 lifecycle SM) | 🟢 → ✅ | lifeware-timebox | [023.10] | cnui/handlers.ts:990 注释 | 2026-07-12 |
+| TD-016 | [023.12] 测试 fixture 漏改 (8/9 tsc 错 [023.13] 自动清 + 本次补 timebox-card fixture 完成 9/9) | 🟠 → ✅ | cross-domain | [023.12] | timebox-card.test.tsx:91 fixture 补全 | 2026-07-12 |
 
 ## 按领域视图
 
@@ -120,7 +121,7 @@ last_updated: 2026-07-12
 
 - [[TD-004]] · R4 timebox/okrs 写入口债 · 🟠 High
 - [[TD-008]] · lifecycle-configs require 多键域债 · 🟡 Medium
-- [[TD-016]] · [023.12] 测试 fixture 漏改：3 域 status 收窄后 9 错 · 🟠 High
+- ~~[[TD-016]]~~ · [023.12] 测试 fixture 漏改: 9 tsc 错 (8 [023.13] 自动清 + 1 fixture) · ✅
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债：hooks + adapter test · 🟡 Medium
 - [[TD-034]] · Task/Objective updateFields 同模式未验证（dateOnly 列 Drizzle 行为待实测） · ⚪ Trivial
 - [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理，新域必再踩） · 🟡 Medium
@@ -211,7 +212,8 @@ last_updated: 2026-07-12
 | 第 15 批(🟢→✅) | 2026-07-12 | TD-009 关闭(1 条) | TD-009 「重复 filter」性能债被 TD-002 (cnui/handlers.ts 重构) 主任务的副效应消除 — 单 filter + loop continue 已是 O(N);印证「债升级为另一债的主任务时顺手清」模式 |
 | 第 16 批(🟢→✅) | 2026-07-12 | TD-010 关闭(1 条) | 「synthesized action 不在 manifest」看似漂移,实际「有意未注册」(字段写路径非 SM transition);cnui/handlers.ts:990 加 3 行 [TD-010] 注释固化理由;vitest 34/34 PASS (1 pre-existing flake 与本改动无关) |
 | 第 17 批(⏸ 搁置 2) | 2026-07-12 | TD-014 + TD-015 状态移至 ⏸ 搁置(等上游) | 两债都依赖 Anthropic Claude Code 上游 schema/command 改动,本项目无法独立修;workarounds 已就绪(NOTES.md + 本地 shadow + sync.sh) |
+| 第 18 批(🟠→✅) | 2026-07-12 | TD-016 关闭(1 条) | [023.13] follow-up 已清 8/9 tsc 错;剩 timebox-card.test.tsx:91 ExecutionRecord shape (原 fixture 缺 8 必填字段),本次补全 fixture (mode+completionStatus+actualDuration+plannedDuration+deviationMinutes+sourceType+loggedAt+completionRating+actualOutput) + tsc 0 新增 + vitest 16/16 PASS |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-010 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢2 / ⚪1 / ✅12
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-016 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢2 / ⚪1 / ✅13
