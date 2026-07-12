@@ -83,7 +83,18 @@ last_updated: 2026-07-06
 
 ## 跟踪记录（History）
 
-- 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-06 · [023.10] · 创建条目
+- 2026-07-12 · 「技术债清除会话[001-002]」调研 + 决策:
+  - **实际数据**:`grep -rn MVP_USER_ID frontend/src` = 283 处引用,**全部使用同一 canonical UUID** = `'00000000-0000-0000-0000-000000000001'`(位于 `scripts/seed-mvp-user.ts` 作为 source of truth)。
+  - **TD-005 创建时描述的"mvp_user"字符串已过期** — [023.10] 之后迭代到 UUID 形式(supabase auth 兼容)。
+  - **MVP 阶段评估**:单用户演示需求下,283 处引用同一 canonical 常量是**合理设计意图**,不是 bug。`T-01~T-04` 多租户约束在 multi-user 启用时才真正生效。
+  - **决策**:本会话不动代码。MVP 阶段多用户场景尚未启用,等认证模块(NextAuth / Supabase Auth)进入 plan 才整体性迁。
+  - **潜在 fix 路径**(留待 multi-user 启用时统一治理):
+    - 抽 `lib/auth/user-context.ts` 导出 `getCurrentUserId()` (env var / session-aware)
+    - 调用点改 import 路径(283 处机械改动)
+    - mock middleware 为认证过渡预留 hook
+    - 评估归 [[project-domain-paradigm-tech-debt]] 跨域治理(与 [[td-035]] updateFields helper 同根因)
+- 2026-07-12 · **TD-005 状态维持登记**:MVP 设计意图 + 多用户场景未启用 + 改动涉及面广;不做早动作。,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
 - 2026-05-XX · MVP 阶段简化设计引入
 
 ## 关联
