@@ -34,6 +34,10 @@
 - **D3** lib/tz.ts 加 3 个 helper（Intl 模式，跨 Node/browser 一致），供两个 `localDayKey` 调用
 - **D4** appointment-locked-card.tsx 最小 diff：`useUserTz()` 已存在，只透传 tz
 
+### 遗留债 → [[TD-039]] ×1
+
+TZ-2.2 /qa 抓漏 pre-existing TZ-2.3 债：`use-timebox.ts:53` `getDateRange` 返回 `TZDate`（@date-fns/tz），Next.js 16 RSC boundary 序列化丢 class，server action 收到 plain object 无 `toISOString`，`fetchTimeboxSummariesByRange`/`getAppointmentsByRange` 抛 `TypeError: start.toISOString is not a function`，`/timeboxes` 页面 500。**TZ-2.2 不引入此 bug**（仅改 localDayKey 内部实现，不触 getDateRange/TZDate 路径），但 ship-then-verify 时漏掉。修复方向：方案 A（推荐）`getDateRange` 返回前显式 `.toISOString()` 转 ISO string。
+
 ### 设计 authority
 
 - Spec：`docs/superpowers/specs/2026-07-12-tz-2-2-localdaykey-iana-tz-design.md`
