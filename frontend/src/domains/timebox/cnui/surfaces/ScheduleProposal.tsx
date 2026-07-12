@@ -125,20 +125,22 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
   const acceptedProposals = proposals.filter(p => !rejected.has(p.id))
 
   // [028] T9 fold-in: dispatch 发 action: 'scheduleProposal'（与 manifest intent_triggers.action + handler submit 分支名一致）
-  // [028] /qa ISSUE-001 fix: items 必带 duration + sourceObjectId（orchestration-handler.ts:716-722
-  //   在 proposal.payload 里给 createTimebox 必备字段；ScheduleProposal 之前只发 4 字段 → validator 静默拒，
-  //   UI 不关、不刷新、不报错）。
-  //   修：spread `p.payload` 保留全部服务端 set 的字段，仅 override 客户端知道的 date（= 目标日）。
+  // [028.1] ISS-002 修复：workspace.openAiPanel 静态 mock proposals 形为 { id, title, startTime, endTime }，
+  //   **不包含 `payload` 字段**（[023.08] T5 placeholder 未替换为真 orchestration-handler.onGenerate）。
+  //   原 a24e336 spread `p.payload` 在 no-op（undefined spread 啥也不带）→ items 仅剩 `{ date }` → validator 拒。
+  //   修：revert 为 picking 4 字段（title/date/startTime/endTime）。rules-registry.ts:99-138
+  //   `timebox_fields_valid` 仅校验 title/startTime/endTime（duration 已被 [023] A2 撤销），sourceObjectId 非必填。
+  //   handler.ts:580-585 已就绪 HH:MM + date → ISO UTC convert。
   const handleAcceptClick = () => {
     const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
     onConfirm({
-      // [028] I-2 polish: 用 SCHEDULE_PROPOSAL_ACTION 常量防字符串漂移
       action: SCHEDULE_PROPOSAL_ACTION,
       fields: {
         items: acceptedProposals.map(p => ({
-          ...p.payload,
-          // override date 为「目标日」客户端明确解析；其它字段保留 server-set 的 duration/sourceObjectId
+          title: p.title,
           date: todayLocal,
+          startTime: p.startTime,
+          endTime: p.endTime,
         })),
       },
     })
