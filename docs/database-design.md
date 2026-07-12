@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_07_12 (refactor)**：[TZ-1] user_tz 抽象层治本 `/ScheduleProposal` +8h bug — `user_settings.timezone` 真正接入 timebox 域：cnui/handlers.ts 写路径调 `getEffectiveTimezone(userId)` 传 hhmmToIso 把 (HH:MM, date) 当 user_tz 本地时间转 UTC 落库；handler internal arithmetic 切 user_tz（`extractOccupiedSlots` / `appointmentToTier0Slot` / `detectConflictsViaPredicate`）；`TimezonePicker` 接 DB。**无 DDL**（用既有 `user_settings.timezone` 列）。部署 TZ 约束段补 [TZ-1] 推进注（`localDayKey` 仍 defer Node 进程 TZ）。变更详情见 CHANGELOG.md `[TZ-1]` 段。
 - **2026_07_06 (refactor)**：[023.12] 三域生命周期语义重构 — `timeboxes.status` 枚举收窄 6→3 态（`planned | logged | cancelled`，删 `running | overtime | ended`）；`timeboxes` 表删除 3 个时间戳列 `started_at`/`ended_at`/`overtime_at`（drop CASCADE，TRUNCATE timeboxes 因数据可弃）。`cycles.status` 枚举收窄 5→4 态（`draft | approved | finished | reviewed`，删 `not_started | in_progress` 合并为 `approved`，`ended` 改名 `finished`）；`cycles.started_at` rename `approved_at`，`cycles.ended_at` rename `finished_at`（USOM 与 schema 同步，AM6）。`appointments.status` 枚举收窄 5→3 态（`scheduled | cancelled | completed`，删 `in_progress | expired` 改读时派生）；`appointments` 表删除 2 个时间戳列 `in_progress_at`/`expired_at`。三域各加 2 条 revert transition：timebox `logged|cancelled→planned`、appointment `cancelled|completed→scheduled`、cycle `reviewed→finished`（单步）。manifest `subscribed_events` 加 `TimeboxReverted`/`AppointmentReverted`/`CycleReverted`。`timeboxFieldMeta` 标记 deprecated（旧 3 个字段元数据不再被引用，保留以兼容历史数据）。**反向 [026] D2 reversal**：appointment 持久化模式从「lazy reconcile 写库」回到「读时派生」（理据见 design doc §与 [026] D2 reversal 的关系）。迁移 0034 落地（journal idx=34，down.sql 兜底）：`TRUNCATE timeboxes CASCADE` + `ALTER TABLE timeboxes DROP COLUMN IF EXISTS started_at/ended_at/overtime_at`；`ALTER TABLE cycles RENAME COLUMN started_at TO approved_at` + `RENAME COLUMN ended_at TO finished_at` + `TRUNCATE cycles CASCADE`；`TRUNCATE appointments CASCADE` + `DROP COLUMN IF EXISTS in_progress_at/expired_at`。CASCADE 影响：cycles TRUNCATE 级联清 `objectives`/`key_results`/`contributions`（数据可弃）；timeboxes TRUNCATE 级联清 `task_timeboxes`/`timebox_habits`（CASCADE 约束）。TRUNCATE CASCADE 链：timeboxes → task_timeboxes/timebox_habits/task_execution_logs.timebox_id SET NULL；cycles → objectives → key_results → contributions；appointments 无 FK 反向依赖。`memory_episodes.metadata` jsonb 软引用 timeboxId 留孤儿（无 FK，无读路径反向解析，[023.08] F4 决策）。USOM 文档同步（§3.5a/§3.9/§3.13 状态机收敛）。
 - **2026_07_03 (refactor)**：[026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod 一致或扩展 UTC 归一化，codex #5 落地）
 - **2026_07_02 (refactor)**：[022.01] Phase 3 — 移除 Objective/KR 独立状态 — `objectives` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_objectives_user_status` 索引；`key_results` 表删除 `status text` 列 + `status` CHECK 约束 + `idx_key_results_user_status` 索引。状态权威迁移至 `cycles.status`（§4.0）。迁移：idx=30（待 Task 6 落地）。`findAll` 过滤逻辑变更：`ne(status, 'archived')` → `discarded_at IS NULL AND archived_at IS NULL`。`paused` 语义永久丢失（迁移有损可接受）
@@ -1801,6 +1802,13 @@ CREATE UNIQUE INDEX uniq_user_settings_user ON user_settings(user_id);
 - 单元测试已覆盖 TZ 边界（`reconcile-appointment-tz.test.ts`），但运行时仍以 Node 进程 TZ 为准。
 
 **当前 [026] 决策**：保持 dev/prod TZ 一致即可，不做 user_settings.timezone → reconcile TZ 的扩展（保留后续 [027] 行程与智能编排合并时再演进）。若需多 TZ 部署，须把 `localDayKey` 扩展为接收显式 IANA TZ 参数或 UTC 归一化（见 [026] OQ-6，defer 至 [027]）。
+
+**[TZ-1] 推进（2026-07-12）**：Step 1 把 `user_settings.timezone` 真正接入 timebox 域——
+- 写路径 `cnui/handlers.ts` submit 调 `getEffectiveTimezone(userId)` 读 DB → 传给 `hhmmToIso(hhmm, date, tz)` 把 (HH:MM, date) 当 user_tz 本地时间转 UTC 落库（治本 /ScheduleProposal +8h bug）
+- handler internal `extractOccupiedSlots` / `appointmentToTier0Slot` / `detectConflictsViaPredicate` 切 user_tz arithmetic（与 hhmmToIso 写路径对齐，conflict detection 正确）
+- `TimezonePicker` 接线 DB（mount 拉 `getUserTimezone`，保存调 `saveUserTimezone` Server Action）
+
+`localDayKey`（reconcile 调度）仍依赖 Node 进程 TZ，本轮**未改**（defer 至 [TZ-2] 后续）。Step 1 落地后 dev/prod TZ 约束放宽到「timebox 域无依赖」，但 reconcile 调度仍需保持一致。
 
 **操作要点**：
 - Docker 部署：在 `docker-compose.yml` / `Dockerfile` 设 `TZ=Asia/Shanghai` 或 `ENV TZ=Asia/Shanghai` + 挂载 `/etc/localtime`。
