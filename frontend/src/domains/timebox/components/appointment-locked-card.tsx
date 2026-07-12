@@ -20,6 +20,7 @@ import type { AppointmentSummary } from "@/usom/types/summaries";
 import type { AppointmentStatus } from "@/usom/types/primitives";
 import { useEffect, useState } from "react";
 import { deriveAppointmentDisplayStatus } from "@/domains/timebox/status/derive-display-status";
+import { useUserTz } from "@/contexts/user-timezone-context";
 
 /** AppointmentStatus 3 态 → Badge 变体 + 中文 label（[023.12] T10：收敛 5→3） */
 const STATUS_STYLES: Record<
@@ -31,14 +32,14 @@ const STATUS_STYLES: Record<
   cancelled: { variant: "outline", label: "已取消" },
 };
 
-/** HH:MM 格式化（与 TimeboxCard.formatTime 行为一致，Asia/Shanghai） */
-function formatTime(timestamp: string): string {
+/** HH:MM 格式化（[TZ-2] tz 参数化，替代硬编码 'Asia/Shanghai'） */
+function formatTime(timestamp: string, tz: string): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: "Asia/Shanghai",
+    timeZone: tz,
   });
 }
 
@@ -70,6 +71,8 @@ interface AppointmentLockedCardProps {
  * surface-card 区分），用 token 颜色，禁 Tailwind 默认色。
  */
 export function AppointmentLockedCard({ appointment, compact = false }: AppointmentLockedCardProps) {
+  // [TZ-2] user_tz 注入（替代硬编码 'Asia/Shanghai'）
+  const { tz } = useUserTz();
   // [023.12] T10：per-minute now state（与 appointment-workspace 同源约定）
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -88,7 +91,7 @@ export function AppointmentLockedCard({ appointment, compact = false }: Appointm
         <div className="flex items-center gap-2 px-3 py-2">
           <MapPin className="size-3 shrink-0 text-primary" />
           <span className="text-xs text-body whitespace-nowrap">
-            {formatTime(appointment.startTime)} · {appointment.durationMin}分钟
+            {formatTime(appointment.startTime, tz)} · {appointment.durationMin}分钟
           </span>
           <span className="flex-1 truncate text-sm font-medium text-ink">
             {appointment.title}
@@ -113,7 +116,7 @@ export function AppointmentLockedCard({ appointment, compact = false }: Appointm
       <div className="flex items-center gap-2">
         <MapPin className="size-4 shrink-0 text-primary" />
         <span className="text-sm text-body whitespace-nowrap">
-          {formatTime(appointment.startTime)} · {appointment.durationMin}分钟
+          {formatTime(appointment.startTime, tz)} · {appointment.durationMin}分钟
         </span>
         <h3 className="flex-1 truncate font-display text-base font-medium text-ink">
           {appointment.title}

@@ -30,6 +30,7 @@ import type { TimeboxStatus } from "@/usom/types/primitives";
 import { getCardBorderColor, getCompletionIcon } from "@/lib/color-coding";
 import { MessageSquare } from "lucide-react";
 import { deriveTimeboxDisplayStatus } from "@/domains/timebox/status/derive-display-status";
+import { useUserTz } from "@/contexts/user-timezone-context";
 
 /** 时间盒状态样式映射（[023.12] T8：收敛到 3 状态；running/overtime 由 displayStatus 派生） */
 const STATUS_STYLES: Record<
@@ -44,16 +45,20 @@ const STATUS_STYLES: Record<
 /**
  * 格式化时间戳为 HH:MM
  *
+ * [TZ-2] Step 1: tz 参数化（[TZ-1] 之前硬编码 'Asia/Shanghai'，与 user_tz 不一致）。
+ *   caller 通过 `useUserTz()` 拿 user_tz 后传入。
+ *
  * @param timestamp - ISO 时间戳
+ * @param tz - IANA 时区字符串（如 'Asia/Shanghai' / 'Asia/Tokyo'）
  * @returns 格式化的时间字符串
  */
-function formatTime(timestamp: string): string {
+function formatTime(timestamp: string, tz: string): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: "Asia/Shanghai",
+    timeZone: tz,
   });
 }
 
@@ -89,6 +94,8 @@ interface TimeboxCardProps {
 }
 
 export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: TimeboxCardProps) {
+  // [TZ-2] user_tz 注入（替代硬编码 'Asia/Shanghai'，Tokyo 用户可正确显示）
+  const { tz } = useUserTz();
   const statusStyle = STATUS_STYLES[timebox.status] ?? STATUS_STYLES.planned;
   const borderColor = getCardBorderColor(timebox.executionRecord);
   const completionIcon = getCompletionIcon(timebox.executionRecord);
@@ -144,7 +151,7 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
             <span className="text-xs shrink-0 w-4 text-center">{completionIcon}</span>
           )}
           <span className="text-xs text-body whitespace-nowrap">
-            {formatTime(timebox.startTime)}-{formatTime(timebox.endTime)}
+            {formatTime(timebox.startTime, tz)}-{formatTime(timebox.endTime, tz)}
           </span>
           <button
             type="button"
@@ -247,7 +254,7 @@ export function TimeboxCard({ timebox, compact = false, onAction, onEdit }: Time
           <span className="text-sm shrink-0 w-5 text-center font-medium">{completionIcon}</span>
         )}
         <span className="text-sm text-body whitespace-nowrap">
-          {formatTime(timebox.startTime)}-{formatTime(timebox.endTime)}
+          {formatTime(timebox.startTime, tz)}-{formatTime(timebox.endTime, tz)}
         </span>
         <h3 className={`flex-1 truncate font-display text-base font-medium ${
           timebox.status === "cancelled" ? "text-body line-through" : "text-ink"

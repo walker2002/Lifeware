@@ -355,6 +355,10 @@ export const timeboxes = pgTable('timeboxes', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   schemaVersion: integer('schema_version').notNull().default(1),
+  // [TD-003] T1: OCC 乐观并发控制列。Repository.updateFields WHERE 谓词会用
+  // expectedOccVersion 匹配；0 rows affected → ConflictError。注意与 schemaVersion
+  //（USOM schema 迁移用）字段语义不同，列名加 occ_ 前缀防混淆。
+  occVersion: integer('occ_version').notNull().default(1),
 
   status: text('status', { enum: ['planned', 'logged', 'cancelled'] }).notNull(),
   title: text('title').notNull(),

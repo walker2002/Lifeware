@@ -14,6 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { render } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import { TimeboxTimeline } from '../timebox-timeline'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { TimeboxesEvent } from '../timeboxes-event'
@@ -65,7 +66,7 @@ function makeSamples(): TimeboxesEvent[] {
 
 describe('[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归', () => {
   it('纯 kind: timebox 输入：3 个时间盒色块按 STATUS_COLORS 渲染', () => {
-    const { container } = render(<TimeboxTimeline events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxTimeline events={makeSamples()} />)
     // title 必须出现
     expect(container.textContent).toContain('晨会')
     expect(container.textContent).toContain('深度工作')
@@ -77,19 +78,19 @@ describe('[026] T15 IRON RULE — TimeboxTimeline 纯 timebox 渲染回归', () 
   })
 
   it('纯 kind: timebox 输入：不含 appointment 独有的 bg-primary/10（ITINERARY_COLOR）', () => {
-    const { container } = render(<TimeboxTimeline events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxTimeline events={makeSamples()} />)
     // ITINERARY_COLOR = "bg-primary/10 border-primary" — 出现即污染
     const polluted = container.querySelectorAll('.bg-primary\\/10')
     expect(polluted.length).toBe(0)
   })
 
   it('纯 kind: timebox 输入：snapshot 锁（方案 A 防御）', () => {
-    const { container } = render(<TimeboxTimeline events={makeSamples()} />)
+    const { container } = renderWithTz(<TimeboxTimeline events={makeSamples()} />)
     expect(container).toMatchSnapshot()
   })
 
   it('空 events 数组：渲染空状态，不分支到 timebox/appointment', () => {
-    const { container } = render(<TimeboxTimeline events={[]} />)
+    const { container } = renderWithTz(<TimeboxTimeline events={[]} />)
     expect(container.textContent).toContain('暂无时间安排')
     expect(container.querySelectorAll('.bg-primary\\/10').length).toBe(0)
     expect(container.querySelectorAll('.bg-primary\\/20').length).toBe(0)
