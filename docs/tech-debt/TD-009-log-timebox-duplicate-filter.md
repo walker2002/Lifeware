@@ -1,9 +1,12 @@
 ---
 id: TD-009
-title: logTimebox 重复 filter(同 query 多次过滤)
-status: 登记
+title: logTimebox 重复 filter(同 query 多次过滤) → [TD-002] 重构后已 O(N)
+status: ✅ 已修复
+severity: 🟢 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: [TD-002] cnui/handlers.ts:777 重构(单 filter + loop continue)
 ---
 
 # TD-009: logTimebox 重复 filter(同 query 多次过滤)
@@ -80,6 +83,16 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-12 · 「技术债清除会话[001-002]」grep 闭环验证:
+  - **TD-009 引用文件已删除**:`ls frontend/src/domains/timebox/handlers/` 只剩 `index.ts` + `orchestration-handler.ts`,原 `logTimebox.ts` 文件不存在
+  - **实际 logTimebox 逻辑位置**:`frontend/src/domains/timebox/cnui/handlers.ts`(CNUI surface handler 内联)
+  - **[TD-002] 重构后**:`cnui/handlers.ts:777` 单次 `.filter()`:
+    ```ts
+    const attempted = items.filter(i => i.state && i.state !== 'skipped')
+    ```
+    其余跳过逻辑走 loop 内 `continue`(L782 `if (it.status && it.status !== 'planned') continue`)。**已是 O(N)**——TD-009 提到「filter `isValid` + filter `isWithinScope` + filter `hasConflict`」3 次遍历的结构不复存在
+  - **性能债已根除** — 副作用是 [TD-002] 把 batch semantics 统一 partial-success 时顺手把单 filter O(N) 化了
+- 2026-07-12 · **TD-009 关闭**:TD-002 重构主任务 + 副效应消除 TD-009 双 filter 债
 
 ## 关联
 
