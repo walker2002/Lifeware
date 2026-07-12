@@ -8,6 +8,53 @@
 
 ---
 
+## [028.2] workspace.openAiPanel 真接 TimeboxOrchestrationHandler.onGenerate（2026-07-12）
+
+> 2026_07_12 — `[028]` 架构债收口：workspace.openAiPanel（`timeboxes-workspace.tsx`）静态 mock proposals → 真接 handler.onGenerate；`cnui/handlers.ts` open scheduleProposal 调 onGenerate → 4 源归集 + §04 硬规则 + Tier0/1/2 + 5 维评分 → 注入 dataSnapshot；surface dataModel 扩 `score?/dimensions?`；AIOrchestratePanel 顶部加 `[data-testid=score-badge]` 5 维评分徽章。SDD 1 task ship-ready + `/browse` 抓 2 P0（[028] ship 时 `score` 未暴露 GenerationResult + ISO UTC→HH:MM helper 缺口）独立 fix commit。
+
+### 改动
+
+- `cnui/handlers.ts` scheduleProposal open 分支 — 新增 onGenerate 调用 + 异常降级（throw → `proposals=[]` + console.warn + UI 不阻塞），把 `proposalSet.proposals` + `score` + `dimensions` + `needConfirm` + `archetypeCandidates` + `confirmReason` 注入 `dataSnapshot`
+- `timeboxes-workspace.tsx:openAiPanel` — `useCallback(async)` 改 `await openCnuiSurface('timebox', 'scheduleProposal', { date })`，新增 `aiProposalsLoading` / `aiNeedConfirm` / `aiScore` state + loading/error toast
+- `timeboxes-workspace.tsx:handleAiConfirm` — 加 `scheduleProposal` accept 分支（`submitCnuiSurface('timebox', 'scheduleProposal', fields)` + batchId 写入 `revertableBatches`）
+- `ScheduleProposal.tsx` dataModel — 加 `score?/dimensions?` 字段透传 `AIOrchestratePanel`；re-export `ArchetypeCandidate` 类型给 workspace 严类型（消除 I-2 `as never` lose-cast）
+- `AIOrchestratePanel.tsx` — props 加 `score?/dimensions?` + 顶部加 5 维评分徽章（含细目 grid `coverage / noConflicts / energyMatch / highPriorityHit`）
+- `orchestration-handler.ts:handle()` — return shape 加 `score: scoreResult.score, dimensions: scoreResult.dimensions`（[028] T7 ship 时漏，[028.2] /browse 抓 + 补）
+- `usom/types/process.ts` — `GenerationResult` interface 加 optional `score? / dimensions?` 字段
+- `time-input-helpers.ts` — 新增 `isoOrHhmmToHhmmInShanghai` helper（处理 ISO + HH:MM 双路径，bug fix #2 根因：`generateProposals:716` 直接 `formatTime` 写 HH:MM 不是 ISO）
+- `handlers.ts` — 新增 `buildCnuiSurfaceIntent` helper（消除 3 处 `crypto.randomUUID() as never` type-pun，I-1 fix）
+- 3 测试文件 +12 cases（cnui-handlers + workspace.openai + schedule-proposal surface）+ time-input-helpers.test.ts +26 contract locking cases
+- `docs/superpowers/plans/2026-07-12-028-2-ai-panel-wireup.md` — 新建 mini-plan
+
+### 验证
+
+- `/qa` health **100 / 100**（+28.5 vs `[028.1]` 71.5 baseline；详见 `.gstack/qa-reports/qa-report-lifeware-2026-07-12.md`）
+- vitest 18 files / 241 PASS / 0 fail / 1 pre-existing flake（handlers-edit-appointment 与 [028.2] 无关）
+- tsc 199 = baseline（被改 14 文件 0 new error）
+- pre-push hooks 全过（`validate:manifest` 0 errors / `validate:structure` ✓ / `validate:rules-registry` 6 项一致）
+- `/browse` 端到端：dev 200 → @e7「AI 智能推荐」点击 → openAiPanel → `score-badge`「今日方案综合分 9.1 / 10」+ 4 维 grid（coverage 10.0 / noConflicts 10.0 / energyMatch 6.3 / highPriorityHit 10.0，restMeal 跳过 — archetype 数据不可得，符合 T7 数学定义）+ 3 proposal cards 真实时间（08:00–08:30 / 08:30–09:00 / 11:00–11:30）真接 onGenerate + 0 console errors
+- 2A 枚举对齐：TimeboxStatus / TaskStatus / HabitStatus USOM ↔ DB CHECK 一致（[028.2] 无 USOM/DB 变更）
+- 2B-2F：沿用 prior baseline，[028.2] 零 DDL 零 USOM 变更
+- UI C-01~C-07：score-badge 用 `bg-primary/5` + `text-primary` + `text-body/70` 令牌色（C-01 PASS）；data-testid 暴露 E2E selector
+- Constitution 约束 ID：[028.2] 无新约束引入
+- mydocs/ 只读：本次会话未动 `mydocs/core/` 任一文件
+
+### 已知 ship-then-polish backlog（不动，scope out）
+
+- **I-3** revertableBatches state 隐式 coupling（"open 非空才覆盖" 语义，close-to-spec）
+- **7 Minor**（score/dimensions reset 不分 branch / console 格式不统一 / mock 样板重复 / 双 selector / 文件头 verify / handleAiConfirm verify / helper 缺 throw test）
+- **M-qa-1** aria-label 缺口（Chinese text label AT-readable 不阻断 ship）
+
+### Meta-pattern
+
+- 印证 [[feedback_post-ship-review-meta-pattern]] 第 5 次（r1 SDD whole-branch Approved ≠ ship-ready；`/browse` 真用户流抓 2 P0 仍能漏）
+- 印证 [[project-cross-module-dispatch-blindspot]] 模式：cnui/handlers open path 未串 onGenerate，workspace 端 mock 假装接通是盲点
+- Plan SSOT：`docs/superpowers/plans/2026-07-12-028-2-ai-panel-wireup.md`（v1 mini-plan）
+- SDD ledger：`.superpowers/sdd/progress-028.2.md`
+- QA report：`.gstack/qa-reports/qa-report-lifeware-2026-07-12.md`
+
+---
+
 ## [neat-2026_07_12] /lifeware-neat 三件套 drift 收口（2026-07-12）
 
 > 2026_07_12 — `/lifeware-neat` 收 3 项 drift：(1) `CHANGELOG.md` 缺 `[028]` / `[028.1]` 段；(2) `manifest.md` 缺 `[028]` / `[028.1]` 索引条目；(3) `docs/database-design.md` + `docs/usom-design.md` 页脚 `2026_07_11` 应 bump 至 `2026_07_12`（[028.1] ISS-002 fix 修复了 ScheduleProposal 端到端但无 schema/db 变更，仅文档漂移需对齐）。
