@@ -20,6 +20,8 @@ import { submitDynamicIntent } from '@/app/actions/intent'
 import { createTimeboxMutationService, createAppointmentMutationService } from './timebox/mutation-service'
 import { TimeboxRepository, AppointmentRepository } from '@/domains/timebox/repository'
 import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
+// [TD-003] T4-fix：保留 ConflictError 实例 + name 透传给 T5 drawer matcher
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 import type { Timebox, Appointment } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
 
@@ -319,6 +321,10 @@ export async function updateTimebox(
     if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
     return { status: 'ok', timebox: tb }
   } catch (err) {
+    // [TD-003] T4-fix：ConflictError 必须原样抛——T5 UI drawer matcher
+    //   `err.name === 'ConflictError'` 才能命中，触发 reload + toast。
+    //   若用 generic `new Error(err.message)` 会丢 name + currentOccVersion。
+    if (err instanceof ConflictError) throw err
     throw new Error(err instanceof Error ? err.message : '更新时间盒失败')
   }
 }

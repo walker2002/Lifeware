@@ -37,6 +37,8 @@ import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { EventBus } from '@/nexus/infrastructure/event-bus'
 import type { FieldExecutor } from '@/nexus/field-executor'
 import type { DbClient } from '@/lib/db'
+// [TD-003] T4-fix：timebox 域 OCC 异常类（re-throw 识别）
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 
 // ─── 注入依赖类型 ──────────────────────────────────────────────
 
@@ -474,6 +476,13 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
           return { success: true, object: lastObject, objects }
         })
       } catch (err) {
+        // [TD-003] T4-fix：ConflictError（timebox OCC 冲突）必须**穿透**外层 catch
+        // 冒泡到 caller，否则 T5 UI drawer 走 `err.name === 'ConflictError'` matcher
+        // 永远不命中，退化到 generic "保存失败" toast，UX 闭环断裂。其他错误
+        // 保持现有折叠行为（{success: false, error: message}）以避免影响现有契约。
+        if (err instanceof ConflictError) {
+          throw err
+        }
         const message = err instanceof Error ? err.message : '聚合写异常'
         return { success: false, error: message }
       }

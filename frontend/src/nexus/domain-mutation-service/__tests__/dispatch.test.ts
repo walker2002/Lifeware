@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { FieldExecutor } from '@/nexus/field-executor'
 import type { FieldMetadata } from '@/usom/types/domain-types'
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 import { createDomainMutationService } from '../index'
 
 // ─── Mock 工厂 ─────────────────────────────────────────────────
@@ -262,5 +263,109 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     // legacy executor.execute() 路径，不调 executeBatch
     expect(executor.execute).toHaveBeenCalledTimes(1)
     expect(executor.executeBatch).not.toHaveBeenCalled()
+  })
+
+  /**
+   * [TD-003] T4-fix：ConflictError 必须**穿透** execute() 的外层 catch 冒泡
+   * 到 caller。背景：field-executor.executeBatch → repo.updateFields 抛
+   * ConflictError（OCC 版本冲突），事务回滚。execute() 外层 catch 原把所有
+   * err 折叠为 { success: false, error: message }（string 化），丢失
+   * ConflictError.name + currentOccVersion/attemptedOccVersion。后果：T5 UI
+   * drawer 走 `err.name === 'ConflictError'` matcher 永远不命中，退化到
+   * generic "保存失败" toast，UX 闭环断裂。
+   *
+   * 修复后：execute() 遇到 ConflictError re-throw（不折叠），caller 拿到
+   * ConflictError 实例（含 name + currentOccVersion），可正确走 reload +
+   * toast 分支。
+   */
+  it('[TD-003] T4-fix: ConflictError 必须穿透 execute() 外层 catch 冒泡', async () => {
+    const repo = makeRepo()
+    // executeBatch 抛 ConflictError（模拟 OCC 冲突）
+    const executor = {
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockRejectedValue(new ConflictError(3, 1)),
+    }
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn()
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    const intent = {
+      id: 'intent-1',
+      domainId: 'timebox',
+      objectType: 'timebox',
+      targetId: 'tb-1',
+      steps: [
+        // expectedOccVersion=1 → execute() 走 executeBatch 路径
+        { kind: 'field', field: 'title', value: 'new title', expectedOccVersion: 1 },
+      ],
+    } as any
+
+    // 关键断言：execute() 应 re-throw ConflictError 实例
+    // （不被折叠为 {success:false, error:string}）
+    let caught: unknown = null
+    try {
+      await service.execute(intent, 'user-1')
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(ConflictError)
+    expect((caught as ConflictError).name).toBe('ConflictError')
+    expect((caught as ConflictError).currentOccVersion).toBe(3)
+    expect((caught as ConflictError).attemptedOccVersion).toBe(1)
+    // 后续 state step 未执行（事务回滚边界）
+    expect(smExecute).not.toHaveBeenCalled()
+  })
+
+  /**
+   * [TD-003] T4-fix：非 ConflictError 的其他错误保持现有折叠行为
+   *（{success: false, error: message}）——只对 ConflictError 透传，其他
+   * 错误类型不变以避免影响现有调用方契约。
+   */
+  it('[TD-003] T4-fix: 非 ConflictError 错误保持折叠行为（向后兼容）', async () => {
+    const repo = makeRepo()
+    const executor = {
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockRejectedValue(new Error('connection lost')),
+    }
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn()
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    const intent = {
+      id: 'intent-1',
+      domainId: 'timebox',
+      objectType: 'timebox',
+      targetId: 'tb-1',
+      steps: [
+        { kind: 'field', field: 'title', value: 'new title', expectedOccVersion: 1 },
+      ],
+    } as any
+
+    const res = await service.execute(intent, 'user-1')
+
+    // 非 ConflictError 保持原契约：折叠为 success:false + error 字符串
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/connection lost/)
   })
 })

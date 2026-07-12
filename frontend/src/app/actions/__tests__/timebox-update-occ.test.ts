@@ -196,4 +196,30 @@ describe('[TD-003] T4 updateTimebox OCC 透传', () => {
     // owner-check 失败后未调 service.execute
     expect(mockServiceExecute).not.toHaveBeenCalled()
   })
+
+  /**
+   * [TD-003] T4-fix：service.execute 抛 ConflictError → updateTimebox 必须原样透传
+   *（name='ConflictError' + currentOccVersion 不丢）——T5 UI drawer matcher
+   *   `err.name === 'ConflictError'` 才能命中 reload + toast 分支。
+   */
+  it('T4-fix: service.execute 抛 ConflictError → updateTimebox 透传 ConflictError 实例', async () => {
+    mockFindById.mockResolvedValue({ id: TB_ID, occVersion: 1, title: 't0' } as any)
+    // service.execute 抛 ConflictError（模拟 OCC 冲突已通过 service.execute 的
+    // re-throw 路径冒泡——本测试只验证 updateTimebox 的 catch 不丢 name）
+    mockServiceExecute.mockImplementationOnce(async () => {
+      throw new ConflictError(2, 1)
+    })
+
+    let caught: unknown = null
+    try {
+      await updateTimebox(TB_ID, { title: 'new title' })
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(ConflictError)
+    expect((caught as ConflictError).name).toBe('ConflictError')
+    expect((caught as ConflictError).currentOccVersion).toBe(2)
+    expect((caught as ConflictError).attemptedOccVersion).toBe(1)
+  })
 })
