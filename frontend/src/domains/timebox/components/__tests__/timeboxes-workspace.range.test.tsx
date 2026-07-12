@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 
 // [023.06] T1：纯函数单测。getDateRange 已 dedupe 到 hooks/use-timebox（C1 fix），
@@ -57,7 +58,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePat
 
 describe('[023.06] TimeboxesWorkspace 视图模式切换器', () => {
   it('默认渲染三个 mode 按钮（日/周/月）', async () => {
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     // 等初次 loadRange 落定（getTimeboxesByRange 至少被调用 1 次）
     await waitFor(() => expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(1))
     expect(screen.getByRole('button', { name: '日' })).toBeDefined()
@@ -67,7 +68,7 @@ describe('[023.06] TimeboxesWorkspace 视图模式切换器', () => {
 
   it('点击「周」按钮 → 切到 week mode，getTimeboxesByRange 再次被调且 end.getDay()===0', async () => {
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     // 等初次 loadRange 落定
     await waitFor(() => expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(1))
     await user.click(screen.getByRole('button', { name: '周' }))

@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 
 const getTimeboxByIdMock = vi.fn()
@@ -34,7 +35,7 @@ import { TimeboxesWorkspace } from '../timeboxes-workspace'
 describe('[023.03] T3 — handleEdit 错误反馈', () => {
   it('getTimeboxById 抛错 → toast.error 出现', async () => {
     getTimeboxByIdMock.mockRejectedValue(new Error('数据库连接失败'))
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     // 等待初始 loadDay 完成
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     // 通过 DayView 的 TimeboxCard 触发 onEdit；此处通过暴露的 handleEdit 行为触发：找到空状态点击新建不会触发 edit；
@@ -52,7 +53,7 @@ describe('[023.03] T3 — handleEdit 错误反馈', () => {
 describe('[023.03] T3 — handleAction 错误反馈', () => {
   it('transitionTimebox 抛错 → toast.error 出现', async () => {
     transitionTimeboxMock.mockRejectedValue(new Error('SM transition rejected'))
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     expect(transitionTimeboxMock).toBeDefined()
   })
@@ -64,7 +65,7 @@ describe('[023.03] T3 — handleAction 错误反馈', () => {
       confirmAction: 'startTimebox',
       confirmFields: {},
     })
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     await waitFor(() => expect(transitionTimeboxMock).not.toHaveBeenCalled())
     expect(transitionTimeboxMock).toBeDefined()
   })
