@@ -1,9 +1,12 @@
 ---
 id: TD-002
-title: logTimebox 批失败处理不对称(部分成功不回滚)
-status: 登记
+title: logTimebox 批失败处理不对称 → 统一 partial-success with explicit report
+status: ✅ 已修复
+severity: 🟠 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: feat/td-002-logtimebox-partial-success (PR #11 → gitee merge 7026808)
 ---
 
 # TD-002: logTimebox 批失败处理不对称(部分成功不回滚)
@@ -85,6 +88,13 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-12 · **本次修复** — `feat/td-002-logtimebox-partial-success` 分支 + PR !11:
+  - **(a) cnui/handlers.ts logTimebox 分支**：「早 break + 不回滚」改 partial-success (collect succeeded[]/failed[]) + `result.data.count/succeeded/failed` + `result.error` 含 title + 具体原因。同文件 5/5 批量分支范式达成一致（createTimebox/scheduleProposal/adjustRemainingTimeboxes/createAppointment/logTimebox）
+  - **(b) handlers.test.ts** +5 场景：第 1/3/5 条失败 / 全部成功 / submitDynamicIntent throw 推入 failed 数组。vitest 34/34 PASS
+  - **(c) constitution.md** §XV.6 新增「CNUI Handler Batch Transaction Semantics」子条款（与 §III 单事务边界正交 — partial-success 适用于多独立写入口循环场景，单事务边界适用于 cross-object 复合写）
+  - **(d) usom-design.md** 2026_07_12 entry 同步本次 partial-success 收口
+  - **(e) PR !11 merge** by user：gitee commit 7026808（merge commit），本地 ff-merge main 同 7026808
+- 2026-07-12 · **TD-002 关闭**：5/5 CNUI handler 批量分支范式一致 + 宪章补条款 + usom-design 同步 + PR merge + 本地 ff-sync + feat 分支删除（origin/feat/td-002-... 留存待 user 在 gitee 网页手动删除）
 
 ## 关联
 
