@@ -73,6 +73,7 @@ import { submitDynamicIntent, submitCnuiSurface, openCnuiSurface } from '@/app/a
 // [023.06] C1 fix: getDateRange/navigateDate 复用 hooks/use-timebox.ts 的 export，
 // 删本地副本避免行为漂移（plan T1 Step 3 约束）。
 import { getDateRange, navigateDate } from '@/hooks/use-timebox'
+import { useUserTz } from '@/contexts/user-timezone-context'
 import type { Timebox } from '@/usom/types/objects'
 import type { TimeboxSummary } from '@/usom/types/summaries'
 import type { DateViewMode } from './types'
@@ -95,6 +96,9 @@ export function TimeboxesWorkspace() {
   // [023.06] T2：视图模式 state + 当前浏览日期
   const [dateMode, setDateMode] = useState<DateViewMode>('day')
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
+  // [TZ-2.3] user_tz：date-fns 调用按 user_tz 算（Tokyo user 在 Shanghai 浏览器
+  //   下取 Tokyo 日/周/月界，与 rbc 渲染 / week-view / month-view 统一）。
+  const { tz: userTz } = useUserTz()
   const [dateLoadKey, setDateLoadKey] = useState(0) // 触发 reload（避免 compare 不全）
   const [events, setEvents] = useState<TimeboxesEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,7 +138,8 @@ export function TimeboxesWorkspace() {
   const loadRange = useCallback(async (mode: DateViewMode, d: Date) => {
     setLoading(true)
     try {
-      const { start, end } = getDateRange(mode, d)
+      // [TZ-2.3] 传 user_tz 给 getDateRange（按 user_tz 日/周/月界拉取，与 rbc 渲染对齐）
+      const { start, end } = getDateRange(mode, d, userTz)
       const [timeboxList, appointmentList] = await Promise.all([
         getTimeboxesByRange(start, end),
         getAppointmentsByRange(start, end),
@@ -148,7 +153,7 @@ export function TimeboxesWorkspace() {
     } finally {
       setLoading(false)
     }
-  }, [isWorkspaceRoute])
+  }, [isWorkspaceRoute, userTz])
 
   useEffect(() => {
     loadRange(dateMode, currentDate)
@@ -156,9 +161,10 @@ export function TimeboxesWorkspace() {
   }, [dateMode, currentDate, dateLoadKey])
 
   // [023.06] T2：DateNav 上 / 下导航（按当前 mode 步进日/周/月）
+  //   [TZ-2.3] 传 user_tz（按 user_tz 自然日加减；setState 用 prev 避免 userTz 缺漏）
   const handleNavigate = useCallback((direction: 'prev' | 'next') => {
-    setCurrentDate(prev => navigateDate(dateMode, prev, direction))
-  }, [dateMode])
+    setCurrentDate(prev => navigateDate(dateMode, prev, direction, userTz))
+  }, [dateMode, userTz])
 
   // [023.06] T2：DateNav 切换视图模式
   const handleDateModeChange = useCallback((newMode: DateViewMode) => {

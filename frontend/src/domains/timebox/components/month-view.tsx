@@ -1,21 +1,32 @@
-"use client"
-
 /**
  * @file month-view
  * @brief 时间盒月视图组件
  *
  * 使用 react-big-calendar 展示每月各日的时间盒事件，
  * 自行控制每天最多显示 4 项事件 + "+x more" Tooltip。
+ *
+ * [023.12] T13 (AM4) — 收窄为 3 键（planned/logged/cancelled）。running/overtime/ended
+ *   不再是持久 status（[023.12] T6 4 态收敛），日历层不做 per-second 派生。
+ *
+ * [TZ-2.1] rbc tz 注入：date-fns v4 `format` / `startOfWeek` / `startOfDay` 通过
+ *   `in: tz(tzName)` option 按 user_tz 渲染（@date-fns/tz v1.4.1，date-fns v4 官方 tz 包）。
+ *   分组逻辑（`byDay` 聚合）也按 user_tz 的 Y-M-D 而非浏览器本地。
+ *   Tokyo user 在 Shanghai 浏览器：原本会被聚合到昨天的事件，现在按 Tokyo 日期聚合。
  */
+"use client"
 
 import { useMemo } from "react"
 import { Calendar, dateFnsLocalizer } from "react-big-calendar"
 import { format, parse, startOfWeek, getDay, startOfDay } from "date-fns"
+import { tz } from "@date-fns/tz"
+import type { FormatOptions } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import type { TimeboxSummary } from "@/usom/types/summaries"
 import type { TimeboxStatus } from "@/usom/types/primitives"
 import type { ExecutionRecord } from "@/usom/types/objects"
 import { getCardBorderColor } from "@/lib/color-coding"
+import { useUserTz } from "@/contexts/user-timezone-context"
+import { tzLocalToUtcMs } from "@/lib/tz"
 import {
   Tooltip,
   TooltipContent,
@@ -36,8 +47,7 @@ interface MonthViewProps {
 const MAX_VISIBLE = 4
 
 /** 状态背景色映射（CSS 变量令牌，自动适配亮/暗色模式） */
-// [023.12] T13 (AM4) — 收窄为 3 键（planned/logged/cancelled）。running/overtime/ended
-//   不再是持久 status（[023.12] T6 4 态收敛），日历层不做 per-second 派生。
+// [023.12] T13 (AM4) — 收窄为 3 键（planned/logged/cancelled）。
 const STATUS_BG: Record<TimeboxStatus, string> = {
   planned: "var(--status-planned-bg)",
   cancelled: "var(--status-cancelled-bg)",
@@ -74,14 +84,6 @@ interface CalendarEvent {
 }
 
 const locales = { "zh-CN": zhCN }
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
-  getDay,
-  locales,
-})
 
 /**
  * 自定义事件渲染组件
@@ -121,6 +123,22 @@ function TimeboxEvent({ event }: { event: CalendarEvent }) {
  * @returns 月视图 JSX
  */
 export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
+  // [TZ-2.1] user_tz 注入：rbc localizer 按 user_tz 渲染；byDay 分组按 user_tz Y-M-D。
+  const { tz: userTz } = useUserTz()
+  const localizer = useMemo(
+    () =>
+      dateFnsLocalizer({
+        format: (date: Date | number, formatStr: string, options?: FormatOptions) =>
+          format(date, formatStr, { ...options, in: tz(userTz) }),
+        parse,
+        startOfWeek: (date: Date | number) =>
+          startOfWeek(date, { weekStartsOn: 1, in: tz(userTz) }),
+        getDay,
+        locales,
+      }),
+    [userTz],
+  )
+
   const events = useMemo<CalendarEvent[]>(() => {
     // 原始事件转换
     const rawEvents: CalendarEvent[] = timeboxes.map((tb) => ({
@@ -132,10 +150,13 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
       executionRecord: tb.executionRecord,
     }))
 
-    // 按开始日期分组
+    // [TZ-2.1] 按 user_tz 的 Y-M-DD 分组（而非浏览器本地）：
+    //   Tokyo user 在 Shanghai 浏览器：原本会被聚合到昨天的事件（Shanghai 16:00 = UTC 8 / Tokyo 17:00）
+    //   现在按 Tokyo 日期聚合（Tokyo 17:00 = "今天"）。
     const byDay = new Map<string, CalendarEvent[]>()
     for (const evt of rawEvents) {
-      const dayKey = format(startOfDay(evt.start), "yyyy-MM-dd")
+      // [TZ-2.1] startOfDay + format 都传 in: tz(userTz)
+      const dayKey = format(startOfDay(evt.start, { in: tz(userTz) }), "yyyy-MM-dd", { in: tz(userTz) })
       const list = byDay.get(dayKey) ?? []
       list.push(evt)
       byDay.set(dayKey, list)
@@ -153,8 +174,12 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
       visible.push(...top)
 
       if (hidden.length > 0) {
-        const baseDate = new Date(dayKey)
-        baseDate.setHours(23, 59, 59, 0)
+        // [TZ-2.1] "+x more" 占位事件 baseDate 用 user_tz 的 day end (23:59 user_tz)。
+        //   用 [TZ-1] lib/tz.ts:tzLocalToUtcMs 直接把 (YYYY-MM-DD 23:59 user_tz) 转 UTC，
+        //   与 hhmmToIso 写路径算法一致（保证月视图日界与 timebox 创建时一致）。
+        const [y, m, d] = dayKey.split('-').map(Number)
+        const dayEndMs = tzLocalToUtcMs(y, m - 1, d, 23, 59, userTz)
+        const baseDate = new Date(dayEndMs)
         moreEvents.push({
           id: `${dayKey}-more`,
           title: `+${hidden.length} more`,
@@ -171,7 +196,7 @@ export function MonthView({ timeboxes, currentDate }: MonthViewProps) {
     const uniqueVisible = [...new Map(visible.map((e) => [e.id, e])).values()]
 
     return [...uniqueVisible, ...moreEvents]
-  }, [timeboxes])
+  }, [timeboxes, userTz])
 
   return (
     <div className="timebox-month-calendar w-full rounded-lg border border-hairline bg-surface-card p-4">
