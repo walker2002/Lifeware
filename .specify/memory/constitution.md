@@ -1179,6 +1179,39 @@ Methodology conflicts are resolved by strict tier priority:
 
 Cross-tier conflicts: higher tier always wins.
 
+### CNUI Handler Batch Transaction Semantics
+
+CNUI handler 在批量处理多个独立写入口调用（如 `logTimebox` 5 条打卡、
+`createTimebox` 5 个草稿、`scheduleProposal` 多 proposals）时，MUST 采用
+**partial-success with explicit report** 语义，禁止「早 break + 不回滚」或
+「全或无 + 全回滚」两种极端：
+
+- 所有条目必须被尝试提交（遇错继续推进而非 early return），收集到
+  `succeeded[]` + `failed[]` 两个分组。
+- 返回 `result.success = (failed.length === 0)`；`result.error` 含每条
+  失败的 title + 具体原因（UI toast 据此展示）；`result.data` 含
+  `{ count, succeeded, failed }` 三字段供前端做逐项状态显示。
+- 此语义与宪法 §III 单事务边界（cross-object 复合写的 ACID）正交：
+  - §III 适用：跨对象的复合写（提升为主线、归档 + 创建等）— 单事务回滚；
+  - §XV.6 适用：CNUI handler 循环调用多个独立写入口的批量场景 — partial-success。
+
+**与 cross-object transaction 区分**：§III 单事务是 single write entry 顶层持有
+db transaction；§XV.6 partial-success 是 CNUI handler 在循环里逐条 submit write entry，
+每次 write entry 独立事务（成功已落库、失败不回滚），UI 层按 succeeded/failed
+分组告知用户，由用户决策下一步动作（哪些已成功的需手动 undo / 哪些失败的需修正重试）。
+
+**Rationale**: 用户视角下「批量」= "我希望知道每条状态" 而非 "神秘的全成功或全失败"。
+统一 partial-success 语义让 CNUI surface 显示与同文件多个分支（`createTimebox` /
+`scheduleProposal` / `adjustRemainingTimeboxes` / `createAppointment` / `logTimebox`）
+保持一致，避免某次改动忘了同步导致的「批量静默不一致」技术债（如 [TD-002]
+logTimebox 旧实现与其他 4 分支不对称）。
+
+**How to apply**: PR review 时，code author 必须在 CNUI handler 批量循环 diff 上：
+1. 明确写出"为什么这次是 partial vs early-break vs all-or-nothing"；
+2. 若选 partial，验证 `failed` 数组必须含 `id + title + error` 三字段；
+3. 若选 early-break / all-or-nothing，需 PR 描述给出产品决策文档链接。
+   新增批量分支默认走 partial-success（除非产品决策明确文档化）。
+
 ## Governance
 
 This constitution is the authoritative governance document for the

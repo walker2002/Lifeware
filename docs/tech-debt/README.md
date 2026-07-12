@@ -38,7 +38,6 @@ last_updated: 2026-07-12
 
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 负责人 |
 |---|---|---|---|---|---|
-| TD-001 | useOrchestrationRecommendations hook 不存在,T8 defer [023.11] | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-002 | logTimebox 批失败处理不对称(部分成功不回滚) | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-004 | R4 timebox/okrs 写入口债(跨域规则未落地) | 🟠 | cross-domain | [023.10] | 暂未指派 |
@@ -72,6 +71,7 @@ last_updated: 2026-07-12
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 修复版本 | 关闭日期 |
 |---|---|---|---|---|---|---|
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮（A1 派生 + A2 pre-push validator 落地） | 🔴 → ✅ | lifeware-timebox | [023.12] hot-fix | [023.13] | 2026-07-07 |
+| TD-001 | useOrchestrationRecommendations hook 不存在 → [028.2] handleAiConfirm 3 分支真接 submitCnuiSurface + openAiPanel 真接 onGenerate | 🟠 → ✅ | lifeware-timebox | [023.10] | [028.2] | 2026-07-12 |
 | TD-031 | use-auto-trigger 双分支 planned gate 同 cycle 双 fire start + overtime (else if 互斥修复) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T5 | [026.02.4-r3] | 2026-07-09 |
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 5 处残留 (Site 0 repository findRunning root source + Sites 1-4 callers) | 🟠 → ✅ | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | [026.02.4] | 2026-07-09 |
 | TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (4 sites 全修) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T2 | [026.02.4-r2] round 2 | 2026-07-09 |
@@ -93,7 +93,7 @@ last_updated: 2026-07-12
 
 ### `lifeware-timebox`
 
-- [[TD-001]] · useOrchestrationRecommendations hook 不存在 · 🟠 High
+- ~~[[TD-001]]~~ · useOrchestrationRecommendations hook 不存在 · 🟠 High · ✅ [028.2]
 - [[TD-002]] · logTimebox 批失败处理不对称 · 🟠 High
 - [[TD-003]] · editTimeboxes TOCTOU · 🟠 High
 - [[TD-006]] · orchestration N+1 sequential · 🟡 Medium
@@ -136,7 +136,7 @@ last_updated: 2026-07-12
 
 ### 🟠 High（本年内修复）
 
-- [[TD-001]] · useOrchestrationRecommendations hook 不存在 → [023.11]
+- ~~[[TD-001]]~~ · useOrchestrationRecommendations hook 不存在 → ✅ [028.2]
 - [[TD-002]] · logTimebox 批失败不对称
 - [[TD-003]] · editTimeboxes TOCTOU
 - [[TD-004]] · R4 timebox/okrs 写入口债
@@ -201,7 +201,8 @@ last_updated: 2026-07-12
 | 第 8 批(🟠→✅) | 2026-07-09 | TD-028 关闭(1 条) | `[026.02.4]` Site 0 repository findRunning rewrite (T4) + Sites 1-4 caller updates (T5) |
 | 第 9 批(🟡→✅) | 2026-07-09 | TD-030 关闭(1 条) | `[026.02.4-r2]` round 2 second-opinion 抓 truthy-check drift 类 — timebox.ts:110/346 + handlers.ts:309/384 共 4 sites 全修 |
 | 第 10 批(🟠+🟡+⚪+🟠→✅) | 2026-07-11 | TD-032 closed + TD-033/034/035 新建(4 条) | 系统性调试 session 发现 `AppointmentRepository.updateFields` ISO string startTime → Drizzle TypeError；hot-fix appointment.ts:49-54 + failing test；同模式扫描发现 Timebox/Task/Objective 都有同坑；抽通用归一化 helper 列入架构治理债 |
+| 第 11 批(🟠→✅) | 2026-07-12 | TD-001 关闭(1 条) | TD-001 后续修复未走债目录已成事实闭环：`[023.10] eece955` revert 真 wire + `[028.2] 34ba5b9/74fd9b1` openAiPanel 真接 + handleAiConfirm 加 `scheduleProposal` accept 分支；今日「技术债清除会话」首条动作补归档 |
 
 ---
 
-**最后更新**: 2026-07-11 · 共 29 条（本批：TD-032 关闭 + TD-033/034/035 新建）· 🔴0 / 🟠5 / 🟡7 / 🟢5 / ⚪3
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-001 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠4 / 🟡7 / 🟢5 / ⚪3 / ✅6
