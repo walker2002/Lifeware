@@ -1,9 +1,12 @@
 ---
 id: TD-001
-title: useOrchestrationRecommendations hook 不存在,T8 defer 至 [023.11]
-status: 登记
+title: useOrchestrationRecommendations hook 不存在,T8 defer 至 [023.11] → [028.2] 真接 submitCnuiSurface 关闭
+status: ✅ 已修复
+severity: 🟠 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: [028.2]
 ---
 
 # TD-001: useOrchestrationRecommendations hook 不存在,T8 defer 至 [023.11]
@@ -84,6 +87,13 @@ last_updated: 2026-07-06
 
 - 2026-07-06 · [023.10] · 创建条目,plan T8 标 defer,Codex #6 抓出 hook 缺失
 - 2026-07-05 · [023.10] T1 commit `eece955` · revert placeholder 上线(非根本解决)
+- 2026-07-05 · [023.10] commit `eece955` · **核心修复**:workspace `handleAiConfirm` revert 分支真 wire 到 `submitCnuiSurface('timebox', 'revertSmartTimeboxes', { batchId })`,替代原 placeholder toast
+- 2026-07-05 · [023.10] commit `4d6e7ca` · accept path 也修：handleAiConfirm accept 走 `submitCnuiSurface` 而非 `submitDynamicIntent`(后者不接受 `{ items }` 格式)
+- 2026-07-12 · [028.2] commit `34ba5b9` · `openAiPanel` 真接 `TimeboxOrchestrationHandler.onGenerate`(4 源归集 + 5 维评分),取代 [023.08] T5 静态 mock proposals
+- 2026-07-12 · [028.2] commit `74fd9b1` · `/qa` ISSUE-001 P0:handleAiConfirm 加 `scheduleProposal` accept 分支(原 100% 静默无操作),走真 `submitCnuiSurface`
+- 2026-07-12 · [028.2] · `handleAiConfirm` deps 加 `revertableBatches`(line 559),避开 stale closure 陷阱
+- 2026-07-12 · [028.2] · **关闭条件齐**:`handleAiConfirm` 3 分支(revertSmartTimeboxes / createTimebox / scheduleProposal)+ `openAiPanel` 全部真 dispatch;`revertableBatches` deps 含;`/qa` health 100;dev server @e7 触发 AI → 接受 3 → DB `timeboxes` 表新增 3 行 planned;0 console errors
+- 2026-07-12 · **TD-001 关闭**：cross-module dispatch 完整闭合(cnui/handlers open + workspace handleAiConfirm revert + submit batch recording),修复版本标 `[028.2]`
 
 ## 关联
 
