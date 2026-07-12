@@ -14,6 +14,9 @@ mydocs/dev/
 .claude/worktrees/
 # gstack 产物软链（指向 ~/.gstack/projects/...，提交进 git 只存死链接，无意义）
 .gstack
+# browse/qa sandbox 限制产物（落到 frontend/ 子目录的截图，应在 .gstack/qa-reports/screenshots/）
+frontend/.gstack/
+frontend/.gstack-screenshots/
 # 个人 claude 启动便捷脚本（claude --dangerously-skip-permissions），非项目组成文件
 .cc
 # 生产库备份产物（backup-prod.sh 的 pg_dump 输出，含真实数据，禁止入库）
