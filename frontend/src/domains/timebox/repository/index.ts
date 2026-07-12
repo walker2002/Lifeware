@@ -170,41 +170,98 @@ export class TimeboxRepository implements ITimeboxRepository {
     return updated
   }
 
-  async archive(id: USOM_ID, userId: USOM_ID, executionRecord?: ExecutionRecord): Promise<void> {
+  /**
+   * 归档时间盒（[TD-003] whole-branch review I-1：OCC 必填）
+   *
+   * 与 updateFields 同样的原子 UPDATE 模式：
+   * SET occ_version = occ_version + 1 同时校验 expectedOccVersion
+   * - 0 rows affected → 抛 ConflictError(currentOccVersion, attemptedOccVersion)
+   * - 1 row → 归档完成（status='logged' + executionRecord + loggedAt）
+   *
+   * 注：archive 当前在 production 无直接 caller（SM 走 updateStatus → updateFields 链
+   * 已 OCC），但接口保留 OCC 守卫避免未来 caller 重蹈覆辙——lifecycle 写必须过 OCC。
+   *
+   * @param id - 时间盒 ID
+   * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（OCC 必填）
+   * @param executionRecord - 执行记录（可选）
+   */
+  async archive(
+    id: USOM_ID,
+    userId: USOM_ID,
+    expectedOccVersion: number,
+    executionRecord?: ExecutionRecord,
+  ): Promise<void> {
     const updates: Record<string, unknown> = {
       status: 'logged',
       loggedAt: new Date(),
+      occVersion: sql`${s.timeboxes.occVersion} + 1`,
+      updatedAt: new Date(),
     }
     if (executionRecord) {
       updates.executionRecord = executionRecord as unknown as Record<string, unknown>
     }
-    await db.update(s.timeboxes)
+    const result = await db.update(s.timeboxes)
       .set(updates)
-      .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+      .where(and(
+        eq(s.timeboxes.id, id),
+        eq(s.timeboxes.userId, userId),
+        eq(s.timeboxes.occVersion, expectedOccVersion),
+      ))
+      .returning({ id: s.timeboxes.id })
+
+    if (result.length === 0) {
+      const [currentRow] = await db.select({ occVersion: s.timeboxes.occVersion })
+        .from(s.timeboxes)
+        .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+      const currentOccVersion = currentRow?.occVersion ?? -1
+      throw new ConflictError(currentOccVersion, expectedOccVersion)
+    }
   }
 
   /**
-   * 回退：{logged, cancelled} → planned（[023.12] T4）
+   * 回退：{logged, cancelled} → planned（[023.12] T4 + [TD-003] whole-branch review I-1）
    *
-   * 软重置：仅盖 status='planned' + updatedAt=now，不动 executionRecord /
-   * startedAt / loggedAt 等历史字段——回退 = 「撤销 SM 转换」而非「清空数据」。
-   * 若调用方要彻底回退（如 AM7 守卫想清 executionRecord），由调用点显式
-   * 在 revert 前清空（这里不耦合 AM7 业务决策，保持仓储纯粹）。
+   * 软重置：仅盖 status='planned' + updatedAt=now + occ_version+1，不动
+   * executionRecord / startedAt / loggedAt 等历史字段——回退 = 「撤销 SM 转换」
+   * 而非「清空数据」。若调用方要彻底回退（如 AM7 守卫想清 executionRecord），
+   * 由调用点显式在 revert 前清空（这里不耦合 AM7 业务决策，保持仓储纯粹）。
+   *
+   * [TD-003] whole-branch review I-1：OCC 必填。原子 UPDATE 同时
+   * SET occ_version = occ_version + 1 + 校验 expectedOccVersion；
+   * 0 rows → 抛 ConflictError。
    *
    * 多租户 T-02：where 必含 userId。
    *
    * @param id - 时间盒 ID
    * @param userId - 用户 ID
-   * @param tx - 可选事务句柄
+   * @param expectedOccVersion - caller 认为的当前 occ_version（OCC 必填）
    */
   async revertTransition(
     id: USOM_ID,
     userId: USOM_ID,
-    tx: DbClient = db,
+    expectedOccVersion: number,
   ): Promise<void> {
-    await tx.update(s.timeboxes)
-      .set({ status: 'planned', updatedAt: new Date() })
-      .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+    const result = await db.update(s.timeboxes)
+      .set({
+        status: 'planned',
+        occVersion: sql`${s.timeboxes.occVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(s.timeboxes.id, id),
+        eq(s.timeboxes.userId, userId),
+        eq(s.timeboxes.occVersion, expectedOccVersion),
+      ))
+      .returning({ id: s.timeboxes.id })
+
+    if (result.length === 0) {
+      const [currentRow] = await db.select({ occVersion: s.timeboxes.occVersion })
+        .from(s.timeboxes)
+        .where(and(eq(s.timeboxes.id, id), eq(s.timeboxes.userId, userId)))
+      const currentOccVersion = currentRow?.occVersion ?? -1
+      throw new ConflictError(currentOccVersion, expectedOccVersion)
+    }
   }
 
   private async loadWithJunctions(rows: any[]): Promise<Timebox[]> {

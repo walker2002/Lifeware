@@ -8,6 +8,117 @@
 
 ---
 
+## [TD-003] timebox 域 OCC（乐观并发控制）POC（2026-07-12）
+
+> 2026_07_12 — `[TD-003]` timebox 域引入乐观并发控制（OCC）解决跨 tab 并发编辑丢失问题。**架构**：DB `timeboxes` 加 `occ_version` 列（[T1] migration）+ Repository 层 OCC WHERE 谓词 + `ConflictError` 异常 + field-executor 批量重构 + UI drawer catch + reload + toast。**范围**：仅 timebox 域 POC；appointment / tasks / habits / okrs / cycles 跨域 OCC → `[TD-037]` P6 deferred。Whole-branch review 抓 5 Important，本 commit 修 I-1（archive + revertTransition OCC）+ I-4（state-machine `?? 0` fallback 替换为防御性 re-read）+ I-3（CHANGELOG 67 行误删恢复 + 本段补登）；I-2 / I-5 ship-then-polish defer。
+
+### 决策摘要
+
+- **D1** OCC 仅在 Repository 层加 `expectedOccVersion: number` 必填参数；WHERE `occ_version = ?` 0 rows → 抛 `ConflictError(current, attempted)`；不污染 §III 业务事实写入口 contract（Nexus 层抛 `FieldMutationError` / `StateMutationError` 模式参考但不沿用）
+- **D2** field-executor 走「validate-all-first + single atomic update + post-write events」批量 OCC：单条 UPDATE WHERE 同时校验所有步骤的 occVersion（plan-eng-review Codex P0+P1+P2 fix 消除 multi-field atomic gap + READ COMMITTED UPDATE 原子性 + 避 nexus blanket catch swallowing）
+- **D3** UI 接入模式：drawer 打开时 read current occVersion → submit 透传 expectedOccVersion → catch `ConflictError` → reload timebox + toast「数据已被其他标签页更新，已为你刷新」——零代码丢数据
+- **D4** `?? 0` fallback 永久删除：state-machine logged transition 改防御性 `findById` re-read（I-4 fix）。原 `?? 0` 让 `WHERE occ_version = 0` 必 0 rows → 抛 ConflictError 阻断合法 logged 路径
+- **D5** cross-domain OCC defer：`Appointment` / `Task` / `Habit` / `Objective` / `Cycle` 全部暂未实施 OCC → `[TD-037]` P6（5 域接入指南）
+
+### 改动（commit `521ec47..e44850d`）
+
+- **T1** `[TD-003 T1]` schema `timeboxes.occ_version INTEGER NOT NULL DEFAULT 0` + migration `0037_add_timebox_occ_version.sql`（IF NOT EXISTS 幂等 + journal idx=37）+ `timeboxUSOMToRow` 双向读写 occVersion 字段
+- **T2** `[TD-003 T2]` `TimeboxRepository.updateFields` 加 `expectedOccVersion: number` 必填参数；OCC atomic UPDATE `SET occ_version = occ_version + 1 WHERE id AND userId AND occ_version = ?` + 0 rows → `ConflictError(current, attempted)`；新增 `errors/occ-conflict-error.ts` 域本地 class（不入 nexus）
+- **T3** `[TD-003 T3]` field-executor `executeBatch` 重构：validate-all-first（所有 step.expectedOccVersion 与 re-read current 一致性预检）+ single atomic `repo.updateFields` 调用（单 UPDATE 多字段）+ post-write events 在事务内发射；消除 multi-field atomic gap + nexus blanket catch 吞错
+- **T4** `[TD-003 T4]` `updateTimebox` server action 透传 `expectedOccVersion`：先 `findById` 读 current → attach 到每个 field step → mutation service.execute → 3-tab 并发测试守护（同一 occVersion=N 三次并发 → 仅 1 成功 + 2 ConflictError → 客户端捕获后 reload 重试）
+- **T4-fix** `[TD-003 T4-fix]` `mutation-service.execute` outer catch 显式 re-throw `ConflictError`（保留 error.name='ConflictError'），防止 nexus blanket catch 把 OCC 异常吞成普通 Error
+- **T5** `[TD-003 T5]` TimeboxDrawer catch `ConflictError` + reload via `findById` + toast「数据已被其他标签页更新，已为你刷新」；ux 优雅降级，不打断用户操作
+- **T6** `[TD-003 T6]` `docs/tech-debt/TD-037-timebox-occ-cross-domain-rollout.md` 新建，登记 5 域 cross-domain OCC 接入指南 + scope 划分 + 接入模板
+
+### Whole-branch fix（本 commit `[TD-003 whole-branch review]`）
+
+- **I-1** `TimeboxRepository.archive` / `revertTransition` 加 `expectedOccVersion` 必填参数 + OCC atomic UPDATE 模式（与 `updateFields` 同形）。原 lifecycle 写绕过 OCC 可让外部 stale write 覆盖当前修改。`ITimeboxRepository.archive` 接口同步更新
+- **I-2**（defer）ConflictError 跨域归属决策（沿用 timebox 域本地 class vs 提升到 nexus）→ `[TD-037]` follow-up
+- **I-3** CHANGELOG 本段补登（删除 67 行误删恢复：[TZ-2.3] + [TZ-2.1] sections 已被前序 commit 误删）
+- **I-4** `state-machine/index.ts` logged transition `?? 0` fallback 替换为 `findById` re-read（防御性，避免阻断合法路径）
+- **I-5**（defer）`timebox.ts:286` stale-read window 加注释「OCC 兜底 race + drawer reload+toast 兜底 UX」
+
+### 验证
+
+- vitest 跨 tab 并发测试守护（3 标签页同时提交 → 1 成功 + 2 ConflictError + reload 不丢数据）
+- tsc 0 新增错误
+- `validate:manifest` 0 errors + `validate:domain-structure` ✓
+- pre-push hooks 全过
+
+### 设计 authority
+
+- Plan SSOT：`docs/superpowers/plans/2026-07-12-td-003-timebox-occ-poc.md`
+- TD 债：`docs/tech-debt/TD-003-timebox-stale-write-risk.md`（关闭）+ `TD-037-timebox-occ-cross-domain-rollout.md`（新建 deferred）
+
+---
+
+## [TZ-2.3] currentDate 链路 tz-aware（use-timebox 范围查询）（2026-07-12）
+
+> 2026_07_12 — `[TZ-2.1]` 把 rbc `WeekView` / `MonthView` 渲染按 user_tz 算（用 `@date-fns/tz:tz()` 包装 localizer），但**调用方传给 rbc 的 `currentDate` 仍按浏览器本地时区解读** — `use-timebox.ts:61` `useState(new Date())` 是 Shanghai 浏览器绝对时刻；`getDateRange` 用 `startOfDay / startOfWeek / startOfMonth` 默认浏览器本地 TZ 计算日/周/月界；`navigateDate` 用 `addDays / addWeeks / addMonths` 默认浏览器本地 TZ 步进。Tokyo user 在 Shanghai 浏览器下：rbc 按 Tokyo 周界，`getDateRange` 按 Shanghai 周界，**跨日/跨月边界事件漏报**。本步统一 `use-timebox` 链路全部按 user_tz 算。
+
+### 改动
+
+- **`frontend/src/hooks/use-timebox.ts`**：
+  - `getDateRange(mode, date, tzName='Asia/Shanghai')` — 加 `tzName` 参数，所有 `startOfDay / endOfDay / startOfWeek / endOfWeek / startOfMonth / endOfMonth` 通过 `{ in: tz(tzName) }` 按 user_tz 算
+  - `navigateDate(mode, date, direction, tzName='Asia/Shanghai')` — `addDays / addWeeks / addMonths` 通过 `{ in: tz(tzName) }` 按 user_tz "自然日"步进
+  - `useTimebox()` hook — 用 `useUserTz()` 拿 tz，传给两个 helper；deps 加 `userTz`
+- **`frontend/src/domains/timebox/components/timeboxes-workspace.tsx`**：
+  - `useUserTz()` 拿 tz；`loadRange` 调 `getDateRange(mode, d, userTz)`；`handleNavigate` 调 `navigateDate(mode, prev, direction, userTz)`
+- **Fixture 更新** 3 个 workspace fixture 补 `renderWithTz` import + `render(<TimeboxesWorkspace />)` → `renderWithTz(...)`（timeboxes-workspace.error / timeboxes-workspace.openai / timeboxes-workspace.range）
+
+### 验证
+
+- ✅ vitest 全 timebox: **669/672 pass**（baseline 668/669；TZ-2.3 +1 pass；剩余 2 failed = pre-existing handlers-edit-appointment + parse-appointment）
+- ✅ tsc: **净 -1 error**（baseline 208 → 207；TZ-2.3 不引入新错误）
+- ✅ dev server `/timeboxes` HTTP 200, 0 RSC 错误
+- ✅ Node 验证 date-fns v4 `in` option：`startOfDay(d, { in: tz('Asia/Shanghai') })` → `2026-07-12T00:00:00.000+08:00`；`addDays(d, 1, { in: tz('Asia/Tokyo') })` → `2026-07-13T17:00:00.000+09:00`
+
+### 设计依据
+
+- **`@date-fns/tz` v1.4.1** 已在 `[TZ-2.1]` 装为 date-fns v4 peer dep，无需 `npm install`
+- **`in: tz(tzName)` option**：date-fns v4 所有时间函数（`startOfDay / startOfWeek / startOfMonth / addDays / addWeeks / addMonths` 等）都支持
+- **默认值 `'Asia/Shanghai'`**：保持向后兼容 + 与 schema default + 系统 TZ 一致
+- **`currentDate` 仍为 absolute moment**：不强制转 user_tz wall clock — rbc 内部 `format(date, str, { in: tz(userTz) })` 自动按 user_tz 显示；`getDateRange` / `navigateDate` 用 `in` option 在 date-fns 层做 tz-aware arithmetic
+- **commit 边界合并**：1 commit（use-timebox + workspace 改造 + 3 fixture 补 import；与 TZ-2 / TZ-2.1 风格一致）
+
+### 遗留（明确登记）
+
+1. **`localDayKey`（reconcile 调度）接受 IANA TZ** → `[TZ-2.2]`（[026] OQ-6 defer；最后一个 tz 边界未收口）
+
+---
+
+## [TZ-2.1] react-big-calendar tz 注入 — week-view / month-view（2026-07-12）
+
+> 2026_07_12 — `[TZ-2]` 落地 4 个显示端组件（timebox-card / appointment-locked-card / timebox-timeline）按 user_tz 显示，但 **`react-big-calendar` 的 `dateFnsLocalizer.format` 仍按浏览器本地时区渲染** — Tokyo user 在 Shanghai 浏览器下，`WeekView` / `MonthView` 仍显示 Shanghai 时间而非 Tokyo 时间。本步通过 `@date-fns/tz` v1.4.1（date-fns v4 官方 tz 包，已装为 peer dep）的 `tz(timeZone)` 工厂函数把 user_tz 注入 dateFnsLocalizer 的 `format` / `startOfWeek`，让 rbc 按 user_tz 渲染事件时间与周界。
+
+### 改动
+
+- `frontend/src/domains/timebox/components/week-view.tsx:48-66` — `useMemo` 缓存 `dateFnsLocalizer`，`format` / `startOfWeek` 通过 `{ in: tz(userTz) }` 包装
+- `frontend/src/domains/timebox/components/month-view.tsx:78-100` — 同上模式；`byDay` 分组逻辑改用 `startOfDay + format` with `in: tz(userTz)`（Tokyo user 在 Shanghai 浏览器：原本会被聚合到昨天的事件，现在按 Tokyo 日期聚合）
+- `frontend/src/domains/timebox/components/month-view.tsx:147-151` — "+x more" 占位事件 baseDate 用 `lib/tz.ts:tzLocalToUtcMs(y, m, d, 23, 59, userTz)` 构造（user_tz 23:59 → UTC 等价时刻，与 `hhmmToIso` 写路径算法一致）
+
+### 验证
+
+- ✅ TZ-1 + TZ-2 + TZ-2.1 测试净 **-1 failed +1 passed**（baseline 3 failed → 2 failed，revert-regression 意外修复）
+- ✅ tsc: 0 新增错误（225 baseline 全 pre-existing）
+- ✅ dev server `/timeboxes` HTTP 200, 0 RSC 错误
+- ✅ Node script 验证 `@date-fns/tz:format(date, str, { in: tz('Asia/Shanghai') })` 正确工作：`'2026-07-12T00:00:00.000Z'` → `'2026-07-12 08:00'`
+- ⚠️ **`currentDate` prop**：仍由 caller（`use-timebox.ts:61`）传浏览器本地 `new Date()`；Tokyo user 在 Shanghai 浏览器下传给 rbc 的 `date` 是 Shanghai wall clock。严格来说 `currentDate` 也需 tz-aware（让 rbc 决定显示哪一周/月），但这属于 workspace 层职责，超出 TZ-2.1 范围。
+
+### 设计依据
+
+- **`@date-fns/tz` v1.4.1** = date-fns v4 官方 tz 包（`@date-fns/tz: ^1.0.2` 在 date-fns `peerDependencies` 列表），无需 `npm install`
+- **`in: tz(tzName)` option**：date-fns v4 标准 tz 注入模式，所有 date-fns 函数接受 `in` option 通过 `tz(timeZone)` 提供 TZDate
+- **localizer useMemo 缓存**：每次 tz 变化重建 localizer（user_tz 来自 DB 几乎不变，性能影响可忽略）
+- **`byDay` 分组按 user_tz Y-M-D**：与 `deriveDisplayStatus` / `localDayKey` 等读时派生一致（之前都用浏览器本地，TZ-2.2 收口 localDayKey）
+
+### 遗留（明确登记）
+
+1. **`currentDate` prop** tz-aware（workspace 层职责，[TZ-2.3] 候选）
+2. **`localDayKey`（reconcile 调度）接受 IANA TZ** → `[TZ-2.2]`（[026] OQ-6 defer）
+
+---
+
 ## [TZ-2] 显示端 user_tz 透传 — React Context + Provider 注入（2026-07-12）
 
 > 2026_07_12 — `[TZ-1]` Step 1 落地后，写路径 + handler internal arithmetic 已切 user_tz，但**前端显示端仍是浏览器本地时区或硬编码 `Asia/Shanghai`**。MVP Shanghai-only 下巧合 OK，但 Tokyo user 切到 `timebox-card` / `appointment-locked-card` 会显示错（硬编码 Shanghai 而非 user_tz）。Step 2 通过 React Context 把 server-side `getEffectiveTimezone(MVP_USER_ID)` 透传到所有显示端组件，让组件按 user_tz 显示。

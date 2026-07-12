@@ -698,12 +698,19 @@ export interface ITimeboxRepository {
   ): Promise<Timebox>
 
   /**
-   * 归档时间盒
+   * 归档时间盒（[TD-003] whole-branch review I-1：OCC 必填）
+   *
    * @param id - 时间盒 ID
    * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（OCC 必填）
    * @param executionRecord - 执行记录（可选）
    */
-  archive(id: USOM_ID, userId: USOM_ID, executionRecord?: import('../types/objects').ExecutionRecord): Promise<void>
+  archive(
+    id: USOM_ID,
+    userId: USOM_ID,
+    expectedOccVersion: number,
+    executionRecord?: import('../types/objects').ExecutionRecord,
+  ): Promise<void>
 }
 
 // ─── Objective ─────────────────────────────────────────────────

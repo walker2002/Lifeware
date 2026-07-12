@@ -306,16 +306,24 @@ export function createGenericStateMachine(deps: GenericStateMachineDeps) {
         //   updateFields 单独路径）；executionRecord 类型断言避免 TS 联合过严。
         const executionRecord = proposal.payload['executionRecord']
         if (executionRecord !== undefined && transition.to === 'logged') {
-          // [TD-003] T2 临时兼容：state-machine 内部 caller 暂未传 OCC（Task 4 处理）；
-          // 当前从 object 读 occVersion（若有）或传 0。timebox 域走 updateFields 时
-          // expectedOccVersion=0 会必抛 ConflictError，故此处仅当 object 已有
-          // occVersion 字段时透传。详细 Task 4 重构请见 plan §IV。
-          const currentOccVersion = (object as { occVersion?: number })?.occVersion
+          // [TD-003] whole-branch review I-4：防御性 re-read 替换 `?? 0` 回退。
+          // 原逻辑从 `object` 读 occVersion，但 updateStatus 路径不保证 occ_version
+          // 已 +1（timebox generic adapter 的 updateStatus 走 save()，不动 occVersion）。
+          // ?? 0 会让 updateFields 的 WHERE occ_version=0 必 0 rows → 抛 ConflictError，
+          // 阻断合法 logged transition。
+          // 修复：从 repo 重新 findById 拿最新 occVersion（同一 tx 内 READ COMMITTED
+          // 一致性，T2 updateFields 后已被同一事务读到的版本应仍是 current）。
+          const reRead = await repo.findById(objectId!, userId, tx)
+          const currentOccVersion = (reRead as { occVersion?: number } | null)?.occVersion ?? -1
+          if (currentOccVersion < 0) {
+            // 行已不存在（极小窗口：updateStatus 与 findById 之间被删），抛错
+            throw new Error(`[TD-003 I-4] Timebox ${objectId} 找不到，logged transition 失败`)
+          }
           object = await repo.updateFields(
             objectId!,
             { executionRecord },
             userId,
-            currentOccVersion ?? 0,
+            currentOccVersion,
             tx,
           )
         }
