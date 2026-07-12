@@ -309,11 +309,13 @@ describe('timeboxCnuiHandler', () => {
       })
 
       // submitDynamicIntent 应收到 ISO UTC 串，而非 HH:MM
+      // [TZ-1] Step 1: hhmmToIso 默认按 Asia/Shanghai 本地时间转 UTC
+      //   08:00 Shanghai → UTC 00:00（09:00 Shanghai → UTC 01:00）
       expect(submitDynamicIntent).toHaveBeenCalledWith('timebox', 'createTimebox', {
         title: '牙医',
         date: '2026-07-05',
-        startTime: '2026-07-05T08:00:00.000Z',
-        endTime: '2026-07-05T09:00:00.000Z',
+        startTime: '2026-07-05T00:00:00.000Z',
+        endTime: '2026-07-05T01:00:00.000Z',
       })
     })
 

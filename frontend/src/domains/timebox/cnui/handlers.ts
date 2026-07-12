@@ -21,6 +21,8 @@ import { SCHEDULE_PROPOSAL_ACTION, SCHEDULE_PROPOSAL_SURFACE } from '../constant
 //   createAIRuntime 是 [023.08] T1 已 ship 的 mock LLM provider 入口
 import { TimeboxOrchestrationHandler } from '@/domains/timebox/handlers/orchestration-handler'
 import { createAIRuntime } from '@/nexus/ai-runtime'
+// [TZ-1] Step 1: 用户配置时区（per-user fallback: DB → 系统时区 → Asia/Shanghai）
+import { getEffectiveTimezone } from '@/lib/timezone-config'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -532,6 +534,10 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
   },
 
   async submit(action, fields): Promise<CnuiSurfaceSubmitResult> {
+    // [TZ-1] Step 1: 每次 submit 入口读 user_tz（DB 配置 → 系统时区 → 'Asia/Shanghai'），
+    //   后续 HH:MM + date 转 ISO UTC 一律按 user_tz 本地时间转；这是修复
+    //   ScheduleProposal 用户报告 +8h bug 的核心点。
+    const tz = await getEffectiveTimezone(MVP_USER_ID as USOM_ID)
     // [023] A2.5 — 多条 timebox 草稿逐条走 Nexus
     if (action === 'createTimebox') {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
@@ -542,15 +548,14 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const failed: { title: string; error: string }[] = []
       for (const it of items) {
         try {
-          // [023.08] T2: ISO 时间 convert — orchestration proposal 发 HH:MM + date,
-          // server action 接收时显式 convert 为 ISO UTC,落库前规范化
+          // [023.08] T2 → [TZ-1]: ISO 时间 convert，HH:MM + date 当 user_tz 本地时间转 UTC
           const normalized: Record<string, unknown> = { ...it }
           delete (normalized as Record<string, unknown>)._source
           if (typeof it.startTime === 'string' && /^\d{2}:\d{2}$/.test(it.startTime) && typeof it.date === 'string') {
-            normalized.startTime = hhmmToIso(it.startTime, it.date)
+            normalized.startTime = hhmmToIso(it.startTime, it.date, tz)
           }
           if (typeof it.endTime === 'string' && /^\d{2}:\d{2}$/.test(it.endTime) && typeof it.date === 'string') {
-            normalized.endTime = hhmmToIso(it.endTime, it.date)
+            normalized.endTime = hhmmToIso(it.endTime, it.date, tz)
           }
           const r = await submitDynamicIntent('timebox', 'createTimebox', normalized)
           if (r.success) {
@@ -675,13 +680,13 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
       const failed: { title: string; error: string }[] = []
       for (const it of items) {
         try {
-          // [023.08] T2：HH:MM + date → ISO UTC（与 createTimebox 分支同模式）
+          // [TZ-1] Step 1: HH:MM + date 按 user_tz 本地时间转 UTC（与 createTimebox 分支同模式）
           const normalized: Record<string, unknown> = { ...it }
           if (typeof it.startTime === 'string' && /^\d{2}:\d{2}$/.test(it.startTime) && typeof it.date === 'string') {
-            normalized.startTime = hhmmToIso(it.startTime, it.date)
+            normalized.startTime = hhmmToIso(it.startTime, it.date, tz)
           }
           if (typeof it.endTime === 'string' && /^\d{2}:\d{2}$/.test(it.endTime) && typeof it.date === 'string') {
-            normalized.endTime = hhmmToIso(it.endTime, it.date)
+            normalized.endTime = hhmmToIso(it.endTime, it.date, tz)
           }
           const r = await submitDynamicIntent('timebox', 'createTimebox', normalized)
           if (r.success) {

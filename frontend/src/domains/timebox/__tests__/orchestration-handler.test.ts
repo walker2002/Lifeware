@@ -258,11 +258,16 @@ describe('[023.07] #3 generateProposals 谓词一致性 + bound', () => {
   })
 })
 
-// [023.09] I-3 TZ fragility 治本：handler 区间 arithmetic 必须用 UTC hour 与 DB 储存
-// canonical 一致；过去用 .getHours() 浏览器 local TZ 错位（如 CST 浏览器读
-// '2026-07-05T22:00:00Z' Date 返 startHour=6 而非 22）。
-describe('[023.09] orchestration-handler TZ fragility (UTC canonical)', () => {
-  // utility: build a GenerationRequest with one existingTimebox at UTC 22:00 on 2026-07-05
+// [023.09] I-3 TZ fragility 治本 → [TZ-1] Step 1 切到 user_tz canonical。
+//   历史: 旧实现 getUTCHours() 在 CST 浏览器下读 UTC 22:00 → startHour=22 (与 DB canonical 一致),
+//         但 [023.10] / [028.2] 揭示整个系统其他位置 (parse-timeboxes / 显示端 / schedule-score)
+//         把 ISO 字符串视为"本地时刻字面读",与 UTC arithmetic 冲突;ScheduleProposal 用户报 +8h。
+//   [TZ-1]: handler 内部从 UTC canonical 切到 user_tz canonical (默认 'Asia/Shanghai'),
+//         与 hhmmToIso 写路径 + parse-timeboxes 读路径 + 显示端 render 路径全部对齐。
+//         fixture 保持 startHour=22 期望,但 ISO 字符串改为 UTC 14:00 (= Shanghai 22:00)。
+describe('[TZ-1] orchestration-handler TZ fragility (user_tz canonical)', () => {
+  // utility: build a GenerationRequest with one existingTimebox at user_tz 22:00 on 2026-07-05
+  //   DB 存 UTC ISO;Shanghai 22:00 = UTC 14:00。
   function makeRequestForTz(): GenerationRequest {
     return {
       intent: {
@@ -283,14 +288,17 @@ describe('[023.09] orchestration-handler TZ fragility (UTC canonical)', () => {
           },
         ],
         pendingHabits: [],
+        // [TZ-1] user_tz 注入（默认 'Asia/Shanghai'）
+        userTimezone: 'Asia/Shanghai',
         existingTimeboxes: [
           {
             id: 'existing-22z',
-            title: '跨日时间盒',
-            // UTC 22:00 = CST 次日 06:00；CST 浏览器读 getHours() 返 startHour=6 ❌
-            // UTC 浏览器读 getUTCHours() 返 startHour=22 ✓
-            startTime: '2026-07-05T22:00:00Z',
-            endTime: '2026-07-05T23:00:00Z',
+            title: '晚间时间盒',
+            // [TZ-1] fixture: DB 存真 UTC ISO;Shanghai 22:00 = UTC 14:00
+            //   旧 [023.09] fixture 用 '2026-07-05T22:00:00Z' 假设 "字面 UTC 22:00"
+            //   与 [TZ-1] user_tz canonical 冲突;已更新为正确 UTC 表示。
+            startTime: '2026-07-05T14:00:00Z',
+            endTime: '2026-07-05T15:00:00Z',
             status: 'planned',
           },
         ] as any,
@@ -299,49 +307,44 @@ describe('[023.09] orchestration-handler TZ fragility (UTC canonical)', () => {
     } as unknown as GenerationRequest
   }
 
-  it('extractOccupiedSlots: UTC ISO timestamp 解出 UTC hour（不应受浏览器 local TZ 影响）', async () => {
+  it('extractOccupiedSlots: UTC ISO timestamp 解出 user_tz hour（Shanghai 22 = UTC 14）', async () => {
     const handler = new TimeboxOrchestrationHandler()
 
     const slots = (handler as any).extractOccupiedSlots(
-      ([{ startTime: '2026-07-05T22:00:00Z', endTime: '2026-07-05T23:00:00Z' }] as any)
+      ([{ startTime: '2026-07-05T14:00:00Z', endTime: '2026-07-05T15:00:00Z' }] as any),
+      'Asia/Shanghai',  // [TZ-1] 显式传 tz
     )
 
-    // UTC hour 是 22；CST 浏览器若读 .getHours() 会返 6（次日） — 修复后必为 22
+    // [TZ-1] user_tz canonical:Shanghai 22:00 = UTC 14:00 → startHour=22（与 [023.09] 同意图）
     expect(slots[0].startHour).toBe(22)
     expect(slots[0].startMinute).toBe(0)
     expect(slots[0].endHour).toBe(23)
     expect(slots[0].endMinute).toBe(0)
   })
 
-  it('detectConflicts: 跨 TZ 数据应触发 SCHEDULE_OVERLAP warning（修复前 CST 浏览器漏报）', async () => {
+  it('detectConflicts: 跨 TZ 数据应触发 SCHEDULE_OVERLAP warning（user_tz arithmetic stable）', async () => {
     const handler = new TimeboxOrchestrationHandler()
     const request = makeRequestForTz()
     const result = await handler.handle(request)
-    // result.warnings 应至少含一条 SCHEDULE_OVERLAP（hour math zone-consistent 后能命中）
     const overlapWarn = (result.warnings ?? []).find(w => w.code === 'SCHEDULE_OVERLAP')
-    // 即便 UTC hour arithmetic 不能保证 overlap（取决于 proposals 生成位置），
-    // 关键是：UTC math 是稳定的。verify 不抛异常 + 返回值 shape 正确。
+    // [TZ-1] user_tz arithmetic 在 CST / UTC 浏览器 / CI 容器下行为一致(Intl.DateTimeFormat
+    //   按 timeZone 参数取分量,不依赖运行时 TZ);verify 不抛异常 + 返回值 shape 正确。
     expect(result).toBeDefined()
     expect(result.warnings).toBeDefined()
-    // 关键 regression guard：跨 22:00 占用时，proposal cursor UTC 推进应绕过 occupied 22-23 时段；
-    // CST 浏览器修前会误认为 22:00 是次日 06:00，proposal 可能推动冲突；修后 UTC 应避开。
-    // 此断言不强制 0 overlap（取决于 tests fixture 路径），只强制 shape 正确。
     expect(Array.isArray(result.warnings)).toBe(true)
   })
 
-  it('detectConflicts message 字段：时间字符串使用 UTC hour（跨 TZ 一致）', async () => {
+  it('detectConflicts message 字段：时间字符串使用 user_tz hour（与 UI 显示一致）', async () => {
     const handler = new TimeboxOrchestrationHandler()
     const request = makeRequestForTz()
     const result = await handler.handle(request)
     const overlap = (result.warnings ?? []).find(w => w.code === 'SCHEDULE_OVERLAP')
-    // 若产生 overlap warning，message 内时间字符串应是 UTC 22:00 (而非 CST 浏览器下的 06:00)
+    // [TZ-1] message 内时间字符串应是 user_tz 22:00（Shanghai 视角，与 /timeboxes 显示一致），
+    //   不再是 [023.09] UTC 22:00。这与 UI 显示端（appointment-locked-card /
+    //   MonthView / WeekView）一致 — 用户看到的就是 message 里写的。
     if (overlap) {
-      expect(overlap.message).toContain('22:00')  // UTC hour
-      // 验证 NOT 包含 CST-misreading 06:00（anti-regression）
-      // 注：06:00 也可能 valid 地出现在 message 中作为另一时间盒的开始，
-      // 所以此断言仅确认 UTC 22:00 存在，不强制排除 06:00。
+      expect(overlap.message).toContain('22:00')  // user_tz hour
     }
-    // even if no overlap, test passes (no-throw regression guard)
     expect(result).toBeDefined()
   })
 })
@@ -368,16 +371,18 @@ describe('[023.08] T3 rule-engine 集成', () => {
     priority: 'P1',
   }
   // 受控 existingTimebox: 状态 planned（active，rule-engine 会触发）
+  // [TZ-1] fixture 更新：DB 存真 UTC ISO；Shanghai 8:00 = UTC 0:00（Shanghai 9:00 = UTC 1:00）
   const conflictExisting = [{
     id: 'tb-existing', title: 'existing',
-    startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+    startTime: '2026-07-05T00:00:00Z', endTime: '2026-07-05T01:00:00Z',
     status: 'planned', taskIds: [], habitIds: [],
   }] as any
 
   it('detectConflicts 调 rule-engine（TimeOverlapRule + status-aware）', async () => {
     const repo = makeMockTimeboxRepo([{
       id: 'tb-existing', title: 'existing',
-      startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+      // [TZ-1] Shanghai 8-9 = UTC 0-1
+      startTime: '2026-07-05T00:00:00Z', endTime: '2026-07-05T01:00:00Z',
       status: 'planned',
     }])
     const ruleEngine = createRuleEngine({ timeboxRepo: repo, userId: 'user-1' as USOM_ID })
@@ -440,9 +445,10 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix', () 
   const strictEquivalenceCases = [
     {
       name: '相邻区间 (boundary tangent, 不重叠)',
+      // [TZ-1] Shanghai 8-9 = UTC 0-1
       existing: [{
         id: 'e1', title: 'e',
-        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+        startTime: '2026-07-05T00:00:00Z', endTime: '2026-07-05T01:00:00Z',
         status: 'planned', taskIds: [], habitIds: [],
       }],
       proposalSpec: { startTime: '09:00', endTime: '10:00', title: 'adjacent' },
@@ -504,9 +510,10 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix', () 
   const expectedDivergenceCases = [
     {
       name: '零时长 proposal (端点撞)',
+      // [TZ-1] Shanghai 8-9 = UTC 0-1
       existing: [{
         id: 'e1', title: 'e',
-        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+        startTime: '2026-07-05T00:00:00Z', endTime: '2026-07-05T01:00:00Z',
         status: 'planned', taskIds: [], habitIds: [],
       }],
       proposalSpec: { startTime: '08:30', endTime: '08:30', title: 'zero-duration' },
@@ -517,9 +524,10 @@ describe('[023.08] T3 [G16] rule-engine ↔ fallback known-behavior matrix', () 
     },
     {
       name: 'status=ended (与已结束重叠 → rule-engine 不触发, fallback 触发)',
+      // [TZ-1] Shanghai 8-9 = UTC 0-1
       existing: [{
         id: 'e1', title: 'e',
-        startTime: '2026-07-05T08:00:00Z', endTime: '2026-07-05T09:00:00Z',
+        startTime: '2026-07-05T00:00:00Z', endTime: '2026-07-05T01:00:00Z',
         status: 'ended', taskIds: [], habitIds: [],
       }],
       proposalSpec: { startTime: '08:30', endTime: '09:30', title: 'after-ended' },
@@ -606,8 +614,9 @@ describe('[023.10] T3 normalizeTimeField proposal.date (A1 fix)', () => {
 
     // [023.10] T3: proposalDate 路径走手工拼接，与 legacy 路径同格式（无 .000Z 后缀），
     // 关键断言：日期部分必须是 proposal.date '2026-07-15'，不是 server today。
-    expect(intent.fields.startTime).toBe('2026-07-15T08:00:00Z')
-    expect(intent.fields.endTime).toBe('2026-07-15T09:00:00Z')
+    // [TZ-1] Step 1: (08:00 + 2026-07-15) 当 Asia/Shanghai 本地时间 → UTC 00:00
+    expect(intent.fields.startTime).toBe('2026-07-15T00:00:00Z')
+    expect(intent.fields.endTime).toBe('2026-07-15T01:00:00Z')
   })
 
   it('边界：今天 proposal 用 today date（不回归 today 行为）', () => {
@@ -627,8 +636,9 @@ describe('[023.10] T3 normalizeTimeField proposal.date (A1 fix)', () => {
 
     const intent = (handler as any).proposalToIntent(proposal)
 
-    expect(intent.fields.startTime).toBe('2026-07-05T08:00:00Z')
-    expect(intent.fields.endTime).toBe('2026-07-05T09:00:00Z')
+    // [TZ-1] Shanghai 8:00/9:00 → UTC 0:00/1:00
+    expect(intent.fields.startTime).toBe('2026-07-05T00:00:00Z')
+    expect(intent.fields.endTime).toBe('2026-07-05T01:00:00Z')
   })
 })
 
@@ -771,8 +781,10 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
       activeTasks: [{ id: 't1', title: '写报告', priority: 'P1', energyRequired: 'high' }] as any,
       existingTimeboxes: [],
       energyCurve: { peakHours: [9], lowHours: [14] },
+      // [TZ-1] user_tz 默认 'Asia/Shanghai'（[orchestration-handler:collectMaterials] 兜底）
+      userTimezone: 'Asia/Shanghai',
       // [026] D2-A USOM SSOT：appointments 只有 startTime + durationMin，无 endTime
-      // '2026-07-11T02:00:00Z' + 60min = [2:00 UTC, 3:00 UTC]
+      // [TZ-1] fixture 更新：DB 存真 UTC ISO；Shanghai 10:00 = UTC 02:00（Shanghai 11:00 = UTC 03:00）
       appointments: [{
         id: 'a1', title: '牙医',
         startTime: '2026-07-11T02:00:00Z',
@@ -795,9 +807,9 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
     // （usom/types/process.ts:310），templates 映射到 'planned'
     expect(items.map((i: any) => i.sourceType).sort()).toEqual(['habit', 'planned', 'task'])
 
-    // Tier0 约定提取为硬占用槽（UTC hour，endTime 由 startTime + durationMin 派生）
+    // [TZ-1] Tier0 约定提取为硬占用槽（user_tz hour；Shanghai 10-11 = UTC 02-03）
     expect(tier0Slots).toHaveLength(1)
-    expect(tier0Slots[0]).toMatchObject({ startHour: 2, endHour: 3 })
+    expect(tier0Slots[0]).toMatchObject({ startHour: 10, endHour: 11 })
 
     // fold-in T2-fix：earliestStart/latestStart/minDuration 字段存在且是 number（UTC hour）
     const tmpl = items.find((i: any) => i.sourceType === 'planned')
@@ -816,6 +828,8 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
       activeTasks: [{ id: 't1', title: '写报告', priority: 'P1' }] as any,
       existingTimeboxes: [],
       energyCurve: { peakHours: [9], lowHours: [14] },
+      // [TZ-1] user_tz 默认 'Asia/Shanghai'（collectMaterials 兜底）
+      userTimezone: 'Asia/Shanghai',
       // 即使传 appointments+templates，legacy 必须忽略（IRON RULE：A1/A2 隔离）
       appointments: [{
         id: 'a1', title: '牙医',
@@ -844,11 +858,13 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
       activeTasks: [],
       existingTimeboxes: [],
       energyCurve: { peakHours: [], lowHours: [] },
+      // [TZ-1] user_tz 默认 'Asia/Shanghai'（collectMaterials 兜底）
+      userTimezone: 'Asia/Shanghai',
       // 三种边界：纯小时 / 小时+分 / 跨日（durationMin 大于剩余当日时长）
       appointments: [
-        // '2026-07-11T10:00:00Z' + 90min = [10:00 UTC, 11:30 UTC]
+        // [TZ-1] fixture 更新：Shanghai 18:00 = UTC 10:00;Shanghai 19:30 = UTC 11:30
         { id: 'a1', title: '会议', startTime: '2026-07-11T10:00:00Z', durationMin: 90 },
-        // '2026-07-11T14:30:00Z' + 30min = [14:30 UTC, 15:00 UTC]
+        // [TZ-1] Shanghai 22:30 = UTC 14:30;Shanghai 23:00 = UTC 15:00
         { id: 'a2', title: '咖啡', startTime: '2026-07-11T14:30:00Z', durationMin: 30 },
       ] as any,
       templates: [],
@@ -858,11 +874,12 @@ describe('[028] T2 buildTimeboxItems 四源归集 + A1/A2 隔离', () => {
 
     expect(tier0Slots).toHaveLength(2)
     // 关键：endHour/Minute 必由 startTime + durationMin 推导（非依赖 endTime 字段）
+    // [TZ-1] user_tz canonical:Shanghai 18-19:30 / 22:30-23:00（与 UI 显示一致）
     expect(tier0Slots[0]).toMatchObject({
-      startHour: 10, startMinute: 0, endHour: 11, endMinute: 30,
+      startHour: 18, startMinute: 0, endHour: 19, endMinute: 30,
     })
     expect(tier0Slots[1]).toMatchObject({
-      startHour: 14, startMinute: 30, endHour: 15, endMinute: 0,
+      startHour: 22, startMinute: 30, endHour: 23, endMinute: 0,
     })
   })
 })

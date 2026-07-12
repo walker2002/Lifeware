@@ -1,13 +1,23 @@
 /**
  * @file timezone-picker
- * @brief 时区选择组件
- * 
- * 提供时区选择和设置功能
+ * @brief 时区选择组件 — [TZ-1] Step 1 接 DB 持久化（之前只写 localStorage）
+ *
+ * 流程：
+ *   1) mount 时调 server action `getUserTimezone()` 拿 DB 配置（fallback: `Intl.DateTimeFormat` 系统时区）
+ *   2) 用户改 select / 输入自定义
+ *   3) 点保存 → 调 server action `saveUserTimezone(tz)` 落库
+ *
+ * 历史：
+ *   - 旧实现只写 `localStorage['lw-timezone']`，DB `user_settings.timezone` 不更新；
+ *     服务端 `getEffectiveTimezone(userId)` 永远拿不到用户选择。
+ *   - [TZ-1] 治本：所有变更经 server action 走 DB（与 schema `user_settings` 列同步），
+ *     localStorage 兜底保留作 cache（mount 时优先读，server unreachable 时用）。
  */
 
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { saveUserTimezone, getUserTimezone } from "@/app/actions/user-settings"
 
 /**
  * 常用时区列表
@@ -28,11 +38,43 @@ export function TimezonePicker() {
   const [timezone, setTimezone] = useState(detected)
   const [customInput, setCustomInput] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = useCallback(() => {
+  // [TZ-1] mount 时拉 DB 配置覆盖 detected（DB 优先）
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const dbTz = await getUserTimezone()
+        if (!cancelled && dbTz) {
+          setTimezone(dbTz)
+        }
+      } catch {
+        // server unreachable → 用 detected 兜底
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const handleSave = useCallback(async () => {
     const tz = customInput.trim() || timezone
-    localStorage.setItem('lw-timezone', tz)
-    setMessage(`时区已设置为 ${tz}`)
+    setSaving(true)
+    setMessage(null)
+    try {
+      // [TZ-1] 接 DB 持久化（之前只写 localStorage）
+      const result = await saveUserTimezone(tz)
+      if (result.success) {
+        setMessage(`时区已保存为 ${tz}`)
+        // localStorage 兜底保留（mount 时 server unreachable 用）
+        try { localStorage.setItem('lw-timezone', tz) } catch {}
+      } else {
+        setMessage(`保存失败：${result.error ?? '未知错误'}`)
+      }
+    } catch (e) {
+      setMessage(`保存失败：${e instanceof Error ? e.message : '网络错误'}`)
+    } finally {
+      setSaving(false)
+    }
   }, [timezone, customInput])
 
   return (
@@ -67,9 +109,10 @@ export function TimezonePicker() {
       <button
         type="button"
         onClick={handleSave}
-        className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+        disabled={saving}
+        className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
       >
-        保存
+        {saving ? '保存中...' : '保存'}
       </button>
     </div>
   )

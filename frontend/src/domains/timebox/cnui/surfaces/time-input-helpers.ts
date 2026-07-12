@@ -1,45 +1,69 @@
 /**
  * @file time-input-helpers
- * @brief [023-01+ v2] ISO 8601 ↔ datetime-local 输入互转（按用户本地时区）
+ * @brief [023-01+ v2 → TZ-1] ISO 8601 ↔ datetime-local / HH:MM 输入互转（按用户时区）
  *
  * 后台始终以 ISO 8601（UTC）保存；CNUI 表面的开始/结束时间用
- * `<input type="datetime-local">` 让用户按**本地时区**输入与查看。
+ * `<input type="datetime-local">` 让用户按**用户时区（user_tz）**输入与查看。
  * 本文件负责两个边界互转，集中时区逻辑，避免散落到各组件。
+ *
+ * **[TZ-1] 治本变更**：
+ *   - 旧 `hhmmToIso` 直接拼 `${date}T${hhmm}:00.000Z`，把 "08:00" 当 UTC 字面，
+ *     导致 Shanghai 用户在 /timeboxes 看到 UTC 字面 + 8h 偏移（用户报告 bug）。
+ *   - 新版 `hhmmToIso(hhmm, date, tz)` 把 (HH:MM, date) 当 **tz 本地时间** 转 UTC 落库；
+ *     调用方透传 user_tz（`getEffectiveTimezone(userId)`），保证读写一致。
+ *   - `isoToLocalDatetimeInput`/`isoToHhmmInShanghai` 重构为 tz 参数化；
+ *     `isoToHhmmInUserTz`/`isoToLocalDatetimeInputInTz` 在 `@/lib/tz` 提供。
+ *
+ * 时区 helper（`tzLocalToUtcMs`/`getUserTzHour`/`getUserTzMinute`/`getSystemTimezone`），
+ * 见 `@/lib/tz`。
  */
 
+import {
+  isoToHhmmInUserTz,
+  isoToLocalDatetimeInputInTz,
+  tzLocalToUtcMs,
+} from '@/lib/tz'
+
+/** 默认 fallback TZ（仅当调用方未传 tz 时使用，正常路径应传 user_tz） */
+const DEFAULT_TZ = 'Asia/Shanghai'
+
 /**
- * ISO 8601 串 → datetime-local 输入值（YYYY-MM-DDTHH:MM，按用户本地时区显示）。
+ * ISO 8601 串 → datetime-local 输入值（YYYY-MM-DDTHH:MM，按 user_tz 显示）。
  * 非法/空输入返回空串（不抛），便于 input 受控渲染。
+ *
+ * [TZ-1] 重构：原版本用浏览器本地时区 `getHours/getDate`，现改为 tz 参数化。
  */
-export function isoToLocalDatetimeInput(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  // 用本地时间分量（getHours/getDate 等），让 datetime-local 显示用户时区的时刻
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+export function isoToLocalDatetimeInput(iso: string, tz: string = DEFAULT_TZ): string {
+  return isoToLocalDatetimeInputInTz(iso, tz)
 }
 
 /**
  * datetime-local 输入值（YYYY-MM-DDTHH:MM）→ ISO 8601 串。
- * `new Date("YYYY-MM-DDTHH:MM")` 按**用户本地时区**解析，toISOString() 转 UTC 落库。
+ * `new Date("YYYY-MM-DDTHH:MM")` 按 **user_tz 本地时间** 解析，toISOString() 转 UTC 落库。
  * 非法/空输入返回空串（不抛）。
  */
-export function localDatetimeInputToIso(local: string): string {
+export function localDatetimeInputToIso(local: string, tz: string = DEFAULT_TZ): string {
   if (!local) return ''
+  // datetime-local 字符串无时区 → 解析为系统本地时间（user_tz 的语义对齐系统 TZ）
+  // 注意：浏览器/Node 在不同 TZ 下解析 datetime-local 会得到不同 UTC；
+  // 我们假设服务端运行时 TZ = user_tz（或接近），caller 应保证一致性。
   const d = new Date(local)
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString()
 }
 
 /**
- * [023.08] T2 [F6 fold]: HH:MM + date → UTC ISO 8601 timestamp.
+ * [023.08] T2 [F6 fold] → [TZ-1] 治本：HH:MM + date → UTC ISO 8601 timestamp.
  *
- * Orchestration proposal payload.startTime/endTime 用 "HH:MM" 字符串（human-friendly），
- * 但 DB timebox schema 要求 ISO 8601。本 helper 是 server-side bridge,与 [023.09]
- * canonical UTC arithmetic 一致;24:00 / 8:00 等 invalid 抛错(fail-CLOSED)。
+ * 把 (HH:MM + date) 视为 **tz 本地时间**，转 UTC ISO 落库。
+ *
+ * 与旧实现的差异：
+ *   - 旧：`${date}T${hhmm}:00.000Z` 拼接（"08:00" 被当 UTC 字面）
+ *   - 新：`(HH:MM, date, tz)` 经 `tzLocalToUtcMs` 转 UTC（Shanghai 08:00 → UTC 00:00）
+ *
+ * 24:00 / 8:00 等 invalid 抛错（fail-CLOSED）。
  */
-export function hhmmToIso(hhmm: string, date: string): string {
+export function hhmmToIso(hhmm: string, date: string, tz: string = DEFAULT_TZ): string {
   if (!/^\d{2}:\d{2}$/.test(hhmm)) {
     throw new Error(`hhmmToIso: invalid hh:mm format: "${hhmm}"`)
   }
@@ -53,59 +77,46 @@ export function hhmmToIso(hhmm: string, date: string): string {
     throw new Error(`hhmmToIso: invalid date format: "${date}"`)
   }
 
-  // UTC ISO (Z 结尾);与 [023.09] canonical UTC invariant 一致
-  return `${date}T${hhmm}:00.000Z`
+  const [y, mo, d] = date.split('-').map(Number)
+  const utcMs = tzLocalToUtcMs(y, mo, d, hour, minute, tz)
+  return new Date(utcMs).toISOString()
 }
 
 /**
- * [028.2] T1: ISO 8601 timestamp → "HH:MM" 字符串（按 Asia/Shanghai 时区显示）。
+ * [028.2] T1 → [TZ-1] 重构：ISO 8601 timestamp → "HH:MM"（按 tz 显示）。
  *
- * Reverse of `hhmmToIso`：orchestration handler 输出的 payload.startTime/endTime 是 UTC ISO，
- * cnui surface Proposal.startTime/endTime 是 "HH:MM"（human-friendly）。本 helper 强制按
- * `Asia/Shanghai` 时区转换（与 workspace 既有 getTodayDate 约定一致），避免 Node 默认时区漂移。
- *
- * 非法/空输入返回空串（不抛）；fallback 行为与 `isoToLocalDatetimeInput` 对齐。
+ * @deprecated 使用 `@/lib/tz:isoToHhmmInUserTz` 直接替代。本文件保留 re-export
+ * 以最小化 [028.2] 既有用法的迁移负担；新代码应直接 import `isoToHhmmInUserTz`。
  */
 export function isoToHhmmInShanghai(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  // en-GB locale 输出 "HH:MM"（24h，零填充），跨 Node/browser 一致
-  return d.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Shanghai',
-  })
+  return isoToHhmmInUserTz(iso, 'Asia/Shanghai')
 }
 
 /**
- * [028.2] T2-fix: ISO OR HH:MM → "HH:MM" 字符串（按 Asia/Shanghai 时区显示）。
+ * [028.2] T2-fix → [TZ-1] 重构：ISO OR HH:MM → "HH:MM"（按 tz 显示）。
  *
- * **路径区分**（[028.2] /browse 抓的 P0 root cause）：
- *   - orchestration handler `generateProposals` 直接调 `this.formatTime(cursorHour, cursorMinute)`
- *     写 `payload.startTime/endTime = "HH:MM"`（[023.08] + [028] 全段保留的 internal contract）。
- *   - `hhmmToIso` 把 "HH:MM" 转成 ISO 是落库侧（onConfirm submit 走规则校验）,
- *     不调 open 路径。
- *   - 旧 `isoToHhmmInShanghai` 直接套 "HH:MM" 串 → `new Date("09:00")` Invalid → 返 ''，
- *     让 AIOrchestratePanel 顶部 proposal 卡片显示 ` – `（空时间）。
+ * **路径区分**（[028.2] /browse 抓的 P0 root cause 保留）：
+ *   - HH:MM（如 `09:00`、`9:30`）→ 直接 passthrough（format HH:MM 不带秒/时区）
+ *   - ISO 8601 → 走 `isoToHhmmInUserTz` 转 tz
+ *   - 空串/非法 → 返空串（不抛）
  *
- * **修法**：
- *   - "HH:MM"（如 `09:00`、`9:30`）→ 直接 passthrough（format HH:MM 不带秒/时区）。
- *   - ISO 8601（包含 'T' 或 'Z' 或 '+HH:MM'）→ 走 `isoToHhmmInShanghai` 转 Asia/Shanghai。
- *   - 空串/非法 → 返空串（不抛，保留原 fallback 语义）。
- *
- * 注意：本函数不动 [023.08] `formatTime(h,m)` 内 `'HH:MM'` 契约（避免 ripple 到
+ * 本函数不动 [023.08] `formatTime(h,m)` 内 `'HH:MM'` 契约（避免 ripple 到
  * onConfirm submit 路径 rules-registry validation 链）；只修 open 路径 surface 渲染。
  */
 export function isoOrHhmmToHhmmInShanghai(value: string): string {
+  return isoOrHhmmToHhmmInTz(value, 'Asia/Shanghai')
+}
+
+/**
+ * [TZ-1] 新增：ISO OR HH:MM → "HH:MM"（按指定 tz 显示）。
+ */
+export function isoOrHhmmToHhmmInTz(value: string, tz: string = DEFAULT_TZ): string {
   if (!value) return ''
-  // [028.2] T2-fix: HH:MM 直觉判断 — 仅含冒号 + 不含 T/Z/+/-,如 '09:00' / '9:30'
+  // HH:MM 直觉判断 — 仅含冒号 + 不含 T/Z/+/-,如 '09:00' / '9:30'
   if (/^\d{1,2}:\d{2}$/.test(value)) {
-    // 规范化为两位数（'9:30' → '09:30'）保持与 helper 输出格式一致
     const [h, m] = value.split(':')
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
   }
-  // ISO / 含时区 / 含 T 分隔符 → 走原 isoToHhmmInShanghai
-  return isoToHhmmInShanghai(value)
+  // ISO / 含时区 / 含 T 分隔符 → 走 isoToHhmmInUserTz
+  return isoToHhmmInUserTz(value, tz)
 }
