@@ -68,8 +68,8 @@ import { Plus, CalendarOff, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 // [028] T9：workspace 入口 — ScheduleProposal surface 组件（替代 [023.08] CreateSmartTimebox；
 //   CreateSmartTimebox 仅保留为 client 注册 `create-smart-timebox` surface 用作 revertSmartTimeboxes 撤销面板）
-import { ScheduleProposal } from '@/domains/timebox/cnui/surfaces/ScheduleProposal'
-import { submitDynamicIntent, submitCnuiSurface } from '@/app/actions/intent'
+import { ScheduleProposal, type ArchetypeCandidate } from '@/domains/timebox/cnui/surfaces/ScheduleProposal'
+import { submitDynamicIntent, submitCnuiSurface, openCnuiSurface } from '@/app/actions/intent'
 // [023.06] C1 fix: getDateRange/navigateDate 复用 hooks/use-timebox.ts 的 export，
 // 删本地副本避免行为漂移（plan T1 Step 3 约束）。
 import { getDateRange, navigateDate } from '@/hooks/use-timebox'
@@ -104,8 +104,19 @@ export function TimeboxesWorkspace() {
   const [actionSubmitting, setActionSubmitting] = useState(false)
   // [023.08] T5：AI 编排 panel — workspace 入口按钮 + 弹出面板
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
-  // AI panel 状态：proposals（来自 mock LLM provider 或 orchestration handler，本任务用静态占位）
+  // AI panel 状态：proposals（来自 [028.2] openCnuiSurface → cnui handler → TimeboxOrchestrationHandler.onGenerate）
   const [aiProposals, setAiProposals] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([])
+  // [028.2] T1：5 维评分（score + dimensions）— 透传到 AIOrchestratePanel 顶部徽章
+  const [aiScore, setAiScore] = useState<number | undefined>()
+  const [aiDimensions, setAiDimensions] = useState<Record<string, number> | undefined>()
+  // [028.2] T1：needConfirm 路径 — NL 解析低置信 / Tier0 冲突时显示 ArchetypePicker 候选
+  //   [028.2] T1 fix (I-2): ArchetypeCandidate 来自 ScheduleProposal re-export，source union 类型对齐
+  const [aiNeedConfirm, setAiNeedConfirm] = useState<{
+    archetypeCandidates: ArchetypeCandidate[]
+    confirmReason: string
+  } | null>(null)
+  // [028.2] T1：openAiPanel loading 态（避免重复点击 + UI 显示「编排中…」）
+  const [aiProposalsLoading, setAiProposalsLoading] = useState(false)
   // revertableBatches（来自 cnui handler open 调用 getRevertableBatches）
   const [revertableBatches, setRevertableBatches] = useState<Array<{ batchId: string; acceptedAt: number; count: number }>>([])
   // [023.13] T7：批量多选模式 + 回退确认弹窗 state
@@ -398,23 +409,53 @@ export function TimeboxesWorkspace() {
   }, [selectedIds, events, dateMode, currentDate, loadRange])
 
   /**
-   * [023.08] T5：AI 智能推荐入口 — 打开 AI panel
-   * - 拉取当前 session 5 分钟内可 revert 的 batches（T4 已有 getRevertableBatches 路径，
-   *   但本任务直接保留 state 由 surface submit 后刷新 — 简化实现）
-   * - 生成 mock proposals（等待 [023.08] T1 mock LLM provider + T3 orchestration-handler 接入；
-   *   本任务 T5 阶段用静态占位 3 条 simulation proposals — 给 E2E 一个稳定的 selector target）
+   * [028.2] T1：AI 智能推荐入口 — 打开 AI panel 真接 openCnuiSurface
+   *
+   * - 调 openCnuiSurface('timebox', 'scheduleProposal', { date }) →
+   *   timeboxCnuiHandler.open → TimeboxOrchestrationHandler.onGenerate（4 源归集 + §04 + Tier0/1/2 + 5 维评分）
+   * - 拿 proposals/score/dimensions/revertableBatches 注入 dataSnapshot
+   * - needConfirm 路径：dataSnapshot.needConfirm=true → setAiNeedConfirm 走 ArchetypePicker 候选视图
+   * - 异常降级：openCnuiSurface throw → toast.error「编排服务暂不可用，请稍后重试」+ 不打开 panel
+   * - 加载态：setAiProposalsLoading(true) → AI panel 打开前显示「编排中…」（避免重复点击）
    */
-  const openAiPanel = useCallback(() => {
-    // [023.08] T5 [F5 fold]: workspace AI 入口触发（data-testid=ai-orchestrate-button 在按钮上）
-    //   proposals 静态填充：3 条「主题 + 间隔」proposal 占位（编排逻辑由 orchestration handler 接入时替换）
-    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-    void todayLocal // proposals 使用 HH:MM 占位；表内具体 ISO convert 由 handler 端 T2 ISO convert 处理
-    setAiProposals([
-      { id: 'p-sim-1', title: '深度专注: 上午核心工作', startTime: '09:00', endTime: '11:00' },
-      { id: 'p-sim-2', title: '协作: 午后站会同步', startTime: '14:00', endTime: '15:00' },
-      { id: 'p-sim-3', title: '复盘: 收尾整理', startTime: '16:30', endTime: '17:00' },
-    ])
-    setAiPanelOpen(true)
+  const openAiPanel = useCallback(async () => {
+    setAiProposalsLoading(true)
+    setAiNeedConfirm(null)  // 重置 needConfirm state（避免上一次会话残留）
+    try {
+      const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+      const result = await openCnuiSurface('timebox', SCHEDULE_PROPOSAL_ACTION, { date: todayLocal })
+      const snapshot = result.surface.dataSnapshot as {
+        proposals?: Array<{ id: string; title: string; startTime: string; endTime: string }>
+        revertableBatches?: Array<{ batchId: string; acceptedAt: number; count: number }>
+        needConfirm?: boolean
+        archetypeCandidates?: ArchetypeCandidate[]
+        confirmReason?: string
+        score?: number
+        dimensions?: Record<string, number>
+      }
+      if (snapshot.needConfirm) {
+        // NL 低置信 / Tier0 冲突路径：dataSnapshot.proposals=[]，走 ArchetypePicker 候选视图
+        setAiNeedConfirm({
+          archetypeCandidates: snapshot.archetypeCandidates ?? [],
+          confirmReason: snapshot.confirmReason ?? '需要您确认候选',
+        })
+      } else {
+        setAiProposals(snapshot.proposals ?? [])
+      }
+      setAiScore(snapshot.score)
+      setAiDimensions(snapshot.dimensions)
+      // [028.2] T1：revertableBatches 从 open 注入（之前是静态 state,accept 后由 handleAiConfirm 写入）。
+      //   注：保留 accept 写入的 state（仅当 open 返回非空时才覆盖,避免冲掉刚 accept 的 batch）
+      if (snapshot.revertableBatches && snapshot.revertableBatches.length > 0) {
+        setRevertableBatches(snapshot.revertableBatches)
+      }
+      setAiPanelOpen(true)
+    } catch (e) {
+      console.error('[TimeboxesWorkspace.openAiPanel] failed', e)
+      toast.error('编排服务暂不可用，请稍后重试')
+    } finally {
+      setAiProposalsLoading(false)
+    }
   }, [])
 
   /**
@@ -556,12 +597,14 @@ export function TimeboxesWorkspace() {
             >
               {selectMode ? '退出多选' : '多选'}
             </Button>
-            {/* [023.08] T5 [F5 fold]: AI 智能推荐入口（data-testid 给 E2E + 验证测试用） */}
+            {/* [023.08] T5 [F5 fold]: AI 智能推荐入口（data-testid 给 E2E + 验证测试用）
+                [028.2] T1: openAiPanel 改 async 后,loading 态禁用按钮避免重复点击 */}
             <Button
               size="sm"
               variant="outline"
               data-testid="ai-orchestrate-button"
               onClick={openAiPanel}
+              disabled={aiProposalsLoading}
             >
               <Sparkles className="mr-1 size-4" />
               AI 智能推荐
@@ -656,7 +699,9 @@ export function TimeboxesWorkspace() {
         />
       )}
 
-      {/* [023.08] T5 [F5 fold]: AI 智能推荐 panel — 右栏 Drawer 同位 420px 浮层 */}
+      {/* [023.08] T5 [F5 fold]: AI 智能推荐 panel — 右栏 Drawer 同位 420px 浮层
+          [028.2] T1：openAiPanel 真接后,dataModel 含 score/dimensions/needConfirm/archetypeCandidates;
+          aiProposalsLoading 用于面板打开前显示「编排中…」状态（避免重复点击） */}
       {aiPanelOpen && (
         <aside
           className="flex w-[420px] flex-col border-l border-hairline bg-canvas"
@@ -677,17 +722,34 @@ export function TimeboxesWorkspace() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            <ScheduleProposal
-              surfaceType={SCHEDULE_PROPOSAL_SURFACE}
-              dataModel={{
-                proposals: aiProposals,
-                revertableBatches,
-              }}
-              onDataChange={() => undefined}
-              onConfirm={handleAiConfirm}
-              onCancel={() => setAiPanelOpen(false)}
-              isLoading={actionSubmitting}
-            />
+            {aiProposalsLoading ? (
+              <div
+                data-testid="ai-panel-loading"
+                className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-body/70"
+              >
+                <div className="size-6 animate-spin rounded-full border-2 border-hairline border-t-primary" />
+                <span>编排中…</span>
+              </div>
+            ) : (
+              <ScheduleProposal
+                surfaceType={SCHEDULE_PROPOSAL_SURFACE}
+                dataModel={{
+                  proposals: aiProposals,
+                  revertableBatches,
+                  score: aiScore,
+                  dimensions: aiDimensions,
+                  needConfirm: !!aiNeedConfirm,
+                  // [028.2] T1 fix (I-2): aiNeedConfirm.archetypeCandidates 已是 ArchetypeCandidate[]
+                  //   （ScheduleProposal re-export 类型对齐），直接透传无需 cast
+                  archetypeCandidates: aiNeedConfirm?.archetypeCandidates ?? [],
+                  confirmReason: aiNeedConfirm?.confirmReason ?? '',
+                }}
+                onDataChange={() => undefined}
+                onConfirm={handleAiConfirm}
+                onCancel={() => setAiPanelOpen(false)}
+                isLoading={actionSubmitting}
+              />
+            )}
           </div>
         </aside>
       )}

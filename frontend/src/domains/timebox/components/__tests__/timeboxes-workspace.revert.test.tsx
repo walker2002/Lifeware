@@ -24,12 +24,14 @@ import userEvent from '@testing-library/user-event'
 
 const submitCnuiSurfaceMock = vi.fn()
 const submitDynamicIntentMock = vi.fn()
+const openCnuiSurfaceMock = vi.fn()
 const transitionTimeboxMock = vi.fn()
 const revertTimeboxMock = vi.fn()
 
 vi.mock('@/app/actions/intent', () => ({
   submitCnuiSurface: (...a: unknown[]) => submitCnuiSurfaceMock(...a),
   submitDynamicIntent: (...a: unknown[]) => submitDynamicIntentMock(...a),
+  openCnuiSurface: (...a: unknown[]) => openCnuiSurfaceMock(...a),
   getTimeboxesByRange: vi.fn().mockResolvedValue([]),
   getAppointmentsByRange: vi.fn().mockResolvedValue([]),
 }))
@@ -103,6 +105,30 @@ describe('[023.10] T1 — workspace handleAiConfirm revert 真 wire', () => {
     vi.clearAllMocks()
     // 默认 accept mock：第一次调用返回 success+batchId，让 workspace 把 revertable batch 塞进 state
     submitCnuiSurfaceMock.mockResolvedValue({ success: true, batchId: 'batch-test-001' })
+    // [028.2] T1: openAiPanel 改 async + 调 openCnuiSurface；mock 默认返 3 条占位 proposals
+    //   （保留旧「3 条 simulation proposals」行为以兼容已有测试断言 — accept/revert 路径不依赖真实数据）
+    openCnuiSurfaceMock.mockResolvedValue({
+      content: 'mock',
+      surface: {
+        cnuiSurfaceId: 'mock-cnui-id',
+        cnuiSurfaceType: 'schedule-proposal',
+        domainId: 'timebox',
+        action: 'scheduleProposal',
+        dataSnapshot: {
+          proposals: [
+            { id: 'p-sim-1', title: '深度专注: 上午核心工作', startTime: '09:00', endTime: '11:00' },
+            { id: 'p-sim-2', title: '协作: 午后站会同步', startTime: '14:00', endTime: '15:00' },
+            { id: 'p-sim-3', title: '复盘: 收尾整理', startTime: '16:30', endTime: '17:00' },
+          ],
+          revertableBatches: [],
+          needConfirm: false,
+          archetypeCandidates: [],
+          confirmReason: '',
+          score: 8.5,
+          dimensions: { energy: 9, conflict: 8, balance: 8, priority: 9, buffer: 8 },
+        },
+      },
+    })
   })
 
   it('点 revert 后 submitCnuiSurface 被以 (timebox, revertSmartTimeboxes, { batchId }) 调用', async () => {

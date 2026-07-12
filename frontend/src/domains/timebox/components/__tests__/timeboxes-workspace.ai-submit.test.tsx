@@ -7,16 +7,15 @@ import { describe, it, expect, vi } from 'vitest'
 
 const submitDynamicIntentMock = vi.fn()
 const submitCnuiSurfaceMock = vi.fn()
-
-vi.mock('@/app/actions/intent', () => ({
-  submitDynamicIntent: (...a: unknown[]) => submitDynamicIntentMock(...a),
-  submitCnuiSurface: (...a: unknown[]) => submitCnuiSurfaceMock(...a),
-}))
-
+const openCnuiSurfaceMock = vi.fn()
 const getTimeboxesByRangeMock = vi.fn()
 const getItinerariesByRangeMock = vi.fn()
 
+// 单一 vi.mock 注册所有 intent 模块导出（[028.2] T1: 补 openCnuiSurface）
 vi.mock('@/app/actions/intent', () => ({
+  submitDynamicIntent: (...a: unknown[]) => submitDynamicIntentMock(...a),
+  submitCnuiSurface: (...a: unknown[]) => submitCnuiSurfaceMock(...a),
+  openCnuiSurface: (...a: unknown[]) => openCnuiSurfaceMock(...a),
   getTimeboxesByRange: (...a: unknown[]) => getTimeboxesByRangeMock(...a),
   getItinerariesByRange: (...a: unknown[]) => getItinerariesByRangeMock(...a),
 }))

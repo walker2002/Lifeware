@@ -56,3 +56,25 @@ export function hhmmToIso(hhmm: string, date: string): string {
   // UTC ISO (Z 结尾);与 [023.09] canonical UTC invariant 一致
   return `${date}T${hhmm}:00.000Z`
 }
+
+/**
+ * [028.2] T1: ISO 8601 timestamp → "HH:MM" 字符串（按 Asia/Shanghai 时区显示）。
+ *
+ * Reverse of `hhmmToIso`：orchestration handler 输出的 payload.startTime/endTime 是 UTC ISO，
+ * cnui surface Proposal.startTime/endTime 是 "HH:MM"（human-friendly）。本 helper 强制按
+ * `Asia/Shanghai` 时区转换（与 workspace 既有 getTodayDate 约定一致），避免 Node 默认时区漂移。
+ *
+ * 非法/空输入返回空串（不抛）；fallback 行为与 `isoToLocalDatetimeInput` 对齐。
+ */
+export function isoToHhmmInShanghai(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  // en-GB locale 输出 "HH:MM"（24h，零填充），跨 Node/browser 一致
+  return d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Shanghai',
+  })
+}

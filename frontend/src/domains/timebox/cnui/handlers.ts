@@ -10,15 +10,49 @@ import { TimeboxRepository, AppointmentRepository } from '@/domains/timebox/repo
 import { TaskRepository } from '@/domains/tasks/repository'
 import { HabitRepository } from '@/domains/habits/repository/habit'
 import { HabitLogRepository } from '@/domains/habits/repository/habit-log'
-import type { Timebox, Task, Habit } from '@/usom/types/objects'
+import type { Timebox, Task, Habit, StructuredIntent } from '@/usom/types/objects'
 import type { USOM_ID, Timestamp } from '@/usom/types/primitives'
-import { hhmmToIso } from './surfaces/time-input-helpers'
+import { hhmmToIso, isoToHhmmInShanghai } from './surfaces/time-input-helpers'
 // [023.08] T4 — batch undo：AI session state 记录 + revert（revertSmartTimeboxes action）
 import { recordBatchProposals, revertBatchProposals, getRevertableBatches } from '@/nexus/ai-runtime/memory/batch-proposals'
 // [028] I-2 polish: SCHEDULE_PROPOSAL_ACTION + SCHEDULE_PROPOSAL_SURFACE 常量（防字符串漂移）
 import { SCHEDULE_PROPOSAL_ACTION, SCHEDULE_PROPOSAL_SURFACE } from '../constants'
+// [028.2] T1: 调 TimeboxOrchestrationHandler.onGenerate 跑 4 源归集 + §04 + Tier0/1/2 + 5 维评分；
+//   createAIRuntime 是 [023.08] T1 已 ship 的 mock LLM provider 入口
+import { TimeboxOrchestrationHandler } from '@/domains/timebox/handlers/orchestration-handler'
+import { createAIRuntime } from '@/nexus/ai-runtime'
 
 const MVP_USER_ID = '00000000-0000-0000-0000-000000000001'
+
+/**
+ * [028.2] T1 fix (I-1): 构造 TimeboxOrchestrationHandler.onGenerate 所需的 StructuredIntent。
+ *
+ * GenerationRequest.intent 是 StructuredIntent 全字段（[usom] id/intentionId/resolvedBy/createdAt）；
+ *   orchestration handler 自身不读这些字段（onGenerate 路径只读 action/fields/nlText），
+ *   但 tsc 要求存在。confidence=1（CNUI 直调视作确定）。
+ *
+ * 集中构造避免散落 `as never` type-pun（reviewer I-1 建议）；
+ *   USOM_ID/Timestamp 是 brand-typed string（[usom] primitives），用 `as unknown as` 一次穿透
+ *   后续逐字段赋值，比每处散落 `as never` 更可读。
+ */
+function buildCnuiSurfaceIntent(
+  action: string,
+  fields: Record<string, unknown>,
+): StructuredIntent {
+  // USOM_ID / Timestamp 是 brand-typed string（[usom] primitives），
+  //   crypto.randomUUID()/new Date().toISOString() 返 plain string，
+  //   整体一次穿透 type brand（handler 不读这些字段，仅 tsc 契约要求存在）
+  return {
+    id: crypto.randomUUID() as unknown as StructuredIntent['id'],
+    intentionId: crypto.randomUUID() as unknown as StructuredIntent['intentionId'],
+    action,
+    targetDomain: 'timebox',
+    fields,
+    confidence: 1,
+    resolvedBy: 'cnui_surface',
+    createdAt: new Date().toISOString() as unknown as StructuredIntent['createdAt'],
+  }
+}
 
 /**
  * 获取今日日期字符串
@@ -131,6 +165,65 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
         windowMs: 5 * 60 * 1000,
       }).catch(() => [])
 
+      // [028.2] T1: 调 TimeboxOrchestrationHandler.onGenerate 跑 4 源归集 + §04 + Tier0/1/2 + 5 维评分。
+      //   - 输入：contexts 内 existingTimeboxes/activeTasks/pendingHabits（[028] T1 已 ship）；onGenerate 内部
+      //     collectMaterials 还读 appointments/templates/nlResult（[028] T1 provider 注入 / T6 NL 注入）。
+      //   - 输出：proposalSet.proposals（已含 sourceType/priority）+ 5 维 score/dimensions
+      //     （[028] T7 fold 通过 type-pun 注入 result.score / result.dimensions）。
+      //   - 异常降级：throw → proposals=[] + console.warn + UI 提示「编排暂不可用」，
+      //     不阻塞 panel 打开；其他上下文字段（timeboxes/tasks/habits/revertableBatches）仍正常返回。
+      let proposals: Array<{ id: string; title: string; startTime: string; endTime: string }> = []
+      let score: number | undefined
+      let dimensions: Record<string, number> | undefined
+      let needConfirm = false
+      let archetypeCandidates: unknown[] = []
+      let confirmReason = ''
+      try {
+        const aiRuntime = createAIRuntime()  // [023.08] T1 mock LLM provider（已在 dev/test 就位）
+        const orchestrator = new TimeboxOrchestrationHandler()
+        const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+        const result = await orchestrator.onGenerate({
+          intent: buildCnuiSurfaceIntent(SCHEDULE_PROPOSAL_ACTION, { date: todayLocal }),
+          contexts: {
+            existingTimeboxes: timeboxes,
+            activeTasks: tasks,
+            pendingHabits: habits,
+            // [028] T1 contexts：appointments/templates 由 provider 注入（[028] T1 已 ship）；
+            //   handler.collectMaterials 已读；onGenerate 路径下若无 nlText 不读 nlResult。
+          },
+        }, aiRuntime)
+
+        // [028] T6：低置信 / Tier0 冲突 → needConfirm=true，proposals 留空
+        //   type-pun 字段（needConfirm/archetypeCandidates/confirmReason）由 handler 注入到 result
+        if ((result as { needConfirm?: boolean }).needConfirm) {
+          needConfirm = true
+          archetypeCandidates = (result as { archetypeCandidates?: unknown[] }).archetypeCandidates ?? []
+          confirmReason = (result as { confirmReason?: string }).confirmReason ?? ''
+        } else if (result.proposalSet?.proposals) {
+          // ISO UTC (payload.startTime/endTime) → HH:MM (Asia/Shanghai)
+          // 沿用 workspace 既有约定；与 createTimebox submit HH:MM→ISO UTC 是反向操作
+          proposals = result.proposalSet.proposals.map((p) => {
+            const payload = (p.payload ?? {}) as { title?: string; startTime?: string; endTime?: string }
+            const isoStart = payload.startTime
+            const isoEnd = payload.endTime
+            return {
+              id: p.id ?? `prop-${payload.title ?? 'unknown'}-${isoStart ?? 'x'}`,
+              // GeneratedProposal 没有顶层 title 字段（[usom]）；title 走 payload.title
+              title: payload.title ?? '未命名',
+              startTime: isoStart ? isoToHhmmInShanghai(isoStart) : '',
+              endTime: isoEnd ? isoToHhmmInShanghai(isoEnd) : '',
+            }
+          })
+          // [028] T7：5 维评分通过 type-pun 注入 result
+          const extended = result as { score?: number; dimensions?: Record<string, number> }
+          score = extended.score
+          dimensions = extended.dimensions
+        }
+      } catch (e) {
+        console.warn('[timeboxCnuiHandler] scheduleProposal open onGenerate 失败（降级返空 proposals）:', e)
+        // 降级：proposals/score/dimensions 留默认（empty/undefined），其他 context 字段仍返回
+      }
+
       return {
         content: '智能编排时间盒 — 根据您的任务、习惯和能量曲线，AI 将自动生成今日时间盒方案',
         dataSnapshot: {
@@ -158,6 +251,13 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             acceptedAt: b.acceptedAt,
             count: b.proposals.length,
           })),
+          // [028.2] T1：onGenerate 产物注入
+          proposals,
+          score,
+          dimensions,
+          needConfirm,
+          archetypeCandidates,
+          confirmReason,
         },
       }
     }

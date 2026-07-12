@@ -47,6 +47,10 @@ interface ArchetypeCandidate {
   reason: string
 }
 
+// [028.2] T1 fix (I-2): re-export ArchetypeCandidate 给 workspace（timeboxes-workspace.tsx）
+//   state type 对齐 source union，避免 `as never` lose-cast
+export type { ArchetypeCandidate }
+
 interface ScheduleProposalProps {
   surfaceType: string
   dataModel: {
@@ -57,6 +61,9 @@ interface ScheduleProposalProps {
     archetypeCandidates?: ArchetypeCandidate[]
     confirmReason?: string
     handoffHint?: string
+    // [028.2] T1: 5 维评分透传 — AIOrchestratePanel 顶部 score 徽章
+    score?: number
+    dimensions?: Record<string, number>
   }
   onDataChange: (d: Record<string, unknown>) => void
   onConfirm: (d: Record<string, unknown>) => void
@@ -72,6 +79,9 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
   const archetypeCandidates = dataModel.archetypeCandidates ?? []
   const confirmReason = dataModel.confirmReason ?? ''
   const handoffHint = dataModel.handoffHint ?? ''
+  // [028.2] T1: 5 维评分透传
+  const score = dataModel.score
+  const dimensions = dataModel.dimensions
 
   // [023.08] T5：rejected Set 跟踪用户拒绝的 proposal（默认全部接受；点「拒绝」加入 set）
   const [rejected, setRejected] = useState<Set<string>>(new Set())
@@ -151,11 +161,14 @@ export function ScheduleProposal({ dataModel, onDataChange, onConfirm, onCancel,
 
   return (
     <div className="space-y-4">
-      {/* AI 编排建议面板 + 接受/拒绝按钮 */}
+      {/* AI 编排建议面板 + 接受/拒绝按钮
+          [028.2] T1: 5 维评分透传（score/dimensions optional,onGenerate 不返时为 undefined） */}
       {proposals.length > 0 && (
         <AIOrchestratePanel
           proposals={proposals}
           rejected={rejected}
+          score={score}
+          dimensions={dimensions}
           onAccept={(id) => {
             const next = new Set(rejected)
             next.delete(id)

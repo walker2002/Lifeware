@@ -275,3 +275,183 @@ describe('[028] T9 scheduleProposal action registration + R12', () => {
     expect(surfaceHandlers['create-smart-timebox']).toBe(timeboxCnuiHandler)
   })
 })
+
+// ─── [028.2] scheduleProposal open 调 TimeboxOrchestrationHandler.onGenerate ─────
+// [028.2] T1: cnui handler open scheduleProposal 调 onGenerate + 把 proposals/score/dimensions/needConfirm 注入 dataSnapshot
+//
+// Mock 边界说明（与 createSmartTimeboxes-integration.test.ts 同模式）：
+// - TimeboxOrchestrationHandler.onGenerate mock（不让其触发真实 4 源归集 + LLM 调用）
+// - TimeboxRepository / TaskRepository / HabitRepository mock（不让其命中真 PG）
+// - createAIRuntime mock（不让其触发真实 LLM gateway）
+
+describe('[028.2] scheduleProposal open 调 TimeboxOrchestrationHandler.onGenerate', () => {
+  // 集中 mock：在顶层用 vi.mock 拦截 dependency 模块
+  const onGenerateMock = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 默认 mock 返回：onGenerate 返回正常 proposalSet + score + dimensions
+    onGenerateMock.mockResolvedValue({
+      proposalSet: {
+        id: 'pset-1',
+        label: '今日智能编排方案',
+        proposals: [
+          {
+            id: 'p-1',
+            action: 'createTimebox',
+            sourceType: 'task',
+            priority: 'P1',
+            payload: {
+              title: '上午写作',
+              date: '2026-07-12',
+              startTime: '2026-07-12T01:00:00.000Z',
+              endTime: '2026-07-12T03:00:00.000Z',
+              durationMinutes: 120,
+            },
+          },
+        ],
+      },
+      warnings: [],
+      // [028] T7 fold：score/dimensions 通过 type-pun 注入到 result
+      score: 8.5,
+      dimensions: { energy: 9.0, conflict: 8.0, balance: 8.5, priority: 9.0, buffer: 8.0 },
+    })
+  })
+
+  it('调 onGenerate 并把 proposalSet.proposals 注入 dataSnapshot.proposals (ISO UTC → HH:MM 转换)', async () => {
+    // 动态 mock：让 timeboxCnuiHandler 内 new TimeboxOrchestrationHandler().onGenerate 走 stub
+    vi.doMock('@/domains/timebox/handlers/orchestration-handler', () => ({
+      TimeboxOrchestrationHandler: class {
+        async onGenerate() { return onGenerateMock() }
+        async handle() { throw new Error('not used in this test') }
+      },
+    }))
+    vi.doMock('@/domains/timebox/repository', () => ({
+      TimeboxRepository: class {
+        findByDateRange() { return [] }
+      },
+      AppointmentRepository: class {
+        findActive() { return [] }
+      },
+    }))
+    vi.doMock('@/domains/tasks/repository', () => ({
+      TaskRepository: class {
+        findByStatus() { return [] }
+      },
+    }))
+    vi.doMock('@/domains/habits/repository/habit', () => ({
+      HabitRepository: class {
+        findByUserId() { return [] }
+      },
+    }))
+    vi.doMock('@/domains/habits/repository/habit-log', () => ({
+      HabitLogRepository: class {
+        findByUserAndDate() { return [] }
+      },
+    }))
+    vi.doMock('@/nexus/ai-runtime', () => ({
+      createAIRuntime: () => ({ generate: vi.fn(), stream: vi.fn() }),
+    }))
+
+    vi.resetModules()
+    const mod = await import('@/domains/timebox/cnui/handlers')
+    const r = await mod.timeboxCnuiHandler.open('scheduleProposal', {})
+    const snapshot = r.dataSnapshot as any
+    // proposals 注入
+    expect(snapshot.proposals).toBeDefined()
+    expect(snapshot.proposals).toHaveLength(1)
+    // ISO UTC → HH:MM 转换（Asia/Shanghai 时区，2026-07-12T01:00Z → 09:00）
+    expect(snapshot.proposals[0].title).toBe('上午写作')
+    expect(snapshot.proposals[0].startTime).toBe('09:00')
+    expect(snapshot.proposals[0].endTime).toBe('11:00')
+    // score/dimensions 注入
+    expect(snapshot.score).toBe(8.5)
+    expect(snapshot.dimensions).toEqual({ energy: 9.0, conflict: 8.0, balance: 8.5, priority: 9.0, buffer: 8.0 })
+    // needConfirm 默认 false
+    expect(snapshot.needConfirm).toBe(false)
+    expect(snapshot.archetypeCandidates).toEqual([])
+  })
+
+  it('onGenerate 返 needConfirm=true → dataSnapshot.needConfirm=true + archetypeCandidates 透传', async () => {
+    onGenerateMock.mockResolvedValueOnce({
+      proposalSet: { id: 'pset-empty', proposals: [], tags: ['need-confirm'] },
+      warnings: [{ code: 'NL_LOW_CONFIDENCE', message: '置信度低', severity: 'confirm' }],
+      needConfirm: true,
+      archetypeCandidates: [
+        { id: '__manual_appointment__', title: '手动改约定', source: 'fallback', reason: '测试用候选' },
+      ],
+      confirmReason: 'NL 置信度低（0.30 < 0.6）',
+    })
+
+    vi.doMock('@/domains/timebox/handlers/orchestration-handler', () => ({
+      TimeboxOrchestrationHandler: class {
+        async onGenerate() { return onGenerateMock() }
+      },
+    }))
+    vi.doMock('@/domains/timebox/repository', () => ({
+      TimeboxRepository: class { findByDateRange() { return [] } },
+      AppointmentRepository: class { findActive() { return [] } },
+    }))
+    vi.doMock('@/domains/tasks/repository', () => ({
+      TaskRepository: class { findByStatus() { return [] } },
+    }))
+    vi.doMock('@/domains/habits/repository/habit', () => ({
+      HabitRepository: class { findByUserId() { return [] } },
+    }))
+    vi.doMock('@/domains/habits/repository/habit-log', () => ({
+      HabitLogRepository: class { findByUserAndDate() { return [] } },
+    }))
+    vi.doMock('@/nexus/ai-runtime', () => ({
+      createAIRuntime: () => ({ generate: vi.fn(), stream: vi.fn() }),
+    }))
+
+    vi.resetModules()
+    const mod = await import('@/domains/timebox/cnui/handlers')
+    const r = await mod.timeboxCnuiHandler.open('scheduleProposal', {})
+    const snapshot = r.dataSnapshot as any
+    expect(snapshot.needConfirm).toBe(true)
+    expect(snapshot.archetypeCandidates).toHaveLength(1)
+    expect(snapshot.archetypeCandidates[0].title).toBe('手动改约定')
+    expect(snapshot.confirmReason).toBe('NL 置信度低（0.30 < 0.6）')
+    expect(snapshot.proposals).toEqual([])
+  })
+
+  it('onGenerate throw → dataSnapshot.proposals=[] + 不抛到 caller（catch 内降级）', async () => {
+    onGenerateMock.mockRejectedValueOnce(new Error('LLM provider 不可达'))
+
+    vi.doMock('@/domains/timebox/handlers/orchestration-handler', () => ({
+      TimeboxOrchestrationHandler: class {
+        async onGenerate() { return onGenerateMock() }
+      },
+    }))
+    vi.doMock('@/domains/timebox/repository', () => ({
+      TimeboxRepository: class { findByDateRange() { return [] } },
+      AppointmentRepository: class { findActive() { return [] } },
+    }))
+    vi.doMock('@/domains/tasks/repository', () => ({
+      TaskRepository: class { findByStatus() { return [] } },
+    }))
+    vi.doMock('@/domains/habits/repository/habit', () => ({
+      HabitRepository: class { findByUserId() { return [] } },
+    }))
+    vi.doMock('@/domains/habits/repository/habit-log', () => ({
+      HabitLogRepository: class { findByUserAndDate() { return [] } },
+    }))
+    vi.doMock('@/nexus/ai-runtime', () => ({
+      createAIRuntime: () => ({ generate: vi.fn(), stream: vi.fn() }),
+    }))
+
+    vi.resetModules()
+    const mod = await import('@/domains/timebox/cnui/handlers')
+    // 不应 throw
+    const r = await mod.timeboxCnuiHandler.open('scheduleProposal', {})
+    const snapshot = r.dataSnapshot as any
+    expect(snapshot.proposals).toEqual([])
+    expect(snapshot.needConfirm).toBe(false)
+    // 其他上下文字段仍返回（timeboxes/tasks/habits/revertableBatches 来自原 handler 路径）
+    expect(snapshot.existingTimeboxes).toBeDefined()
+    expect(snapshot.activeTasks).toBeDefined()
+    expect(snapshot.pendingHabits).toBeDefined()
+    expect(snapshot.revertableBatches).toBeDefined()
+  })
+})
