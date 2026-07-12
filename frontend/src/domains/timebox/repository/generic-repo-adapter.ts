@@ -70,11 +70,18 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
         return updated
       },
       async updateFields(id, fields, userId, expectedOccVersion, tx) {
-        // [TD-003] T2: 透传 expectedOccVersion 给仓储 OCC 谓词。
-        // GenericRepo 把它设为可选（兼容 habits/tasks/okrs adapter），但
-        // TimeboxRepository.updateFields 要求 number；此处把 undefined 收敛为 0
-        // （Task 3/4 真实 caller 会传有效 occVersion；0 仅作 fallback）。
-        return repos.timeboxRepo.updateFields(id, fields, userId, expectedOccVersion ?? 0, tx)
+        // [TD-003] T3：消除硬码 0 占位符。GenericRepo 接口把 expectedOccVersion
+        // 标为可选（兼容 habits/tasks/okrs adapter），但 timebox 域 OCC 已实装——
+        // undefined 时 **throw**（fail-fast），不再静默回退到 0。caller 必须
+        // 主动透传：field-executor.executeBatch 会用 step.expectedOccVersion 或
+        // repo.findById 读 current 兜底（详见 [TD-003] T3 executor 注释）。
+        if (typeof expectedOccVersion !== 'number') {
+          throw new Error(
+            `timebox GenericRepo.updateFields 必须传 expectedOccVersion: number，`
+            + `收到 ${typeof expectedOccVersion}。caller 路径走 field-executor.executeBatch 或显式传值`,
+          )
+        }
+        return repos.timeboxRepo.updateFields(id, fields, userId, expectedOccVersion, tx)
       },
     },
     // [023.12] T5: 约定独立 GenericRepo 键，updateStatus 派发到 3 态路径

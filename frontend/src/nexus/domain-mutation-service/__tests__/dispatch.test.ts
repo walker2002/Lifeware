@@ -39,6 +39,10 @@ function makeRepo(): GenericRepo {
 function makeExecutor(): FieldExecutor {
   return {
     execute: vi.fn().mockResolvedValue({ kind: 'Passed' }),
+    // [TD-003] T3 executeBatch — 聚合写路径使用。当前 dispatch.test.ts 主要
+    // 覆盖 update() 单字段路径（execute）和 execute() 单 field step 路径，
+    // executeBatch 未直接调用，但 FieldExecutor 类型要求存在此方法。
+    executeBatch: vi.fn().mockResolvedValue({ kind: 'Passed' }),
   }
 }
 
