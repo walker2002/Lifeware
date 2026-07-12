@@ -213,8 +213,13 @@ export async function revertTimebox(
   // [023.13] P3：确认清空分支——UI 弹窗确认后传 clearExecutionRecord=true
   if (opts?.clearExecutionRecord) {
     // AM3 复用 updateFields：单条 UPDATE，T-02 userId 过滤，与持久化修复同通道
-    // [TD-003] T2 临时兼容：clearExecutionRecord 走 updateFields OCC 必填——传
-    // 当前 row 的 occVersion。Task 4 重构会引入 retry 回路。
+    // [TD-003] T2 OCC 必填：clearExecutionRecord 走 updateFields 原子 UPDATE WHERE
+    // occ_version = tb.occVersion；0 rows → 抛 ConflictError（drawer toast + reload）。
+    // **stale-read limitation（second-opinion review Important #1）**：此处 `tb.occVersion`
+    // 是函数入口 read 的，与下面 submitDynamicIntent('revertTimebox') 之间存在小窗口
+    // （同 process 串行同步代码，μs 级），如果用户其他 tab 在该窗口改 row，第二个 SM
+    // revert 会抛 ConflictError——已通过 outer catch 兜底转通用「保存失败」toast。
+    // Future fix: 把 read+clearExecutionRecord+revert 包到单 transaction + 单一 OCC 校验。
     await repo.updateFields(
       timeboxId as USOM_ID,
       { executionRecord: null },
