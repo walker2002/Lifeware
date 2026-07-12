@@ -46,10 +46,10 @@ export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, is
 
   // [023.04] 内部重叠预检（同日 batch 内多条互判）。
   //   useMemo 缓存：items 引用变化才重算；用户翻页/编辑文本框不触发。
-  //   dayStart/dayEnd 仅为 API 兼容位（与已有 today 列表的比较在服务端 rule）。
+  //   [TD-011] 已删除未用的 dayStart/dayEnd 参数（[023.04] 设计时预留,实际实现走纯 epoch 算术不需要）;
+  //   与已有 today 列表的比较仍在服务端 rule（timebox-overlap rule）做单一权威源。
   const overlap = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
-    return assertNoInternalOverlap(items, today + 'T00:00:00+08:00', today + 'T23:59:59+08:00')
+    return assertNoInternalOverlap(items)
   }, [items])
   const hasOverlap = overlap.hasOverlap
 

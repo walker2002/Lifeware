@@ -9,17 +9,15 @@ import { describe, it, expect } from 'vitest'
 import { assertNoInternalOverlap, type OverlapItem } from '../overlap'
 
 const day = (h: number, m = 0) => `2026-07-04T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`
-const dayStart = '2026-07-04T00:00:00+08:00'
-const dayEnd = '2026-07-05T00:00:00+08:00'
 
 describe('[023.04] assertNoInternalOverlap', () => {
   it('空数组 → hasOverlap=false', () => {
-    expect(assertNoInternalOverlap([], dayStart, dayEnd)).toEqual({ hasOverlap: false, conflictTitles: [] })
+    expect(assertNoInternalOverlap([])).toEqual({ hasOverlap: false, conflictTitles: [] })
   })
 
   it('单条 → hasOverlap=false', () => {
     const items: OverlapItem[] = [{ title: 'A', startTime: day(9), endTime: day(10) }]
-    expect(assertNoInternalOverlap(items, dayStart, dayEnd).hasOverlap).toBe(false)
+    expect(assertNoInternalOverlap(items).hasOverlap).toBe(false)
   })
 
   it('两条完全不重叠 → hasOverlap=false', () => {
@@ -27,7 +25,7 @@ describe('[023.04] assertNoInternalOverlap', () => {
       { title: 'A', startTime: day(9), endTime: day(10) },
       { title: 'B', startTime: day(11), endTime: day(12) },
     ]
-    expect(assertNoInternalOverlap(items, dayStart, dayEnd).hasOverlap).toBe(false)
+    expect(assertNoInternalOverlap(items).hasOverlap).toBe(false)
   })
 
   it('两条完全重叠 → hasOverlap=true + conflictTitles 含双方', () => {
@@ -35,7 +33,7 @@ describe('[023.04] assertNoInternalOverlap', () => {
       { title: 'A', startTime: day(9), endTime: day(11) },
       { title: 'B', startTime: day(10), endTime: day(12) },
     ]
-    const r = assertNoInternalOverlap(items, dayStart, dayEnd)
+    const r = assertNoInternalOverlap(items)
     expect(r.hasOverlap).toBe(true)
     expect(r.conflictTitles).toContain('A')
     expect(r.conflictTitles).toContain('B')
@@ -46,7 +44,7 @@ describe('[023.04] assertNoInternalOverlap', () => {
       { title: 'A', startTime: day(9), endTime: day(10) },
       { title: 'B', startTime: day(10), endTime: day(11) },
     ]
-    expect(assertNoInternalOverlap(items, dayStart, dayEnd).hasOverlap).toBe(false)
+    expect(assertNoInternalOverlap(items).hasOverlap).toBe(false)
   })
 
   it('跨日不算同日重叠', () => {
@@ -54,6 +52,6 @@ describe('[023.04] assertNoInternalOverlap', () => {
       { title: 'A', startTime: '2026-07-04T23:00:00+08:00', endTime: '2026-07-05T01:00:00+08:00' },
       { title: 'B', startTime: '2026-07-05T09:00:00+08:00', endTime: '2026-07-05T10:00:00+08:00' },
     ]
-    expect(assertNoInternalOverlap(items, dayStart, dayEnd).hasOverlap).toBe(false)
+    expect(assertNoInternalOverlap(items).hasOverlap).toBe(false)
   })
 })

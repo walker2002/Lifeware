@@ -30,8 +30,6 @@ export interface OverlapResult {
 
 export function assertNoInternalOverlap(
   items: OverlapItem[],
-  _dayStart: string,
-  _dayEnd: string,
 ): OverlapResult {
   const conflictTitles: string[] = []
   for (let i = 0; i < items.length; i++) {
