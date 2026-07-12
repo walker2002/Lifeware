@@ -1,9 +1,12 @@
 ---
 id: TD-011
-title: I-3 assertNoInternalOverlap _dayStart/_dayEnd unused params
-status: 登记
+title: I-3 assertNoInternalOverlap _dayStart/_dayEnd unused params → 删除未用参数
+status: ✅ 已修复
+severity: ⚪ → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: main 57844c2 (轻量级 main 直接改)
 ---
 
 # TD-011: I-3 assertNoInternalOverlap _dayStart/_dayEnd unused params
@@ -80,6 +83,15 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 [023.04] plan-eng-review 21 findings I-3
+- 2026-07-12 · 「技术债清除会话[001-002]」本次修复:
+  - **(a) overlap.ts**: 函数签名删除 `_dayStart: string, _dayEnd: string` 两个未用参数(保留实现走纯 epoch 算术)
+  - **(b) overlap.test.ts**: 调用方清理,`dayStart`/`dayEnd` 常量删除（[023.04] 测试 fixture 不再需要这俩 wrapper arg）
+  - **(c) CreateTimebox.tsx**: useMemo 调用简化,不再计算 `today + 'T00:00:00+08:00'` 边界字面量
+  - **轻量级 main 直接改**(单文件改影响小,符合 CLAUDE.md「轻量级任务」流程):commit `57844c2` push origin main
+  - vitest: 6/6 PASS (overlap.test.ts 全 6 case 不变)
+  - tsc: 0 新增
+  - pre-push hook: `validate:rules-registry` 6 项一致
+- 2026-07-12 · **TD-011 关闭**:trivial unused-param 清理完成,签名与实现语义对齐
 
 ## 关联
 

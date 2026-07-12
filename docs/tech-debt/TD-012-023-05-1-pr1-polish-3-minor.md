@@ -1,9 +1,12 @@
 ---
 id: TD-012
-title: [023.05-1] PR1 Polish 3 Minor(测试文案残留旧词)
-status: 登记
+title: [023.05-1] PR1 Polish 3 Minor(测试文案残留旧词) → 后续 PR2 + neat 已自动清理
+status: ✅ 已修复
+severity: ⚪ → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: 后续 [023.05-1] PR2 + [neat-2026_07_12] 自动清理
 ---
 
 # TD-012: [023.05-1] PR1 Polish 3 Minor(测试文案残留旧词)
@@ -85,6 +88,15 @@ last_updated: 2026-07-06
 
 - 2026-07-06 · [023.10] · 创建条目,源自 [023.05-1] PR1 polish follow-up 遗留
 - 2026-07-05 · [023.05-1] PR1 polish commit `f0efd68` · 4 Minor 修了 1 处,3 处遗留
+- 2026-07-05 · [023.05-1] PR2 (`7283a8e`) · whole-branch review 抓出并修了其中部分残留
+- 2026-07-05 · [023.07] neat / [027-b] template polish · 修残留
+- 2026-07-06 · [023.10] postship-defer cleanup · 修残留
+- 2026-07-12 · **本次会话「技术债清除会话[001-002]」grep 闭环验证**:
+  - `grep -rn 'view_schedule' src/` → 0 hits(原 TD-012 提及的 `action-view.test.tsx:75` 已不被命中)
+  - `grep -n '调整日程' src/domains/timebox/cnui/__tests__/handlers.test.ts` → line 139 已是「应包含未打卡的习惯」(非「调整日程」),it() title 早被 PR2 polish 替换
+  - `domain-types.test.ts:170-172` fixture keywords 早被替换为「时间盒/timebox」
+  - **故 TD-012 提到 3 处残留 100% 自动闭环**;无新 code 改动需 push
+- 2026-07-12 · **TD-012 关闭**:遗留 fixture 文案已被 PR2 + 后续 commits 自动清理
 
 ## 关联
 
