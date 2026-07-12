@@ -1,14 +1,17 @@
 ---
 id: TD-004
-title: R4 timebox/okrs 写入口债(跨域规则未落地)
-status: 登记
+title: R4 timebox/okrs 写入口债(跨域规则未落地) → 描述与代码脱节,关闭 + 重开为观察债 TD-038
+status: ✅ 已修复
+severity: 🟠 High → ✅ (历史债描述基于过时假设,5 路 grep 0 实际缺口)
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: 文档调研,无代码改动
 ---
 
-# TD-004: R4 timebox/okrs 写入口债(跨域规则未落地)
+# TD-004: R4 timebox/okrs 写入口债 → 描述与代码脱节(关闭 + 重开为观察债)
 
-> 摘要：[018] 第三组规则三层架构 R0/R1/R2/R3 已在 habits+tasks 两域落地(d12215f),但 R4(timebox / okrs 跨域)的写入口债未处理,继续累积。
+> 摘要:TD-004 ledger 创建时(2026-07-06)基于过时假设「timebox 该关联 OKR」。2026-07-12 用户洞察「timebox 不该直接关联 OKR,tasks/habits/appointments 才是 OKR 关联对象」+ 5 路 grep 验证 ledger 描述无对应债。关闭 TD-004 + 新开观察债 TD-038(timebox↔{tasks,habits,appointments} 跨域写边界预防性监控)。模式记录:第 7 条「描述与代码脱节」型债闭环(继 TD-007/008/009/010/011/012 后)。
 
 ## 元信息
 
@@ -25,6 +28,9 @@ last_updated: 2026-07-06
 
 ## 现象（What）
 
+> ⚠️ **历史描述基于过时假设**,2026-07-12 关闭时验证:ledger 描述「timebox↔okrs 跨域联动」无对应代码债。详见下方「跟踪记录」2026-07-12 调研条目。
+
+**历史描述(2026-07-06 ledger 原文)**:
 timebox 和 okrs 两个域之间的规则联动仍按"各自独立"实现,无统一写入口,导致：
 - timebox 完成时触发 OKR progress 联动 → 通过直接调用 OKR repository 绕开 orchestrator
 - OKR 进度变化触发建议生成 timebox → 通过直接调用 timebox repository 绕开 orchestrator
@@ -81,15 +87,35 @@ timebox 和 okrs 两个域之间的规则联动仍按"各自独立"实现,无统
 
 ## 验收标准（Done Criteria）
 
-- [ ] R4 design session 完成,产出 spec 到 `docs/superpowers/specs/`
-- [ ] plan-eng-review APPROVED
-- [ ] 实现跨域写入口,timebox ↔ OKR 联动走 orchestrator
-- [ ] vitest 跨域事务测试通过(失败回滚场景)
-- [ ] 宪章补"跨域写边界"条款
-- [ ] 已更新 docs/usom-design.md + docs/database-design.md
+> ⚠️ **历史验收标准全部作废**,基于错误前提。
+
+- [x] 5 路 grep 验证 ledger 描述无对应债(2026-07-12)
+- [x] 用户洞察确认 timebox↔okrs 反产品决策(2026-07-12)
+- [x] 真实对象图重画:tasks/habits/appointments ↔ okrs(timebox 不直接关联 OKR)
+- [x] TD-038 观察债新建,继承预防性监控职责
+- [x] README.md 索引同步:TD-004 → 已修复,TD-038 → 新建
+- [x] 无 DDL / 无 manifest 变更 / 无宪章修订 / 无代码改动
+- [x] 历史记录保留(审计可追溯)
 
 ## 跟踪记录（History）
 
+- 2026-07-12 · 「技术债清除会话[003]」调研 + **关闭**(无代码改动):
+  - **关键发现**:TD-004 ledger 描述「timebox ↔ OKR 跨域联动」基于**过时假设**(timebox 该关联 OKR)。实际代码 grep 验证:
+    - ① `grep keyResultId frontend/src/lib/db/schema.ts timebox 表` = **0 hits**(`timeboxes` 表 schema.ts:354 无 keyResultId 列)
+    - ② `grep "linked_kr\|kr_id\|okrsRepository" frontend/src/domains/timebox/` = **0 hits**
+    - ③ `grep "timeboxRepository\|\.timeboxes\." frontend/src/domains/okrs/` = **0 hits**
+    - ④ `grep "okrRepository\|keyResultRepository" frontend/src/app/actions/timebox.ts` = **0 hits**
+    - ⑤ `grep "keyResultId\|krId" frontend/src/usom/` = **0 hits**
+  - **用户洞察(2026-07-12)**:「timebox 内容的来源,应该是 tasks、habits 和 Appointments,并不直接和 OKR 关联,而是这三个对象跟 OKR 关联,所以我觉得 timebox.keyResultID 的存在本身是有问题的」
+  - **真实对象图**(代码为权威源):
+    - OKR ↔ {tasks, habits, appointments}(tasks 已 ship [025] D1 模式,habits 保留 [018]/[019],appointments 待启)
+    - timebox ↔ {tasks, habits}(已建 `timebox_tasks` / `timebox_habits` junction 表 + `timeboxes.taskIds[]` / `habitIds[]` soft FK array,**无** cascade 联动)
+    - timebox **不**直接关联 OKR(反产品决策)
+  - **真实跨域写** 已 ship:[025] completeTask 全走 Orchestrator + 复用 mutation service(D1 模式:Orchestrator 契约路径对「带字段 payload 的状态 intent」复用域业务事实写入口做原子字段+状态写)= **单域内复用**,**不**是 R4 跨域事务
+  - **结论**:TD-004 ledger 描述的「跨域规则未落地」**没有真实对应债**。timebox↔okrs 不是真实跨域债,timebox↔{tasks,habits,appointments} 才是(且**无现实联动需求**,纯预防性)。
+  - **用户决策**:关闭 TD-004 + 重开为观察债 [[TD-038]] (跨域写边界预防性监控)。
+  - **模式记录**:第 7 条「描述与代码脱节」型债闭环(继 TD-007/008/009/010/011/012 后)。印证 [[feedback_post-ship-review-meta-pattern]] 第 N+2 次。
+  - **SSOT**: `~/.gstack/projects/walker2002-lifeware/walker-main-design-20260712-TD-004-closure.md`
 - 2026-07-06 · [023.10] · 创建条目,源自 [018] followup 历史遗留
 - 2026-07-12 · 「技术债清除会话[001-002]」调研:
   - **R3 现状**: git log 显示 habits+tasks R3 已修(d12215f ff-merge),`completeTask` 已走 orchestrator(参 [project-025-cascade-decisions])。OKR 写入口 grep 守卫已实装(cbb7ea9 [022] 1B-T14)。

@@ -32,13 +32,13 @@ last_updated: 2026-07-12
 | TD-034 | TaskRepository/ObjectiveRepository updateFields 同模式未验证：dateOnly 列 Drizzle 行为待实测 | ⚪ | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-035 | updateFields 通用归一化 helper 缺失：4 域 repo 各自分散归一化，新域必再踩同坑 | 🟡 | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-036 | [028.2] 9 项 ship-then-polish backlog + 3 项 meta-pattern 债（I-3 + 7 Minor + M-qa-1 + mock-vs-real + GenerationResult type-pun + ISO↔HH:MM 抽象） | 🟠 | lifeware-timebox | [028.2] 2026-07-12 | 暂未指派 |
+| TD-038 | 跨域写边界预防性观察债(timebox↔{tasks,habits,appointments}),继承自 TD-004 关闭 | 🟢 | cross-domain | 2026-07-12 | 暂未指派(产品决策触发时启 R4 design) |
 
 ### 📌 登记（已纳入待办）
 
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 负责人 |
 |---|---|---|---|---|---|
 | TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
-| TD-004 | R4 timebox/okrs 写入口债(跨域规则未落地) | 🟠 | cross-domain | [023.10] | 暂未指派 |
 | TD-005 | MVP_USER_ID 硬码(占位用户身份未走认证) | 🟡 | infra | [023.10] | 暂未指派 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环(双注册缺一层)" → 描述与代码脱节,tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口 | 🟡 → ✅ | lifeware-tasks | [023.10] | 关闭（误记） |
 | TD-008 | lifecycle-configs require('@/...') 多键域债 → [022.01] 已全量迁 ESM import,债自动清 | 🟡 → ✅ | cross-domain | [023.10] | 关闭（已治本） |
@@ -85,6 +85,7 @@ last_updated: 2026-07-12
 | TD-006 | orchestration N+1 sequential ([023.08]+[028] T1 已用 Promise.all 优化 4 源归集 + collectMaterials) | 🟡 → ✅ | lifeware-timebox | [023.10] | [023.08]+[028] 已有改动 | 2026-07-12 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环" → 描述与代码脱节（tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口;暂停主线 = pauseThread,结束任务 = archiveTask,均 4 路全闭合） | 🟡 → ✅ | lifeware-tasks | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 | TD-008 | "lifecycle-configs require('@/...') 多键域债" → [022.01] 已全量迁 ESM import（5 路 grep 验证 0 实际 require 调用,顶部 3 个 ESM static import;多键域 PascalCase longest-match 防护已就位） | 🟡 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
+| TD-004 | "R4 timebox/okrs 写入口债(跨域规则未落地)" → 描述与代码脱节,5 路 grep 0 实际缺口(timebox↔okrs 反产品决策,tasks/habits/appointments 才是 OKR 关联对象);重开为观察债 [[TD-038]] | 🟠 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 
 ## 按领域视图
 
@@ -123,7 +124,8 @@ last_updated: 2026-07-12
 
 ### `cross-domain`
 
-- [[TD-004]] · R4 timebox/okrs 写入口债 · 🟠 High
+- ~~[[TD-004]]~~ · "R4 timebox/okrs 写入口债" · 🟠 High · ✅ 描述与代码脱节(2026-07-12)
+- [[TD-038]] · 跨域写边界预防性观察债(timebox↔{tasks,habits,appointments}) · 🟢 Low(继承自 TD-004 关闭)
 - ~~[[TD-008]]~~ · "lifecycle-configs require 多键域债" · 🟡 Medium · ✅ [022.01] 已治本
 - ~~[[TD-016]]~~ · [023.12] 测试 fixture 漏改: 9 tsc 错 (8 [023.13] 自动清 + 1 fixture) · ✅
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债：hooks + adapter test · 🟡 Medium
@@ -148,7 +150,7 @@ last_updated: 2026-07-12
 - ~~[[TD-001]]~~ · useOrchestrationRecommendations hook 不存在 → ✅ [028.2]
 - ~~[[TD-002]]~~ · logTimebox 批失败不对称 → ✅ PR #11
 - [[TD-003]] · editTimeboxes TOCTOU (待 R4 OCC cross-domain design session, 5-7 人日)
-- [[TD-004]] · R4 timebox/okrs 写入口债 (待 design session, 5-10 人日)
+- ~~[[TD-004]]~~ · "R4 timebox/okrs 写入口债" → ✅ 描述与代码脱节(2026-07-12)
 - [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
 - [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列）
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status JS literals 残留 (Site 0 root source) · ✅ [026.02.4]
@@ -171,6 +173,7 @@ last_updated: 2026-07-12
 - ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · ✅ docs/manifest-rules.md
 - ~~[[TD-014]]~~ · settings.json schema 顶层严格 → ⏸ 搁置
 - ~~[[TD-015]]~~ · Claude Code 内置 /review shadow gstack /review → ⏸ 搁置
+- [[TD-038]] · 跨域写边界预防性观察债(继承自 TD-004 关闭,产品决策触发时启 R4 design)
 
 ### ⚪ Trivial（无影响但已知）
 
@@ -222,7 +225,8 @@ last_updated: 2026-07-12
 | 第 21 批(🟡→✅) | 2026-07-12 | TD-006 关闭(1 条) | orchestration-handler 14 处 for 循环全是 CPU 内存操作,DB 入口统一到 collectMaterials + Promise.all 并行取 4 源,N+1 性能债已闭环 |
 | 第 22 批(🟡→✅) | 2026-07-12 | TD-007 关闭(1 条) | 「Suspend action CNUI 回环未闭环」描述与代码脱节：tasks 域 manifest 从未含 suspendTask action（5 路 grep + 4 文件精读证实 0 缺口）;Suspend 字面量专属 habits 域（suspendHabit 4 路全闭合）;tasks 域真实「暂停主线」= pauseThread、「结束任务」= completeTask/archiveTask 全部 4 路闭合;**模式记录** = 「债目录与代码脱节自查」——任何债关闭前必 5 路 grep + Read 验证,不只看描述就关（类似 [[feedback_post-ship-review-meta-pattern]] 第 N 次）;无代码改动,纯文档调研 |
 | 第 23 批(🟡→✅) | 2026-07-12 | TD-008 关闭(1 条) | 「lifecycle-configs require('@/...') 多键域债」已治本：[022.01] 已全量 require → ESM static import（5 路 grep 验证 0 实际 require 调用,文件顶部 3 个 ESM import）;多键域(okrs: objective/key_result)走 Object.keys(lifecycle) + PascalCase longest-match 防护（[Habits Bug 2]）;TD-008 创建时（2026-07-06）描述已过期;**模式记录** = TD-007/008 连续 2 条「描述与代码脱节」型债,印证债目录与代码漂移自查模式 |
+| 第 24 批(🟠→✅ + 🟢🆕) | 2026-07-12 | TD-004 关闭 + TD-038 新建(2 条) | 「R4 timebox/okrs 写入口债」描述与代码脱节：5 路 grep 验证 0 实际缺口(timeboxes 表无 keyResultId 列 / timebox 域 0 okrsRepository 引用 / okrs 域 0 timeboxRepository 引用 / actions/timebox.ts 0 okr/keyResult repo 引用 / usom/ 0 keyResultId);用户洞察确认「timebox 不该直接关联 OKR,tasks/habits/appointments 才是 OKR 关联对象」;真实跨域写 [025] 已 ship (D1 单域内复用 mutation service 模式,非 R4 跨域事务);关闭 TD-004 + 重开为观察债 TD-038(跨域写边界预防性监控,产品决策触发时启 R4 design);**模式记录** = 第 7 条「描述与代码脱节」型债闭环(继 TD-007/008/009/010/011/012 后) |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-008 关闭）· 🔴0 / 🟠2 / 🟡2 / 🟢2 / ⚪1 / ✅18
+**最后更新**: 2026-07-12 · 共 33 条（本批：TD-004 关闭 + TD-038 新建）· 🔴0 / 🟠3 / 🟡4 / 🟢1(+搁置 2) / ⚪1 / ✅19
