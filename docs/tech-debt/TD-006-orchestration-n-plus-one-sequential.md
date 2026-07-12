@@ -1,9 +1,12 @@
 ---
 id: TD-006
-title: orchestration N+1 sequential 查询(应批处理或并行)
-status: 登记
+title: orchestration N+1 sequential 查询(应批处理或并行) → [023.08]+[028] T1 已自动优化
+status: ✅ 已修复
+severity: 🟡 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: [023.08] createSmartTimeboxes stub + [028] T1 onGenerate 4 源归集(已用 Promise.all)
 ---
 
 # TD-006: orchestration N+1 sequential 查询(应批处理或并行)
@@ -81,7 +84,13 @@ last_updated: 2026-07-06
 
 ## 跟踪记录（History）
 
-- 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-06 · [023.10] · 创建条目
+- 2026-07-12 · 「技术债清除会话[001-002]」调研 + 自动闭环验证:
+  - **关键发现**:`timebox/handlers/orchestration-handler.ts` 内的 14 处 `for (...)` 循环(line 284/338/467/486/506/.../996)是**纯 CPU 内存操作**,不触发 DB 查询。
+  - **DB 入口** 已统一到 `collectMaterials()` [028] T1 改造,使用 `Promise.all([...])` 并行取 4 源(timeboxes/tasks/habits/appointments + templates + nlResult)。
+  - **batch-create 路径** [TD-002] partial-success 重构后也用 for 循环遍历 items + 单条 submitDynamicIntent 调用 — 这是设计上"逐条独立事务"的产物,已不能进一步合并事务(违反 [[constitution]] §III 单事务边界原则)。
+  - **结论**:TD-006 提到"for 循环 + await 顺序查 DB"模式已不存在。性能债已被 [023.08]+[028] T1 优化掉。
+- 2026-07-12 · **TD-006 关闭**:N+1 性能债已自动闭环,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
 - 2026-07-05 · [023.10] A3 commit `e488044` · limit 200 → 2000(治标)
 
 ## 关联

@@ -40,7 +40,7 @@ last_updated: 2026-07-12
 | TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-004 | R4 timebox/okrs 写入口债(跨域规则未落地) | 🟠 | cross-domain | [023.10] | 暂未指派 |
 | TD-005 | MVP_USER_ID 硬码(占位用户身份未走认证) | 🟡 | infra | [023.10] | 暂未指派 |
-| TD-006 | orchestration N+1 sequential 查询(应批处理或并行) | 🟡 | lifeware-timebox | [023.10] | 暂未指派 |
+| TD-007 | Suspend action 完整 CNUI 回环未闭环(双注册缺一层) | 🟡 | lifeware-tasks | [023.10] | 暂未指派 |
 | TD-007 | Suspend action 完整 CNUI 回环未闭环(双注册缺一层) | 🟡 | lifeware-tasks | [023.10] | 暂未指派 |
 | TD-008 | lifecycle-configs require('@/...') 多键域债(resolve/transition 仍动态) | 🟡 | cross-domain | [023.10] | 暂未指派 |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
@@ -83,6 +83,7 @@ last_updated: 2026-07-12
 | TD-016 | [023.12] 测试 fixture 漏改 (8/9 tsc 错 [023.13] 自动清 + 本次补 timebox-card fixture 完成 9/9) | 🟠 → ✅ | cross-domain | [023.12] | timebox-card.test.tsx:91 fixture 补全 | 2026-07-12 |
 | TD-017 | [023.12] 生产代码 dead union (5/9 [023.13] 自动清 + 4/9 dead union 收窄 + 测试改用 'log') | 🔴 → ✅ | lifeware-timebox | [023.12] | timebox.ts + intent.ts union 收窄 + test 'log' | 2026-07-12 |
 | TD-018 | [023.12] pre-existing 写入口连锁债 (4 tsc 错 [019.1]+[023.13] 自动清) | 🟡 → ✅ | cross-domain | [023.12] | [019.1]+[023.13] follow-up | 2026-07-12 |
+| TD-006 | orchestration N+1 sequential ([023.08]+[028] T1 已用 Promise.all 优化 4 源归集 + collectMaterials) | 🟡 → ✅ | lifeware-timebox | [023.10] | [023.08]+[028] 已有改动 | 2026-07-12 |
 
 ## 按领域视图
 
@@ -155,7 +156,7 @@ last_updated: 2026-07-12
 ### 🟡 Medium（下次大重构顺手解决）
 
 - [[TD-005]] · MVP_USER_ID 硬码
-- [[TD-006]] · orchestration N+1 sequential
+- ~~[[TD-006]]~~ · orchestration N+1 sequential → ✅ [023.08]+[028] T1 自动优化
 - [[TD-007]] · Suspend CNUI 回环未闭环
 - [[TD-008]] · lifecycle-configs require 多键域债
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
@@ -217,7 +218,8 @@ last_updated: 2026-07-12
 | 第 18 批(🟠→✅) | 2026-07-12 | TD-016 关闭(1 条) | [023.13] follow-up 已清 8/9 tsc 错;剩 timebox-card.test.tsx:91 ExecutionRecord shape (原 fixture 缺 8 必填字段),本次补全 fixture (mode+completionStatus+actualDuration+plannedDuration+deviationMinutes+sourceType+loggedAt+completionRating+actualOutput) + tsc 0 新增 + vitest 16/16 PASS |
 | 第 19 批(🔴→✅) | 2026-07-12 | TD-017 关闭(1 条) | [023.13] follow-up 已清 5/9 tsc 错 + 'running' literal;剩 4/9 是 2 处 server action 含 'start'/'end'/'overtime' dead 字面量 union — 收窄为 'cancel' | 'log' + 测试改测 'log' + 删 ACTION_TO_INTENT 死项;tsc 0 新增 + vitest 8/8 PASS |
 | 第 20 批(🟡→✅) | 2026-07-12 | TD-018 关闭(1 条) | pre-existing 4 条 tsc 错(hooks.ts:139/149/159 + 2 generic-repo-adapter.test.ts:84/138/92/151)被 [019.1]+[023.13] follow-up 自动清;npx tsc --noEmit 全项目 0 error — TD-018 完全自动闭环(runtime dead string 清理留 follow-up,本会话不 scope) |
+| 第 21 批(🟡→✅) | 2026-07-12 | TD-006 关闭(1 条) | orchestration-handler 14 处 for 循环全是 CPU 内存操作,DB 入口统一到 collectMaterials + Promise.all 并行取 4 源,N+1 性能债已闭环 |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-018 关闭）· 🔴0 / 🟠2 / 🟡6 / 🟢2 / ⚪1 / ✅15
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-006 关闭）· 🔴0 / 🟠2 / 🟡4 / 🟢2 / ⚪1 / ✅16
