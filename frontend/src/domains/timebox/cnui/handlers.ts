@@ -987,6 +987,11 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
           id: crypto.randomUUID() as USOM_ID,
           intentionId: crypto.randomUUID() as USOM_ID,
           targetDomain: 'timebox',
+          // [TD-010] 2026-07-12: synthesized rule-probe action — 仅用于触发
+          //   timebox-overlap rule.evaluate (rule 不读 intent.action, 只读 fields).
+          //   不入 manifest lifecycle: 这是字段更新路径(field executor), 不是
+          //   lifecycle SM transition. 故不在 STATUS_TRANSITION_ACTIONS 注册,
+          //   也无需 manifest.yaml 登记(SSOT 不漂移).
           action: 'update_timebox',
           fields: { ...patch },  // [023.04] I-5 polish: rule 不读 fields.id,不必把 selectedId 塞进去
           confidence: 1,

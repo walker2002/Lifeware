@@ -1,9 +1,12 @@
 ---
 id: TD-010
-title: I-1 synthesized action 'update_timebox' 不在 manifest lifecycle
-status: 登记
+title: I-1 synthesized action 'update_timebox' 不在 manifest lifecycle → 加注释标注 rule-probe synthesized
+status: ✅ 已修复
+severity: 🟢 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: cnui/handlers.ts:990 加 [TD-010] 注释 (3 行)
 ---
 
 # TD-010: I-1 synthesized action 'update_timebox' 不在 manifest lifecycle
@@ -80,6 +83,15 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 [023.04] plan-eng-review 的 21 findings I-1
+- 2026-07-12 · 「技术债清除会话[001-002]」本次修复:
+  - **决策路径**：TD-010 提到的"3 选项"——A 删 / B 补 manifest / C 维持注释。第三选项(C)实际最优,因为 update_timebox **不该入 manifest**：
+    - 它是字段写路径 (`field executor` via mutation service,非 lifecycle SM transition)
+    - rule engine `timebox-overlap.ts` 不读 `intent.action`,只读 `intent.fields` 做 evaluate
+    - manifest.yaml lifecycle 仅记 `planned | logged | cancelled` 3 态转换
+    - 故 manifest 漂移是"有意为之"——只是没标注原因
+  - **修复方式**:`cnui/handlers.ts:990` 加 3 行 [TD-010] 注释说明 `update_timebox` 是 rule-probe synthesized action,不发 dispatcher,不入 manifest lifecycle (字段写走 field executor)
+  - **验证**:vitest 34/34 PASS (handlers.test.ts 含 TD-002 +5 用例 + 既有 case),tsc 0 新增 (1 pre-existing flake 来自 `handlers-edit-appointment` [026.02] P1 backlog,与本改动无关)
+- 2026-07-12 · **TD-010 关闭**:SSOT 漂移债务澄清 + 注释固化
 
 ## 关联
 

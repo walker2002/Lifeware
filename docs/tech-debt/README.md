@@ -44,7 +44,7 @@ last_updated: 2026-07-12
 | TD-006 | orchestration N+1 sequential 查询(应批处理或并行) | 🟡 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-007 | Suspend action 完整 CNUI 回环未闭环(双注册缺一层) | 🟡 | lifeware-tasks | [023.10] | 暂未指派 |
 | TD-008 | lifecycle-configs require('@/...') 多键域债(resolve/transition 仍动态) | 🟡 | cross-domain | [023.10] | 暂未指派 |
-| TD-010 | I-1 synthesized action 'update_timebox' 不在 manifest lifecycle | 🟢 | lifeware-timebox | [023.10] | 暂未指派 |
+| TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
@@ -77,6 +77,7 @@ last_updated: 2026-07-12
 | TD-012 | [023.05-1] PR1 polish 3 Minor 文案残留 (后续 PR2 + neat 自动清理 grep 0 hits) | ⚪ → ✅ | lifeware-timebox | [023.10] | 后续 PRs 自动清 | 2026-07-12 |
 | TD-013 | manifest validator PascalCase 约束文档化 + K-component-not-found 错误附 §4.2 链接 (manifest-rules.md 13 节) | 🟢 → ✅ | infra | [023.10] | docs/manifest-rules.md | 2026-07-12 |
 | TD-009 | logTimebox 重复 filter ([TD-002] 重构后已 O(N) 单 filter + loop continue) | 🟢 → ✅ | lifeware-timebox | [023.10] | TD-002 重构副效应 | 2026-07-12 |
+| TD-010 | synthesized action 'update_timebox' rule-probe 注释澄清 (不入 manifest by design — 字段写路径非 lifecycle SM) | 🟢 → ✅ | lifeware-timebox | [023.10] | cnui/handlers.ts:990 注释 | 2026-07-12 |
 
 ## 按领域视图
 
@@ -159,7 +160,7 @@ last_updated: 2026-07-12
 ### 🟢 Low（有精力再说）
 
 - ~~[[TD-009]]~~ · logTimebox 重复 filter · ✅ TD-002 重构闭环
-- [[TD-010]] · I-1 synthesized action update_timebox
+- ~~[[TD-010]]~~ · I-1 synthesized action update_timebox · ✅ cnui/handlers.ts 注释 (rule-probe action, 不入 manifest by design)
 - ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · ✅ docs/manifest-rules.md
 - [[TD-014]] · settings.json schema 顶层严格
 - [[TD-015]] · Claude Code 内置 /review shadow gstack /review
@@ -206,7 +207,8 @@ last_updated: 2026-07-12
 | 第 13 批(⚪⚪→✅) | 2026-07-12 | TD-011 + TD-012 关闭(2 条) | TD-011 (assertNoInternalOverlap 死参数 57844c2 main 直接改 3 文件) + TD-012 (PR1 polish 3 Minor 文案残留 PR2+neat 自动清理 grep 0 hits) — 印证「已发现债 后续自动闭环」模式 (类似 TD-001) |
 | 第 14 批(🟢→✅) | 2026-07-12 | TD-013 关闭(1 条) | 新增 docs/manifest-rules.md 13 节 (360 行) + validate-manifest.ts K-component-not-found 错误信息附 §4.2 链接 + 文件头加 [TD-013] 指引;validate:manifest 0 错 2 警告 2 info 无 regression |
 | 第 15 批(🟢→✅) | 2026-07-12 | TD-009 关闭(1 条) | TD-009 「重复 filter」性能债被 TD-002 (cnui/handlers.ts 重构) 主任务的副效应消除 — 单 filter + loop continue 已是 O(N);印证「债升级为另一债的主任务时顺手清」模式 |
+| 第 16 批(🟢→✅) | 2026-07-12 | TD-010 关闭(1 条) | 「synthesized action 不在 manifest」看似漂移,实际「有意未注册」(字段写路径非 SM transition);cnui/handlers.ts:990 加 3 行 [TD-010] 注释固化理由;vitest 34/34 PASS (1 pre-existing flake 与本改动无关) |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-009 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢3 / ⚪1 / ✅11
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-010 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢2 / ⚪1 / ✅12
