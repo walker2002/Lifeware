@@ -2026,10 +2026,12 @@ interface VersionedObject {
 
 ---
 
-*文档版本：2026_07_11*
+*文档版本：2026_07_12*
 *关联上级文档：LW_overall_总体设计_2026_05_02.md*
 *关联数据库文档：docs/database-design.md*
 
+*变更：[028.1] (2026_07_12) — 无 USOM 变更（ISS-002 修复仅 ScheduleProposal.tsx surface 端 items 构造，无 schema/USOM/字段漂移）。Footer 升级 2026_07_11 → 2026_07_12*
+*变更：[028] (2026_07_11) — 无 USOM 变更（ScheduleProposal 是 contract path 渲染层增强，无新类型/字段，manifest A 块加 scheduleProposal intent_trigger + K 块加 schedule-proposal surface）*
 *变更：[027-B] (2026_07_11) — §3.12 TimeboxTemplate `TemplateRow` 形状重构：`{start,end}` → `{defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?}`；行为矩阵精炼（custom 可编辑原型/全部时间/约束，habit 时间/约束锁时，task/thread 原型只读派生+时间可编辑）；`rowToTemplate` 仓储读时 lazy 自愈旧形状，无 DDL*
 *变更：[027-A] (2026_07_11) — Task/Habit `activityArchetypeId` widen 到 `USOM_ID | null`（3-state clear：undefined=skip/null=clear/string=set），对齐 DB nullable FK；Timebox/Appointment 暂未 widen（pre-existing imprecision，登记 neat/后续）*
 *变更：[026.02.3.1] (2026_07_09) — T1 AISessionStatus 三向一致 (USOM 扩 6 值 + 删局部 SessionStatus 别名)；T2 v_running_timeboxes 派生语义重写（migration 0036）*

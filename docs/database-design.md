@@ -1854,7 +1854,7 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_07_11*
+*文档版本：2026_07_12*
 *关联上游文档：docs/usom-design.md*
 
 *变更：[027-B] (2026_07_11) — §7.8 timebox_templates.rows JSONB 内 `TemplateRow` 形状重构（`{start,end}` → `{defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?}`）+ 仓储 `rowToTemplate` 读时 lazy 自愈旧形状（无需 DDL：`[027-B] TemplateRow 行 schema（无 DDL，JSONB 内自描述）`段已记录自愈逻辑）*

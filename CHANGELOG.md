@@ -8,6 +8,110 @@
 
 ---
 
+## [neat-2026_07_12] /lifeware-neat 三件套 drift 收口（2026-07-12）
+
+> 2026_07_12 — `/lifeware-neat` 收 3 项 drift：(1) `CHANGELOG.md` 缺 `[028]` / `[028.1]` 段；(2) `manifest.md` 缺 `[028]` / `[028.1]` 索引条目；(3) `docs/database-design.md` + `docs/usom-design.md` 页脚 `2026_07_11` 应 bump 至 `2026_07_12`（[028.1] ISS-002 fix 修复了 ScheduleProposal 端到端但无 schema/db 变更，仅文档漂移需对齐）。
+
+### 改动
+
+- `CHANGELOG.md` — 追加 `[028] ScheduleProposal 今日计划` + `[028.1] ISS-002 修复` + 本 `[neat-2026_07_12]` 三段（最新在上）
+- `manifest.md` — 追加 `[028]` + `[028.1]` 索引条目（带 plan/CHANGELOG/cross-module-dispatch-blindspot learning 交叉引用）
+- `docs/database-design.md` — 文档版本 `2026_07_11 → 2026_07_12`（无 schema 变更，footer 仅对齐）
+- `docs/usom-design.md` — 文档版本 `2026_07_11 → 2026_07_12`（无 USOM 变更，footer 仅对齐）
+- `docs/superpowers/plans/2026-07-11-028-schedule-proposal.md` — untracked 加入 git 跟踪（commit `773c1b9` 时漏 `git add`）
+
+### 验证
+
+- 2A 枚举对齐：TimeboxStatus / TaskStatus / HabitStatus / etc. USOM ↔ DB CHECK 一致（[028]/[028.1] 无 USOM/DB 变更，沿用 prior baseline）
+- 2B 表结构总览：33 表 / 32 CREATE TABLE（沿用 prior baseline，`external_events` 是 §十二 阶段二预留，合法）
+- 2C 视图/SQL 列名：[028] 无新视图，沿用 prior baseline
+- 2D 残留文本：usom/database-design 无删除遗留片段
+- 2E 版本号：`usom-design 2026_07_12`、`database-design 2026_07_12`（自洽）
+- 2F 字段一致：[028] 无新字段，沿用 prior baseline
+- UI C-01~C-07：[028.1] 改动仅 ScheduleProposal.tsx 1 文件 9+/7-，无新颜色/布局（C-01 PASS by diff scope）
+- Constitution 约束 ID：[028.1] 无新约束引入
+- mydocs/ 只读：本次会话未动 `mydocs/core/` 任一文件
+
+### 未处理
+
+- `specs/001~010` 共 10 个 speckit feature 目录仍在 active 状态（未归档 `specs/_archived/`）—— 历史遗留，超出本次 scope，待用户决策（沿用 [neat-2026_07_11] 登记）
+- **[028.2] 架构债**：`workspace.openAiPanel` 仍写死 3 条 static mock proposals（[023.08] T5 placeholder），未替换为真 `orchestration-handler.onGenerate` 接线 —— 属 [028] T1-T4 残留 scope 债，单独 ticket
+- **ship-then-polish backlog**（7 Important + 9 Minor）：NL `parseNL` zod schema 校验 / R12 migration SQL / M-9 PG E2E spec 等 —— 待开 next ticket 收口
+
+---
+
+## [028.1] ISS-002 修复 — ScheduleProposal items 不 spread 不存在的 payload（2026-07-12）
+
+> 2026_07_12 — `/superpowers:systematic-debugging` 4-phase 独立 debug session 修复 ISS-002（`/qa` 后残留：`3 intentions 写库但 0 timeboxes 落库`）。**根因**：workspace.openAiPanel（`timeboxes-workspace.tsx:412-416`）静态填 3 条 mock proposals 形为 `{ id, title, startTime, endTime }` **不包含 `payload` 字段**（[023.08] T5 placeholder 未替换为真 `orchestration-handler.onGenerate` 接线）；原 `[028] a24e336` spread `p.payload` 在 mock 上是 no-op → items 仅剩 `{ date }` → `timebox_fields_valid` validator（`rules-registry.ts:99-138`）拒缺字段。**修复**：revert 为 picking 4 字段（`title/date/startTime/endTime`）；duration 非校验范围（[023] A2 撤销），sourceObjectId 非必填；HH:MM + date → ISO UTC convert 已就绪（`handlers.ts:580-585`）。诊断基础设施（`/tmp/iss002-debug.log` 临时 log）已撤回。
+
+### 改动
+
+- `frontend/src/domains/timebox/cnui/surfaces/ScheduleProposal.tsx` — `items` 构造从 `...p.payload + date:todayLocal` 改为 picking `title/date/startTime/endTime`（9+/7-）
+- 临时 `appendFileSync(/tmp/iss002-debug.log, ...)` diagnostic（handlers.ts + loop 内 4 处）—— 已 100% 撤回
+
+### 验证（端到端真实浏览器 + PG 落库）
+
+- `browse` 触发 `/timeboxes → AI 智能推荐 → 接受 3 个时间盒`
+- DB `timeboxes` 表新增 3 行 `planned`：09:00-11:00 深度专注 / 14:00-15:00 协作 / 16:30-17:00 复盘（ISO UTC 正确）
+- console clean / panel 关闭 / view 刷新
+- `vitest`：`handlers.test.ts 30/30` + `cnui-handlers.test.ts 17/17` + 9 surfaces tests `138 总` 全绿
+- `tsc`：0 新增（199 total = pre-existing test mocks baseline）
+- `git push gitee origin main`：pre-push hooks `validate:manifest` 0 errors / `validate:structure` ✓ / `validate:rules-registry` 6 项一致
+- `/qa` 重测：health score **71.5 → 96.0**（ISS-002 残留关闭，ISS-001 仍 fixed）
+
+### Meta-pattern learning
+
+印证 `[[feedback_post-ship-review-meta-pattern]]` 第 N 次 + 上次 cross-module-dispatch-blindspot：
+- `[028] a24e336` ISS-001 L2 修复"逻辑"正确（payload 字段应有）但**假设错了** —— surface 对 schema 假设 + mock vs real source 不一致
+- **教训**：debug 必先 runtime verify schema 实际 shape（diagnostic log 看 `keys:['title','date','startTime','endTime']` vs `keys:['date']` 一目了然），不当 source-of-truth 假设
+- SSOT：memory `project-028-schedule-proposal.md` ## /qa ISS-002 DEBUG 段（含 Phase 1-4 完整 evidence）
+
+---
+
+## [028] ScheduleProposal 今日计划（2026-07-11）
+
+> 2026_07_11 — 用 `/ScheduleProposal` 替代并退役 smartTimeboxes。**Plan v2 修订后进 SDD**：10 task T1-T10 + 4 plan-eng-review findings + 14 codex outside voice findings 全折入 + whole-branch polish amend（I-1/I-2/I-4/I-5 + M-1/M-3 + R12 silent debt 文档化）。
+
+### 决策（plan-eng-review + office-hours A 系列）
+
+- **P1-P6 premise 收敛**：复用 [023.08] 基础设施 / §04 硬规则词典序 / generative action 不建表 / NL 一次结构化输出+结构性置信度 / 手动入口 / 5 维 rule-based 评分
+- **R12 非 bug 决策**（eng review A4）：`getRevertableBatches`（`batch-proposals.ts:233-242`）filter 不含 sessionId（dead parameter），单复数不一致功能无害，撤销按 userId 查实际 work
+- **manifest rename**: `createSmartTimeboxes → scheduleProposal`（K-block 保留 `create-smart-timebox` 入口防 revertSmartTimeboxes 引用断）
+- **5 维评分规则**（T7）：定义聚合公式 + 能量 0-0.9→0-10 + 空集 0/0 guard + 数据不可得 vs 条件不满足
+- **pathType 边界**（T6）：NL 解析移到 `onGenerate`（`handle()` 无 aiRuntime，`process.ts:345-349`）
+- **dispatch 一致性**（T9）：ScheduleProposal.tsx 发 `scheduleProposal`（与 manifest `intent_triggers.action` + handler submit 分支名对齐）
+
+### 改动（commit `50b39d7..83ddba9`）
+
+- `frontend/src/domains/timebox/handlers/orchestration-handler.ts` — 4 源归集（模板+约定+任务+NL）+ 5 维评分 + batch recording
+- `frontend/src/domains/timebox/cnui/handlers.ts` — scheduleProposal submit 分支（自含 batch recording 不依赖 `_source` 字符串 hack）
+- `frontend/src/domains/timebox/cnui/surfaces/ScheduleProposal.tsx` — T9 新 surface，复用 [023.08] T5 范式（手写 [019.1]）
+- `frontend/src/domains/timebox/cnui/constants.ts` — `SCHEDULE_PROPOSAL_ACTION` + `SCHEDULE_PROPOSAL_SURFACE` 防字符串漂移
+- `frontend/src/domains/timebox/components/timeboxes-workspace.tsx` — handleAiConfirm 加 `scheduleProposal` 分支（[028.1] ISS-001 L1 修复起点）
+- `frontend/src/app/actions/intent.ts` — `/smartTimeboxes` 重定向到 `/ScheduleProposal`
+- `frontend/src/domains/timebox/manifest.yaml` — A 块 scheduleProposal intent_trigger + B 块无 lifecycle 变更（contract path）+ K 块 schedule-proposal surface
+
+### Whole-branch verification
+
+- `tsc 199 = baseline`（pre-existing 测试 mocks 不变）
+- `vitest 26 fail = baseline`（handlers.test.ts + workspace.ai-submit + workspace.revert 4 个 pre-existing flake 隔离）
+- pre-push hooks `validate:manifest` 0 errors / `validate:structure` ✓ / `validate:rules-registry` 6 项一致
+- 全 10 SDD task T1-T10 完成 + 1 polish amend commit
+- push gitee origin/main `50b39d7..83ddba9`（13 commits 含 polish）
+
+### post-ship /qa（详见 [028.1] 段修复历史）
+
+- ISS-001 P0 silent fail：`/qa` 抓双层（handleAiConfirm 缺分支 + items 漏字段），2 commit 修（`a24e336` + `74fd9b1`）
+- ISS-002（残留）：3 intentions 写库 0 timeboxes 落库 → `[028.1]` standalone debug session 修（commit `773c1b9`）
+- `/qa` health score: 50.75 → 71.5 → 96.0
+
+### 架构债 + 延后
+
+- **[028.2] workspace.openAiPanel 真 orchestration wiring**：`openAiPanel` 仍写死 mock（[023.08] T5 placeholder 未替换），[028] T1-T4 残留 scope 债，单独 ticket
+- **ship-then-polish backlog** 7 Important + 9 Minor：NL `parseNL` zod schema / R12 migration SQL / M-9 PG E2E spec 等
+
+---
+
 ## [neat-2026_07_11] /lifeware-neat 三项 drift 收口（2026-07-11）
 
 > 2026_07_11 — `/lifeware-neat` 收 3 项 drift：(1) `[027-A]` 缺 `manifest.md` 索引条目；(2) `docs/database-design.md` 文档版本 `2026_07_09` 应 bump 至 `2026_07_11`（[027-B] §7.8 自愈说明未登记版本变更）；(3) `database-design.md` 缺 `[027-B]` 变更记录。
