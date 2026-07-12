@@ -46,9 +46,7 @@ last_updated: 2026-07-12
 | TD-008 | lifecycle-configs require('@/...') 多键域债(resolve/transition 仍动态) | 🟡 | cross-domain | [023.10] | 暂未指派 |
 | TD-009 | logTimebox 重复 filter(同 query 多次过滤) | 🟢 | lifeware-timebox | [023.10] | 暂未指派 |
 | TD-010 | I-1 synthesized action 'update_timebox' 不在 manifest lifecycle | 🟢 | lifeware-timebox | [023.10] | 暂未指派 |
-| TD-011 | I-3 assertNoInternalOverlap _dayStart/_dayEnd unused params | ⚪ | lifeware-timebox | [023.10] | 暂未指派 |
-| TD-012 | [023.05-1] PR1 Polish 3 Minor(测试文案残留旧词) | ⚪ | lifeware-timebox | [023.10] | 暂未指派 |
-| TD-013 | manifest validator K-component PascalCase 约束未文档化 | 🟢 | infra | [023.10] | 暂未指派 |
+| TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
 | TD-018 | [023.12] pre-existing 写入口连锁债：tasks/hooks.ts 死 action + 2 测试 fixture | 🟡 | cross-domain | [023.12] | 暂未指派 |
@@ -76,6 +74,9 @@ last_updated: 2026-07-12
 | TD-028 | [026.02.3.1] post-review:Timebox 'running' status literals 在 JS 层 5 处残留 (Site 0 repository findRunning root source + Sites 1-4 callers) | 🟠 → ✅ | lifeware-timebox + nexus/intent | [026.02.3.1] post-review | [026.02.4] | 2026-07-09 |
 | TD-030 | [026.02.4] post-T2 review:timebox.ts createAppointment adapter 仍有 truthy-check bug pattern (4 sites 全修) | 🟡 → ✅ | lifeware-timebox | [026.02.4] post-T2 | [026.02.4-r2] round 2 | 2026-07-09 |
 | TD-032 | AppointmentRepository.updateFields 缺 timestamp 列 string→Date 归一化,editAppointment 保存触发 Drizzle TypeError（加 startTime 归一化 + failing test 守护） | 🟠 → ✅ | lifeware-appointments | [026.02.4] 后 hot-fix | main hot-fix | 2026-07-11 |
+| TD-011 | I-3 assertNoInternalOverlap 删未用 _dayStart/_dayEnd 参数 (main 57844c2 + 6/6 vitest) | ⚪ → ✅ | lifeware-timebox | [023.10] | main 57844c2 | 2026-07-12 |
+| TD-012 | [023.05-1] PR1 polish 3 Minor 文案残留 (后续 PR2 + neat 自动清理 grep 0 hits) | ⚪ → ✅ | lifeware-timebox | [023.10] | 后续 PRs 自动清 | 2026-07-12 |
+| TD-013 | manifest validator PascalCase 约束文档化 + K-component-not-found 错误附 §4.2 链接 (manifest-rules.md 13 节) | 🟢 → ✅ | infra | [023.10] | docs/manifest-rules.md | 2026-07-12 |
 
 ## 按领域视图
 
@@ -124,7 +125,7 @@ last_updated: 2026-07-12
 ### `infra`
 
 - [[TD-005]] · MVP_USER_ID 硬码 · 🟡 Medium
-- [[TD-013]] · manifest validator PascalCase 约束未文档化 · 🟢 Low
+- ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · 🟢 Low · ✅ docs/manifest-rules.md
 - [[TD-014]] · settings.json schema 顶层严格 · 🟢 Low
 - [[TD-015]] · Claude Code 内置 /review shadow gstack /review · 🟢 Low
 
@@ -138,8 +139,8 @@ last_updated: 2026-07-12
 
 - ~~[[TD-001]]~~ · useOrchestrationRecommendations hook 不存在 → ✅ [028.2]
 - ~~[[TD-002]]~~ · logTimebox 批失败不对称 → ✅ PR #11
-- [[TD-003]] · editTimeboxes TOCTOU
-- [[TD-004]] · R4 timebox/okrs 写入口债
+- [[TD-003]] · editTimeboxes TOCTOU (待 R4 OCC cross-domain design session, 5-7 人日)
+- [[TD-004]] · R4 timebox/okrs 写入口债 (待 design session, 5-10 人日)
 - [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
 - [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列）
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status JS literals 残留 (Site 0 root source) · ✅ [026.02.4]
@@ -159,7 +160,7 @@ last_updated: 2026-07-12
 
 - [[TD-009]] · logTimebox 重复 filter
 - [[TD-010]] · I-1 synthesized action update_timebox
-- [[TD-013]] · manifest validator PascalCase 约束未文档化
+- ~~[[TD-013]]~~ · manifest validator PascalCase 约束未文档化 · ✅ docs/manifest-rules.md
 - [[TD-014]] · settings.json schema 顶层严格
 - [[TD-015]] · Claude Code 内置 /review shadow gstack /review
 
@@ -202,8 +203,9 @@ last_updated: 2026-07-12
 | 第 9 批(🟡→✅) | 2026-07-09 | TD-030 关闭(1 条) | `[026.02.4-r2]` round 2 second-opinion 抓 truthy-check drift 类 — timebox.ts:110/346 + handlers.ts:309/384 共 4 sites 全修 |
 | 第 10 批(🟠+🟡+⚪+🟠→✅) | 2026-07-11 | TD-032 closed + TD-033/034/035 新建(4 条) | 系统性调试 session 发现 `AppointmentRepository.updateFields` ISO string startTime → Drizzle TypeError；hot-fix appointment.ts:49-54 + failing test；同模式扫描发现 Timebox/Task/Objective 都有同坑；抽通用归一化 helper 列入架构治理债 |
 | 第 11 批(🟠→✅) | 2026-07-12 | TD-001 关闭(1 条) | TD-001 后续修复未走债目录已成事实闭环：`[023.10] eece955` revert 真 wire + `[028.2] 34ba5b9/74fd9b1` openAiPanel 真接 + handleAiConfirm 加 `scheduleProposal` accept 分支；今日「技术债清除会话」首条动作补归档 |
-| 第 12 批(🟠→✅) | 2026-07-12 | TD-002 关闭(1 条) | 本次会话亲提 feat 分支 + PR !11 merge：logTimebox 旧「早 break + 不回滚」改 partial-success；同文件 5/5 CNUI handler 批量分支范式一致；宪章 §XV.6 新增条款；vitest 34/34 PASS；tsc 0 新增 |
+| 第 13 批(⚪⚪→✅) | 2026-07-12 | TD-011 + TD-012 关闭(2 条) | TD-011 (assertNoInternalOverlap 死参数 57844c2 main 直接改 3 文件) + TD-012 (PR1 polish 3 Minor 文案残留 PR2+neat 自动清理 grep 0 hits) — 印证「已发现债 后续自动闭环」模式 (类似 TD-001) |
+| 第 14 批(🟢→✅) | 2026-07-12 | TD-013 关闭(1 条) | 新增 docs/manifest-rules.md 13 节 (360 行) + validate-manifest.ts K-component-not-found 错误信息附 §4.2 链接 + 文件头加 [TD-013] 指引;validate:manifest 0 错 2 警告 2 info 无 regression |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-002 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢5 / ⚪3 / ✅7
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-013 关闭，移到 🟢 已修复 组）· 🔴0 / 🟠3 / 🟡7 / 🟢4 / ⚪1 / ✅10

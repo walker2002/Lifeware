@@ -2,13 +2,16 @@
 /**
  * @file validate-manifest
  * @brief Manifest 诊断工具 — 校验所有 domain manifest.yaml 是否符合规范
- * 
+ *
  * @usage npx tsx scripts/validate-manifest.ts
  * @exitcode 0 = 全部通过, 1 = 有 error 级别问题
- * 
+ *
  * 校验策略：
  *   - 直接解析 YAML 获取完整字段（避免 Zod schema 剥离未知字段）
  *   - 同时调用 loadDomainManifest 检测结构/语义错误
+ *
+ * [TD-013] 2026-07-12 起：错误信息附 `docs/manifest-rules.md` 章节指引，
+ *   新增约束 / 约束语义参见该文档。
  */
 
 import * as fs from 'node:fs'
@@ -316,7 +319,7 @@ function validateDomain(domainId: string): void {
     const componentPath = path.join(domainDir, 'cnui', 'surfaces', componentName + '.tsx')
     if (!fs.existsSync(componentPath)) {
       addError(domainId, 'K-component-not-found',
-        `cnui_surface "${surfaceType}" 的组件文件不存在（按约定查找）: ${componentPath}`)
+        `cnui_surface "${surfaceType}" 的组件文件不存在（按约定查找）: ${componentPath}。参考 docs/manifest-rules.md §4.2（kebab-case surfaceType → PascalCase 组件文件名）`)
     }
 
     // 被引用检查

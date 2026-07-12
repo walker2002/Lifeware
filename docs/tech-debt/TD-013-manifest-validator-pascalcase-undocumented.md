@@ -1,9 +1,12 @@
 ---
 id: TD-013
-title: manifest validator K-component PascalCase 约束未文档化
-status: 登记
+title: manifest validator K-component PascalCase 约束未文档化 → docs/manifest-rules.md + validator 错误信息附链接
+status: ✅ 已修复
+severity: 🟢 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: main docs/manifest-rules.md (new file) + validate-manifest.ts 增强
 ---
 
 # TD-013: manifest validator K-component PascalCase 约束未文档化
@@ -83,6 +86,24 @@ last_updated: 2026-07-06
 
 - 2026-07-06 · [023.10] · 创建条目,源自 [023] A2 ship 时 pre-push hook 抓 3 次(commit 0ab6e6c)
 - 2026-06-29 · [023] A2 commit `0ab6e6c` · 3 surface 文件名 kebab → PascalCase
+- 2026-07-12 · 「技术债清除会话[001-002]」本次修复:
+  - **(a) 新建 `docs/manifest-rules.md`**（13 节,~360 行）:沉淀 `validate-manifest.ts` 全部约束：
+    1. 文件位置 & 入口
+    2. 必填字段(id/name/version)
+    3. 顶级区块顺序约定
+    4. 命名约定（surfaceType kebab-case + 组件 PascalCase + handler 路径）
+    5. 区块 A intent_triggers 规则
+    6. 区块 K cnui_surfaces 规则（**K-component PascalCase 约束主文档**）
+    7. 区块 G/Q generation_actions & query_actions
+    8. 跨域约束（surface type 全局唯一）
+    9. 区块 C field_metadata 嵌套
+    10. 区块 L lifecycle
+    11. 执行命令
+    12. 常见错误速查（11 个错误 + 修复）
+    13. 实战示例（完整 timebox manifest）
+  - **(b) validator 增强**:`validate-manifest.ts:319` K-component-not-found 错误信息附 `docs/manifest-rules.md §4.2` 章节指引；文件头加 [TD-013] 标记 + 顶层指引
+  - **(c) 验证**:`npx tsx scripts/validate-manifest.ts` 跑通 — 4 domain, 0 错, 2 警告 (K-unreferenced-surface pre-existing in tasks), 2 info, **0 新增 error**
+- 2026-07-12 · **TD-013 关闭**:约束文档化 + validator 错误信息附指引 + 0 regression
 
 ## 关联
 
