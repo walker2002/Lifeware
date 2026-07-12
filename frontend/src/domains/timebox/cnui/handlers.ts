@@ -769,9 +769,15 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
     if (action === 'logTimebox') {
       const { submitDynamicIntent } = await import('@/app/actions/intent')
       const items = (fields.items as any[]) ?? []
-      const logged = items.filter(i => i.state && i.state !== 'skipped')
-      for (const it of items) {
-        if (!it.state || it.state === 'skipped') continue
+      // [TD-002] partial-success 语义：遇错不再 early return,与同文件 createTimebox /
+      //   scheduleProposal / adjustRemainingTimeboxes 范式对齐 — 全部条目继续提交,
+      //   succeeded/failed 分组返回 (UI 据此 toast 显示「N 条成功 / M 条失败」)。
+      //   旧实现「早 break 不回滚」语义让用户无法判断哪些条目已落库。
+      //   与 constitution §XV.6 (待补)「CNUI Handler Batch Semantics」一致。
+      const attempted = items.filter(i => i.state && i.state !== 'skipped')
+      const succeeded: { timeboxId: string; title: string }[] = []
+      const failed: { id: string; title: string; error: string }[] = []
+      for (const it of attempted) {
         // [023.12] T7 (AM3) — 仅 planned 可打卡（避免对 logged/cancelled 行触发 SM 错误）
         // open 路径已 filter t.status === 'ended'（L165），但批量场景下 user 可能在
         // open 后修改时间窗口让某条进入终态，故加 server-side 守护。
@@ -809,12 +815,32 @@ export const timeboxCnuiHandler: CnuiSurfaceHandler = {
             objectId: it.id,
             executionRecord,
           })
-          if (!r.success) return { success: false, error: r.error ?? `${it.title} 打卡失败` }
+          if (r.success) {
+            // logTimebox 是 update 操作（不是 create），timeboxId = it.id
+            succeeded.push({ timeboxId: it.id, title: it.title ?? '未命名' })
+          } else {
+            failed.push({ id: it.id, title: it.title ?? '未命名', error: r.error ?? '打卡失败' })
+          }
         } catch (e) {
-          return { success: false, error: e instanceof Error ? e.message : `${it.title} 打卡失败` }
+          failed.push({
+            id: it.id,
+            title: it.title ?? '未命名',
+            error: e instanceof Error ? e.message : '打卡失败',
+          })
         }
       }
-      return { success: true, data: { count: logged.length } }
+      return {
+        success: failed.length === 0,
+        // [TD-002] UI 友好错误：每条带 title + 具体原因（仿 [023] A2.5 RC-B 修复）
+        error: failed.length
+          ? `${failed.length} 条失败：${failed.map(f => `${f.title || '未命名'}（${f.error}）`).join('；')}`
+          : undefined,
+        data: {
+          count: succeeded.length,
+          succeeded: succeeded.map(s => s.timeboxId),
+          failed,
+        },
+      }
     }
 
     // [026][023.05] A2.5 — 约定 3 surface submit 分支

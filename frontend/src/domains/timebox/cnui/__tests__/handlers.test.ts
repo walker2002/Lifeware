@@ -565,4 +565,137 @@ describe('timeboxCnuiHandler', () => {
       spy.mockRestore()
     })
   })
+
+  // [TD-002] logTimebox submit 语义统一为 partial-success（与同文件 createTimebox/scheduleProposal 对齐）
+  // 3 失败场景:第 1 / 3 / 5 条失败 + 全部成功兜底
+  describe('submit - logTimebox（[TD-002] partial-success 失败语义）', () => {
+    beforeEach(() => {
+      vi.resetModules()
+    })
+
+    // 测试 helper:对每条 item 单独设置 submitDynamicIntent 返 success/fail(可控)
+    function mockSubmitDynamicIntentByItem(behavior: Array<'ok' | 'fail'>) {
+      vi.doMock('@/app/actions/intent', () => ({
+        submitDynamicIntent: vi.fn().mockImplementation((_domain, _action, fields) => {
+          // match by index via objectId — 但 mock 不知道下标，所以用 side-effect 计数器
+          return Promise.resolve({ success: true, object: { id: fields.objectId } })
+        }),
+      }))
+      // 实际失败注入通过 import handler 后替换 submitDynamicIntent.callable 不可行,
+      // 改用更简单策略:直接 mock 全失败 + 通过 items 数量控制检查
+      // 但 TD-002 要测 partial-success,改为:对每个 item 设置顺序行为
+      const queue = [...behavior]
+      return vi.doMock('@/app/actions/intent', () => ({
+        submitDynamicIntent: vi.fn().mockImplementation((_domain, _action, fields) => {
+          const next = queue.shift() ?? 'ok'
+          if (next === 'fail') return Promise.resolve({ success: false, error: 'SM 校验失败:actualDuration>720min' })
+          return Promise.resolve({ success: true, object: { id: fields.objectId } })
+        }),
+      }))
+    }
+
+    it('第 1 条失败 → 2/3/4/5 仍继续 (partial-success),failed.length===1,data.count===4', async () => {
+      mockSubmitDynamicIntentByItem(['fail', 'ok', 'ok', 'ok', 'ok'])
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const items = [
+        { id: 'tb-1', title: '晨会', state: 'completed' },
+        { id: 'tb-2', title: '深度专注', state: 'completed' },
+        { id: 'tb-3', title: '协作', state: 'completed' },
+        { id: 'tb-4', title: '复盘', state: 'completed' },
+        { id: 'tb-5', title: '收尾', state: 'completed' },
+      ]
+      const result = await mod.timeboxCnuiHandler.submit('logTimebox', { items })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('1 条失败')
+      expect(result.error).toContain('晨会')
+      expect(result.error).toContain('SM 校验失败')
+      const data = result.data as { count: number; succeeded: string[]; failed: Array<{ id: string; title: string; error: string }> }
+      expect(data.count).toBe(4)
+      expect(data.succeeded).toEqual(['tb-2', 'tb-3', 'tb-4', 'tb-5'])
+      expect(data.failed).toHaveLength(1)
+      expect(data.failed[0]!.id).toBe('tb-1')
+      expect(data.failed[0]!.title).toBe('晨会')
+    })
+
+    it('第 3 条失败 → 1/2/4/5 仍继续,failed.length===1,data.count===4', async () => {
+      mockSubmitDynamicIntentByItem(['ok', 'ok', 'fail', 'ok', 'ok'])
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const items = [
+        { id: 'tb-1', title: '晨会', state: 'completed' },
+        { id: 'tb-2', title: '深度专注', state: 'completed' },
+        { id: 'tb-3', title: '协作', state: 'completed' },
+        { id: 'tb-4', title: '复盘', state: 'completed' },
+        { id: 'tb-5', title: '收尾', state: 'completed' },
+      ]
+      const result = await mod.timeboxCnuiHandler.submit('logTimebox', { items })
+      expect(result.success).toBe(false)
+      const data = result.data as { count: number; succeeded: string[]; failed: Array<{ id: string; title: string }> }
+      expect(data.count).toBe(4)
+      expect(data.succeeded).toEqual(['tb-1', 'tb-2', 'tb-4', 'tb-5'])
+      expect(data.failed).toHaveLength(1)
+      expect(data.failed[0]!.id).toBe('tb-3')
+      expect(data.failed[0]!.title).toBe('协作')
+    })
+
+    it('第 5 条失败 → 1/2/3/4 仍继续,failed.length===1,data.count===4', async () => {
+      mockSubmitDynamicIntentByItem(['ok', 'ok', 'ok', 'ok', 'fail'])
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const items = [
+        { id: 'tb-1', title: '晨会', state: 'completed' },
+        { id: 'tb-2', title: '深度专注', state: 'completed' },
+        { id: 'tb-3', title: '协作', state: 'completed' },
+        { id: 'tb-4', title: '复盘', state: 'completed' },
+        { id: 'tb-5', title: '收尾', state: 'completed' },
+      ]
+      const result = await mod.timeboxCnuiHandler.submit('logTimebox', { items })
+      expect(result.success).toBe(false)
+      const data = result.data as { count: number; succeeded: string[]; failed: Array<{ id: string }> }
+      expect(data.count).toBe(4)
+      expect(data.succeeded).toEqual(['tb-1', 'tb-2', 'tb-3', 'tb-4'])
+      expect(data.failed[0]!.id).toBe('tb-5')
+    })
+
+    it('全部成功 → success=true + data.count===5 + failed.length===0', async () => {
+      mockSubmitDynamicIntentByItem(['ok', 'ok', 'ok', 'ok', 'ok'])
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const items = [
+        { id: 'tb-1', title: '晨会', state: 'completed' },
+        { id: 'tb-2', title: '深度专注', state: 'completed' },
+        { id: 'tb-3', title: '协作', state: 'completed' },
+        { id: 'tb-4', title: '复盘', state: 'completed' },
+        { id: 'tb-5', title: '收尾', state: 'completed' },
+      ]
+      const result = await mod.timeboxCnuiHandler.submit('logTimebox', { items })
+      expect(result.success).toBe(true)
+      const data = result.data as { count: number; succeeded: string[]; failed: unknown[] }
+      expect(data.count).toBe(5)
+      expect(data.succeeded).toHaveLength(5)
+      expect(data.failed).toHaveLength(0)
+      expect(result.error).toBeUndefined()
+    })
+
+    it('submitDynamicIntent 抛异常 → 仍推进到 failed 数组(非 throw 逃逸)', async () => {
+      vi.doMock('@/app/actions/intent', () => ({
+        submitDynamicIntent: vi.fn().mockRejectedValue(new Error('ServerAction 502')),
+      }))
+      vi.resetModules()
+      const mod = await import('../handlers')
+      const items = [
+        { id: 'tb-1', title: '晨会', state: 'completed' },
+        { id: 'tb-2', title: '深度专注', state: 'completed' },
+      ]
+      const result = await mod.timeboxCnuiHandler.submit('logTimebox', { items })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('2 条失败')
+      expect(result.error).toContain('ServerAction 502')
+      const data = result.data as { count: number; failed: Array<{ id: string; error: string }> }
+      expect(data.count).toBe(0)
+      expect(data.failed).toHaveLength(2)
+      expect(data.failed[0]!.error).toContain('ServerAction 502')
+    })
+  })
 })
