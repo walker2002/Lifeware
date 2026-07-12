@@ -146,13 +146,16 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     } as any)
 
     // 聚合步骤：先字段（priority），后状态（plan）
+    // [TD-003] T4: step 含 expectedOccVersion → execute() 聚合路径走
+    //   field-executor.executeBatch（OCC 透传路径）。不含 expectedOccVersion
+    //   则走 legacy executor.execute()（向后兼容 non-OCC 域：tasks/habits/okrs）。
     const intent = {
       id: 'intent-1',
       domainId: 'tasks',
       objectType: 'task',
       targetId: 'task-1',
       steps: [
-        { kind: 'field', field: 'priority', value: 'high' },
+        { kind: 'field', field: 'priority', value: 'high', expectedOccVersion: 1 },
         { kind: 'state', action: 'plan', payload: {} },
       ],
     } as any
@@ -164,16 +167,20 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     expect(txCallback).toHaveBeenCalled()
     // 不绕 submitDynamicIntent
     expect(submitDynamicIntent).not.toHaveBeenCalled()
-    // 字段执行器被调，且透传 tx
-    expect(executor.execute).toHaveBeenCalledTimes(1)
-    expect(executor.execute).toHaveBeenCalledWith(
-      'task-1', 'priority', 'high', 'user-1',
+    // [TD-003] T4: executeBatch 被调（OCC 关掉），且透传 tx + batch 内含 1 个 field step
+    expect(executor.executeBatch).toHaveBeenCalledTimes(1)
+    expect(executor.executeBatch).toHaveBeenCalledWith(
+      'task-1',
+      [{ field: 'priority', value: 'high', expectedOccVersion: 1 }],
+      'user-1',
       expect.objectContaining({ tx: fakeTx }),
     )
+    // 单字段 execute() 不再被调（聚合路径切到 executeBatch，因为 step 含 expectedOccVersion）
+    expect(executor.execute).not.toHaveBeenCalled()
     // SM.execute 被调，且透传 tx
     expect(smExecute).toHaveBeenCalledTimes(1)
     // 先字段后状态：字段执行器调用序号 < SM 调用序号
-    const executorMock = vi.mocked(executor.execute)
+    const executorMock = vi.mocked(executor.executeBatch)
     expect(executorMock.mock.invocationCallOrder[0]).toBeLessThan(
       smExecute.mock.invocationCallOrder[0],
     )
@@ -182,8 +189,10 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
 
   it('字段执行器失败 → 整体回滚（异常向上抛出，不调用 SM）', async () => {
     const repo = makeRepo()
+    // [TD-003] T4: execute() 路径含 expectedOccVersion 时改用 executeBatch——reject 来自 executeBatch
     const executor = {
-      execute: vi.fn().mockResolvedValue({ kind: 'Rejected', errors: ['非法枚举'] }),
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockResolvedValue({ kind: 'Rejected', errors: ['非法枚举'] }),
     }
     const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
     const smExecute = vi.fn()
@@ -204,7 +213,8 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
       objectType: 'task',
       targetId: 'task-1',
       steps: [
-        { kind: 'field', field: 'priority', value: 'INVALID' },
+        // 加 expectedOccVersion 走 batch 路径（executeBatch 拒）
+        { kind: 'field', field: 'priority', value: 'INVALID', expectedOccVersion: 1 },
         { kind: 'state', action: 'plan', payload: {} },
       ],
     } as any
@@ -214,5 +224,43 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     expect(res.success).toBe(false)
     // 后续状态步未执行
     expect(smExecute).not.toHaveBeenCalled()
+    // executeBatch reject 触发回滚
+    expect(executor.executeBatch).toHaveBeenCalledTimes(1)
+  })
+
+  it('[TD-003] T4: step 不含 expectedOccVersion → 仍走 legacy executor.execute()（向后兼容 non-OCC 域）', async () => {
+    const repo = makeRepo()
+    const executor = makeExecutor()
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn().mockResolvedValue({ success: true, object: { id: 'task-1', status: 'planned' } })
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    // step 不带 expectedOccVersion → legacy 路径（tasks/habits/okrs 暂未实施 OCC）
+    const intent = {
+      id: 'intent-1',
+      domainId: 'tasks',
+      objectType: 'task',
+      targetId: 'task-1',
+      steps: [
+        { kind: 'field', field: 'priority', value: 'high' },
+        { kind: 'state', action: 'plan', payload: {} },
+      ],
+    } as any
+
+    await service.execute(intent, 'user-1')
+
+    // legacy executor.execute() 路径，不调 executeBatch
+    expect(executor.execute).toHaveBeenCalledTimes(1)
+    expect(executor.executeBatch).not.toHaveBeenCalled()
   })
 })

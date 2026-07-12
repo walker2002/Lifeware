@@ -160,6 +160,15 @@ export interface MutationStep {
    */
   valueFromLastObject?: boolean
   /**
+   * field 步骤：[TD-003] T4 OCC 透传。caller 主动持有 current occVersion 时
+   * 显式透传给 field-executor.executeBatch（如 updateTimebox action 入口
+   * 先读 current）。executeBatch 优先用此值（避免内部 findById 引入
+   * read-then-write race window）；未透传时 batch 内部 fallback 用 repo.findById
+   * 读 current。各步骤可独立透传（同一 batch 内首步 first-write OCC 谓词即可，
+   * 后续 step 共享 batch 上下文）。
+   */
+  expectedOccVersion?: number
+  /**
    * 步骤标签。state 步骤产出对象会以 tag 为键收集到 execute() 结果的 objects 表中，
    * 供调用方获取中间步骤产物（如 promoteToThread 取新建主线的对象）。
    */
@@ -324,7 +333,27 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
           let lastTargetId: USOM_ID | undefined
           let hasFieldSteps = false
           const objects: Record<string, unknown> = {}
-          for (const step of steps) {
+          // [TD-003] T4 关键修复：execute() 聚合路径**当 caller 透传 expectedOccVersion
+          // 时**切到 field-executor.executeBatch（timebox 域 OCC 关掉），否则保持
+          // 旧 executor.execute() 单字段路径（向后兼容 tasks/habits/okrs 等未实施
+          // OCC 的域——TD-037 P6 deferred）。
+          //
+          // 关键改动：聚合路径分流——任何 step 含 expectedOccVersion 即整段切 batch。
+          // T3 implementer 留了回归窗口：execute() 路径全用 executor.execute()，
+          // 硬码 0 透传 repo.updateFields(... , 0, ...)，timebox 域必抛 ConflictError。
+          // T4 updateTimebox 入口读 current occVersion 透传给每个 step，本路径检到
+          // expectedOccVersion 后切到 executeBatch（validate-all-first + single atomic
+          // updateFields + post-write events）。
+          //
+          // 路径选择：callerOptInOCC = steps[*].expectedOccVersion 含值时为 true。
+          // - true → 聚合同一 stepObjectType + stepTargetId 的连续 field 步为 1 个
+          //          batch call executeBatch —— single atomic UPDATE OCC 关掉。
+          // - false → 旧 per-step executor.execute()（legacy 0 占位，non-OCC 域兼容）。
+          //       state 步骤打断 batch 边界。
+          const callerOptInOCC = steps.some(s => s.kind === 'field'
+            && (s as { expectedOccVersion?: number }).expectedOccVersion !== undefined)
+          for (let i = 0; i < steps.length; i++) {
+            const step = steps[i]
             const stepObjectType = step.objectType ?? intent.objectType
             const fieldMetadata = getFieldMetadata(domainId, stepObjectType)
             const repo = getRepository(stepObjectType, domainId)
@@ -332,27 +361,74 @@ export function createDomainMutationService(deps: DomainMutationServiceDeps) {
             // 字段写步骤
             if (step.kind === 'field') {
               const stepTargetId = step.targetId ?? intent.targetId
-              // valueFromLastObject：取最近一次 state 步骤产出对象的 ID（跨对象依赖）
               const stepValue = step.valueFromLastObject
                 ? (lastObject as { id?: USOM_ID } | undefined)?.id
                 : step.value
               const executor = getExecutor()
-              const result: ValidationResult = await executor.execute(
-                stepTargetId,
-                step.field!,
-                stepValue,
-                userId,
-                {
-                  repo,
-                  eventBus,
-                  objectType: stepObjectType,
-                  fieldMetadata,
-                  fieldUpdatedEventType,
-                  tx,
-                },
-              )
-              if (result.kind === 'Rejected') {
-                throw new FieldMutationError((result as any).errors?.join('; ') ?? '字段写入失败')
+
+              // 分支：BATCH 路径（caller 透传 expectedOccVersion）
+              if (callerOptInOCC) {
+                // 合并连续同 (stepObjectType, stepTargetId) field 步为 1 个 batch
+                const batchSteps: Array<{ field: string; value: unknown; expectedOccVersion?: number }> = [{
+                  field: step.field!,
+                  value: stepValue,
+                  ...(step as { expectedOccVersion?: number }).expectedOccVersion !== undefined
+                    ? { expectedOccVersion: (step as { expectedOccVersion?: number }).expectedOccVersion }
+                    : {},
+                }]
+                while (i + 1 < steps.length) {
+                  const nextStep = steps[i + 1]
+                  if (nextStep.kind !== 'field') break
+                  const nextObjectType = nextStep.objectType ?? intent.objectType
+                  if (nextObjectType !== stepObjectType) break
+                  const nextTargetId = nextStep.targetId ?? intent.targetId
+                  if (nextTargetId !== stepTargetId) break
+                  batchSteps.push({
+                    field: nextStep.field!,
+                    value: nextStep.valueFromLastObject
+                      ? (lastObject as { id?: USOM_ID } | undefined)?.id
+                      : nextStep.value,
+                    ...(nextStep as { expectedOccVersion?: number }).expectedOccVersion !== undefined
+                      ? { expectedOccVersion: (nextStep as { expectedOccVersion?: number }).expectedOccVersion }
+                      : {},
+                  })
+                  i++
+                }
+                const result: ValidationResult = await executor.executeBatch(
+                  stepTargetId,
+                  batchSteps,
+                  userId,
+                  {
+                    repo,
+                    eventBus,
+                    objectType: stepObjectType,
+                    fieldMetadata,
+                    fieldUpdatedEventType,
+                    tx,
+                  },
+                )
+                if (result.kind === 'Rejected') {
+                  throw new FieldMutationError((result as any).errors?.join('; ') ?? '字段写入失败')
+                }
+              } else {
+                // 旧 LEGACY 路径（向后兼容 non-OCC 域：tasks/habits/okrs）
+                const result: ValidationResult = await executor.execute(
+                  stepTargetId,
+                  step.field!,
+                  stepValue,
+                  userId,
+                  {
+                    repo,
+                    eventBus,
+                    objectType: stepObjectType,
+                    fieldMetadata,
+                    fieldUpdatedEventType,
+                    tx,
+                  },
+                )
+                if (result.kind === 'Rejected') {
+                  throw new FieldMutationError((result as any).errors?.join('; ') ?? '字段写入失败')
+                }
               }
               hasFieldSteps = true
               lastObjectType = stepObjectType

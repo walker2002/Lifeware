@@ -245,6 +245,17 @@ export async function revertTimebox(
  * [023] A2 OV#P1-#1：客户端必须把 `duration` 折成 `endTime = startTime + duration`
  * 在 Drawer edit 路径已实现（本函数不接 duration 字段；USOM Timebox 无 duration 字段）。
  *
+ * [TD-003] T4 OCC 透传：本函数入口先读 current `occVersion`，attach 到每个
+ * field step 的 `expectedOccVersion` 字段。`field-executor.executeBatch`
+ * （参 @/nexus/field-executor/index.ts）会读取 step.expectedOccVersion 优先
+ * 透传给 `repo.updateFields(... expectedOccVersion ...)`，WHERE 谓词失败
+ * 时抛 ConflictError（详见 @/domains/timebox/errors/occ-conflict-error.ts）。
+ *
+ * 透传场景：
+ *  - drawer 持有的 current occVersion（避免 field-executor 内部 findById 读 current
+ *    引入 read-then-write race window）；
+ *  - 3-tab 并发：3 个 update 起点都从同一 occVersion 读，OCC 谓词保证仅 1 win。
+ *
  * @param timeboxId - 目标时间盒 ID
  * @param fields - 待写字段（仅值非 undefined 落库）
  */
@@ -270,6 +281,24 @@ export async function updateTimebox(
       return { status: 'ok', timebox: tb }
     }
 
+    // [TD-003] T4 OCC 透传：先读 current occVersion（drawer 持有的版本号）。
+    // Repository.findById 返回完整 row（含 occVersion 列，T1 schema 加列）。
+    // 跨 tab 并发场景：3 个 updateTimebox 入口可能同时 read 到同一 occVersion=1，
+    // 后续 mutation service.execute 在事务内调 repo.updateFields(..., 1, ...) →
+    // WHERE occ_version=1 仅 1 row 命中 → 后续 2 个 0 rows → 抛 ConflictError。
+    const tbRepo = new TimeboxRepository()
+    const currentTb = await tbRepo.findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!currentTb) throw new Error(`Timebox ${timeboxId} not found`)
+    // USOM Timebox.type.occVersion（T2 起加入字段定义）。未声明时（防御性）回退 0
+    // ——timebox 仓储的 WHERE occ_version=0 必 0 rows，生产环境不会发生。
+    const currentOccVersion = (currentTb as { occVersion?: number }).occVersion ?? 0
+    // 把 expectedOccVersion attach 到每个 field step（field-executor.executeBatch
+    // 内部优先读 step.expectedOccVersion，再 fallback 到 repo.findById）。
+    const fieldStepsWithOcc = fieldSteps.map(step => ({
+      ...step,
+      expectedOccVersion: currentOccVersion,
+    }))
+
     const service = createTimeboxMutationService()
     const res = await service.execute(
       {
@@ -277,7 +306,7 @@ export async function updateTimebox(
         domainId: 'timebox',
         objectType: 'timebox',
         targetId: timeboxId as USOM_ID,
-        steps: fieldSteps,
+        steps: fieldStepsWithOcc,
       },
       MVP_USER_ID as USOM_ID,
     )
@@ -286,7 +315,7 @@ export async function updateTimebox(
     // 纯 field steps 下 res.object 为 undefined（execute 仅在 state step 设 lastObject），
     // 兜底用 findById 读回更新后的时间盒。
     if (res.object) return { status: 'ok', timebox: res.object as Timebox }
-    const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+    const tb = await tbRepo.findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
     if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
     return { status: 'ok', timebox: tb }
   } catch (err) {
