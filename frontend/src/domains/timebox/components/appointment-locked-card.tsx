@@ -82,7 +82,8 @@ export function AppointmentLockedCard({ appointment, compact = false }: Appointm
   }, []);
 
   const statusStyle = STATUS_STYLES[appointment.status] ?? STATUS_STYLES.scheduled;
-  const displayStatus = deriveAppointmentDisplayStatus(appointment.status, appointment.startTime, now);
+  // [TZ-2.2] 透传 useUserTz().tz 给派生函数（修 [TZ-2] 漏改的边角）
+  const displayStatus = deriveAppointmentDisplayStatus(appointment.status, appointment.startTime, now, tz);
 
   if (compact) {
     return (

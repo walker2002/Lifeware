@@ -65,7 +65,7 @@ const base = (overrides: Partial<Appointment> = {}): Appointment => ({
   ...overrides,
 })
 
-describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026] T20 codex #5）', () => {
+describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026] T20 codex #5 + [TZ-2.2] tz 必传）', () => {
   it('TZ=Asia/Shanghai (UTC+8)：约定日=2026-07-15 本地，当日 scheduled → badge=in_progress', () => {
     process.env.TZ = 'Asia/Shanghai'
     // 验证 TZ 切换生效（调试期守护）
@@ -73,6 +73,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15), // now = 2026-07-15 本地正午
+      'Asia/Shanghai', // [TZ-2.2] tz 必传
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: 'in_progress' },
@@ -84,6 +85,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 16),
+      'Asia/Shanghai',
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: 'expired' },
@@ -95,6 +97,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 10),
+      'Asia/Shanghai',
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: null },
@@ -108,6 +111,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15),
+      'Pacific/Auckland',
     )
     // 关键对称性：Auckland 当日与 Shanghai 当日得到同样结果（约定 + now 都是本地正午）
     expect(badges).toEqual([
@@ -120,6 +124,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 16),
+      'Pacific/Auckland',
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: 'expired' },
@@ -134,6 +139,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base()],
       localNoon(2026, 6, 15),
+      'America/New_York',
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: 'in_progress' },
@@ -146,6 +152,7 @@ describe('deriveAppointmentBadges — 跨 TZ 边界（[023.12] T5 改造 + [026]
     const badges = deriveAppointmentBadges(
       [base({ status: 'cancelled', cancelledAt: '2026-07-14T12:00:00' })],
       localNoon(2026, 6, 16),
+      'UTC',
     )
     expect(badges).toEqual([
       { appointmentId: 'i1', badge: null },
