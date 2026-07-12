@@ -1,9 +1,12 @@
 ---
 id: TD-018
-title: "[023.12] pre-existing 写入口连锁债:tasks/hooks.ts 死 action + generic-repo-adapter 死 repo 引用,2 处"
-status: 新建
+title: "[023.12] pre-existing 写入口连锁债 → [019.1]+[023.13] 已自动清 tsc 错全闭环"
+status: ✅ 已修复
+severity: 🟡 → ✅
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
+closed: 2026-07-12
+fix_version: [019.1] Adapter 退役 + [023.13] follow-up 自动清
 ---
 
 # TD-018: [023.12] pre-existing 写入口连锁债:tasks/hooks.ts 死 action + generic-repo-adapter 死 repo 引用,2 处

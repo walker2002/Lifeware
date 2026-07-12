@@ -47,7 +47,7 @@ last_updated: 2026-07-12
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-016 | [023.12] 测试 fixture 漏改：status 收窄后 9 条 tsc 错(3 文件) | 🟠 | cross-domain | [023.12] | 暂未指派 |
 | TD-017 | [023.12] 生产代码漏跟 status 收窄：timebox.ts + intent.ts 9 条 tsc 错 | 🔴 | lifeware-timebox | [023.12] | 暂未指派 |
-| TD-018 | [023.12] pre-existing 写入口连锁债：tasks/hooks.ts 死 action + 2 测试 fixture | 🟡 | cross-domain | [023.12] | 暂未指派 |
+| TD-023 | timebox 写入口绕过 mutation service：revertTimebox 直调 repo.updateFields 写列 (AM3 reuse) | 🟡 | lifeware-timebox | [023.13] | 暂未指派 |
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮 | ✅ | lifeware-timebox | [023.12] hot-fix → [023.13] 关闭 | 暂未指派 |
 | TD-023 | timebox 写入口绕过 mutation service：revertTimebox 直调 repo.updateFields 写列 (AM3 reuse) | 🟡 | lifeware-timebox | [023.13] | 暂未指派 |
 
@@ -82,6 +82,7 @@ last_updated: 2026-07-12
 | TD-010 | synthesized action 'update_timebox' rule-probe 注释澄清 (不入 manifest by design — 字段写路径非 lifecycle SM) | 🟢 → ✅ | lifeware-timebox | [023.10] | cnui/handlers.ts:990 注释 | 2026-07-12 |
 | TD-016 | [023.12] 测试 fixture 漏改 (8/9 tsc 错 [023.13] 自动清 + 本次补 timebox-card fixture 完成 9/9) | 🟠 → ✅ | cross-domain | [023.12] | timebox-card.test.tsx:91 fixture 补全 | 2026-07-12 |
 | TD-017 | [023.12] 生产代码 dead union (5/9 [023.13] 自动清 + 4/9 dead union 收窄 + 测试改用 'log') | 🔴 → ✅ | lifeware-timebox | [023.12] | timebox.ts + intent.ts union 收窄 + test 'log' | 2026-07-12 |
+| TD-018 | [023.12] pre-existing 写入口连锁债 (4 tsc 错 [019.1]+[023.13] 自动清) | 🟡 → ✅ | cross-domain | [023.12] | [019.1]+[023.13] follow-up | 2026-07-12 |
 
 ## 按领域视图
 
@@ -215,7 +216,8 @@ last_updated: 2026-07-12
 | 第 17 批(⏸ 搁置 2) | 2026-07-12 | TD-014 + TD-015 状态移至 ⏸ 搁置(等上游) | 两债都依赖 Anthropic Claude Code 上游 schema/command 改动,本项目无法独立修;workarounds 已就绪(NOTES.md + 本地 shadow + sync.sh) |
 | 第 18 批(🟠→✅) | 2026-07-12 | TD-016 关闭(1 条) | [023.13] follow-up 已清 8/9 tsc 错;剩 timebox-card.test.tsx:91 ExecutionRecord shape (原 fixture 缺 8 必填字段),本次补全 fixture (mode+completionStatus+actualDuration+plannedDuration+deviationMinutes+sourceType+loggedAt+completionRating+actualOutput) + tsc 0 新增 + vitest 16/16 PASS |
 | 第 19 批(🔴→✅) | 2026-07-12 | TD-017 关闭(1 条) | [023.13] follow-up 已清 5/9 tsc 错 + 'running' literal;剩 4/9 是 2 处 server action 含 'start'/'end'/'overtime' dead 字面量 union — 收窄为 'cancel' | 'log' + 测试改测 'log' + 删 ACTION_TO_INTENT 死项;tsc 0 新增 + vitest 8/8 PASS |
+| 第 20 批(🟡→✅) | 2026-07-12 | TD-018 关闭(1 条) | pre-existing 4 条 tsc 错(hooks.ts:139/149/159 + 2 generic-repo-adapter.test.ts:84/138/92/151)被 [019.1]+[023.13] follow-up 自动清;npx tsc --noEmit 全项目 0 error — TD-018 完全自动闭环(runtime dead string 清理留 follow-up,本会话不 scope) |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 32 条（本批：TD-017 关闭）· 🔴0 / 🟠2 / 🟡7 / 🟢2 / ⚪1 / ✅14
+**最后更新**: 2026-07-12 · 共 32 条（本批：TD-018 关闭）· 🔴0 / 🟠2 / 🟡6 / 🟢2 / ⚪1 / ✅15
