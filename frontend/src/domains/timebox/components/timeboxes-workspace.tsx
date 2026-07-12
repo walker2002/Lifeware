@@ -56,7 +56,7 @@ import { transitionTimebox, getTimeboxById, revertTimebox, deleteTimebox } from 
 import { getTimeboxesByRange, getAppointmentsByRange } from '@/app/actions/intent'
 import { mergeEvents, type TimeboxesEvent } from './timeboxes-event'
 // [028] I-2 polish amend: SCHEDULE_PROPOSAL_SURFACE 常量（reviewer found missed JSX surfaceType site）
-import { SCHEDULE_PROPOSAL_SURFACE } from '@/domains/timebox/constants'
+import { SCHEDULE_PROPOSAL_SURFACE, SCHEDULE_PROPOSAL_ACTION } from '@/domains/timebox/constants'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader,
@@ -481,6 +481,32 @@ export function TimeboxesWorkspace() {
           }
         } else {
           toast.error(`创建失败：${result.error ?? '未知错误'}`)
+        }
+      } else if (action === SCHEDULE_PROPOSAL_ACTION) {
+        // [028] /qa ISSUE-001 critical: 之前 scheduleProposal action 在 handleAiConfirm
+        //   没分支 → 点击「接受 N 个时间盒」静默无操作。
+        // 走 submitCnuiSurface 路由到 cnui/handlers.ts:552 scheduleProposal submit branch
+        //   (自含 batch recording: 逐条 submitDynamicIntent('timebox', 'createTimebox', ...) +
+        //   succeeded[] → recordBatchProposals)。
+        const fields = (data.fields ?? {}) as Record<string, unknown>
+        const result = await submitCnuiSurface(
+          '',  // cnuiSurfaceId — ignored by handler
+          'timebox',
+          SCHEDULE_PROPOSAL_ACTION,
+          fields,
+        )
+        if (result.success) {
+          await loadRange(dateMode, currentDate)
+          setAiPanelOpen(false)
+          // result.data 自含 batchId / batchSize
+          const batchId = (result as { batchId?: string }).batchId
+          const batchSize = (result as { batchSize?: number }).batchSize ?? (fields.items as unknown[] | undefined)?.length ?? 0
+          if (batchId) {
+            setRevertableBatches([{ batchId, acceptedAt: Date.now(), count: batchSize }])
+          }
+          toast.success(`已编排 ${batchSize} 个时间盒`)
+        } else {
+          toast.error(`编排失败：${result.error ?? '未知错误'}`)
         }
       }
     } catch (e) {
