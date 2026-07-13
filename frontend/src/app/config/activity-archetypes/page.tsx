@@ -7,7 +7,7 @@
  */
 
 import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
-import { ArchetypeTable } from './archetype-table'
+import { ArchetypeTable } from '@/domains/timebox/config/archetype-table'
 
 export default async function ActivityArchetypesPage() {
   const repo = new ActivityArchetypeRepository()

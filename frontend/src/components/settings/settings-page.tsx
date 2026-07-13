@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react"
 import { LLMSettings } from "./llm-settings"
 import { TimezonePicker } from "./timezone-picker"
-import { ArchetypeTable } from "@/app/config/activity-archetypes/archetype-table"
+import { ArchetypeTable } from '@/domains/timebox/config/archetype-table'
 import { getArchetypes } from "@/app/actions/activity-archetype"
 import { setTraceConfig, getTraceConfig } from "@/lib/config/trace-config"
 import type { ActivityArchetype } from "@/usom/activity-archetype/types"
