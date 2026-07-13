@@ -1573,6 +1573,7 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ### Domain 注册指南（已并入 domain-development-guide）
 
+- 2026_07_13 — [page-thin] 双路径架构 + 容器归属 5 约定：server entry 命名（`-route.tsx` 避 client wrapper 同名冲突）、容器自包含（entry 拥 h-screen/min-h-full/space-y-4，page.tsx 保持裸）、server-only helper 路径（`lib/server/load-*.ts`，目录约定不引 `server-only` 包）、dual-use workspace `standalone` prop（双用组件 + IRON RULE 双向断言）、manifest view_route 强约束（`component` 必指 `domains/` 禁 `app/`，D8 不变量测试守护）
 - 2026_05_26 — 构建时路由生成流程说明；废弃手动创建 app/ 路由
 - 2026_05_23 — Step 11 query_actions + Step 12 onQuery；manifest 区块 G
 - 2026_05_22 — Step 9 Handler 扩展：onGenerate(aiRuntime) 依赖注入 + generation_actions 新字段
