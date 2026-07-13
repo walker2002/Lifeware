@@ -18,6 +18,11 @@ export const APPOINTMENT_PAGE_WINDOW_DAYS = 90
  *
  * @param now - 基准时间，默认 new Date()；测试应注入固定值
  * @returns { start, end } ISO 8601 UTC 字符串
+ *
+ * 时区说明：本计算使用宿主本地日历（`setDate` / `getDate`），与
+ * `AppointmentWorkspace.reload` 行为一致；与 `/appointments/page.tsx` 首载同源。
+ * 之所以不用 UTC 日历：与 `user_tz` 路径分叉会让同一窗口产生不同数据；
+ * 若日后需要 UTC 日历，请同时改 AppointmentWorkspace.reload 并补回归测试。
  */
 export function getAppointmentPageWindow(now: Date = new Date()): {
   start: string
