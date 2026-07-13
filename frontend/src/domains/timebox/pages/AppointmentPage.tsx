@@ -24,6 +24,7 @@
 import { useEffect, useState } from 'react'
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
 import { getAppointmentsByRange } from '@/app/actions/intent'
+import { getAppointmentPageWindow } from '@/domains/timebox/lib/appointment-window'
 import type { AppointmentSummary } from '@/usom/types/summaries'
 
 export function AppointmentPage() {
@@ -32,11 +33,9 @@ export function AppointmentPage() {
 
   useEffect(() => {
     let cancelled = false
-    // 与 /app/appointments/page.tsx 保持窗口一致：过去 7 天 + 未来 90 天
-    const start = new Date()
-    start.setDate(start.getDate() - 7)
-    const end = new Date()
-    end.setDate(end.getDate() + 90)
+    // 窗口 ±90 天，与独立路由一致（getAppointmentPageWindow 纯函数，client 可 import）
+    // [026.02] T9: 7→90 扩窗同步独立路由（Month 视图 90 天回看）
+    const { start, end } = getAppointmentPageWindow()
     getAppointmentsByRange(start, end)
       .then(list => {
         if (cancelled) return

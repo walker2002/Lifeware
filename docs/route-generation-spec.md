@@ -136,6 +136,14 @@ export default function HabitsListPage() {
 | 空目录处理 | 自动创建中间目录 |
 | **幂等写入** | 业务字段（component/url/params）未变则跳过重写；时间戳行不计入比对，否则每次 dev/build 都会留下「时间戳漂移」 |
 
+#### 4.3.1 Domain 组件与 props 契约
+
+- `component` 必须是 `domains/` 下的路径，禁止指向 `app/`；生成的 `page.tsx` 只能薄封装 Domain 入口，避免循环导入。
+- 默认导出名由组件文件名推断：kebab-case 会转为 PascalCase，例如 `timeboxes-workspace` → `TimeboxesWorkspace`。
+- 缩写等无法可靠推断的名称用 `export_name` 显式覆盖，例如 `export_name: OKRWorkspace`。
+- `page_props` 的每个值可以是 JSON 字面值，或 `{ from: 'searchParams', key: '<key>' }`；`key` 必须是非空字符串，其他 `from` 值为非法配置。
+- 代码生成器会读取组件文件：检测到 `export default` 时生成默认导入，否则生成命名导入；文件不可读时保持历史行为，回退为命名导入。
+
 ### 4.4 示例映射
 
 | manifest url | 生成文件路径 |

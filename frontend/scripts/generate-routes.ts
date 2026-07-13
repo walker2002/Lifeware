@@ -15,7 +15,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath } from 'node:url'
 import * as yaml from 'js-yaml'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -31,8 +31,16 @@ interface ViewRouteConfig {
   component: string
   /** URL 路径 */
   url?: string
-  /** 额外参数 */
-  params?: Record<string, unknown>
+  /**
+   * 导出名覆盖（kebab→PascalCase 与实际导出不符时，如 OKRWorkspace）
+   *
+   * 注：view_route 不再支持 `params:` 字段——历史曾有过 `<Component params={...} />`
+   * 死分支（所有 manifest 改用 page_props searchParams 透传）。schema 仍保留字段为
+   * 向前兼容；codegen 端已删除相关分支。
+   */
+  export_name?: string
+  /** page.tsx 透传 props（字面值或 { from: searchParams, key }） */
+  page_props?: Record<string, unknown>
 }
 
 /**
@@ -48,7 +56,7 @@ interface Manifest {
 /**
  * 路由条目
  */
-interface RouteEntry {
+export interface RouteEntry {
   /** 域 ID */
   domainId: string
   /** 动作名称 */
@@ -57,8 +65,10 @@ interface RouteEntry {
   component: string
   /** URL 路径 */
   url: string
-  /** 额外参数 */
-  params?: Record<string, unknown>
+  /** 导出名覆盖 */
+  exportName?: string
+  /** page.tsx 透传 props */
+  pageProps?: Record<string, unknown>
 }
 
 /**
@@ -78,7 +88,16 @@ interface GenerateOptions {
 const PROJECT_ROOT = path.resolve(__dirname, '..')
 const DOMAINS_DIR = path.join(PROJECT_ROOT, 'src', 'domains')
 const APP_DIR = path.join(PROJECT_ROOT, 'src', 'app')
-const AUTO_GENERATED_HEADER = `// ---
+// JSDoc 文件头 + ASCII 横幅：满足 CLAUDE.md「每个 TS/JS 文件必须有 @file/@brief」要求；
+// 同时保留可视的自动生成标记，避免误编辑。@file 标路由路径，@brief 注明自动生成身份。
+const AUTO_GENERATED_HEADER = `/**
+ * @file app/{url-path}/page
+ * @brief 自动生成 thin wrapper — 由 scripts/generate-routes.ts 从 domains/{domain}/manifest.yaml 派生。
+ *
+ * 渲染 {component-name}。勿手动编辑（修改会被下一次 \`npm run generate:routes\` 覆盖）。
+ * 如需调整，编辑对应域的 manifest.yaml view_routes 或 domain 入口组件。
+ */
+// ---
 // Auto-generated from domains/{domain}/manifest.yaml
 // DO NOT EDIT MANUALLY
 // Generated at: {timestamp}
@@ -179,7 +198,8 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
           action,
           component: route.component,
           url: route.url,
-          params: route.params,
+          exportName: route.export_name,
+          pageProps: route.page_props,
         })
       }
 
@@ -200,7 +220,7 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
  * @param routes - 路由条目列表
  * @throws {Error} 验证失败时抛出错误
  */
-async function validateRoutes(routes: RouteEntry[]): Promise<void> {
+export async function validateRoutes(routes: RouteEntry[]): Promise<void> {
   const errors: string[] = []
   const warnings: string[] = []
   const urlMap = new Map<string, RouteEntry>()
@@ -209,6 +229,25 @@ async function validateRoutes(routes: RouteEntry[]): Promise<void> {
     // 验证 URL 格式
     if (!route.url.startsWith('/')) {
       errors.push(`${route.domainId}.${route.action}: url must start with '/'`)
+    }
+
+    // page_props 仅允许字面值，或结构完整的 searchParams 映射。
+    for (const [propName, value] of Object.entries(route.pageProps ?? {})) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+
+      const mapping = value as { from?: unknown; key?: unknown }
+      if (mapping.from === undefined) continue
+      if (mapping.from !== 'searchParams') {
+        errors.push(
+          `${route.domainId}.${route.action}: page_props.${propName}.from must be 'searchParams'`,
+        )
+        continue
+      }
+      if (typeof mapping.key !== 'string' || mapping.key.trim() === '') {
+        errors.push(
+          `${route.domainId}.${route.action}: page_props.${propName}.key must be a non-empty string`,
+        )
+      }
     }
 
     // 检测 URL 冲突
@@ -301,25 +340,107 @@ function stripTimestampLine(content: string): string {
 // ─── 生成单个路由文件内容 ───────────────────────────────────────────
 
 /**
- * 生成单个路由文件的内容
- * @param route - 路由条目
- * @returns 文件内容字符串
+ * 检测组件文件是否使用 `export default` 形式导出。
+ * 若文件不存在或读取失败，按命名导出回退（与历史行为一致）。
  */
-function generateRouteFileContent(route: RouteEntry): string {
-  const componentName = extractComponentName(route.component)
-  const paramsProp = route.params ? JSON.stringify(route.params, null, 2) : '{}'
+function detectDefaultExport(componentPath: string): boolean {
+  const fullPath = path.join(PROJECT_ROOT, 'src', componentPath + '.tsx')
+  if (!fs.existsSync(fullPath)) return false
+  const source = fs.readFileSync(fullPath, 'utf-8')
+  return /\bexport\s+default\s+/.test(source)
+}
 
+/**
+ * 生成单个路由文件的内容。
+ * - 无 page_props → 同步模板
+ * - page_props 仅字面值 → 同步模板 + 字面 props
+ * - page_props 含 { from: searchParams } → async server component + searchParams 解包
+ *
+ * [page-thin] T7-fix：根据组件文件是否使用 `export default` 选择 import 形式：
+ * - 默认导出 → `import Foo from "..."`（无花括号）
+ * - 命名导出 → `import { Foo } from "..."`
+ * 文件缺失/读取失败时按命名导出回退（与历史行为一致；此时 collectRoutes 已 warn）。
+ *
+ * [pre-land-fix] 函数名去重：组件名已以 `Page`/`Route`/`Workspace`/`Component`
+ * 结尾时直接复用（避免 `ActivityArchetypesPagePage` / `TaskTreePagePage` /
+ * `TimeboxesWorkspacePage` 这种累赘），否则追加 `Page` 后缀。
+ *
+ * 注意：函数名 = 组件名时 (例如 TimeboxesWorkspace)，不能直接 `import { TimeboxesWorkspace }`
+ * 同时本地声明 `function TimeboxesWorkspace()`，会触发 TS2440 冲突。
+ * 此时将本地函数命名为 `Default` 后缀（`TimeboxesWorkspaceDefault`），保持 import 名不变。
+ */
+export function generateRouteFileContent(route: RouteEntry): string {
+  const componentName = route.exportName ?? extractComponentName(route.component)
+  // [pre-land-fix] 函数名去重：name 末尾已是 Page/Route/Workspace/Component 时直接复用。
+  // 但 fnName 撞上 componentName 会触发 TS2440（同名 import + 本地 function 冲突），
+  // 所以本地 function 用 componentName + 'Default' 保证不撞。
+  const fnNameReuseName = /(Page|Route|Workspace|Component)$/.test(componentName)
+  const fnName = fnNameReuseName ? componentName + 'Default' : componentName + 'Page'
   const header = AUTO_GENERATED_HEADER
-    .replace('{domain}', route.domainId)
-    .replace('{timestamp}', new Date().toISOString())
+    .replaceAll('{domain}', route.domainId)
+    .replaceAll('{url-path}', route.url.replace(/^\//, ''))
+    .replaceAll('{component-name}', componentName)
+    .replaceAll('{timestamp}', new Date().toISOString())
+  const usesDefaultExport = detectDefaultExport(route.component)
+  const imports = usesDefaultExport
+    ? `import ${componentName} from "@/${route.component}"\n`
+    : `import { ${componentName} } from "@/${route.component}"\n`
 
-  const imports = `import { ${componentName} } from "@/${route.component}"\n`
+  const pageProps = route.pageProps
+  const hasPageProps = pageProps && Object.keys(pageProps).length > 0
 
-  const body = `export default function ${componentName}Page() {
-  return <${componentName} ${Object.keys(route.params || {}).length > 0 ? `params={${paramsProp}}` : ''} />
+  // page_props 分支
+  if (hasPageProps) {
+    const entries = Object.entries(pageProps)
+    const needsSearchParams = entries.some(
+      ([, value]) =>
+        typeof value === 'object' &&
+        value !== null &&
+        (value as { from?: string }).from === 'searchParams',
+    )
+
+    const propsBlock = entries
+      .map(([key, value]) => {
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          (value as { from?: string }).from === 'searchParams'
+        ) {
+          return `      ${key}={sp.${(value as { key: string }).key}}`
+        }
+        return `      ${key}={${JSON.stringify(value)}}`
+      })
+      .join('\n')
+
+    if (needsSearchParams) {
+      const body = `export default async function ${fnName}({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams
+  return (
+    <${componentName}
+${propsBlock}
+    />
+  )
 }
 `
+      return header + imports + body
+    }
 
+    const body = `export default function ${fnName}() {
+  return (
+    <${componentName}
+${propsBlock}
+    />
+  )
+}
+`
+    return header + imports + body
+  }
+
+  // [pre-land-fix] 移除旧的 `params` 分支（无 manifest view_route 使用，codegen 死代码）。
+  const body = `export default function ${fnName}() {
+  return <${componentName} />
+}
+`
   return header + imports + body
 }
 
@@ -343,14 +464,17 @@ function urlToFilePath(url: string): string {
 // ─── 提取组件名 ─────────────────────────────────────────────────────
 
 /**
- * 从组件路径中提取组件名称
- * @param componentPath - 组件路径
- * @returns 组件名称
+ * 从组件路径中提取组件名称（kebab-case → PascalCase）。
+ * timebox 域用 kebab 文件名 + PascalCase 导出；已 PascalCase 的名字（无 '-'）不受影响。
+ * 缩写（如 OKRWorkspace）需 manifest 显式声明 export_name 覆盖。
  */
-function extractComponentName(componentPath: string): string {
+export function extractComponentName(componentPath: string): string {
   const parts = componentPath.split('/')
-  const fileName = parts[parts.length - 1]
-  return fileName.replace(/\.tsx?$/, '')
+  const fileName = parts[parts.length - 1].replace(/\.tsx?$/, '')
+  return fileName
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
 }
 
 // ─── 清理孤立路由 ───────────────────────────────────────────────────
@@ -407,7 +531,13 @@ function getAllRouteFiles(dir: string, files: string[] = []): string[] {
 
 // ─── 运行 ─────────────────────────────────────────────────────────────
 
-main().catch(err => {
-  console.error('Fatal error:', err)
-  process.exit(1)
-})
+// 仅直接运行时执行（测试 import 时不触发 main）
+const invokedAsScript = process.argv[1]
+  ? fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+  : false
+if (invokedAsScript) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

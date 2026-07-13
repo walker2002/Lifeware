@@ -92,7 +92,12 @@ interface ConfirmState {
   action: () => Promise<void>
 }
 
-export function TimeboxesWorkspace() {
+interface TimeboxesWorkspaceProps {
+  /** 独立页面模式：root 用 h-screen 自撑高度；默认 false（AppShell 嵌入用 h-full） */
+  standalone?: boolean
+}
+
+export function TimeboxesWorkspace({ standalone = false }: TimeboxesWorkspaceProps = {}) {
   // [023.06] T2：视图模式 state + 当前浏览日期
   const [dateMode, setDateMode] = useState<DateViewMode>('day')
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date())
@@ -580,7 +585,7 @@ export function TimeboxesWorkspace() {
   }, [])
 
   return (
-    <div className="flex h-full">
+    <div className={`flex ${standalone ? "h-screen" : "h-full"}`}>
       {/* 左栏：当日时间盒列表 */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* [023.03] UI 统一：去重标题。PageBanner 已在主页 context 显示"我的时间盒"，

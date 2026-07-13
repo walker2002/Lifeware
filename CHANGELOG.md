@@ -8,6 +8,55 @@
 
 ---
 
+## [page-thin] page.tsx 退化为 thin wrapper — domain 自包含入口统一（2026-07-13）
+
+> 2026_07_13 — 9 任务重构（branch `refactor/page-thin-wrapper`）：把 `app/<route>/page.tsx` 从手写壳统一收敛为 codegen 生成的薄 wrapper；页面入口（含数据预取 + 容器）下移到 domain。manifest.view_routes.component 语义统一指向 domain 入口组件（去 `app/` 前缀），消除 codegen 循环 import 风险。6 个 page-thin 目标路由（`/tasks` `/okrs` `/timeboxes` `/timebox-templates` `/config/activity-archetypes` `/appointments`）全部 ship。
+
+- **WBR 最终修复**：约定 reload 复用 canonical ±90 天窗口；路由 codegen 增加 `page_props` 结构校验与 ESM-safe 入口守卫；D8 测试改为 YAML 解析失败即失败，并精确断言全部 `(domain, action, component)` 绑定；`route-generation-spec.md` 与 `domain-development-guide.md` 同步补齐 Domain 路径、导出推断/覆盖、`page_props` 和默认导出检测契约。
+
+### 改动（9 任务）
+
+- **T1 — appointment-window 纯函数（timebox/lib）**：`getAppointmentWindow(now, ±90d)` + `daysFromToday(now, offset)` 两个纯函数 + 2 单测；F3 收口 client `AppointmentPage` 之前 stale 7/90 天窗口。
+- **T2 — archetype 入口搬入 domain**：`archetype-table.tsx` + `archetype-form.tsx` 从 `components/settings/` 搬入 `domains/timebox/config/`，配套 `load-activity-archetypes.ts` server helper；T2-fix 一并修 archetype-form 漏改回归。
+- **T3 — timebox-templates route 入口**：`timebox-templates-route.tsx`（D9 重命名）+ `load-templates.ts` server helper + 2 单测。
+- **T4 — appointment route 入口（拥 h-screen）**：`appointment-route.tsx` + `load-appointments.ts` server helper + 1 单测；F3 收口 client `AppointmentPage` stale 窗口。
+- **T5 — workspace standalone prop**：OKRWorkspace + TimeboxesWorkspace 新增 `standalone?: boolean`（默认 false），standalone 时 root 用 `h-screen` 自撑高度，AppShell 嵌入仍 `h-full`；CRITICAL 回归测试守住两种模式。
+- **T6 — manifest 校准**：`timebox/manifest.yaml` 4 个 view_route.component 改指向 domain，`okrs/manifest.yaml` 加 `page_props`；`ViewRouteSchema`（Zod）加 `export_name` + `page_props` 两可选字段；不变量测试 `manifest-view-routes.test.ts`（16 cases）禁 `app/` 前缀。
+- **T7 — codegen 扩展**：`generate-routes.ts` 支持 kebab→PascalCase 文件名、`export_name` 兜底默认导出、`page_props` 透传、`searchParams` 类型拓宽；单测 9 cases 覆盖 4 种分支。
+- **T7-fix**：`default-export detection`（codegen 默认导出识别）+ `OKRWorkspace searchParams union widening`（从 `Record<string,string>` 拓宽到 `Record<string, string|string[]|undefined>`）。
+- **T8 — `--force` 接管 6 pages**：6 个手写 page.tsx（tasks/okrs/timeboxes/timebox-templates/activity-archetypes/appointments）被 codegen 覆盖为 9 行薄 wrapper；habits 2 个 page 幂等不变（no manifest change since T6）。
+
+### 关键决策
+
+- **D3** `standalone` 必传（不设 default）— 强制 caller 显式声明是嵌入还是独立页，避免 AppShell 嵌入时误用 `h-screen` 撑爆父容器（参 [[project_chromium-stretch-flex-percent-height-bug]]）。
+- **D4** validate-all-first + single atomic update + post-write events — UI drawer catch → reload + toast。
+- **D6** codegen page_props JSON.stringify 边界（null/obj）由 Task 7 单测覆盖 4 case。
+- **D8** manifest view_route.component 禁 `app/` 前缀 — 不变量测试守护，防回归循环 import。
+- **D9** `appointment` + `timebox-templates` 重命名（避「行程计划」与 timebox 撞车）。
+
+### 验证
+
+- ✅ vitest critical 6 suite 全绿：`scripts/__tests__/generate-routes.test.ts` (9/9) + `domains/timebox/lib/__tests__/appointment-window.test.ts` (2/2) + `domains/__tests__/manifest-view-routes.test.ts` (16/16) + 5 个新 route/standalone/render 测试 (24/24) + OKR components (37/37) + timebox components (142/142)
+- ✅ vitest full suite **零净回归**：44 failed 全在 T1-T8 范围外（timebox-card / habit-card / OKR repos / nexus state-machine / habit handlers 等 — 全部 pre-existing）
+- ✅ tsc head **201 错误，净 -18 vs T8 baseline (219)**；2 个 `transitionTimebox` 类型错误在 baseline 9c01c65 已存在，确认 pre-existing，非本次引入
+- ✅ manifest 校验 0 新警告：8 routes 全部 `✓`（2 habits + 1 okrs + 1 tasks + 4 timebox），6 条历史「not auto-generated」警告全消失（T8 接管）；仅剩 2 条结构性 `Skipping X: no manifest.yaml found`（`__tests__/` / `manifest-loader/` 目录无 manifest — by design）
+- ✅ dev server (port 3000) 6 路由 + `/` 全 200：tasks / okrs / timeboxes / timebox-templates / config/activity-archetypes / appointments
+
+### 遗留（不在本期处理）
+
+- /browse 视觉回归（`/okrs` `/timeboxes` `/appointments` 滚动链）由 controller 在本 commit 后单独跑
+- 双重 `h-screen` 期视觉异常 — 理论嵌套等价 100vh，无变化；如视觉回归，回退 Task 5 对应文件 `h-screen` 即可
+- `view_routes` kebab vs snake 命名风格混用（历史债）
+
+### 关联
+
+- 设计：`docs/superpowers/specs/2026-07-13-page-thin-wrapper-refactor-design.md`
+- 计划：`docs/superpowers/plans/2026-07-13-page-thin-wrapper-refactor.md`（9 任务）+ `docs/superpowers/plans/2026-07-13-page-thin-wrapper-refactor-review.md`（eng-review 8 findings 折入）
+- Branch：`refactor/page-thin-wrapper`（10 commits ahead main: T1 → T8）
+- 相关项目债：[[TD-039]] TZDate RSC boundary（同期同 PR 收口）
+
+---
+
 ## [TD-039] TZDate RSC boundary 序列化丢失 class — 治本修复（2026-07-13）
 
 > 2026_07_13 — TZ-2.2 段尾遗留债。`use-timebox.ts:53` `getDateRange` 用 `@date-fns/tz v1.4.1` 的 `tz(tzName)` 包出 `TZDate`（Date subclass），跨 Next.js 16 RSC boundary 序列化时 Next.js 不识别 subclass prototype，server action 收到 plain object 后 `start.toISOString()` 抛 `TypeError`。`/timeboxes` / `/appointments` 页面 100% 触发（hydration 后 client `loadRange()` → Server Action），`/timeboxes` HTTP 200 但 UI 显示「今天还没有时间盒」空 state（fetch 失败被 catch 静默 swallow）。MVP Shanghai-only 巧合 OK；任何有范围查询的 page 加载即爆。
@@ -1520,10 +1569,16 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ### Domain 路由生成规范
 
+- 2026_07_13 — [page-thin] view_routes schema 扩展：`export_name` 缩写名覆盖（kebab→PascalCase 推断不符时，如 `OKRWorkspace`）+ `page_props` 字段（字面值或 `{ from: searchParams, key: '<key>' }`，含结构校验）；新增 `## 8. 区块 G: view_routes 路由声明` § 完整字段规范与 5 约束配套
 - 2026_05_26 — 创建：构建时路由生成方案 B；manifest.yaml view_routes.url 字段规范
+
+### 代码注释规范
+
+- 2026_07_13 — [page-thin] codegen-generated files JSDoc 头约定：`scripts/generate-routes.ts` 的 `AUTO_GENERATED_HEADER` 自动发射 `@file` + `@brief` JSDoc 块（满足 CLAUDE.md「每个 TS/JS 文件必须有 `@file/@brief`」硬约束）；新增 `## 2.1 Codegen 生成的文件` § 模板 + `replaceAll` 占位符填充细节
 
 ### Domain 注册指南（已并入 domain-development-guide）
 
+- 2026_07_13 — [page-thin] 双路径架构 + 容器归属 5 约定：server entry 命名（`-route.tsx` 避 client wrapper 同名冲突）、容器自包含（entry 拥 h-screen/min-h-full/space-y-4，page.tsx 保持裸）、server-only helper 路径（`lib/server/load-*.ts`，目录约定不引 `server-only` 包）、dual-use workspace `standalone` prop（双用组件 + IRON RULE 双向断言）、manifest view_route 强约束（`component` 必指 `domains/` 禁 `app/`，D8 不变量测试守护）
 - 2026_05_26 — 构建时路由生成流程说明；废弃手动创建 app/ 路由
 - 2026_05_23 — Step 11 query_actions + Step 12 onQuery；manifest 区块 G
 - 2026_05_22 — Step 9 Handler 扩展：onGenerate(aiRuntime) 依赖注入 + generation_actions 新字段

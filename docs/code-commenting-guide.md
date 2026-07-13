@@ -27,6 +27,34 @@
  */
 ```
 
+### 2.1 Codegen 生成的文件（[page-thin] 2026-07-13 约定）
+
+**所有由 `scripts/generate-routes.ts` 自动生成的文件（典型：`app/<route>/page.tsx`）同样需要文件头注释**。这是 CLAUDE.md「每个 TS/JS 文件必须有 `@file/@brief` 头」要求的硬约束（commit `e235be6` requesting-code-review 修复后强制执行）。
+
+`scripts/generate-routes.ts` 的 `AUTO_GENERATED_HEADER` 模板自动发射 JSDoc 头 + ASCII 横幅（`generateRouteFileContent` 内的 `replaceAll` 占位符填充）：
+
+```typescript
+// 模板（scripts/generate-routes.ts:93-106）
+const AUTO_GENERATED_HEADER = `/**
+ * @file app/{url-path}/page
+ * @brief 自动生成 thin wrapper — 由 scripts/generate-routes.ts 从 domains/{domain}/manifest.yaml 派生。
+ *
+ * 渲染 {component-name}。勿手动编辑（修改会被下一次 \`npm run generate:routes\` 覆盖）。
+ * 如需调整，编辑对应域的 manifest.yaml view_routes 或 domain 入口组件。
+ */
+// ---
+// Auto-generated from domains/{domain}/manifest.yaml
+// DO NOT EDIT MANUALLY
+// Generated at: {timestamp}
+// ---
+
+`
+```
+
+`@file` 用 `app/<url-path>/page` 格式（无 `app/` 前导斜杠）；`@brief` 显式标注「自动生成」身份 + 警告「勿手动编辑」。占位符填充用 `String.replaceAll`（不带 `/g` 标志的 `replace` 仅替换首匹配，会导致 banner 残留字面值 — 见 commit `e235be6` 修复的 TS2440 collision guard 同源问题）。
+
+**新增/修改 codegen 模板时**：确保 `AUTO_GENERATED_HEADER` 始终包含 JSDoc `@file` + `@brief` 块，并测试生成输出含这两个标签（`generate-routes.test.ts` 现有 case 应扩到 JSDoc 头断言）。
+
 ---
 
 ## 3. 模块分隔注释

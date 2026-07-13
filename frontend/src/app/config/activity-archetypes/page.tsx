@@ -1,21 +1,17 @@
 /**
- * @file page
- * @brief Activity Archetype 配置管理页（手写 Next.js page，不走 codegen）
+ * @file app/config/activity-archetypes/page
+ * @brief 自动生成 thin wrapper — 由 scripts/generate-routes.ts 从 domains/timebox/manifest.yaml 派生。
  *
- * 服务端组件：拉取全部 Archetype 数据 → 传递给客户端表格组件。
- * D4：类型归 USOM，运行时数据归 DB。不走 SM（OQ-7）。
+ * 渲染 ActivityArchetypesPage。勿手动编辑（修改会被下一次 `npm run generate:routes` 覆盖）。
+ * 如需调整，编辑对应域的 manifest.yaml view_routes 或 domain 入口组件。
  */
+// ---
+// Auto-generated from domains/timebox/manifest.yaml
+// DO NOT EDIT MANUALLY
+// Generated at: 2026-07-13T14:27:04.020Z
+// ---
 
-import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
-import { ArchetypeTable } from './archetype-table'
-
-export default async function ActivityArchetypesPage() {
-  const repo = new ActivityArchetypeRepository()
-  const archetypes = await repo.findByUser('00000000-0000-0000-0000-000000000001') // MVP 固定用户
-
-  return (
-    <div className="space-y-4">
-      <ArchetypeTable initialData={archetypes} />
-    </div>
-  )
+import { ActivityArchetypesPage } from "@/domains/timebox/config/activity-archetypes-page"
+export default function ActivityArchetypesPageDefault() {
+  return <ActivityArchetypesPage />
 }

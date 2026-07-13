@@ -114,10 +114,14 @@ const FieldPromptSchema = z.object({
  * 视图路由模式
  */
 const ViewRouteSchema = z.object({
-  /** 组件路径 */
+  /** 组件路径（统一指向 domain 入口组件，禁止 app/<route>/page） */
   component: z.string(),
   /** 路由参数 */
   params: z.record(z.string(), z.unknown()).optional(),
+  /** 导出名覆盖（当 kebab→PascalCase 与实际导出不符时，如缩写 OKRWorkspace） */
+  export_name: z.string().optional(),
+  /** page.tsx 透传 props（codegen 用；支持字面值或 { from: searchParams, key }） */
+  page_props: z.record(z.string(), z.unknown()).optional(),
 })
 
 /**
