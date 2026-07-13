@@ -15,7 +15,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath } from 'node:url'
 import * as yaml from 'js-yaml'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -210,7 +210,7 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
  * @param routes - 路由条目列表
  * @throws {Error} 验证失败时抛出错误
  */
-async function validateRoutes(routes: RouteEntry[]): Promise<void> {
+export async function validateRoutes(routes: RouteEntry[]): Promise<void> {
   const errors: string[] = []
   const warnings: string[] = []
   const urlMap = new Map<string, RouteEntry>()
@@ -219,6 +219,25 @@ async function validateRoutes(routes: RouteEntry[]): Promise<void> {
     // 验证 URL 格式
     if (!route.url.startsWith('/')) {
       errors.push(`${route.domainId}.${route.action}: url must start with '/'`)
+    }
+
+    // page_props 仅允许字面值，或结构完整的 searchParams 映射。
+    for (const [propName, value] of Object.entries(route.pageProps ?? {})) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+
+      const mapping = value as { from?: unknown; key?: unknown }
+      if (mapping.from === undefined) continue
+      if (mapping.from !== 'searchParams') {
+        errors.push(
+          `${route.domainId}.${route.action}: page_props.${propName}.from must be 'searchParams'`,
+        )
+        continue
+      }
+      if (typeof mapping.key !== 'string' || mapping.key.trim() === '') {
+        errors.push(
+          `${route.domainId}.${route.action}: page_props.${propName}.key must be a non-empty string`,
+        )
+      }
     }
 
     // 检测 URL 冲突
@@ -495,7 +514,10 @@ function getAllRouteFiles(dir: string, files: string[] = []): string[] {
 // ─── 运行 ─────────────────────────────────────────────────────────────
 
 // 仅直接运行时执行（测试 import 时不触发 main）
-if (require.main === module) {
+const invokedAsScript = process.argv[1]
+  ? fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+  : false
+if (invokedAsScript) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)

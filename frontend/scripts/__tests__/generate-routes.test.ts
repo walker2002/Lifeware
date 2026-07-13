@@ -1,10 +1,9 @@
 /**
  * @file generate-routes.test
- * @brief codegen 工具单测（kebab→PascalCase / export_name / page_props async 生成 /
- *        default-export 检测）
+ * @brief codegen 工具单测（组件名/导出形式/page_props 验证与 ESM 入口守卫）
  */
-import { describe, it, expect } from 'vitest'
-import { generateRouteFileContent, extractComponentName } from '../generate-routes'
+import { describe, it, expect, vi } from 'vitest'
+import { generateRouteFileContent, extractComponentName, validateRoutes } from '../generate-routes'
 import type { RouteEntry } from '../generate-routes'
 
 describe('extractComponentName', () => {
@@ -122,5 +121,32 @@ describe('generateRouteFileContent', () => {
       expect(out).toContain('import { OKRWorkspace } from "@/domains/okrs/components/okr-workspace"')
       expect(out).not.toMatch(/^import OKRWorkspace /m)
     })
+  })
+})
+
+describe('validateRoutes', () => {
+  const base = (pageProps: Record<string, unknown>): RouteEntry => ({
+    domainId: 'timebox',
+    action: 'viewTimeboxes',
+    component: 'domains/timebox/components/timeboxes-workspace',
+    url: '/timeboxes',
+    pageProps,
+  })
+
+  it.each([
+    ['缺少 key', { initialId: { from: 'searchParams' } }],
+    ['key 为空字符串', { initialId: { from: 'searchParams', key: '' } }],
+    ['from 值未知', { initialId: { from: 'query', key: 'id' } }],
+  ])('拒绝 page_props searchParams 结构非法：%s', async (_label, pageProps) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(validateRoutes([base(pageProps)])).rejects.toThrow('Route validation failed')
+  })
+})
+
+describe('模块入口守卫', () => {
+  it('import generate-routes 时不调用 main', async () => {
+    const log = vi.spyOn(console, 'log')
+    await import('../generate-routes')
+    expect(log).not.toHaveBeenCalledWith('🔧 Domain Route Generator')
   })
 })
