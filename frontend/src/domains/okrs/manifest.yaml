@@ -128,16 +128,11 @@ view_routes:
   okrs:
     component: domains/okrs/pages/OkrWorkspacePage
     url: /okrs
-  createObjective:
-    component: domains/okrs/pages/ObjectiveFormPage
-    url: /okrs/objectives/new
-    params:
-      mode: create
-  createKeyResult:
-    component: domains/okrs/pages/KeyResultFormPage
-    url: /okrs/key-results/new
-    params:
-      mode: create
+  # 清理 [2026-07-13]：createObjective / createKeyResult 两个 view_route 已死
+  # — 组件 ObjectiveFormPage / KeyResultFormPage 源码不存在，validate 报 component file not found。
+  # 注意：区块 E required_fields 中相应的 createObjective / createKeyResult **保留**——
+  # 它们是 onValidate 的真实业务校验规则（app/actions/okr.ts 实现 + __tests__/okr-domain.test.ts 覆盖），
+  # 与 view_route 是两个独立概念，不可混为一谈。
 
 # [022.01] Phase 3：移除 cascade_rules.parent_child_status 块（6 条）。
 # SM 侧已有 null-safety：
