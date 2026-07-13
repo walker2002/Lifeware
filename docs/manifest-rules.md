@@ -149,7 +149,103 @@ cnui_surfaces:
 
 - `cnui_surface` 引用 → 必须在 cnui_surfaces 中存在（`QA-surface-not-found` error）
 
-## 8. 跨域约束
+## 8. 区块 G: view_routes 路由声明（[page-thin] 2026-07-13 扩展）
+
+> **背景**：[page-thin] 重构（26 commits，见 CHANGELOG `## [page-thin]`）扩展了 `view_routes` 字段并强制了 codegen 契约。本节是新增 schema 字段的权威定义，`scripts/generate-routes.ts` 与 `scripts/validate-manifest.ts` 都按此实现。
+
+### 8.1 完整字段模板
+
+```yaml
+view_routes:
+  <action>:
+    component: domains/<domain>/<entry-path>:<symbol>   # 必填，强约束见 §8.2
+    url:        /<kebab-case>                          # 必填（[026.02] T9 之后）
+    export_name: <PascalCaseSymbol>                    # 可选（kebab→PascalCase 推断失败时覆盖）
+    page_props:                                        # 可选（[page-thin] T7 新增）
+      <prop-name>: <literal-value>                    # 字面值
+      <prop-name>: { from: searchParams, key: <key> } # 透传 searchParams
+```
+
+### 8.2 `component` 强约束（D8 不变量测试守护）
+
+- **必填字段**（缺失 → codegen skip + warning）
+- **必须指向 `domains/` 路径**，**禁止** `app/`
+  - 理由：codegen 生成 `app/<route>/page.tsx` 时若 `import { XxxPage } from "@/app/<route>/page"`，是循环 import 自身
+- **路径结构**（多选其一）：
+  - `domains/<domain>/pages/XxxPage`（与 manifest `domain_id` 嵌套、kebab-case 目录）
+  - `domains/<domain>/components/Xxx`（单用/多入口，PascalCase 文件名）
+  - `domains/<domain>/config/Xxx`（配置类）
+- **不能包含 `.tsx` 扩展名**（codegen 自动加）
+- **不存在的路径** → `component file not found` warning，codegen 跳过
+- 守护测试：`domains/__tests__/manifest-view-routes.test.ts`（D8 不变量，每条 view_route 必须 `not.toMatch(/^app\//)` + `toMatch(/^domains\//)`）
+
+### 8.3 `url` 字段规范
+
+- **必填字段**
+- kebab-case（`-` 分隔非 camelCase）：`/my-domain` 而非 `/myDomain`
+- 复数表示列表：`/my-domain` / `/projects`
+- 单数表示详情：`/my-domain/[id]` / `/projects/[id]`
+- 动态路由用 `[id]`（非 Next.js 早期 `:id`）
+- `params` 字段：**已废弃**（page_props searchParams 替代），schema 保留字段向后兼容
+- `url must start with '/'`（`scripts/generate-routes.ts:230` 守卫）
+
+### 8.4 `export_name` 字段（缩写名覆盖）
+
+- **可选字段**
+- 用途：kebab→PascalCase 推断与实际导出不符时使用
+- 范例：`domains/okrs/components/okr-workspace` 文件名推断 `OkrWorkspace`，但实际导出 `OKRWorkspace`（缩写）。manifest 写 `export_name: OKRWorkspace` 即可
+- codegen 测试：`generate-routes.test.ts` "export_name 覆盖组件绑定名（OKRWorkspace 缩写）"
+
+### 8.5 `page_props` 字段（[page-thin] T7 新增）
+
+独立 URL 路由（`/my-domain` 这种）若需要在 `app/<route>/page.tsx` 透传 props 给组件，用此字段。
+
+**两种值类型**（`scripts/validate-routes.ts:235-251` 严格校验）：
+
+1. **JSON 字面值**（同步模板，无 searchParams）：
+   ```yaml
+   page_props:
+     standalone: true       # 布尔
+     mode: 'create'          # 字符串（单引号推荐）
+     initialId: 42           # 数字
+   ```
+   生成的 `page.tsx`：
+   ```tsx
+   export default function XxxRoutePage() {
+     return <XxxWorkspace standalone={true} mode={"create"} initialId={42} />
+   }
+   ```
+
+2. **searchParams 透传**（异步模板）：
+   ```yaml
+   page_props:
+     standalone: true
+     initialDetailId: { from: searchParams, key: detail }
+   ```
+   生成的 `page.tsx`（async server component + searchParams 解包）：
+   ```tsx
+   export default async function XxxRoutePage({ searchParams }: {
+     searchParams: Promise<Record<string, string | string[] | undefined>>
+   }) {
+     const sp = await searchParams
+     return <XxxWorkspace standalone={true} initialDetailId={sp.detail} />
+   }
+   ```
+   - **`key` 必须是非空字符串**（`validateRoutes` error）
+   - **`from` 只接受 `searchParams`**，未知值报错（防 silent fallback 把 `{ from: query, ... }` 当字面值）
+   - 混合（字面 + searchParams）→ 整体 async（一个 searchParams 触发整页 async）
+
+### 8.6 5 约束（与 `domain-development-guide.md` §"Domain 路由入口与 Client 包装" 配套）
+
+1. **Server entry 命名**：domain 已存在 `pages/XxxPage.tsx`（ActionView 嵌入用 client wrapper）时，server 入口**必须**命名为 `components/xxx-route.tsx`（导出 `XxxRoute`），禁 `xxx-page.tsx` / `XxxPage`（TS2305 撞名）
+2. **容器自包含**：server entry 自拥 `h-screen` / `min-h-full` / `space-y-4`，page.tsx 保持裸
+3. **server-only helper 路径**：`lib/server/load-*.ts`（目录约定，不引 `server-only` 包）
+4. **dual-use workspace `standalone` prop**（P1 landmine 关键）：TimeboxesWorkspace 这类 AppShell 嵌入 + 独立路由双用组件**必须**加 `standalone` prop + IRON RULE 双向断言
+5. **manifest view_route 强约束**：`component` 必指 `domains/` 禁 `app/`，D8 不变量测试守护
+
+详细范式（manifest 片段 + server entry 模板 + IRON RULE 测试）见 `domain-development-guide.md` §"Domain 路由入口与 Client 包装（[page-thin] 2026-07-13 约定）"。
+
+## 9. 跨域约束
 
 **Cross-domain surface 唯一性**（`cross-domain-surface-duplicate` error）：
 - `cnui_surfaces.<surface-type>` 不允许跨 domain 重复
@@ -161,7 +257,7 @@ cnui_surfaces:
 grep -rn "<your-surface-type>" frontend/src/domains/*/manifest.yaml
 ```
 
-## 9. 区块 C: field_metadata 嵌套结构
+## 10. 区块 C: field_metadata 嵌套结构
 
 ```yaml
 # ✓ 正确：[026] T23 per-objectType 嵌套
@@ -177,7 +273,7 @@ field_metadata:
   priority: { type: enum, ... }      # ← C-flat-field-metadata error
 ```
 
-## 10. 区块 L: lifecycle
+## 11. 区块 L: lifecycle
 
 `lifecycle.statuses` / `lifecycle.transitions` 由 `validate-rules-registry` 独立校验（`frontend/scripts/validate-rules-registry.ts`），与 `STATUS_TRANSITION_ACTIONS` 同步：
 
@@ -194,7 +290,7 @@ lifecycle:
 - `STATUS_TRANSITION_ACTIONS` 与 manifest.lifecycle 一致
 - 排除 `create`（特殊注入不算 transition）
 
-## 11. 执行命令
+## 12. 执行命令
 
 ```bash
 cd frontend && npx tsx scripts/validate-manifest.ts    # 单跑 manifest 校验
@@ -207,7 +303,7 @@ Pre-push hook 链：
 2. `validate:rules-registry` ← lifecycle 同步校验（[023.13] Critical Fix 引入）
 3. `validate:domain-structure` ← Domain 横切结构校验
 
-## 12. 常见错误速查
+## 13. 常见错误速查
 
 | 错误 | 修复 |
 |---|---|
@@ -223,7 +319,7 @@ Pre-push hook 链：
 | `C-flat-field-metadata` | 重构为 per-objectType 嵌套（见 §9）|
 | `missing-id` | 加 `id: <domain-id>`（与目录名一致）|
 
-## 13. 实战示例
+## 14. 实战示例
 
 完整时间盒 manifest（参考 lifeware-timebox 实际 schema）：
 

@@ -1569,7 +1569,12 @@ Ship 后 whole-branch review + post-ship second-opinion (Opus, fresh "diff vs co
 
 ### Domain 路由生成规范
 
+- 2026_07_13 — [page-thin] view_routes schema 扩展：`export_name` 缩写名覆盖（kebab→PascalCase 推断不符时，如 `OKRWorkspace`）+ `page_props` 字段（字面值或 `{ from: searchParams, key: '<key>' }`，含结构校验）；新增 `## 8. 区块 G: view_routes 路由声明` § 完整字段规范与 5 约束配套
 - 2026_05_26 — 创建：构建时路由生成方案 B；manifest.yaml view_routes.url 字段规范
+
+### 代码注释规范
+
+- 2026_07_13 — [page-thin] codegen-generated files JSDoc 头约定：`scripts/generate-routes.ts` 的 `AUTO_GENERATED_HEADER` 自动发射 `@file` + `@brief` JSDoc 块（满足 CLAUDE.md「每个 TS/JS 文件必须有 `@file/@brief`」硬约束）；新增 `## 2.1 Codegen 生成的文件` § 模板 + `replaceAll` 占位符填充细节
 
 ### Domain 注册指南（已并入 domain-development-guide）
 
