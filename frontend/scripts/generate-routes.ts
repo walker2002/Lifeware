@@ -33,6 +33,10 @@ interface ViewRouteConfig {
   url?: string
   /** 额外参数 */
   params?: Record<string, unknown>
+  /** 导出名覆盖（kebab→PascalCase 与实际导出不符时，如 OKRWorkspace） */
+  export_name?: string
+  /** page.tsx 透传 props（字面值或 { from: searchParams, key }） */
+  page_props?: Record<string, unknown>
 }
 
 /**
@@ -48,7 +52,7 @@ interface Manifest {
 /**
  * 路由条目
  */
-interface RouteEntry {
+export interface RouteEntry {
   /** 域 ID */
   domainId: string
   /** 动作名称 */
@@ -59,6 +63,10 @@ interface RouteEntry {
   url: string
   /** 额外参数 */
   params?: Record<string, unknown>
+  /** 导出名覆盖 */
+  exportName?: string
+  /** page.tsx 透传 props */
+  pageProps?: Record<string, unknown>
 }
 
 /**
@@ -180,6 +188,8 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
           component: route.component,
           url: route.url,
           params: route.params,
+          exportName: route.export_name,
+          pageProps: route.page_props,
         })
       }
 
@@ -301,25 +311,80 @@ function stripTimestampLine(content: string): string {
 // ─── 生成单个路由文件内容 ───────────────────────────────────────────
 
 /**
- * 生成单个路由文件的内容
- * @param route - 路由条目
- * @returns 文件内容字符串
+ * 生成单个路由文件的内容。
+ * - 无 page_props → 同步模板
+ * - page_props 仅字面值 → 同步模板 + 字面 props
+ * - page_props 含 { from: searchParams } → async server component + searchParams 解包
  */
-function generateRouteFileContent(route: RouteEntry): string {
-  const componentName = extractComponentName(route.component)
-  const paramsProp = route.params ? JSON.stringify(route.params, null, 2) : '{}'
-
-  const header = AUTO_GENERATED_HEADER
-    .replace('{domain}', route.domainId)
-    .replace('{timestamp}', new Date().toISOString())
-
+export function generateRouteFileContent(route: RouteEntry): string {
+  const componentName = route.exportName ?? extractComponentName(route.component)
+  const header = AUTO_GENERATED_HEADER.replace('{domain}', route.domainId).replace(
+    '{timestamp}',
+    new Date().toISOString(),
+  )
   const imports = `import { ${componentName} } from "@/${route.component}"\n`
 
-  const body = `export default function ${componentName}Page() {
-  return <${componentName} ${Object.keys(route.params || {}).length > 0 ? `params={${paramsProp}}` : ''} />
+  const pageProps = route.pageProps
+  const hasPageProps = pageProps && Object.keys(pageProps).length > 0
+
+  // page_props 分支
+  if (hasPageProps) {
+    const entries = Object.entries(pageProps)
+    const needsSearchParams = entries.some(
+      ([, value]) =>
+        typeof value === 'object' &&
+        value !== null &&
+        (value as { from?: string }).from === 'searchParams',
+    )
+
+    const propsBlock = entries
+      .map(([key, value]) => {
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          (value as { from?: string }).from === 'searchParams'
+        ) {
+          return `      ${key}={sp.${(value as { key: string }).key}}`
+        }
+        return `      ${key}={${JSON.stringify(value)}}`
+      })
+      .join('\n')
+
+    if (needsSearchParams) {
+      const body = `export default async function ${componentName}Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams
+  return (
+    <${componentName}
+${propsBlock}
+    />
+  )
 }
 `
+      return header + imports + body
+    }
 
+    const body = `export default function ${componentName}Page() {
+  return (
+    <${componentName}
+${propsBlock}
+    />
+  )
+}
+`
+    return header + imports + body
+  }
+
+  // 默认同步模板（保留原 params 逻辑）
+  const paramsProp = route.params ? JSON.stringify(route.params, null, 2) : '{}'
+  const body = route.params
+    ? `export default function ${componentName}Page() {
+  return <${componentName} params={${paramsProp}} />
+}
+`
+    : `export default function ${componentName}Page() {
+  return <${componentName} />
+}
+`
   return header + imports + body
 }
 
@@ -343,14 +408,17 @@ function urlToFilePath(url: string): string {
 // ─── 提取组件名 ─────────────────────────────────────────────────────
 
 /**
- * 从组件路径中提取组件名称
- * @param componentPath - 组件路径
- * @returns 组件名称
+ * 从组件路径中提取组件名称（kebab-case → PascalCase）。
+ * timebox 域用 kebab 文件名 + PascalCase 导出；已 PascalCase 的名字（无 '-'）不受影响。
+ * 缩写（如 OKRWorkspace）需 manifest 显式声明 export_name 覆盖。
  */
-function extractComponentName(componentPath: string): string {
+export function extractComponentName(componentPath: string): string {
   const parts = componentPath.split('/')
-  const fileName = parts[parts.length - 1]
-  return fileName.replace(/\.tsx?$/, '')
+  const fileName = parts[parts.length - 1].replace(/\.tsx?$/, '')
+  return fileName
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
 }
 
 // ─── 清理孤立路由 ───────────────────────────────────────────────────
@@ -407,7 +475,10 @@ function getAllRouteFiles(dir: string, files: string[] = []): string[] {
 
 // ─── 运行 ─────────────────────────────────────────────────────────────
 
-main().catch(err => {
-  console.error('Fatal error:', err)
-  process.exit(1)
-})
+// 仅直接运行时执行（测试 import 时不触发 main）
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}
