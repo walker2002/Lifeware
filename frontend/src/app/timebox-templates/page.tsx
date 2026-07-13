@@ -8,10 +8,10 @@
 // ---
 // Auto-generated from domains/timebox/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T13:53:26.973Z
+// Generated at: 2026-07-13T14:22:55.628Z
 // ---
 
 import { TimeboxTemplatesRoute } from "@/domains/timebox/components/timebox-templates-route"
-export default function TimeboxTemplatesRoutePage() {
+export default function TimeboxTemplatesRoute() {
   return <TimeboxTemplatesRoute />
 }

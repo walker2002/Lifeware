@@ -31,9 +31,13 @@ interface ViewRouteConfig {
   component: string
   /** URL 路径 */
   url?: string
-  /** 额外参数 */
-  params?: Record<string, unknown>
-  /** 导出名覆盖（kebab→PascalCase 与实际导出不符时，如 OKRWorkspace） */
+  /**
+   * 导出名覆盖（kebab→PascalCase 与实际导出不符时，如 OKRWorkspace）
+   *
+   * 注：view_route 不再支持 `params:` 字段——历史曾有过 `<Component params={...} />`
+   * 死分支（所有 manifest 改用 page_props searchParams 透传）。schema 仍保留字段为
+   * 向前兼容；codegen 端已删除相关分支。
+   */
   export_name?: string
   /** page.tsx 透传 props（字面值或 { from: searchParams, key }） */
   page_props?: Record<string, unknown>
@@ -61,8 +65,6 @@ export interface RouteEntry {
   component: string
   /** URL 路径 */
   url: string
-  /** 额外参数 */
-  params?: Record<string, unknown>
   /** 导出名覆盖 */
   exportName?: string
   /** page.tsx 透传 props */
@@ -196,7 +198,6 @@ async function collectRoutes(domainFilter?: string[]): Promise<RouteEntry[]> {
           action,
           component: route.component,
           url: route.url,
-          params: route.params,
           exportName: route.export_name,
           pageProps: route.page_props,
         })
@@ -359,9 +360,17 @@ function detectDefaultExport(componentPath: string): boolean {
  * - 默认导出 → `import Foo from "..."`（无花括号）
  * - 命名导出 → `import { Foo } from "..."`
  * 文件缺失/读取失败时按命名导出回退（与历史行为一致；此时 collectRoutes 已 warn）。
+ *
+ * [pre-land-fix] 函数名去重：组件名已以 `Page`/`Route`/`Workspace`/`Component`
+ * 结尾时直接复用（避免 `ActivityArchetypesPagePage` / `TaskTreePagePage` /
+ * `TimeboxesWorkspacePage` 这种累赘），否则追加 `Page` 后缀。
  */
 export function generateRouteFileContent(route: RouteEntry): string {
   const componentName = route.exportName ?? extractComponentName(route.component)
+  // [pre-land-fix] 函数名去重：name 末尾已是 Page/Route/Workspace/Component 时直接复用。
+  const fnName = /(Page|Route|Workspace|Component)$/.test(componentName)
+    ? componentName
+    : componentName + 'Page'
   const header = AUTO_GENERATED_HEADER
     .replaceAll('{domain}', route.domainId)
     .replaceAll('{url-path}', route.url.replace(/^\//, ''))
@@ -399,7 +408,7 @@ export function generateRouteFileContent(route: RouteEntry): string {
       .join('\n')
 
     if (needsSearchParams) {
-      const body = `export default async function ${componentName}Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+      const body = `export default async function ${fnName}({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams
   return (
     <${componentName}
@@ -411,7 +420,7 @@ ${propsBlock}
       return header + imports + body
     }
 
-    const body = `export default function ${componentName}Page() {
+    const body = `export default function ${fnName}() {
   return (
     <${componentName}
 ${propsBlock}
@@ -422,14 +431,8 @@ ${propsBlock}
     return header + imports + body
   }
 
-  // 默认同步模板（保留原 params 逻辑）
-  const paramsProp = route.params ? JSON.stringify(route.params, null, 2) : '{}'
-  const body = route.params
-    ? `export default function ${componentName}Page() {
-  return <${componentName} params={${paramsProp}} />
-}
-`
-    : `export default function ${componentName}Page() {
+  // [pre-land-fix] 移除旧的 `params` 分支（无 manifest view_route 使用，codegen 死代码）。
+  const body = `export default function ${fnName}() {
   return <${componentName} />
 }
 `

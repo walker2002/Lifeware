@@ -8,10 +8,10 @@
 // ---
 // Auto-generated from domains/tasks/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T13:53:26.972Z
+// Generated at: 2026-07-13T14:22:55.627Z
 // ---
 
 import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"
-export default function TaskTreePagePage() {
+export default function TaskTreePage() {
   return <TaskTreePage />
 }

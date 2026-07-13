@@ -25,16 +25,18 @@ describe('generateRouteFileContent', () => {
     ...over,
   })
 
-  it('默认同步模板（无 page_props）：kebab 文件名正确解析组件名', () => {
+  it('默认同步模板（无 page_props）：kebab 文件名正确解析组件名，函数名去重追加 Page', () => {
     const out = generateRouteFileContent(
       base({ component: 'domains/timebox/components/timeboxes-workspace' }),
     )
     expect(out).toContain('import { TimeboxesWorkspace } from "@/domains/timebox/components/timeboxes-workspace"')
-    expect(out).toMatch(/export default function TimeboxesWorkspacePage\(\)/)
+    // [pre-land-fix] 组件名 ends with Workspace → fnName 复用，无需再追加 Page
+    expect(out).toMatch(/export default function TimeboxesWorkspace\(\)/)
+    expect(out).not.toMatch(/export default function TimeboxesWorkspacePage\(\)/)
     expect(out).toContain('<TimeboxesWorkspace />')
   })
 
-  it('export_name 覆盖组件绑定名（OKRWorkspace 缩写）', () => {
+  it('export_name 覆盖组件绑定名（OKRWorkspace 缩写，endsWith Workspace → 不再追加 Page）', () => {
     const out = generateRouteFileContent(
       base({
         component: 'domains/okrs/components/okr-workspace',
@@ -42,11 +44,12 @@ describe('generateRouteFileContent', () => {
       }),
     )
     expect(out).toContain('import { OKRWorkspace }')
-    expect(out).toMatch(/export default function OKRWorkspacePage\(\)/)
+    expect(out).toMatch(/export default function OKRWorkspace\(\)/)
+    expect(out).not.toMatch(/export default function OKRWorkspacePage\(\)/)
     expect(out).toContain('<OKRWorkspace />')
   })
 
-  it('page_props 含 searchParams → 生成 async + searchParams 解包', () => {
+  it('page_props 含 searchParams → 生成 async + searchParams 解包（fnName 去重）', () => {
     const out = generateRouteFileContent(
       base({
         component: 'domains/okrs/components/okr-workspace',
@@ -57,23 +60,91 @@ describe('generateRouteFileContent', () => {
         },
       }),
     )
-    expect(out).toMatch(/export default async function OKRWorkspacePage\(/)
+    expect(out).toMatch(/export default async function OKRWorkspace\(/)
+    expect(out).not.toMatch(/export default async function OKRWorkspacePage\(/)
     expect(out).toContain('Promise<Record<string, string | string[] | undefined>>')
     expect(out).toContain('const sp = await searchParams')
     expect(out).toContain('standalone={true}')
     expect(out).toContain('initialDetailId={sp.detail}')
   })
 
-  it('page_props 仅字面值（无 searchParams）→ 同步模板 + 字面 prop', () => {
+  it('page_props 仅字面值（无 searchParams）→ 同步模板 + 字面 prop（fnName 去重）', () => {
     const out = generateRouteFileContent(
       base({
         component: 'domains/x/components/foo',
         pageProps: { mode: 'create' },
       }),
     )
+    // foo 不结尾于 Page/Route/Workspace/Component → 追加 Page
     expect(out).toMatch(/export default function FooPage\(\)/)
     expect(out).toContain('mode={"create"}')
     expect(out).not.toContain('searchParams')
+  })
+
+  /**
+   * [pre-land-fix] 函数名去重：以 Page/Route/Component 结尾的 componentName 不再
+   * 重复追加 Page（避免 `ActivityArchetypesPagePage` / `TaskTreePagePage`）。
+   * 以下测试覆盖三类后缀分支：
+   * - `<Name>Page` 直接复用（如 HabitListPage → HabitListPage）
+   * - `<Name>Route` 直接复用（如 appointment-route 自定义场景）
+   * - `<Name>Component` 直接复用
+   */
+  describe('函数名去重', () => {
+    it('componentName endsWith Page → 复用，不再追加 Page', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/habits/pages/HabitListPage',
+          exportName: 'HabitListPage',
+        }),
+      )
+      expect(out).toMatch(/export default function HabitListPage\(\)/)
+      expect(out).not.toMatch(/export default function HabitListPagePage\(\)/)
+    })
+
+    it('componentName endsWith Page（PascalCase 别名 export_name）→ 复用', () => {
+      // 等同于 TaskTreePage（export_name 与 file PascalCase 一致），kebab→PascalCase
+      // 同样得到 `TaskTreePage`。
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/tasks/pages/TaskTreePage',
+          exportName: 'TaskTreePage',
+        }),
+      )
+      expect(out).toMatch(/export default function TaskTreePage\(\)/)
+      expect(out).not.toMatch(/export default function TaskTreePagePage\(\)/)
+    })
+
+    it('componentName endsWith Route → 复用', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/timebox/components/appointment-route',
+          exportName: 'AppointmentRoute',
+        }),
+      )
+      expect(out).toMatch(/export default function AppointmentRoute\(\)/)
+      expect(out).not.toMatch(/export default function AppointmentRoutePage\(\)/)
+    })
+
+    it('componentName endsWith Component → 复用', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/x/components/widget-component',
+          exportName: 'WidgetComponent',
+        }),
+      )
+      expect(out).toMatch(/export default function WidgetComponent\(\)/)
+      expect(out).not.toMatch(/export default function WidgetComponentPage\(\)/)
+    })
+
+    it('componentName 不以后缀结尾 → 追加 Page', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/x/components/foo',
+          exportName: 'Foo',
+        }),
+      )
+      expect(out).toMatch(/export default function FooPage\(\)/)
+    })
   })
 
   /**
@@ -125,11 +196,11 @@ describe('generateRouteFileContent', () => {
 })
 
 describe('validateRoutes', () => {
-  const base = (pageProps: Record<string, unknown>): RouteEntry => ({
+  const base = (pageProps: Record<string, unknown>, url = '/timeboxes'): RouteEntry => ({
     domainId: 'timebox',
     action: 'viewTimeboxes',
     component: 'domains/timebox/components/timeboxes-workspace',
-    url: '/timeboxes',
+    url,
     pageProps,
   })
 
@@ -140,6 +211,35 @@ describe('validateRoutes', () => {
   ])('拒绝 page_props searchParams 结构非法：%s', async (_label, pageProps) => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await expect(validateRoutes([base(pageProps)])).rejects.toThrow('Route validation failed')
+  })
+
+  /**
+   * [pre-land-fix] URL 格式 + 冲突：
+   * - url 不以 `/` 开头 → 拒绝
+   * - 同 url 出现两次 → 拒绝 + 报错含 `conflicts`
+   */
+  it('url 不以斜线开头 → 拒绝', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(
+      validateRoutes([base({}, '-timeboxes')]),
+    ).rejects.toThrow('Route validation failed')
+  })
+
+  it('两条路由同 url → 拒绝且错误信息含 conflicts', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error')
+    await expect(
+      validateRoutes([
+        base({}, '/x'),
+        { ...base({}, '/x'), action: 'otherAction' },
+      ]),
+    ).rejects.toThrow('Route validation failed')
+    // 至少一条 error 行提及 `conflicts`
+    expect(
+      errorSpy.mock.calls
+        .map((c) => String(c[0] ?? ''))
+        .join('\n'),
+    ).toContain('conflicts')
   })
 })
 

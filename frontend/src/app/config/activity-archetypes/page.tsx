@@ -8,10 +8,10 @@
 // ---
 // Auto-generated from domains/timebox/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T13:53:26.973Z
+// Generated at: 2026-07-13T14:22:55.628Z
 // ---
 
 import { ActivityArchetypesPage } from "@/domains/timebox/config/activity-archetypes-page"
-export default function ActivityArchetypesPagePage() {
+export default function ActivityArchetypesPage() {
   return <ActivityArchetypesPage />
 }

@@ -8,10 +8,10 @@
 // ---
 // Auto-generated from domains/habits/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T13:53:26.971Z
+// Generated at: 2026-07-13T14:22:55.626Z
 // ---
 
 import { HabitStatisticsPage } from "@/domains/habits/pages/HabitStatisticsPage"
-export default function HabitStatisticsPagePage() {
+export default function HabitStatisticsPage() {
   return <HabitStatisticsPage />
 }

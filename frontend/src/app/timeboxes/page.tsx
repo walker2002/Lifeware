@@ -8,11 +8,11 @@
 // ---
 // Auto-generated from domains/timebox/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T13:53:26.972Z
+// Generated at: 2026-07-13T14:22:55.627Z
 // ---
 
 import { TimeboxesWorkspace } from "@/domains/timebox/components/timeboxes-workspace"
-export default function TimeboxesWorkspacePage() {
+export default function TimeboxesWorkspace() {
   return (
     <TimeboxesWorkspace
       standalone={true}
