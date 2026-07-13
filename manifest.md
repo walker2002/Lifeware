@@ -44,6 +44,8 @@ superpowers/plans/
   2026-06-20-018-g3-r0-rules-framework.md             # [018-G3] R0 walking-skeleton 实现计划
   2026-06-20-018-g3-r1-habits-end-to-end.md           # [018-G3] R1 habits 端到端实现计划
   2026-06-24-020-rules-management-redesign.md         # [020] 去 C/L 范式重构实现计划（plan-eng-review CLEARED，RT1-RT9）
+superpowers/specs/2026-07-13-page-thin-wrapper-refactor-design.md  # [page-thin] page.tsx 退化为 thin wrapper（2026-07-13，9 任务 + 4 WBR-fix + 5 pre-land-fix，branch `refactor/page-thin-wrapper`，详情见 CHANGELOG.md `## [page-thin]`）
+superpowers/plans/2026-07-13-page-thin-wrapper-refactor.md          # [page-thin] 实现计划（9 任务 + GSTACK REVIEW REPORT 已附：plan-eng-review 8 findings + pre-land 4 specialist 21 findings + 5 fix wave 全部折入）
 
 # [026] Itinerary 域 — Plan 在 `.superpowers/sdd/task-026-T{1..14}-brief.md`（不在 docs/superpowers/plans/，因 [026] 实施时未走完整 /superpowers:writing-plans 流程；brief 在 .superpowers/sdd/ 维护）。设计 authority 在 CHANGELOG.md `## Itinerary 域（[026]）` 段 + docs/usom-design.md §3.13 + docs/database-design.md §4.X。完整 ship-ready：A3 (T1-T14) 14 commits 已 ship，剩余 P2/P3 follow-up T15-T23。
 
