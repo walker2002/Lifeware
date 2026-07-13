@@ -8,6 +8,41 @@
 
 ---
 
+## [neat-2026_07_12-td003] /lifeware-neat [TD-003] 四件套 drift 收口（2026-07-12）
+
+> 2026_07_12 — `/lifeware-neat` 第二轮扫描 `[TD-003]` branch (`fix/td-003-occ-version` 9 commits ahead of main) 收 4 件 drift：(1) `docs/database-design.md` §4.7 timeboxes CREATE TABLE 漏 `occ_version` 列（schema 已加，但文档没跟上）；(2) `docs/usom-design.md` §3.10 漏 `ITimeboxRepository` `expectedOccVersion` 必填参数说明；(3) `manifest.md` 漏 `[TD-003]` 索引条目；(4) `docs/tech-debt/README.md` TD-003 应移到「已修复」段（已通过 [TD-003] OCC POC 闭环），TD-037 已在新建段登记。
+
+### 改动
+
+- `docs/database-design.md` — §4.7 timeboxes CREATE TABLE 加 `occ_version integer NOT NULL DEFAULT 1` 列 + `[TD-003]` 注脚 + 顶部「变更记录」加 2026_07_12 `[TD-003]` 段 + 页脚「*变更」加 [TD-003] 行
+- `docs/usom-design.md` — §3.10 Timebox Repository 注脚加 `expectedOccVersion` 必填参数 + USOM `Timebox` interface **不暴露** occVersion（Repository 契约）+ 顶部「变更记录」加 2026_07_12 `[TD-003]` 段 + 页脚「*变更」加 [TD-003] 行
+- `manifest.md` — 追加 `[TD-003]` 索引条目（带 design SSOT / plan SSOT / CHANGELOG / memory / tech-debt / branch 9 commits / `/qa` 阻塞等交叉引用）
+- `docs/tech-debt/TD-003-edit-timeboxes-toctou.md` — `status: 登记 → 已修复` + `last_updated: 2026-07-06 → 2026-07-12` + History 加 2026-07-12 [TD-003] 修复记录段
+- `docs/tech-debt/README.md` — TD-003 在「📌 登记」段加修复状态说明 + 「🟢 已修复」段加 TD-003 一行（[TD-003] / fix/td-003-occ-version / 2026-07-12）
+- `CHANGELOG.md` — 追加本 `[neat-2026_07_12-td003]` 段（最新在上）
+
+### 验证
+
+- 2A 枚举对齐：TimeboxStatus USOM `planned|logged|cancelled` ↔ DB CHECK 一致（[TD-003] 无状态枚举变更）
+- 2B 表结构总览：timeboxes 表 §二总览已存在，§4.7 CREATE TABLE 现含 `occ_version` 列（双向对齐）
+- 2C 视图/SQL 列名：`v_running_timeboxes` 引用的列（`status` / `start_time` / `end_time`）均在 timeboxes 表中存在（含新加的 `occ_version` 不被 view 引用，OK）
+- 2D 残留文本：usom-design / database-design 无删除遗留片段
+- 2E 版本号：`usom-design` / `database-design` 页脚 `2026_07_11 → 2026_07_12`（与最新变更日期自洽）
+- 2F 字段一致：USOM `Timebox` interface（不含 occVersion）↔ DB `occ_version` 列：USOM 不暴露，Repository 接口契约 `expectedOccVersion` 必填（在 usom-design 注释中说明），符合「Repository 契约不污染域对象」原则
+- UI C-01~C-07：[TD-003] 改动仅 timebox-drawer.tsx 内 `instanceof ConflictError` 分支 + toast 文案，无新颜色/布局（C-01 PASS by diff scope）
+- Constitution 约束 ID：[TD-003] 无新约束引入（Repository 原子写入是 R-02 既有约束的延伸，不需新增约束 ID）
+- mydocs/ 只读：本次会话未动 `mydocs/core/` 任一文件
+- 修复 [TD-037] 漏登债：branch 新增 `docs/tech-debt/TD-037-cross-domain-occ-deferred.md` 已就位 + README 登记段已含（branch 之前已做）
+
+### 未处理
+
+- `/browse` 浏览器 E2E 受 pre-existing `fetchTimeboxSummariesByRange start.toISOString` 阻塞（[TD-039]）— 与 [TD-003] 无关，沿用既有登记
+- [TD-003] ship-then-polish backlog：I-2 ConflictError 跨域归属决策 / I-5 revertTimebox stale-read window / T3 I-2 execute() legacy path / T3 M-1 `?? 0` fallback / T5 I-1 真空 wait / T5 M-5 `getTimeboxById` outer try 失败兜底 — 待 user 启 next session 收口
+- `0037_TD-003_add_timebox_occ_version.sql` 非幂等（无 `IF NOT EXISTS`），手工应用后漏 INSERT `drizzle.__drizzle_migrations` 表（已被 [systematic-debugging] 修）—— 改 `ADD COLUMN IF NOT EXISTS` + 登记 helper script 待 [TD-038] follow-up
+- `manifest.md` 仍 109 行（soft limit 80）；行数膨胀历史遗留（详细 [026.02.3.1]/[026.02.4] 长注释），不在本轮 scope
+
+---
+
 ## [TD-003] timebox 域 OCC（乐观并发控制）POC（2026-07-12）
 
 > 2026_07_12 — `[TD-003]` timebox 域引入乐观并发控制（OCC）解决跨 tab 并发编辑丢失问题。**架构**：DB `timeboxes` 加 `occ_version` 列（[T1] migration）+ Repository 层 OCC WHERE 谓词 + `ConflictError` 异常 + field-executor 批量重构 + UI drawer catch + reload + toast。**范围**：仅 timebox 域 POC；appointment / tasks / habits / okrs / cycles 跨域 OCC → `[TD-037]` P6 deferred。Whole-branch review 抓 5 Important，本 commit 修 I-1（archive + revertTransition OCC）+ I-4（state-machine `?? 0` fallback 替换为防御性 re-read）+ I-3（CHANGELOG 67 行误删恢复 + 本段补登）；I-2 / I-5 ship-then-polish defer。

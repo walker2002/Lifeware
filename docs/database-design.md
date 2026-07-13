@@ -18,6 +18,7 @@
 - `LW_overall_技术栈设计演进_2026_03_18.md`（技术约束）
 
 **变更记录**：
+- **2026_07_12 (refactor)**：[TD-003] timebox 域 OCC（乐观并发控制）POC — `timeboxes` 表加 `occ_version integer NOT NULL DEFAULT 1` 列（迁移 0037，journal idx=37）。Repository 层 OCC atomic UPDATE `WHERE occ_version = expectedOccVersion`（0 rows → 抛 `ConflictError(currentOccVersion, attemptedOccVersion)`）；field-executor batch OCC（validate-all-first + single atomic update + post-write events）；UI drawer catch `ConflictError` → reload + toast。**仅 timebox 域 POC**，5 域（tasks/habits/appointments/cycles/objectives）跨域 OCC 接入 → `[[TD-037]]` deferred。列名 `occ_version` 而非 `version`，避免与 `schema_version`（USOM schema 迁移用）命名冲突。USOM `Timebox` interface 不暴露 occVersion（属 Repository 契约，不污染域对象）。详见 CHANGELOG.md `[TD-003]` 段 + `docs/tech-debt/TD-003-edit-timeboxes-toctou.md`（已关闭）。
 - **2026_07_12 (refactor)**：[TZ-1] user_tz 抽象层治本 `/ScheduleProposal` +8h bug — `user_settings.timezone` 真正接入 timebox 域：cnui/handlers.ts 写路径调 `getEffectiveTimezone(userId)` 传 hhmmToIso 把 (HH:MM, date) 当 user_tz 本地时间转 UTC 落库；handler internal arithmetic 切 user_tz（`extractOccupiedSlots` / `appointmentToTier0Slot` / `detectConflictsViaPredicate`）；`TimezonePicker` 接 DB。**无 DDL**（用既有 `user_settings.timezone` 列）。部署 TZ 约束段补 [TZ-1] 推进注（`localDayKey` 仍 defer Node 进程 TZ）。变更详情见 CHANGELOG.md `[TZ-1]` 段。
 - **2026_07_06 (refactor)**：[023.12] 三域生命周期语义重构 — `timeboxes.status` 枚举收窄 6→3 态（`planned | logged | cancelled`，删 `running | overtime | ended`）；`timeboxes` 表删除 3 个时间戳列 `started_at`/`ended_at`/`overtime_at`（drop CASCADE，TRUNCATE timeboxes 因数据可弃）。`cycles.status` 枚举收窄 5→4 态（`draft | approved | finished | reviewed`，删 `not_started | in_progress` 合并为 `approved`，`ended` 改名 `finished`）；`cycles.started_at` rename `approved_at`，`cycles.ended_at` rename `finished_at`（USOM 与 schema 同步，AM6）。`appointments.status` 枚举收窄 5→3 态（`scheduled | cancelled | completed`，删 `in_progress | expired` 改读时派生）；`appointments` 表删除 2 个时间戳列 `in_progress_at`/`expired_at`。三域各加 2 条 revert transition：timebox `logged|cancelled→planned`、appointment `cancelled|completed→scheduled`、cycle `reviewed→finished`（单步）。manifest `subscribed_events` 加 `TimeboxReverted`/`AppointmentReverted`/`CycleReverted`。`timeboxFieldMeta` 标记 deprecated（旧 3 个字段元数据不再被引用，保留以兼容历史数据）。**反向 [026] D2 reversal**：appointment 持久化模式从「lazy reconcile 写库」回到「读时派生」（理据见 design doc §与 [026] D2 reversal 的关系）。迁移 0034 落地（journal idx=34，down.sql 兜底）：`TRUNCATE timeboxes CASCADE` + `ALTER TABLE timeboxes DROP COLUMN IF EXISTS started_at/ended_at/overtime_at`；`ALTER TABLE cycles RENAME COLUMN started_at TO approved_at` + `RENAME COLUMN ended_at TO finished_at` + `TRUNCATE cycles CASCADE`；`TRUNCATE appointments CASCADE` + `DROP COLUMN IF EXISTS in_progress_at/expired_at`。CASCADE 影响：cycles TRUNCATE 级联清 `objectives`/`key_results`/`contributions`（数据可弃）；timeboxes TRUNCATE 级联清 `task_timeboxes`/`timebox_habits`（CASCADE 约束）。TRUNCATE CASCADE 链：timeboxes → task_timeboxes/timebox_habits/task_execution_logs.timebox_id SET NULL；cycles → objectives → key_results → contributions；appointments 无 FK 反向依赖。`memory_episodes.metadata` jsonb 软引用 timeboxId 留孤儿（无 FK，无读路径反向解析，[023.08] F4 决策）。USOM 文档同步（§3.5a/§3.9/§3.13 状态机收敛）。
 - **2026_07_03 (refactor)**：[026] T20 — `user_settings.timezone` 段后新增「部署 TZ 约束」段（reconcile 调度依赖宿主 TZ，跨 TZ 部署需保持 dev/prod 一致或扩展 UTC 归一化，codex #5 落地）
@@ -722,9 +723,12 @@ CREATE INDEX idx_habit_logs_habit_id ON habit_logs(habit_id);
 > **[023.12] 2026-07-06 状态枚举收敛 + 字段清理**：状态 enum 从 6 值 `planned | running | overtime | ended | cancelled | logged` 收敛为 3 值 `planned | logged | cancelled`（`running` / `overtime` / `ended` 时间派生态不持久化，由 `derive-display-status` 工具读时派生显示）。3 个时间戳列 `started_at` / `overtime_at` / `ended_at` 删除（migration 0034 `DROP COLUMN IF EXISTS`，TRUNCATE 清旧值后由 `schema.ts` `enum: [...]` 在 app 层约束 status 合法值；status 列是 TEXT，无 PG enum type）。
 >
 > **[023.12] 新增可修改性规则**：planned 可编辑/可删；logged/cancelled 不可编辑/不可删，但可经 `revert` action 回退到 planned。`revert` 守卫：若 `executionRecord != null`（logged 行）抛"请先清理执行记录再回退"（[023.12] D7），等价于 logged→planned 路径被拦截（logged 行必有 executionRecord），仅 cancelled→planned 可直接回退。
+>
+> **[TD-003] 2026-07-12 OCC（乐观并发控制）POC**：加 `occ_version integer NOT NULL DEFAULT 1` 列；Repository 层 OCC atomic UPDATE `WHERE occ_version = expectedOccVersion`（0 rows → 抛 `ConflictError`）；USOM `Timebox` interface 不暴露 occVersion（属 Repository 层契约，不污染域对象）。迁移 0037 落地（journal idx=37）。列名 `occ_version` 而非 `version`，避免与 `schema_version`（USOM schema 迁移用）命名冲突——两列语义不同但类型相同，前缀防混淆。详见 `docs/tech-debt/TD-003-edit-timeboxes-toctou.md`（已关闭）+ CHANGELOG.md `[TD-003]` 段。**仅 timebox 域 POC**，5 域（tasks/habits/appointments/cycles/objectives）跨域 OCC 接入 → `[[TD-037]]` deferred。
 
 ```sql
 -- v2 变更（2026-07-06, [023.12]）：status 6→3 态（删 running/overtime/ended 改读时派生）；删 3 个时间戳列。
+-- v3 变更（2026-07-12, [TD-003]）：加 occ_version 列做 OCC（仅 timebox 域 POC）
 CREATE TABLE timeboxes (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null references users(id) on delete cascade,
@@ -751,6 +755,11 @@ CREATE TABLE timeboxes (
   -- [023] A2 OV#P1-#2: USOM taskIds/habitIds 落库列（软关联，无 FK；强一致性由 Repository 负责）
   task_ids  uuid[] not null default '{}',
   habit_ids uuid[] not null default '{}',
+
+  -- [TD-003] 乐观并发控制版本号：Repository atomic UPDATE 谓词
+  -- WHERE occ_version = expectedOccVersion 决定 0/1 row affected；NOT NULL 强制 caller 显式提供；
+  -- DEFAULT 1 兼容迁移时存量 17 行（dev DB 实测）；不暴露给 USOM Timebox interface（Repository 契约）。
+  occ_version   integer NOT NULL DEFAULT 1,  -- [TD-003] OCC
 
   -- 审计字段
   notes         text,
@@ -1875,3 +1884,4 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 *变更：[023.11] (2026_07_06) — §7.6 activity_archetypes 加 `synonyms jsonb NOT NULL DEFAULT '[]'` 列（迁移 0034_023_11_archetype_synonyms.sql，幂等 ADD COLUMN IF NOT EXISTS）*
 *变更：[026.01] (2026_07_07) — §appointments 加 `activity_archetype_id uuid REFERENCES activity_archetypes(id) ON DELETE SET NULL` 列 + 索引 `idx_appointments_archetype`，迁移 0035_026_01_appointment_activity_archetype.sql（IF NOT EXISTS 幂等）*
 *变更：[023.05] PR2 阶段 2 (2026_07_05) — §4.X appointments（rename 自 itineraries）+ 0033 RENAME 迁移 + F2 snapshot drift acknowledge（drizzle snapshot 停 0006，未来 schema 变更继续手写 SQL + 登记 journal，不引入 `drizzle-kit up`）*
+*变更：[TD-003] (2026_07_12) — §4.7 timeboxes 加 `occ_version integer NOT NULL DEFAULT 1` 列做 OCC（迁移 0037_..._add_timebox_occ_version.sql）；Repository 层 atomic UPDATE 谓词；USOM `Timebox` 不暴露 occVersion（Repository 契约，不污染域对象）；仅 timebox 域 POC，跨域 5 域 OCC → [[TD-037]] deferred；详见 CHANGELOG.md `[TD-003]` 段*

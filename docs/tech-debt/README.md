@@ -38,7 +38,7 @@ last_updated: 2026-07-12
 
 | 编号 | 标题 | 严重性 | 领域 | 录入版本 | 负责人 |
 |---|---|---|---|---|---|
-| TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) | 🟠 | lifeware-timebox | [023.10] | 暂未指派 |
+| TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) → [TD-003] OCC POC ship-ready,迁移 0037 + Repository atomic UPDATE + UI drawer reload + toast | 🟠 → ✅ | lifeware-timebox | [023.10] | [TD-003] ship-ready（fix/td-003-occ-version）→ user 手动 merge gitee |
 | TD-005 | MVP_USER_ID 硬码(占位用户身份未走认证) | 🟡 | infra | [023.10] | 暂未指派 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环(双注册缺一层)" → 描述与代码脱节,tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口 | 🟡 → ✅ | lifeware-tasks | [023.10] | 关闭（误记） |
 | TD-008 | lifecycle-configs require('@/...') 多键域债 → [022.01] 已全量迁 ESM import,债自动清 | 🟡 → ✅ | cross-domain | [023.10] | 关闭（已治本） |
@@ -84,6 +84,7 @@ last_updated: 2026-07-12
 | TD-017 | [023.12] 生产代码 dead union (5/9 [023.13] 自动清 + 4/9 dead union 收窄 + 测试改用 'log') | 🔴 → ✅ | lifeware-timebox | [023.12] | timebox.ts + intent.ts union 收窄 + test 'log' | 2026-07-12 |
 | TD-018 | [023.12] pre-existing 写入口连锁债 (4 tsc 错 [019.1]+[023.13] 自动清) | 🟡 → ✅ | cross-domain | [023.12] | [019.1]+[023.13] follow-up | 2026-07-12 |
 | TD-006 | orchestration N+1 sequential ([023.08]+[028] T1 已用 Promise.all 优化 4 源归集 + collectMaterials) | 🟡 → ✅ | lifeware-timebox | [023.10] | [023.08]+[028] 已有改动 | 2026-07-12 |
+| TD-003 | editTimeboxes TOCTOU(time-of-check vs time-of-use) → [TD-003] OCC POC ship-ready: DB `occ_version` 列(迁移 0037)+ Repository atomic UPDATE 0 rows → ConflictError + field-executor batch OCC + UI drawer catch reload + toast;USOM Timebox interface 不暴露 occVersion(Repository 契约);仅 timebox 域 POC,5 域 → [[TD-037]] deferred | 🟠 → ✅ | lifeware-timebox | [023.10] | [TD-003] (fix/td-003-occ-version) | 2026-07-12 |
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环" → 描述与代码脱节（tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口;暂停主线 = pauseThread,结束任务 = archiveTask,均 4 路全闭合） | 🟡 → ✅ | lifeware-tasks | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 | TD-008 | "lifecycle-configs require('@/...') 多键域债" → [022.01] 已全量迁 ESM import（5 路 grep 验证 0 实际 require 调用,顶部 3 个 ESM static import;多键域 PascalCase longest-match 防护已就位） | 🟡 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 | TD-004 | "R4 timebox/okrs 写入口债(跨域规则未落地)" → 描述与代码脱节,5 路 grep 0 实际缺口(timebox↔okrs 反产品决策,tasks/habits/appointments 才是 OKR 关联对象);重开为观察债 [[TD-038]] | 🟠 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
