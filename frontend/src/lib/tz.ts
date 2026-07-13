@@ -98,6 +98,45 @@ export function getUserTzMinute(date: Date, tz: string): number {
 }
 
 /**
+ * [TZ-2.2] 取 Date 对象在 tz 下的 year 分量
+ *
+ * 与 getUserTzHour/Minute 同 Intl 模式，供 localDayKey 等日历日派生用。
+ * 跨 Node/browser 一致（不依赖运行时 TZ）。
+ */
+export function getUserTzYear(date: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+  }).formatToParts(date)
+  return Number(parts.find(p => p.type === 'year')?.value ?? '0')
+}
+
+/**
+ * [TZ-2.2] 取 Date 对象在 tz 下的 month 分量（1-12）
+ *
+ * 注：与 Date#getMonth() 的 0-11 语义不同，本函数返回 1-12（与日历一致），
+ * 避免下游 localDayKey 写 `+ 1` 的常见 bug。
+ */
+export function getUserTzMonth(date: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    month: '2-digit',
+  }).formatToParts(date)
+  return Number(parts.find(p => p.type === 'month')?.value ?? '0')
+}
+
+/**
+ * [TZ-2.2] 取 Date 对象在 tz 下的 day-of-month 分量（1-31）
+ */
+export function getUserTzDate(date: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    day: '2-digit',
+  }).formatToParts(date)
+  return Number(parts.find(p => p.type === 'day')?.value ?? '0')
+}
+
+/**
  * ISO 8601 UTC timestamp → "HH:MM"（按 tz 显示）
  * 非法/空输入返回空串（不抛）。
  */

@@ -8,6 +8,42 @@
 
 ---
 
+## [TZ-2.2] localDayKey 接受 IANA TZ — 收口 [026] OQ-6 最后一个 tz 边界（2026-07-12）
+
+> 2026_07_12 — `[TZ-2] / [TZ-2.1] / [TZ-2.3]` 全链路 SHIPPED 后，写路径 + handler internal + 显示端 + 范围查询 全部切 user_tz，但**约定日历日派生** `localDayKey`（`getFullYear/getMonth/getDate`）仍按 OS TZ 计算——是 TZ-2 范围最后一个边界遗漏。`appointment-locked-card.tsx:85` [TZ-2] 改造时切了 `formatTime(iso, tz)` 但漏了 `deriveAppointmentDisplayStatus(status, startTime, now)`，是该函数内部 `localDayKey` 仍按浏览器/OS TZ 计算日历日。MVP Shanghai-only 巧合 OK；Tokyo user 跨日/跨月边界会与 TZ-1 写路径 8h 漂移同根因。
+
+### 改动
+
+- **新增** `frontend/src/lib/tz.ts`：`getUserTzYear/Month/Date` 三个 Intl-based helper（与已有 `getUserTzHour/Minute` 同模式）
+- **新增** `frontend/src/lib/__tests__/tz.test.ts`：17 cases 覆盖 4 个 TZ（Shanghai/Tokyo/NY/Auckland）+ 跨年边界
+- **修改** `frontend/src/domains/timebox/status/derive-display-status.ts`：`localDayKey(d, tz)` 用 `getUserTzYear/Month/Date` 替代 `getFullYear/Month/Date`；`deriveAppointmentDisplayStatus` 加 `tz: string` 必传
+- **修改** `frontend/src/domains/timebox/status/reconcile-appointment.ts`：同上 + `deriveAppointmentBadges` / `findExpiredAppointmentIds` / `findInProgressAppointmentIds` 同步加 `tz: string` 必传（list helper 虽 production 无 callsite 但保持 API 对称）
+- **修改** `frontend/src/domains/timebox/components/appointment-locked-card.tsx:85`：`useUserTz().tz` 透传给 `deriveAppointmentDisplayStatus`（修 [TZ-2] 漏改的边角）
+- **测试更新** 3 文件：`derive-display-status.test.ts` 12 cases（含 3 跨 TZ）、`reconcile-appointment.test.ts` 16 cases（含 3 跨 TZ list batch）、`reconcile-appointment-tz.test.ts` 7 cases 加 tz 参数
+
+### 验证
+
+- ✅ vitest TZ-2.2 范围 **52/52 pass**（17 helpers + 12 derive + 16 list + 7 cross-TZ）
+- ✅ vitest 全 timebox **679/681 pass**（1 failed = pre-existing handlers-edit-appointment flake，baseline 对齐）
+- ✅ tsc **0 新增错误**（强制必传 tz 会暴露其他遗忘点——已 grep 确认 0 遗漏）
+
+### 关键决策
+
+- **D1** `tz: string` **必传**（不设 default）：避免 MVP Shanghai-only 巧合隐藏 bug，与 TZ-1 `useUserTz()` 模式一致
+- **D2** `localDayKey` 在两个文件各自保留（功能模块内聚，user D2 决策）
+- **D3** lib/tz.ts 加 3 个 helper（Intl 模式，跨 Node/browser 一致），供两个 `localDayKey` 调用
+- **D4** appointment-locked-card.tsx 最小 diff：`useUserTz()` 已存在，只透传 tz
+
+### 设计 authority
+
+- Spec：`docs/superpowers/specs/2026-07-12-tz-2-2-localdaykey-iana-tz-design.md`
+- Plan：`docs/superpowers/plans/2026-07-12-tz-2-2-localdaykey-iana-tz.md`
+- 关联 [[project-tz-2-full-shipment]]（TZ 全链路最后一块拼图）
+- 关联 [026] OQ-6（[026] 收口 defer 列表）
+- 上游 TZ-2：origin/main @ `d283dbd`
+
+---
+
 ## [neat-2026_07_12-td003] /lifeware-neat [TD-003] 四件套 drift 收口（2026-07-12）
 
 > 2026_07_12 — `/lifeware-neat` 第二轮扫描 `[TD-003]` branch (`fix/td-003-occ-version` 9 commits ahead of main) 收 4 件 drift：(1) `docs/database-design.md` §4.7 timeboxes CREATE TABLE 漏 `occ_version` 列（schema 已加，但文档没跟上）；(2) `docs/usom-design.md` §3.10 漏 `ITimeboxRepository` `expectedOccVersion` 必填参数说明；(3) `manifest.md` 漏 `[TD-003]` 索引条目；(4) `docs/tech-debt/README.md` TD-003 应移到「已修复」段（已通过 [TD-003] OCC POC 闭环），TD-037 已在新建段登记。
@@ -110,7 +146,7 @@
 
 ### 设计依据
 
-- **`@date-fns/tz` v1.4.1** 已在 `[TZ-2.1]` 装为 date-fns v4 peer dep，无需 `npm install`
+- **`@date-fns/tz` v1.4.1`** 已在 `[TZ-2.1]` 装为 date-fns v4 peer dep，无需 `npm install`
 - **`in: tz(tzName)` option**：date-fns v4 所有时间函数（`startOfDay / startOfWeek / startOfMonth / addDays / addWeeks / addMonths` 等）都支持
 - **默认值 `'Asia/Shanghai'`**：保持向后兼容 + 与 schema default + 系统 TZ 一致
 - **`currentDate` 仍为 absolute moment**：不强制转 user_tz wall clock — rbc 内部 `format(date, str, { in: tz(userTz) })` 自动按 user_tz 显示；`getDateRange` / `navigateDate` 用 `in` option 在 date-fns 层做 tz-aware arithmetic

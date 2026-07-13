@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { renderWithTz } from '@/contexts/__tests__/test-utils'
 import userEvent from '@testing-library/user-event'
 
 const submitCnuiSurfaceMock = vi.fn()
@@ -82,7 +83,7 @@ describe('[028.2] T1 — workspace.openAiPanel 真接 openCnuiSurface', () => {
 
   it('点 AI 智能推荐 → openCnuiSurface(timebox, scheduleProposal, { date }) 被调', async () => {
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     await user.click(screen.getByTestId('ai-orchestrate-button'))
 
@@ -98,7 +99,7 @@ describe('[028.2] T1 — workspace.openAiPanel 真接 openCnuiSurface', () => {
 
   it('openCnuiSurface 返回 proposals → AIOrchestratePanel 渲染 score-badge', async () => {
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
 
     await user.click(screen.getByTestId('ai-orchestrate-button'))
 
@@ -134,7 +135,7 @@ describe('[028.2] T1 — workspace.openAiPanel 真接 openCnuiSurface', () => {
     })
 
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     await user.click(screen.getByTestId('ai-orchestrate-button'))
 
     await waitFor(() => expect(screen.getByTestId('need-confirm-card')).toBeInTheDocument())
@@ -150,7 +151,7 @@ describe('[028.2] T1 — workspace.openAiPanel 真接 openCnuiSurface', () => {
     openCnuiSurfaceMock.mockRejectedValueOnce(new Error('network error'))
 
     const user = userEvent.setup()
-    render(<TimeboxesWorkspace />)
+    renderWithTz(<TimeboxesWorkspace />)
     await user.click(screen.getByTestId('ai-orchestrate-button'))
 
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('编排服务暂不可用，请稍后重试'))

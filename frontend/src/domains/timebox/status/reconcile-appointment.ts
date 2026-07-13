@@ -13,14 +13,21 @@
  * 现改造为返回 AppointmentBadge 列表（badge 是 UI 展示需要的，不是 DB 状态）。
  * 命名迁移：`reconcileAppointmentStatuses` 保留作 deprecated alias，指向
  * `deriveAppointmentBadges`；T10 UI 接新名，旧名仅供遗留调用方（罕见）。
+ *
+ * [TZ-2.2] localDayKey(d, tz) tz 必传：替代 OS TZ；list helper 同步加 tz 参数。
+ *   当前 production 无 callsite（仅测试引用，per TZ-2.2 spec grep 验证），
+ *   但保持 export API 对称便于未来接入。
  */
 
 import type { Appointment } from '@/usom/types/objects'
 import { deriveAppointmentDisplayStatus } from './derive-display-status'
+import { getUserTzYear, getUserTzMonth, getUserTzDate } from '@/lib/tz'
 
-/** 本地日历日整数键（年*10000+月*100+日），与 derive-display-status.ts 保持一致 */
-function localDayKey(d: Date): number {
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()
+/** [TZ-2.2] tz 必传（与 derive-display-status.ts 同语义） */
+function localDayKey(d: Date, tz: string): number {
+  return getUserTzYear(d, tz) * 10000
+       + getUserTzMonth(d, tz) * 100
+       + getUserTzDate(d, tz)
 }
 
 /**
@@ -39,38 +46,46 @@ export type AppointmentBadge = {
  *
  * @param appointments - 约定列表（已过滤 userId）
  * @param now - 当前时间
+ * @param tz - IANA 时区（如 'Asia/Shanghai' / 'Asia/Tokyo'）；[TZ-2.2] 必传
  * @returns 每条约定一个 badge
  */
 export function deriveAppointmentBadges(
   appointments: ReadonlyArray<Appointment>,
   now: Date,
+  tz: string,
 ): AppointmentBadge[] {
   return appointments.map(a => ({
     appointmentId: a.id as string,
-    badge: deriveAppointmentDisplayStatus(a.status, a.startTime, now),
+    badge: deriveAppointmentDisplayStatus(a.status, a.startTime, now, tz),
   }))
 }
 
 /**
  * 找 badge=expired 的所有约定 ID（UI 列表「过期未处理」过滤用）
+ *
+ * [TZ-2.2] tz 必传，与 deriveAppointmentBadges 同步
  */
 export function findExpiredAppointmentIds(
   appointments: ReadonlyArray<Appointment>,
   now: Date,
+  tz: string,
 ): string[] {
-  return deriveAppointmentBadges(appointments, now)
+  return deriveAppointmentBadges(appointments, now, tz)
     .filter(b => b.badge === 'expired')
     .map(b => b.appointmentId)
 }
 
 /**
  * 找 badge=in_progress 的所有约定 ID（UI 列表「今日执行中」过滤用）
+ *
+ * [TZ-2.2] tz 必传，与 deriveAppointmentBadges 同步
  */
 export function findInProgressAppointmentIds(
   appointments: ReadonlyArray<Appointment>,
   now: Date,
+  tz: string,
 ): string[] {
-  return deriveAppointmentBadges(appointments, now)
+  return deriveAppointmentBadges(appointments, now, tz)
     .filter(b => b.badge === 'in_progress')
     .map(b => b.appointmentId)
 }
