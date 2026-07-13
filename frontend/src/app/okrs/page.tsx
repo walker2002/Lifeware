@@ -1,7 +1,14 @@
+/**
+ * @file app/okrs/page
+ * @brief 自动生成 thin wrapper — 由 scripts/generate-routes.ts 从 domains/okrs/manifest.yaml 派生。
+ *
+ * 渲染 OKRWorkspace。勿手动编辑（修改会被下一次 `npm run generate:routes` 覆盖）。
+ * 如需调整，编辑对应域的 manifest.yaml view_routes 或 domain 入口组件。
+ */
 // ---
 // Auto-generated from domains/okrs/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T12:01:56.122Z
+// Generated at: 2026-07-13T13:53:26.972Z
 // ---
 
 import { OKRWorkspace } from "@/domains/okrs/components/okr-workspace"

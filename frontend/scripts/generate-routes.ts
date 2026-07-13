@@ -86,7 +86,16 @@ interface GenerateOptions {
 const PROJECT_ROOT = path.resolve(__dirname, '..')
 const DOMAINS_DIR = path.join(PROJECT_ROOT, 'src', 'domains')
 const APP_DIR = path.join(PROJECT_ROOT, 'src', 'app')
-const AUTO_GENERATED_HEADER = `// ---
+// JSDoc 文件头 + ASCII 横幅：满足 CLAUDE.md「每个 TS/JS 文件必须有 @file/@brief」要求；
+// 同时保留可视的自动生成标记，避免误编辑。@file 标路由路径，@brief 注明自动生成身份。
+const AUTO_GENERATED_HEADER = `/**
+ * @file app/{url-path}/page
+ * @brief 自动生成 thin wrapper — 由 scripts/generate-routes.ts 从 domains/{domain}/manifest.yaml 派生。
+ *
+ * 渲染 {component-name}。勿手动编辑（修改会被下一次 \`npm run generate:routes\` 覆盖）。
+ * 如需调整，编辑对应域的 manifest.yaml view_routes 或 domain 入口组件。
+ */
+// ---
 // Auto-generated from domains/{domain}/manifest.yaml
 // DO NOT EDIT MANUALLY
 // Generated at: {timestamp}
@@ -353,10 +362,11 @@ function detectDefaultExport(componentPath: string): boolean {
  */
 export function generateRouteFileContent(route: RouteEntry): string {
   const componentName = route.exportName ?? extractComponentName(route.component)
-  const header = AUTO_GENERATED_HEADER.replace('{domain}', route.domainId).replace(
-    '{timestamp}',
-    new Date().toISOString(),
-  )
+  const header = AUTO_GENERATED_HEADER
+    .replaceAll('{domain}', route.domainId)
+    .replaceAll('{url-path}', route.url.replace(/^\//, ''))
+    .replaceAll('{component-name}', componentName)
+    .replaceAll('{timestamp}', new Date().toISOString())
   const usesDefaultExport = detectDefaultExport(route.component)
   const imports = usesDefaultExport
     ? `import ${componentName} from "@/${route.component}"\n`
