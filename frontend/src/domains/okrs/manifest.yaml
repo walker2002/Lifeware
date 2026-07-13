@@ -131,6 +131,7 @@ view_routes:
     export_name: OKRWorkspace
     url: /okrs
     # page_props：codegen 生成 async server page，透传 standalone + searchParams.detail
+    # /okrs 独立页必须显式 true（OkrWorkspacePage.tsx 嵌入模式默认 false）
     page_props:
       standalone: true
       initialDetailId: { from: searchParams, key: detail }
