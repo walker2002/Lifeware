@@ -1121,9 +1121,15 @@ view_routes:
 
 **工作流程**：
 1. 扫描所有 Domain 的 `manifest.yaml` 文件
-2. 读取 `view_routes` 区块的 `url` 和 `component` 声明
-3. 验证组件文件是否存在
-4. 生成 `app/{url_path}/page.tsx` 文件
+2. 读取 `view_routes` 区块的 `url`、`component`、`export_name` 与 `page_props` 声明
+3. 验证组件文件和 `page_props` 结构
+4. 读取组件文件以检测默认导出，并生成 `app/{url_path}/page.tsx` 薄 wrapper
+
+**声明契约**：
+- `component` 必须指向 `domains/` 路径，禁止指向 `app/`，避免生成页循环导入自身。
+- 默认组件名按文件名 kebab-case → PascalCase 推断；缩写名称用 `export_name` 覆盖，例如 `OKRWorkspace`。
+- `page_props` 可传 JSON 字面值，或 `{ from: 'searchParams', key: '<key>' }`；`key` 必须为非空字符串，未知 `from` 会使验证失败。
+- 代码生成器读取组件文件检测 `export default`：命中时生成默认导入，否则生成命名导入。
 
 **生成的路由文件格式**：
 

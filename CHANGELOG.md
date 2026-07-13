@@ -12,6 +12,8 @@
 
 > 2026_07_13 — 9 任务重构（branch `refactor/page-thin-wrapper`）：把 `app/<route>/page.tsx` 从手写壳统一收敛为 codegen 生成的薄 wrapper；页面入口（含数据预取 + 容器）下移到 domain。manifest.view_routes.component 语义统一指向 domain 入口组件（去 `app/` 前缀），消除 codegen 循环 import 风险。6 个 page-thin 目标路由（`/tasks` `/okrs` `/timeboxes` `/timebox-templates` `/config/activity-archetypes` `/appointments`）全部 ship。
 
+- **WBR 最终修复**：约定 reload 复用 canonical ±90 天窗口；路由 codegen 增加 `page_props` 结构校验与 ESM-safe 入口守卫；D8 测试改为 YAML 解析失败即失败，并精确断言全部 `(domain, action, component)` 绑定；`route-generation-spec.md` 与 `domain-development-guide.md` 同步补齐 Domain 路径、导出推断/覆盖、`page_props` 和默认导出检测契约。
+
 ### 改动（9 任务）
 
 - **T1 — appointment-window 纯函数（timebox/lib）**：`getAppointmentWindow(now, ±90d)` + `daysFromToday(now, offset)` 两个纯函数 + 2 单测；F3 收口 client `AppointmentPage` 之前 stale 7/90 天窗口。
