@@ -364,13 +364,18 @@ function detectDefaultExport(componentPath: string): boolean {
  * [pre-land-fix] 函数名去重：组件名已以 `Page`/`Route`/`Workspace`/`Component`
  * 结尾时直接复用（避免 `ActivityArchetypesPagePage` / `TaskTreePagePage` /
  * `TimeboxesWorkspacePage` 这种累赘），否则追加 `Page` 后缀。
+ *
+ * 注意：函数名 = 组件名时 (例如 TimeboxesWorkspace)，不能直接 `import { TimeboxesWorkspace }`
+ * 同时本地声明 `function TimeboxesWorkspace()`，会触发 TS2440 冲突。
+ * 此时将本地函数命名为 `Default` 后缀（`TimeboxesWorkspaceDefault`），保持 import 名不变。
  */
 export function generateRouteFileContent(route: RouteEntry): string {
   const componentName = route.exportName ?? extractComponentName(route.component)
   // [pre-land-fix] 函数名去重：name 末尾已是 Page/Route/Workspace/Component 时直接复用。
-  const fnName = /(Page|Route|Workspace|Component)$/.test(componentName)
-    ? componentName
-    : componentName + 'Page'
+  // 但 fnName 撞上 componentName 会触发 TS2440（同名 import + 本地 function 冲突），
+  // 所以本地 function 用 componentName + 'Default' 保证不撞。
+  const fnNameReuseName = /(Page|Route|Workspace|Component)$/.test(componentName)
+  const fnName = fnNameReuseName ? componentName + 'Default' : componentName + 'Page'
   const header = AUTO_GENERATED_HEADER
     .replaceAll('{domain}', route.domainId)
     .replaceAll('{url-path}', route.url.replace(/^\//, ''))

@@ -8,11 +8,11 @@
 // ---
 // Auto-generated from domains/okrs/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T14:22:55.627Z
+// Generated at: 2026-07-13T14:27:04.019Z
 // ---
 
 import { OKRWorkspace } from "@/domains/okrs/components/okr-workspace"
-export default async function OKRWorkspace({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function OKRWorkspaceDefault({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams
   return (
     <OKRWorkspace

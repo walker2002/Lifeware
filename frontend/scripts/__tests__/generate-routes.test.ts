@@ -25,18 +25,19 @@ describe('generateRouteFileContent', () => {
     ...over,
   })
 
-  it('默认同步模板（无 page_props）：kebab 文件名正确解析组件名，函数名去重追加 Page', () => {
+  it('默认同步模板（无 page_props）：kebab 文件名正确解析组件名，函数名去重加 Default 避免 import 冲突', () => {
     const out = generateRouteFileContent(
       base({ component: 'domains/timebox/components/timeboxes-workspace' }),
     )
     expect(out).toContain('import { TimeboxesWorkspace } from "@/domains/timebox/components/timeboxes-workspace"')
-    // [pre-land-fix] 组件名 ends with Workspace → fnName 复用，无需再追加 Page
-    expect(out).toMatch(/export default function TimeboxesWorkspace\(\)/)
+    // [pre-land-fix] 组件名 ends with Workspace → 复用 import 名 + Default 后缀避免 TS2440
+    expect(out).toMatch(/export default function TimeboxesWorkspaceDefault\(\)/)
+    expect(out).not.toMatch(/export default function TimeboxesWorkspace\(\)/)
     expect(out).not.toMatch(/export default function TimeboxesWorkspacePage\(\)/)
     expect(out).toContain('<TimeboxesWorkspace />')
   })
 
-  it('export_name 覆盖组件绑定名（OKRWorkspace 缩写，endsWith Workspace → 不再追加 Page）', () => {
+  it('export_name 覆盖组件绑定名（OKRWorkspace 缩写，endsWith Workspace → 加 Default）', () => {
     const out = generateRouteFileContent(
       base({
         component: 'domains/okrs/components/okr-workspace',
@@ -44,7 +45,8 @@ describe('generateRouteFileContent', () => {
       }),
     )
     expect(out).toContain('import { OKRWorkspace }')
-    expect(out).toMatch(/export default function OKRWorkspace\(\)/)
+    expect(out).toMatch(/export default function OKRWorkspaceDefault\(\)/)
+    expect(out).not.toMatch(/export default function OKRWorkspace\(\)/)
     expect(out).not.toMatch(/export default function OKRWorkspacePage\(\)/)
     expect(out).toContain('<OKRWorkspace />')
   })
@@ -60,7 +62,8 @@ describe('generateRouteFileContent', () => {
         },
       }),
     )
-    expect(out).toMatch(/export default async function OKRWorkspace\(/)
+    expect(out).toMatch(/export default async function OKRWorkspaceDefault\(/)
+    expect(out).not.toMatch(/export default async function OKRWorkspace\(/)
     expect(out).not.toMatch(/export default async function OKRWorkspacePage\(/)
     expect(out).toContain('Promise<Record<string, string | string[] | undefined>>')
     expect(out).toContain('const sp = await searchParams')
@@ -84,24 +87,24 @@ describe('generateRouteFileContent', () => {
   /**
    * [pre-land-fix] 函数名去重：以 Page/Route/Component 结尾的 componentName 不再
    * 重复追加 Page（避免 `ActivityArchetypesPagePage` / `TaskTreePagePage`）。
-   * 以下测试覆盖三类后缀分支：
-   * - `<Name>Page` 直接复用（如 HabitListPage → HabitListPage）
-   * - `<Name>Route` 直接复用（如 appointment-route 自定义场景）
-   * - `<Name>Component` 直接复用
+   * 为避免 TS2440（同名 import + 本地 function 冲突），本地 function 改用
+   * `<Name>Default` 后缀（仅当 fnName 撞上 componentName 时）。
    */
   describe('函数名去重', () => {
-    it('componentName endsWith Page → 复用，不再追加 Page', () => {
+    it('componentName endsWith Page → import 复用 + 本地 fnName + Default', () => {
       const out = generateRouteFileContent(
         base({
           component: 'domains/habits/pages/HabitListPage',
           exportName: 'HabitListPage',
         }),
       )
-      expect(out).toMatch(/export default function HabitListPage\(\)/)
+      expect(out).toMatch(/export default function HabitListPageDefault\(\)/)
       expect(out).not.toMatch(/export default function HabitListPagePage\(\)/)
+      // import 仍是 HabitListPage（不发生 alias）
+      expect(out).toContain('import { HabitListPage }')
     })
 
-    it('componentName endsWith Page（PascalCase 别名 export_name）→ 复用', () => {
+    it('componentName endsWith Page（PascalCase 别名 export_name）→ + Default', () => {
       // 等同于 TaskTreePage（export_name 与 file PascalCase 一致），kebab→PascalCase
       // 同样得到 `TaskTreePage`。
       const out = generateRouteFileContent(
@@ -110,33 +113,33 @@ describe('generateRouteFileContent', () => {
           exportName: 'TaskTreePage',
         }),
       )
-      expect(out).toMatch(/export default function TaskTreePage\(\)/)
+      expect(out).toMatch(/export default function TaskTreePageDefault\(\)/)
       expect(out).not.toMatch(/export default function TaskTreePagePage\(\)/)
     })
 
-    it('componentName endsWith Route → 复用', () => {
+    it('componentName endsWith Route → 复用 + Default', () => {
       const out = generateRouteFileContent(
         base({
           component: 'domains/timebox/components/appointment-route',
           exportName: 'AppointmentRoute',
         }),
       )
-      expect(out).toMatch(/export default function AppointmentRoute\(\)/)
+      expect(out).toMatch(/export default function AppointmentRouteDefault\(\)/)
       expect(out).not.toMatch(/export default function AppointmentRoutePage\(\)/)
     })
 
-    it('componentName endsWith Component → 复用', () => {
+    it('componentName endsWith Component → 复用 + Default', () => {
       const out = generateRouteFileContent(
         base({
           component: 'domains/x/components/widget-component',
           exportName: 'WidgetComponent',
         }),
       )
-      expect(out).toMatch(/export default function WidgetComponent\(\)/)
+      expect(out).toMatch(/export default function WidgetComponentDefault\(\)/)
       expect(out).not.toMatch(/export default function WidgetComponentPage\(\)/)
     })
 
-    it('componentName 不以后缀结尾 → 追加 Page', () => {
+    it('componentName 不以后缀结尾 → 追加 Page（不冲突）', () => {
       const out = generateRouteFileContent(
         base({
           component: 'domains/x/components/foo',

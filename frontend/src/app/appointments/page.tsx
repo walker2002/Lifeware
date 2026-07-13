@@ -8,10 +8,10 @@
 // ---
 // Auto-generated from domains/timebox/manifest.yaml
 // DO NOT EDIT MANUALLY
-// Generated at: 2026-07-13T14:22:55.628Z
+// Generated at: 2026-07-13T14:27:04.021Z
 // ---
 
 import { AppointmentRoute } from "@/domains/timebox/components/appointment-route"
-export default function AppointmentRoute() {
+export default function AppointmentRouteDefault() {
   return <AppointmentRoute />
 }
