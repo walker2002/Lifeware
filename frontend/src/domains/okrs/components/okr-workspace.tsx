@@ -47,8 +47,13 @@ type PanelMode = "empty" | "detail" | "edit" | "create" | "import"
 interface OKRWorkspaceProps {
   /** 独立页面模式：全高布局 + PageBanner；默认 false（内嵌模式） */
   standalone?: boolean
-  /** 初始展开的 Objective ID（来自 ?detail= 查询参数） */
-  initialDetailId?: string
+  /**
+   * 初始展开的 Objective ID（来自 ?detail= 查询参数）。
+   * [page-thin] T7-fix：searchParams 透传时 Next.js 给的是
+   * `string | string[] | undefined`，因此类型放宽到接受数组形式；
+   * 内部统一规范化为 `string | null`。
+   */
+  initialDetailId?: string | string[]
 }
 
 export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspaceProps) {
@@ -56,9 +61,14 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   const { leftWidth, handleMouseDown, containerRef } = useResizablePanel({
     storageKey: "lw-okr-left-width",
   })
-  // [022] 用 initialDetailId 作为 selectedId 的初始化值，
+  // [page-thin] T7-fix：searchParams 透传的 detail 可能是 string[]（多值），
+  // 这里取首个值规范化；缺失或空数组都视为未传入。
+  const normalizedInitialDetailId: string | null = Array.isArray(initialDetailId)
+    ? initialDetailId[0] ?? null
+    : initialDetailId ?? null
+  // [022] 用 normalizedInitialDetailId 作为 selectedId 的初始化值，
   // 避免 useEffect 触发的 1-frame 闪烁。
-  const [selectedId, setSelectedId] = useState<string | null>(initialDetailId ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(normalizedInitialDetailId)
   const [mode, setMode] = useState<PanelMode>("empty")
   const [statusFilter, setStatusFilter] = useState<Cycle["status"] | "all">("all")
   const [detailData, setDetailData] = useState<ObjectiveWithKR | null>(null)
@@ -206,16 +216,17 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   // [022] standalone 模式下根据 ?detail= 自动展开详情。
   // selectedId 已通过 useState initializer 同步设置，避免 1-frame 闪烁；
   // 此 effect 仅负责在 objectives 首次加载完成后调用 loadDetail 加载详情数据。
+  // [page-thin] T7-fix：用规范化的字符串值，避免数组 deps 引用漂移。
   useEffect(() => {
     if (
-      initialDetailId &&
+      normalizedInitialDetailId &&
       hook.objectives.length > 0 &&
-      hook.objectives.some((o) => o.id === initialDetailId) &&
-      detailData?.id !== initialDetailId
+      hook.objectives.some((o) => o.id === normalizedInitialDetailId) &&
+      detailData?.id !== normalizedInitialDetailId
     ) {
-      void handleSelect(initialDetailId)
+      void handleSelect(normalizedInitialDetailId)
     }
-  }, [initialDetailId, hook.objectives, detailData, handleSelect])
+  }, [normalizedInitialDetailId, hook.objectives, detailData, handleSelect])
 
   return (
     <div className={`${standalone ? "h-screen flex flex-col" : "absolute inset-0 flex flex-col"}`}>

@@ -1,6 +1,7 @@
 /**
  * @file generate-routes.test
- * @brief codegen 工具单测（kebab→PascalCase / export_name / page_props async 生成）
+ * @brief codegen 工具单测（kebab→PascalCase / export_name / page_props async 生成 /
+ *        default-export 检测）
  */
 import { describe, it, expect } from 'vitest'
 import { generateRouteFileContent, extractComponentName } from '../generate-routes'
@@ -74,5 +75,52 @@ describe('generateRouteFileContent', () => {
     expect(out).toMatch(/export default function FooPage\(\)/)
     expect(out).toContain('mode={"create"}')
     expect(out).not.toContain('searchParams')
+  })
+
+  /**
+   * [page-thin] T7-fix：检测组件文件用 `export default` 时，
+   * 应生成无花括号的默认导入。
+   * 仓库内真实存在的 default-export 组件：`domains/tasks/pages/TaskTreePage.tsx`（line 47）。
+   * generate-routes 读 `PROJECT_ROOT/src/<component>.tsx`，直接把这条
+   * 路径喂给 generateRouteFileContent 即可触发 detectDefaultExport 命中。
+   */
+  describe('default-export 检测', () => {
+    it('组件用 export default → 生成默认导入（无花括号）', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/tasks/pages/TaskTreePage',
+          exportName: 'TaskTreePage',
+        }),
+      )
+      // 默认导入：无花括号
+      expect(out).toContain('import TaskTreePage from "@/domains/tasks/pages/TaskTreePage"')
+      // 反向断言：确保没有把文件错误地当成命名导出
+      expect(out).not.toContain('import { TaskTreePage }')
+      // 默认导入的 binding 在 JSX 中用法相同
+      expect(out).toContain('<TaskTreePage />')
+    })
+
+    it('文件不存在 → 走命名导出 fallback（与历史行为一致）', () => {
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/widget/components/missing-export',
+          exportName: 'MissingExport',
+        }),
+      )
+      expect(out).toContain('import { MissingExport } from "@/domains/widget/components/missing-export"')
+      expect(out).not.toContain('import MissingExport ')
+    })
+
+    it('组件用命名导出 → 走花括号命名导入', () => {
+      // OKRWorkspace 用 `export function OKRWorkspace(...)`，是命名导出。
+      const out = generateRouteFileContent(
+        base({
+          component: 'domains/okrs/components/okr-workspace',
+          exportName: 'OKRWorkspace',
+        }),
+      )
+      expect(out).toContain('import { OKRWorkspace } from "@/domains/okrs/components/okr-workspace"')
+      expect(out).not.toMatch(/^import OKRWorkspace /m)
+    })
   })
 })

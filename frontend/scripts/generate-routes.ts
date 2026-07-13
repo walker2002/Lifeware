@@ -311,10 +311,26 @@ function stripTimestampLine(content: string): string {
 // ─── 生成单个路由文件内容 ───────────────────────────────────────────
 
 /**
+ * 检测组件文件是否使用 `export default` 形式导出。
+ * 若文件不存在或读取失败，按命名导出回退（与历史行为一致）。
+ */
+function detectDefaultExport(componentPath: string): boolean {
+  const fullPath = path.join(PROJECT_ROOT, 'src', componentPath + '.tsx')
+  if (!fs.existsSync(fullPath)) return false
+  const source = fs.readFileSync(fullPath, 'utf-8')
+  return /\bexport\s+default\s+/.test(source)
+}
+
+/**
  * 生成单个路由文件的内容。
  * - 无 page_props → 同步模板
  * - page_props 仅字面值 → 同步模板 + 字面 props
  * - page_props 含 { from: searchParams } → async server component + searchParams 解包
+ *
+ * [page-thin] T7-fix：根据组件文件是否使用 `export default` 选择 import 形式：
+ * - 默认导出 → `import Foo from "..."`（无花括号）
+ * - 命名导出 → `import { Foo } from "..."`
+ * 文件缺失/读取失败时按命名导出回退（与历史行为一致；此时 collectRoutes 已 warn）。
  */
 export function generateRouteFileContent(route: RouteEntry): string {
   const componentName = route.exportName ?? extractComponentName(route.component)
@@ -322,7 +338,10 @@ export function generateRouteFileContent(route: RouteEntry): string {
     '{timestamp}',
     new Date().toISOString(),
   )
-  const imports = `import { ${componentName} } from "@/${route.component}"\n`
+  const usesDefaultExport = detectDefaultExport(route.component)
+  const imports = usesDefaultExport
+    ? `import ${componentName} from "@/${route.component}"\n`
+    : `import { ${componentName} } from "@/${route.component}"\n`
 
   const pageProps = route.pageProps
   const hasPageProps = pageProps && Object.keys(pageProps).length > 0
