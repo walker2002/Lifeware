@@ -19,7 +19,8 @@ export default async function AppointmentsPage() {
   start.setDate(start.getDate() - 90)
   const end = new Date()
   end.setDate(end.getDate() + 90)
-  const items = await getAppointmentsByRange(start, end)
+  // [TD-039] 跨 RSC boundary 传 ISO string，调用契约对齐 client 路径
+  const items = await getAppointmentsByRange(start.toISOString(), end.toISOString())
 
   return (
     <div className="h-screen flex flex-col">

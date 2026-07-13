@@ -18,23 +18,30 @@ describe('[023.06] getDateRange', () => {
   it('day 模式 → startOfDay ~ endOfDay（00:00:00 ~ 23:59:59.999）', () => {
     const d = new Date('2026-07-05T12:00:00Z')
     const { start, end } = getDateRange('day', d)
-    expect(start.getHours()).toBe(0)
-    expect(end.getHours()).toBe(23)
-    expect(end.getMilliseconds()).toBeGreaterThan(990)
+    // [TD-039] getDateRange 返回 ISO string，转 Date 读本地分量
+    const startD = new Date(start)
+    const endD = new Date(end)
+    expect(startD.getHours()).toBe(0)
+    expect(endD.getHours()).toBe(23)
+    expect(endD.getMilliseconds()).toBeGreaterThan(990)
   })
 
   it('week 模式 → 周一到周日 (weekStartsOn: 1)', () => {
     const d = new Date('2026-07-05T12:00:00Z') // 周日
     const { start, end } = getDateRange('week', d)
-    expect(start.getDay()).toBe(1)
-    expect(end.getDay()).toBe(0)
+    const startD = new Date(start)
+    const endD = new Date(end)
+    expect(startD.getDay()).toBe(1)
+    expect(endD.getDay()).toBe(0)
   })
 
   it('month 模式 → 1 号 ~ 月末', () => {
     const d = new Date('2026-07-05')
     const { start, end } = getDateRange('month', d)
-    expect(start.getDate()).toBe(1)
-    expect(end.getMonth()).toBe(6) // 0-indexed: 6 = July
+    const startD = new Date(start)
+    const endD = new Date(end)
+    expect(startD.getDate()).toBe(1)
+    expect(endD.getMonth()).toBe(6) // 0-indexed: 6 = July
   })
 })
 
@@ -75,7 +82,8 @@ describe('[023.06] TimeboxesWorkspace 视图模式切换器', () => {
     // [023.06] 验证 getTimeboxesByRange 被以 week 范围再次调用
     await waitFor(() => expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(2))
     const lastCall = getTimeboxesByRangeMock.mock.calls.at(-1)!
-    const [, end] = lastCall as [Date, Date]
-    expect(end.getDay()).toBe(0) // week mode end = 周日 (weekStartsOn: 1)
+    // [TD-039] getTimeboxesByRange 现传 string contract；end 是 ISO string
+    const [, end] = lastCall as [string, string]
+    expect(new Date(end).getDay()).toBe(0) // week mode end = 周日 (weekStartsOn: 1)
   })
 })

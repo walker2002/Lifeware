@@ -157,19 +157,25 @@ async function loadArchetypeNames(archetypeIds: string[]): Promise<Map<string, s
 
 /**
  * 根据日期范围获取时间盒摘要列表
- * @param start - 开始日期
- * @param end - 结束日期
+ *
+ * [TD-039] 修：参数从 `Date` 改 `string`（ISO 8601 UTC）。`@date-fns/tz` 的
+ *   `TZDate` 跨 Next.js 16 RSC boundary 序列化丢失 prototype，收到 plain object
+ *   后 `start.toISOString()` 抛 TypeError。出口在 caller（`getDateRange`）转 string，
+ *   此处直接当 `Timestamp` 透传，零额外转换。
+ *
+ * @param start - ISO 8601 UTC 字符串开始（含）
+ * @param end - ISO 8601 UTC 字符串结束（含）
  * @returns 时间盒摘要列表
  */
 async function fetchTimeboxSummariesByRange(
-  start: Date,
-  end: Date,
+  start: string,
+  end: string,
 ): Promise<TimeboxSummary[]> {
   const timeboxRepo = new TimeboxRepository();
 
   const timeboxes = await timeboxRepo.findByDateRange(
-    start.toISOString() as Timestamp,
-    end.toISOString() as Timestamp,
+    start as Timestamp,
+    end as Timestamp,
     MVP_USER_ID,
   );
 
@@ -188,13 +194,17 @@ async function fetchTimeboxSummariesByRange(
 
 /**
  * 获取当天的时间盒摘要列表
+ *
+ * [TD-039] 内部在传 `fetchTimeboxSummariesByRange` 前 `.toISOString()` 转 string
+ *   对齐新的 caller 契约。
+ *
  * @returns 当天时间盒摘要列表
  */
 async function fetchTimeboxSummaries(): Promise<TimeboxSummary[]> {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  return fetchTimeboxSummariesByRange(startOfDay, endOfDay);
+  return fetchTimeboxSummariesByRange(startOfDay.toISOString(), endOfDay.toISOString());
 }
 
 // ─── 解析失败兜底辅助函数 ───────────────────────────────────────
@@ -818,9 +828,18 @@ export async function submitBatchIntent(
   return { results };
 }
 
+/**
+ * 按 [start, end] 范围读取时间盒摘要列表。
+ *
+ * [TD-039] 参数类型 `Date → string`：客户端调 `getDateRange(mode, d, userTz)`
+ *   拿到 ISO 字符串（避开 TZDate 跨 RSC boundary 丢 prototype）。
+ *
+ * @param start - ISO 8601 UTC 字符串开始（含）
+ * @param end - ISO 8601 UTC 字符串结束（含）
+ */
 export async function getTimeboxesByRange(
-  start: Date,
-  end: Date,
+  start: string,
+  end: string,
 ): Promise<TimeboxSummary[]> {
   return fetchTimeboxSummariesByRange(start, end);
 }
@@ -840,21 +859,23 @@ export async function getTimeboxesByRange(
  *   reconcileAndAdvanceAppointments()（T8 helper）。
  * 不直接调本函数会读到陈旧 status（未 reconcile 的 scheduled/in_progress）。
  *
+ * [TD-039] 参数类型 `Date → string`：client 端 `getDateRange` 已转 ISO 字符串。
+ *
  * 多租户 T-02：透传 MVP_USER_ID。
  *
- * @param start - 起始时间（含）
- * @param end - 结束时间（含）
+ * @param start - ISO 8601 UTC 字符串开始（含）
+ * @param end - ISO 8601 UTC 字符串结束（含）
  * @returns 约定摘要列表（5 态 status 直接来自 DB）
  */
 export async function getAppointmentsByRange(
-  start: Date,
-  end: Date,
+  start: string,
+  end: string,
 ): Promise<AppointmentSummary[]> {
   const repo = new AppointmentRepository();
   // [026] A1.7 / codex D5：纯读，不内联 reconcile
   const list = await repo.findByDateRange(
-    start.toISOString() as Timestamp,
-    end.toISOString() as Timestamp,
+    start as Timestamp,
+    end as Timestamp,
     MVP_USER_ID as USOM_ID,
   );
   return list.map(it => ({

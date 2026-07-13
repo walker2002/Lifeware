@@ -38,38 +38,44 @@ import { useUserTz } from "@/contexts/user-timezone-context";
 const INITIAL_TIMEBOXES: TimeboxSummary[] = [];
 
 /**
- * 获取日期范围
+ * 获取日期范围（[TD-039] 修：返回 ISO 8601 UTC string 而非 Date）
  *
  * [TZ-2.3] `tz` 参数：用 date-fns `in: tz(tzName)` option 让 start/end
  *   按 user_tz 算（Tokyo user 在 Shanghai 浏览器下拿 Tokyo 日界，与 rbc
  *   渲染一致）。默认 'Asia/Shanghai'（与 schema default + 系统 TZ 兜底对齐）。
  *
+ * [TD-039] 出口改 string：`@date-fns/tz v1.4.1` 的 `tz()` 返回 `TZDate`
+ * （Date 的 subclass），跨 Next.js 16 RSC boundary 序列化时丢失 prototype，
+ * server action 收到 plain object 后 `start.toISOString()` 抛 TypeError。
+ * 修法：在出口处 `.toISOString()` 转 ISO 字符串，避免跨 boundary 失败。
+ * 下游 `getTimeboxesByRange` / `getAppointmentsByRange` 同步改 `string` 类型契约。
+ *
  * @param mode - 日期视图模式
  * @param date - 基准日期（absolute moment；时区解读由 tz 决定）
  * @param tz - IANA 时区（[TZ-1] lib/timezone-config: getEffectiveTimezone）
- * @returns 日期范围
+ * @returns ISO 8601 UTC 字符串范围的开始/结束
  */
 // [023.06] C1 fix: 升格为 export，供 timeboxes-workspace 等其他消费者复用，避免行为漂移
 export function getDateRange(
   mode: DateViewMode,
   date: Date,
   tzName: string = "Asia/Shanghai",
-): { start: Date; end: Date } {
+): { start: string; end: string } {
   switch (mode) {
     case 'day':
       return {
-        start: startOfDay(date, { in: tz(tzName) }),
-        end: endOfDay(date, { in: tz(tzName) }),
+        start: startOfDay(date, { in: tz(tzName) }).toISOString(),
+        end: endOfDay(date, { in: tz(tzName) }).toISOString(),
       };
     case 'week':
       return {
-        start: startOfWeek(date, { weekStartsOn: 1, in: tz(tzName) }),
-        end: endOfWeek(date, { weekStartsOn: 1, in: tz(tzName) }),
+        start: startOfWeek(date, { weekStartsOn: 1, in: tz(tzName) }).toISOString(),
+        end: endOfWeek(date, { weekStartsOn: 1, in: tz(tzName) }).toISOString(),
       };
     case 'month':
       return {
-        start: startOfMonth(date, { in: tz(tzName) }),
-        end: endOfMonth(date, { in: tz(tzName) }),
+        start: startOfMonth(date, { in: tz(tzName) }).toISOString(),
+        end: endOfMonth(date, { in: tz(tzName) }).toISOString(),
       };
   }
 }

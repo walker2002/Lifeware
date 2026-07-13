@@ -77,13 +77,13 @@ describe('[023.06] T3 — 周/月三向路由', () => {
     await waitFor(() =>
       expect(container.querySelector('.rbc-calendar')).not.toBeNull(),
     )
-    // 同时验证 getTimeboxesByRange 第二次调用是 week 范围（end.getDay()===0）
+    // 同时验证 getTimeboxesByRange 第二次调用是 week 范围（end 是 ISO string，对应 getDay()===0）
     await waitFor(() =>
       expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     )
-    const lastCall = getTimeboxesByRangeMock.mock.calls.at(-1)! as [Date, Date]
+    const lastCall = getTimeboxesByRangeMock.mock.calls.at(-1)! as [string, string]
     const [, end] = lastCall
-    expect(end.getDay()).toBe(0)
+    expect(new Date(end).getDay()).toBe(0)
   })
 
   it('click 月 → workspace 切到 MonthView（.rbc-calendar 出现，month 范围被拉取）', async () => {
@@ -100,12 +100,12 @@ describe('[023.06] T3 — 周/月三向路由', () => {
     await waitFor(() =>
       expect(container.querySelector('.rbc-calendar')).not.toBeNull(),
     )
-    // 同时验证 getTimeboxesByRange 第二次调用是 month 范围（start.getDate()===1）
+    // 同时验证 getTimeboxesByRange 第二次调用是 month 范围（start 是 ISO string，对应 getDate()===1）
     await waitFor(() =>
       expect(getTimeboxesByRangeMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     )
-    const lastCall = getTimeboxesByRangeMock.mock.calls.at(-1)! as [Date, Date]
+    const lastCall = getTimeboxesByRangeMock.mock.calls.at(-1)! as [string, string]
     const [start] = lastCall
-    expect(start.getDate()).toBe(1)
+    expect(new Date(start).getDate()).toBe(1)
   })
 })

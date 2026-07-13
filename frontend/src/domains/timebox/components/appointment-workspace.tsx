@@ -141,7 +141,8 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
       const end = new Date()
       end.setDate(end.getDate() + 90)
       try {
-        const list = await getAppointmentsByRange(start, end)
+        // [TD-039] 跨 RSC boundary 传 ISO string，避免 plain Date 转 ISO 时区漂移
+        const list = await getAppointmentsByRange(start.toISOString(), end.toISOString())
         setItems(list)
       } catch (e) {
         console.error('[AppointmentWorkspace] reload failed', e)
