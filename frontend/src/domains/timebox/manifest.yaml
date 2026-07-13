@@ -296,24 +296,29 @@ subscribed_events:
   - ExecutionLogged
 
 # ─── 区块 G: view_routes ─────────────────────────────────────────
-# 仅列真页面跳转（[023] A2.9 OV#P3-#6 锁定）：
+# component 统一指向 domain 入口组件（禁止 app/<route>/page，防循环 import）。
 # - createTimebox 不绑 view_route（CNUI-only action，入口是 AI 助手翻页，
 #   不绑 view_route；OV#P3-#6 移除）
-# - 其余 view_route 沿用 src/app/<route>/page.tsx 路径，component 字段
-#   标识实际入口组件（[023] A2.3 / A2.8 真实页面）。
+# - viewTimeboxes 加 page_props.standalone=true（D3/F1：独立 /timeboxes 页用
+#   h-screen 撑满窗口；AppShell 嵌入 app/page.tsx 不传 → 默认 false → h-full）
+# - configTimeboxTemplates → timebox-templates-route（D9/7A：T3 重命名后的入口）
+# - viewAppointments → appointment-route（D9/7A：T4 重命名后的入口）
 view_routes:
   viewTimeboxes:
-    component: app/timeboxes/page
+    component: domains/timebox/components/timeboxes-workspace
     url: /timeboxes
+    # page_props：独立 /timeboxes 页传 standalone:true（AppShell 嵌入 app/page.tsx:103 不传→默认 false→h-full）
+    page_props:
+      standalone: true
   configTimeboxTemplates:
-    component: domains/timebox/pages/TimeboxTemplatesPage
+    component: domains/timebox/components/timebox-templates-route
     url: /timebox-templates
   config_activity_archetypes:
-    component: app/config/activity-archetypes/page
+    component: domains/timebox/config/activity-archetypes-page
     url: /config/activity-archetypes
   # [026] A1.5 + [023.05] PR2 阶段 2: 约定管理页
   viewAppointments:
-    component: app/appointments/page
+    component: domains/timebox/components/appointment-route
     url: /appointments
 
 # ─── 区块 H: templates ───────────────────────────────────────────
