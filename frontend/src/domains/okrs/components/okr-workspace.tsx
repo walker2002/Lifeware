@@ -218,7 +218,7 @@ export function OKRWorkspace({ standalone = false, initialDetailId }: OKRWorkspa
   }, [initialDetailId, hook.objectives, detailData, handleSelect])
 
   return (
-    <div className={`${standalone ? "h-full flex flex-col" : "absolute inset-0 flex flex-col"}`}>
+    <div className={`${standalone ? "h-screen flex flex-col" : "absolute inset-0 flex flex-col"}`}>
       {/* [023.03] 补：顶部图片 Banner（domainId='okrs' 匹配 '/banner-OKRs1.png' /
           '/banner-OKRs2.png'，可折叠）。原 'standalone' 模式只显示 h1 标题行；
           改为统一显示 PageBanner，h1 标题去除（与 [023.03] UI 规范一致：
