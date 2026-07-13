@@ -1,7 +1,7 @@
 ---
 id: TD-039
 title: TZDate 在 RSC boundary 序列化丢失 class，server action 收到 plain object 报 start.toISOString
-status: 新建
+status: 已修复
 created: 2026-07-13
 last_updated: 2026-07-13
 ---
@@ -18,9 +18,9 @@ last_updated: 2026-07-13
 | 类别 | 架构 / 兼容性 |
 | 领域 | `lifeware-timebox` |
 | 录入版本 | TZ-2.2 ([TZ-2.2]) |
-| 负责人 | 暂未指派 |
-| 修复目标版本 | 未知 |
-| 关联 PR/分支 | main @ `f766066`（[TZ-2.2] merge）；根因 commit `5e36355` ([TZ-2.3]) |
+| 负责人 | Claude（[TD-039] systematic-debugging 修复） |
+| 修复目标版本 | main @ `374e9f3` ([TD-039] fix) |
+| 关联 PR/分支 | 根因 commit `5e36355` ([TZ-2.3])；fix commit `374e9f3` ([TD-039]) |
 | 关联 Constitution 条款 | N/A |
 
 ## 现象（What）
@@ -93,16 +93,17 @@ last_updated: 2026-07-13
 
 ## 验收标准（Done Criteria）
 
-- [ ] vitest 新增「TZDate 跨 server action boundary 不丢 class」测试用例覆盖根因场景
-- [ ] tsc 无新增报错
-- [ ] `/timeboxes` + `/appointments` 在真实 PG + dev server 下复现 → 修复后 HTTP 200 + 数据正常加载
-- [ ] `/qa` 浏览器端验证 TZ-2.2 派生 badge（插入 today scheduled appointment 后 appointment locked card 显示「执行中」）
-- [ ] 已删除临时方案的兜底代码（如有）
+- [x] vitest 新增「TZDate 跨 server action boundary 不丢 class」测试用例覆盖根因场景（`hooks/__tests__/use-timebox.test.ts` 9 cases 全 PASS）
+- [x] tsc 无新增报错（净 -5 错误，225→220）
+- [x] `/timeboxes` + `/appointments` 在真实 PG + dev server 下复现 → 修复后 HTTP 200 + 数据正常加载（`/timeboxes` 4 个 timebox 卡片 / `/appointments` 约定管理页正常）
+- [x] 已删除临时方案的兜底代码（如有）（方案 B/C 没采用，无需清理）
+- [ ] `/qa` 浏览器端验证 TZ-2.2 派生 badge（插入 today scheduled appointment 后 appointment locked card 显示「执行中」）—— 已不在 TD-039 范围，留作 [TZ-2.2] neat follow-up
 
 ## 跟踪记录（History）
 
 - 2026-07-13 · [TZ-2.2] · 创建条目（QA pass 时发现：`.gstack/qa-reports/qa-report-tz22-2026-07-13.md` ISSUE-001）
 - 2026-07-13 · [TZ-2.2] · 经 baseline 对比确认 pre-existing（commit `62aebf3` pre-TZ-2.2 同样错误），根因在 TZ-2.3 (`5e36355` + `db7569b`)
+- 2026-07-13 · [TD-039] · 治本修复 — **commit `374e9f3`** 采用方案 A（getDateRange 出口 `.toISOString()` 转 ISO string，下游 `getTimeboxesByRange` / `getAppointmentsByRange` / `fetchTimeboxSummariesByRange` 类型契约 `Date → string`，3 个 caller 同步：timeboxes-workspace / use-timebox-hook / AppointmentWorkspace.reload + `/app/appointments/page.tsx` server component） + 新增 `hooks/__tests__/use-timebox.test.ts` 守 `{start: string, end: string}` 契约（9/9 PASS） + 2 个 existing test 适配 new contract。验收：vitest 35/35 touched PASS + tsc 净 **-5 错误**（225→220）+ 0 净回归（15 文件 pre-existing failed 全部保留，TD-039 my fix 触达的 vitest 全部 GREEN）+ 视觉验证 dev server `:3002` `/timeboxes` 200/0 console/Server Actions POST 200/4 个 timebox 卡片真渲染 + `/appointments` 200/0 console/约定管理页正常
 
 ## 关联
 

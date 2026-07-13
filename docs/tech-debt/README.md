@@ -33,7 +33,6 @@ last_updated: 2026-07-13
 | TD-035 | updateFields 通用归一化 helper 缺失：4 域 repo 各自分散归一化，新域必再踩同坑 | 🟡 | cross-domain | [026.02.4] 后 hot-fix 债 | 暂未指派 |
 | TD-036 | [028.2] 9 项 ship-then-polish backlog + 3 项 meta-pattern 债（I-3 + 7 Minor + M-qa-1 + mock-vs-real + GenerationResult type-pun + ISO↔HH:MM 抽象） | 🟠 | lifeware-timebox | [028.2] 2026-07-12 | 暂未指派 |
 | TD-038 | 跨域写边界预防性观察债(timebox↔{tasks,habits,appointments}),继承自 TD-004 关闭 | 🟢 | cross-domain | 2026-07-12 | 暂未指派(产品决策触发时启 R4 design) |
-| TD-039 | TZDate 在 RSC boundary 序列化丢失 class，server action 收到 plain object 报 start.toISOString（[TZ-2.2] /qa 抓漏，根因 [TZ-2.3]） | 🟠 | lifeware-timebox | [TZ-2.2] 2026-07-13 | 暂未指派 |
 
 ### 📌 登记（已纳入待办）
 
@@ -89,6 +88,7 @@ last_updated: 2026-07-13
 | TD-007 | "Suspend action 完整 CNUI 回环未闭环" → 描述与代码脱节（tasks 域 Suspend 从未引入,5 路 grep 验证 0 缺口;暂停主线 = pauseThread,结束任务 = archiveTask,均 4 路全闭合） | 🟡 → ✅ | lifeware-tasks | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 | TD-008 | "lifecycle-configs require('@/...') 多键域债" → [022.01] 已全量迁 ESM import（5 路 grep 验证 0 实际 require 调用,顶部 3 个 ESM static import;多键域 PascalCase longest-match 防护已就位） | 🟡 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
 | TD-004 | "R4 timebox/okrs 写入口债(跨域规则未落地)" → 描述与代码脱节,5 路 grep 0 实际缺口(timebox↔okrs 反产品决策,tasks/habits/appointments 才是 OKR 关联对象);重开为观察债 [[TD-038]] | 🟠 → ✅ | cross-domain | [023.10] | 文档调研,无代码改动 | 2026-07-12 |
+| TD-039 | TZDate 在 RSC boundary 序列化丢失 class → 治本修复方案 A（getDateRange 出口 .toISOString() 转 ISO string,下游 3 个 server action + 3 caller 类型契约 Date→string,新增 hooks/__tests__/use-timebox.test.ts 9 cases 守约） | 🟠 → ✅ | lifeware-timebox | [TZ-2.2] 2026-07-13 | main `374e9f3` ([TD-039]) | 2026-07-13 |
 
 ## 按领域视图
 
@@ -232,7 +232,8 @@ last_updated: 2026-07-13
 | 第 23 批(🟡→✅) | 2026-07-12 | TD-008 关闭(1 条) | 「lifecycle-configs require('@/...') 多键域债」已治本：[022.01] 已全量 require → ESM static import（5 路 grep 验证 0 实际 require 调用,文件顶部 3 个 ESM import）;多键域(okrs: objective/key_result)走 Object.keys(lifecycle) + PascalCase longest-match 防护（[Habits Bug 2]）;TD-008 创建时（2026-07-06）描述已过期;**模式记录** = TD-007/008 连续 2 条「描述与代码脱节」型债,印证债目录与代码漂移自查模式 |
 | 第 24 批(🟠→✅ + 🟢🆕) | 2026-07-12 | TD-004 关闭 + TD-038 新建(2 条) | 「R4 timebox/okrs 写入口债」描述与代码脱节：5 路 grep 验证 0 实际缺口(timeboxes 表无 keyResultId 列 / timebox 域 0 okrsRepository 引用 / okrs 域 0 timeboxRepository 引用 / actions/timebox.ts 0 okr/keyResult repo 引用 / usom/ 0 keyResultId);用户洞察确认「timebox 不该直接关联 OKR,tasks/habits/appointments 才是 OKR 关联对象」;真实跨域写 [025] 已 ship (D1 单域内复用 mutation service 模式,非 R4 跨域事务);关闭 TD-004 + 重开为观察债 TD-038(跨域写边界预防性监控,产品决策触发时启 R4 design);**模式记录** = 第 7 条「描述与代码脱节」型债闭环(继 TD-007/008/009/010/011/012 后) |
 | 第 25 批(🟠🆕) | 2026-07-12 | TD-037 新建(1 条) | [TD-003] P6 follow-up:plan-eng-review Codex cold read 抓 writer boundary gap(5 域 lifecycle writes via SM bypass execute() + 5 域 update() 单字段写路径 OCC 缺位);[TD-003] P1 reversal 选择 1 域 POC ship,本债登记 5 域剩余 + ConflictError 跨域归属决策 + 复用 [TD-003] T3 field-executor batch OCC pattern;scope 5-7 人日待跨域 OCC 专题启 design session |
+| 第 26 批(🟠→✅) | 2026-07-13 | TD-039 关闭(1 条) | TZ-2.2 ship-then-/qa 抓漏 ISS-001 pre-existing TZ-2.3 债：`use-timebox.ts:53` `getDateRange` 用 `@date-fns/tz v1.4.1` `tz()` 返回 `TZDate`，Next.js 16 RSC boundary 序列化丢 class，server action 收到 plain object 后 `start.toISOString()` 抛 TypeError `/timeboxes` 100% 触发；systematic-debugging 4-phase + 方案 A 治本：`getDateRange` 出口 `.toISOString()` 转 ISO string + 3 server action (`getTimeboxesByRange` / `getAppointmentsByRange` / `fetchTimeboxSummariesByRange`) 类型契约 `Date → string` + 3 caller (`timeboxes-workspace` / `appointment-workspace` / `/app/appointments/page.tsx`) + 新增 `hooks/__tests__/use-timebox.test.ts` 9 cases 守 `{start: string, end: string}` 契约；7 files +155/-41；vitest touched 35/35 PASS（新增 9/9） + 0 净回归（baseline 15 文件 pre-existing 全保留） + tsc 净 -5 错误（225→220） + 视觉验证 dev :3002 `/timeboxes` 与 `/appointments` 均 HTTP 200 + 0 console error + Server Action POST 200 + 4 timebox 卡片真渲染 + 印证 [[feedback_post-ship-review-meta-pattern]] 第 N 次（TZ-2.2 ship-then-verify 漏 RSC boundary + TZ-2.3 引入未做跨域测试） |
 
 ---
 
-**最后更新**: 2026-07-12 · 共 34 条（本批：TD-037 新建）· 🔴0 / 🟠4 / 🟡4 / 🟢1(+搁置 2) / ⚪1 / ✅19
+**最后更新**: 2026-07-13 · 共 35 条（本批：TD-037 新建 + TD-039 关闭）· 🔴0 / 🟠4 / 🟡4 / 🟢1(+搁置 2) / ⚪1 / ✅20

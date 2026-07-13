@@ -8,6 +8,48 @@
 
 ---
 
+## [TD-039] TZDate RSC boundary 序列化丢失 class — 治本修复（2026-07-13）
+
+> 2026_07_13 — TZ-2.2 段尾遗留债。`use-timebox.ts:53` `getDateRange` 用 `@date-fns/tz v1.4.1` 的 `tz(tzName)` 包出 `TZDate`（Date subclass），跨 Next.js 16 RSC boundary 序列化时 Next.js 不识别 subclass prototype，server action 收到 plain object 后 `start.toISOString()` 抛 `TypeError`。`/timeboxes` / `/appointments` 页面 100% 触发（hydration 后 client `loadRange()` → Server Action），`/timeboxes` HTTP 200 但 UI 显示「今天还没有时间盒」空 state（fetch 失败被 catch 静默 swallow）。MVP Shanghai-only 巧合 OK；任何有范围查询的 page 加载即爆。
+
+### 改动（方案 A — 治本）
+
+- **`frontend/src/hooks/use-timebox.ts`**：`getDateRange(mode, date, tzName)` 返回类型 `Date → { start: string; end: string }`，出口 `.toISOString()` 转 ISO 字符串。`string` 是 RSC boundary 安全的 primitive，零额外转换、零 runtime 分支判断
+- **`frontend/src/app/actions/intent.ts`**：`fetchTimeboxSummariesByRange` / `getTimeboxesByRange` / `getAppointmentsByRange` 类型契约 `Date → string`，去掉入口 `.toISOString()` 调用（直接当 `Timestamp` 透传）
+- **`frontend/src/app/appointments/page.tsx`**（server component）：`new Date()` → `.toISOString()` 调 `getAppointmentsByRange`
+- **`frontend/src/domains/timebox/components/appointment-workspace.tsx`**（client reload）：同上
+- **测试**：
+  - **新增** `frontend/src/hooks/__tests__/use-timebox.test.ts`（9 cases）守 `{ start: string; end: string }` 契约 + day/week/month 模式形状 + 跨日跨度
+  - **修改** `__tests__/timeboxes-workspace.{range,view-mode}.test.tsx`：`.getHours()` / `.getDay()` / `.getDate()` 改 `new Date(start).xxx()`，类型断言 `[Date, Date] → [string, string]`
+  - 改动 7 files +155 / -41（1 new test + 6 改）
+
+### 关键决策
+
+- **D1** 方案 A 治本（推荐）：`getDateRange` 出口转 ISO string，类型契约清晰，跨 boundary 永远 safe
+- **D2** 方案 B（intent.ts 入口 `instanceof Date` 兜底）抛弃：治标 — 治不到其他未来 caller 仍可能踩同一坑
+- **D3** 方案 C（getDateRange 返回 ms number）抛弃：API 仍非 string，caller 协同成本高于 D1
+
+### 验证
+
+- ✅ vitest touched **35/35 PASS**（含新增 9/9）
+- ✅ vitest baseline 对比：**零净回归**（15 文件 pre-existing failed 全保留，TD-039 触达 vitest 全部 GREEN）
+- ✅ tsc **净 -5 错误**（225 → 220）—— string 类型契约使 chain 严格化
+- ✅ dev server `:3002` `/timeboxes` HTTP 200 + 0 console error + 4 个 timebox 卡片真实渲染（晨间规划 / 深度工作 / 午间运动 / 睡前阅读） + Server Actions POST 200
+- ✅ dev server `:3002` `/appointments` HTTP 200 + 0 console error + 约定管理页正常 + 月历 grid 渲染
+
+### 遗留
+
+- [TZ-2.2] `appointment-locked-card.tsx` 视觉 badge 验证：原计划在本 PR 补，但 TZ-2.2 ship-then-verify 时因 TD-039 阻断无法 browser 验证 — TD-039 修复后下次 `/qa` 顺手补即可，不再单独立 TD
+
+### 关联
+
+- 根因：commit `5e36355` ([TZ-2.3]) 引入 `@date-fns/tz` 但未做 RSC boundary 跨域测试
+- 修复：commit `374e9f3` ([TD-039])（待 push origin main + 用户手动 merge PR）
+- TD 文档：`docs/tech-debt/TD-039-tzdate-rsc-serialization.md`（status: 已修复）
+- 印证 [[feedback_post-ship-review-meta-pattern]] 第 N 次累积（TZ-2.2 ship-then-verify 漏 RSC boundary）
+
+---
+
 ## [TZ-2.2] localDayKey 接受 IANA TZ — 收口 [026] OQ-6 最后一个 tz 边界（2026-07-12）
 
 > 2026_07_12 — `[TZ-2] / [TZ-2.1] / [TZ-2.3]` 全链路 SHIPPED 后，写路径 + handler internal + 显示端 + 范围查询 全部切 user_tz，但**约定日历日派生** `localDayKey`（`getFullYear/getMonth/getDate`）仍按 OS TZ 计算——是 TZ-2 范围最后一个边界遗漏。`appointment-locked-card.tsx:85` [TZ-2] 改造时切了 `formatTime(iso, tz)` 但漏了 `deriveAppointmentDisplayStatus(status, startTime, now)`，是该函数内部 `localDayKey` 仍按浏览器/OS TZ 计算日历日。MVP Shanghai-only 巧合 OK；Tokyo user 跨日/跨月边界会与 TZ-1 写路径 8h 漂移同根因。
