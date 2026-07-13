@@ -26,6 +26,8 @@ function makeTimeboxRepo(overrides: Partial<ITimeboxRepository> = {}): ITimeboxR
     findUpcoming: vi.fn(),
     findByDateRange: vi.fn(),
     save: vi.fn(),
+    // [TD-003] T2: ITimeboxRepository.updateFields（OCC 必填）mock stub
+    updateFields: vi.fn(),
     archive: vi.fn(),
     ...overrides,
   }
@@ -43,6 +45,9 @@ function makeTimebox(overrides: Partial<Timebox> = {}): Timebox {
     habitIds: [],
     isRecurring: false,
     tags: [],
+    // [TD-003] T2: OCC + schemaVersion 字段补齐（USOM Timebox 新增）
+    occVersion: 1,
+    schemaVersion: 1,
     createdAt: '2026-05-01T00:00:00Z' as Timestamp,
     updatedAt: '2026-05-01T00:00:00Z' as Timestamp,
     ...overrides,

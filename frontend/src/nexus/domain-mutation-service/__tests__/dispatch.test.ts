@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { FieldExecutor } from '@/nexus/field-executor'
 import type { FieldMetadata } from '@/usom/types/domain-types'
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 import { createDomainMutationService } from '../index'
 
 // ─── Mock 工厂 ─────────────────────────────────────────────────
@@ -39,6 +40,10 @@ function makeRepo(): GenericRepo {
 function makeExecutor(): FieldExecutor {
   return {
     execute: vi.fn().mockResolvedValue({ kind: 'Passed' }),
+    // [TD-003] T3 executeBatch — 聚合写路径使用。当前 dispatch.test.ts 主要
+    // 覆盖 update() 单字段路径（execute）和 execute() 单 field step 路径，
+    // executeBatch 未直接调用，但 FieldExecutor 类型要求存在此方法。
+    executeBatch: vi.fn().mockResolvedValue({ kind: 'Passed' }),
   }
 }
 
@@ -89,7 +94,7 @@ describe('domainMutationService — update() 单字段写', () => {
     await service.update('task-1', 'title', '新标题', 'user-1', 'tasks', 'task')
 
     // 直走 repo，不经 submitDynamicIntent，也不经字段执行器
-    expect(repo.updateFields).toHaveBeenCalledWith('task-1', { title: '新标题' }, 'user-1')
+    expect(repo.updateFields).toHaveBeenCalledWith('task-1', { title: '新标题' }, 'user-1', 0)
     expect(submitDynamicIntent).not.toHaveBeenCalled()
     expect(executor.execute).not.toHaveBeenCalled()
   })
@@ -142,13 +147,16 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     } as any)
 
     // 聚合步骤：先字段（priority），后状态（plan）
+    // [TD-003] T4: step 含 expectedOccVersion → execute() 聚合路径走
+    //   field-executor.executeBatch（OCC 透传路径）。不含 expectedOccVersion
+    //   则走 legacy executor.execute()（向后兼容 non-OCC 域：tasks/habits/okrs）。
     const intent = {
       id: 'intent-1',
       domainId: 'tasks',
       objectType: 'task',
       targetId: 'task-1',
       steps: [
-        { kind: 'field', field: 'priority', value: 'high' },
+        { kind: 'field', field: 'priority', value: 'high', expectedOccVersion: 1 },
         { kind: 'state', action: 'plan', payload: {} },
       ],
     } as any
@@ -160,16 +168,20 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     expect(txCallback).toHaveBeenCalled()
     // 不绕 submitDynamicIntent
     expect(submitDynamicIntent).not.toHaveBeenCalled()
-    // 字段执行器被调，且透传 tx
-    expect(executor.execute).toHaveBeenCalledTimes(1)
-    expect(executor.execute).toHaveBeenCalledWith(
-      'task-1', 'priority', 'high', 'user-1',
+    // [TD-003] T4: executeBatch 被调（OCC 关掉），且透传 tx + batch 内含 1 个 field step
+    expect(executor.executeBatch).toHaveBeenCalledTimes(1)
+    expect(executor.executeBatch).toHaveBeenCalledWith(
+      'task-1',
+      [{ field: 'priority', value: 'high', expectedOccVersion: 1 }],
+      'user-1',
       expect.objectContaining({ tx: fakeTx }),
     )
+    // 单字段 execute() 不再被调（聚合路径切到 executeBatch，因为 step 含 expectedOccVersion）
+    expect(executor.execute).not.toHaveBeenCalled()
     // SM.execute 被调，且透传 tx
     expect(smExecute).toHaveBeenCalledTimes(1)
     // 先字段后状态：字段执行器调用序号 < SM 调用序号
-    const executorMock = vi.mocked(executor.execute)
+    const executorMock = vi.mocked(executor.executeBatch)
     expect(executorMock.mock.invocationCallOrder[0]).toBeLessThan(
       smExecute.mock.invocationCallOrder[0],
     )
@@ -178,8 +190,10 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
 
   it('字段执行器失败 → 整体回滚（异常向上抛出，不调用 SM）', async () => {
     const repo = makeRepo()
+    // [TD-003] T4: execute() 路径含 expectedOccVersion 时改用 executeBatch——reject 来自 executeBatch
     const executor = {
-      execute: vi.fn().mockResolvedValue({ kind: 'Rejected', errors: ['非法枚举'] }),
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockResolvedValue({ kind: 'Rejected', errors: ['非法枚举'] }),
     }
     const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
     const smExecute = vi.fn()
@@ -200,7 +214,8 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
       objectType: 'task',
       targetId: 'task-1',
       steps: [
-        { kind: 'field', field: 'priority', value: 'INVALID' },
+        // 加 expectedOccVersion 走 batch 路径（executeBatch 拒）
+        { kind: 'field', field: 'priority', value: 'INVALID', expectedOccVersion: 1 },
         { kind: 'state', action: 'plan', payload: {} },
       ],
     } as any
@@ -210,5 +225,147 @@ describe('domainMutationService — execute() 聚合/事务写', () => {
     expect(res.success).toBe(false)
     // 后续状态步未执行
     expect(smExecute).not.toHaveBeenCalled()
+    // executeBatch reject 触发回滚
+    expect(executor.executeBatch).toHaveBeenCalledTimes(1)
+  })
+
+  it('[TD-003] T4: step 不含 expectedOccVersion → 仍走 legacy executor.execute()（向后兼容 non-OCC 域）', async () => {
+    const repo = makeRepo()
+    const executor = makeExecutor()
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn().mockResolvedValue({ success: true, object: { id: 'task-1', status: 'planned' } })
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    // step 不带 expectedOccVersion → legacy 路径（tasks/habits/okrs 暂未实施 OCC）
+    const intent = {
+      id: 'intent-1',
+      domainId: 'tasks',
+      objectType: 'task',
+      targetId: 'task-1',
+      steps: [
+        { kind: 'field', field: 'priority', value: 'high' },
+        { kind: 'state', action: 'plan', payload: {} },
+      ],
+    } as any
+
+    await service.execute(intent, 'user-1')
+
+    // legacy executor.execute() 路径，不调 executeBatch
+    expect(executor.execute).toHaveBeenCalledTimes(1)
+    expect(executor.executeBatch).not.toHaveBeenCalled()
+  })
+
+  /**
+   * [TD-003] T4-fix：ConflictError 必须**穿透** execute() 的外层 catch 冒泡
+   * 到 caller。背景：field-executor.executeBatch → repo.updateFields 抛
+   * ConflictError（OCC 版本冲突），事务回滚。execute() 外层 catch 原把所有
+   * err 折叠为 { success: false, error: message }（string 化），丢失
+   * ConflictError.name + currentOccVersion/attemptedOccVersion。后果：T5 UI
+   * drawer 走 `err.name === 'ConflictError'` matcher 永远不命中，退化到
+   * generic "保存失败" toast，UX 闭环断裂。
+   *
+   * 修复后：execute() 遇到 ConflictError re-throw（不折叠），caller 拿到
+   * ConflictError 实例（含 name + currentOccVersion），可正确走 reload +
+   * toast 分支。
+   */
+  it('[TD-003] T4-fix: ConflictError 必须穿透 execute() 外层 catch 冒泡', async () => {
+    const repo = makeRepo()
+    // executeBatch 抛 ConflictError（模拟 OCC 冲突）
+    const executor = {
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockRejectedValue(new ConflictError(3, 1)),
+    }
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn()
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    const intent = {
+      id: 'intent-1',
+      domainId: 'timebox',
+      objectType: 'timebox',
+      targetId: 'tb-1',
+      steps: [
+        // expectedOccVersion=1 → execute() 走 executeBatch 路径
+        { kind: 'field', field: 'title', value: 'new title', expectedOccVersion: 1 },
+      ],
+    } as any
+
+    // 关键断言：execute() 应 re-throw ConflictError 实例
+    // （不被折叠为 {success:false, error:string}）
+    let caught: unknown = null
+    try {
+      await service.execute(intent, 'user-1')
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(ConflictError)
+    expect((caught as ConflictError).name).toBe('ConflictError')
+    expect((caught as ConflictError).currentOccVersion).toBe(3)
+    expect((caught as ConflictError).attemptedOccVersion).toBe(1)
+    // 后续 state step 未执行（事务回滚边界）
+    expect(smExecute).not.toHaveBeenCalled()
+  })
+
+  /**
+   * [TD-003] T4-fix：非 ConflictError 的其他错误保持现有折叠行为
+   *（{success: false, error: message}）——只对 ConflictError 透传，其他
+   * 错误类型不变以避免影响现有调用方契约。
+   */
+  it('[TD-003] T4-fix: 非 ConflictError 错误保持折叠行为（向后兼容）', async () => {
+    const repo = makeRepo()
+    const executor = {
+      execute: vi.fn(),
+      executeBatch: vi.fn().mockRejectedValue(new Error('connection lost')),
+    }
+    const transaction = vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ __tx: true }))
+    const submitDynamicIntent = vi.fn()
+    const smExecute = vi.fn()
+
+    const service = createDomainMutationService({
+      getRepository: () => repo,
+      getExecutor: () => executor,
+      getFieldMetadata: () => FIELD_META,
+      fieldUpdatedEventType: 'TaskFieldUpdated',
+      submitDynamicIntent,
+      transaction,
+      smExecute,
+    } as any)
+
+    const intent = {
+      id: 'intent-1',
+      domainId: 'timebox',
+      objectType: 'timebox',
+      targetId: 'tb-1',
+      steps: [
+        { kind: 'field', field: 'title', value: 'new title', expectedOccVersion: 1 },
+      ],
+    } as any
+
+    const res = await service.execute(intent, 'user-1')
+
+    // 非 ConflictError 保持原契约：折叠为 success:false + error 字符串
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/connection lost/)
   })
 })

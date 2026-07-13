@@ -50,7 +50,8 @@ export function createHabitsGenericRepo(repos: HabitsRepoPair): Record<string, G
       async updateStatus(id, toStatus, userId, tx) {
         return repos.habitRepo.updateStatus(id, toStatus, userId, tx)
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
+        // [TD-003] T2: habits 域暂未实施 OCC，_expectedOccVersion 忽略（TD-037 P6 deferred）
         return repos.habitRepo.updateFields(id, fields, userId, tx)
       },
     },

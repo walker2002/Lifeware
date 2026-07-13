@@ -53,7 +53,8 @@ export function createTasksGenericRepo(repos: TasksRepoPair): Record<string, Gen
       async updateStatus(id, toStatus, userId, tx) {
         return repos.taskRepo.updateStatus(id, toStatus, userId, tx)
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
+        // [TD-003] T2: tasks 域暂未实施 OCC，_expectedOccVersion 忽略（TD-037 P6 deferred）
         return repos.taskRepo.updateFields(id, fields, userId, tx)
       },
     },
@@ -71,7 +72,7 @@ export function createTasksGenericRepo(repos: TasksRepoPair): Record<string, Gen
       async updateStatus(id, toStatus, userId, tx) {
         return repos.threadRepo.updateStatus(id, toStatus, userId, tx)
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
         return repos.threadRepo.updateFields(id, fields, userId, tx)
       },
     },

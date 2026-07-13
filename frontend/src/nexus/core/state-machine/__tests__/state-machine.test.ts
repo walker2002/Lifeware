@@ -51,6 +51,8 @@ function makeMockRepos() {
     save: vi.fn(async (timebox: Timebox) => {
       savedTimeboxes.push(timebox)
     }),
+    // [TD-003] T2: ITimeboxRepository.updateFields（OCC 必填）mock stub
+    updateFields: vi.fn().mockResolvedValue(null),
     archive: vi.fn().mockResolvedValue(undefined),
   }
 

@@ -20,6 +20,8 @@ import { submitDynamicIntent } from '@/app/actions/intent'
 import { createTimeboxMutationService, createAppointmentMutationService } from './timebox/mutation-service'
 import { TimeboxRepository, AppointmentRepository } from '@/domains/timebox/repository'
 import { ActivityArchetypeRepository } from '@/lib/db/repositories/activity-archetype.repository'
+// [TD-003] T4-fix：保留 ConflictError 实例 + name 透传给 T5 drawer matcher
+import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 import type { Timebox, Appointment } from '@/usom/types/objects'
 import type { USOM_ID } from '@/usom/types/primitives'
 
@@ -211,10 +213,18 @@ export async function revertTimebox(
   // [023.13] P3：确认清空分支——UI 弹窗确认后传 clearExecutionRecord=true
   if (opts?.clearExecutionRecord) {
     // AM3 复用 updateFields：单条 UPDATE，T-02 userId 过滤，与持久化修复同通道
+    // [TD-003] T2 OCC 必填：clearExecutionRecord 走 updateFields 原子 UPDATE WHERE
+    // occ_version = tb.occVersion；0 rows → 抛 ConflictError（drawer toast + reload）。
+    // **stale-read limitation（second-opinion review Important #1）**：此处 `tb.occVersion`
+    // 是函数入口 read 的，与下面 submitDynamicIntent('revertTimebox') 之间存在小窗口
+    // （同 process 串行同步代码，μs 级），如果用户其他 tab 在该窗口改 row，第二个 SM
+    // revert 会抛 ConflictError——已通过 outer catch 兜底转通用「保存失败」toast。
+    // Future fix: 把 read+clearExecutionRecord+revert 包到单 transaction + 单一 OCC 校验。
     await repo.updateFields(
       timeboxId as USOM_ID,
       { executionRecord: null },
       MVP_USER_ID as USOM_ID,
+      tb.occVersion ?? 0,
     )
   } else if (tb.executionRecord != null) {
     // [AM7] 守卫保留（默认路径不变）
@@ -242,6 +252,17 @@ export async function revertTimebox(
  * [023] A2 OV#P1-#1：客户端必须把 `duration` 折成 `endTime = startTime + duration`
  * 在 Drawer edit 路径已实现（本函数不接 duration 字段；USOM Timebox 无 duration 字段）。
  *
+ * [TD-003] T4 OCC 透传：本函数入口先读 current `occVersion`，attach 到每个
+ * field step 的 `expectedOccVersion` 字段。`field-executor.executeBatch`
+ * （参 @/nexus/field-executor/index.ts）会读取 step.expectedOccVersion 优先
+ * 透传给 `repo.updateFields(... expectedOccVersion ...)`，WHERE 谓词失败
+ * 时抛 ConflictError（详见 @/domains/timebox/errors/occ-conflict-error.ts）。
+ *
+ * 透传场景：
+ *  - drawer 持有的 current occVersion（避免 field-executor 内部 findById 读 current
+ *    引入 read-then-write race window）；
+ *  - 3-tab 并发：3 个 update 起点都从同一 occVersion 读，OCC 谓词保证仅 1 win。
+ *
  * @param timeboxId - 目标时间盒 ID
  * @param fields - 待写字段（仅值非 undefined 落库）
  */
@@ -267,6 +288,24 @@ export async function updateTimebox(
       return { status: 'ok', timebox: tb }
     }
 
+    // [TD-003] T4 OCC 透传：先读 current occVersion（drawer 持有的版本号）。
+    // Repository.findById 返回完整 row（含 occVersion 列，T1 schema 加列）。
+    // 跨 tab 并发场景：3 个 updateTimebox 入口可能同时 read 到同一 occVersion=1，
+    // 后续 mutation service.execute 在事务内调 repo.updateFields(..., 1, ...) →
+    // WHERE occ_version=1 仅 1 row 命中 → 后续 2 个 0 rows → 抛 ConflictError。
+    const tbRepo = new TimeboxRepository()
+    const currentTb = await tbRepo.findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+    if (!currentTb) throw new Error(`Timebox ${timeboxId} not found`)
+    // USOM Timebox.type.occVersion（T2 起加入字段定义）。未声明时（防御性）回退 0
+    // ——timebox 仓储的 WHERE occ_version=0 必 0 rows，生产环境不会发生。
+    const currentOccVersion = (currentTb as { occVersion?: number }).occVersion ?? 0
+    // 把 expectedOccVersion attach 到每个 field step（field-executor.executeBatch
+    // 内部优先读 step.expectedOccVersion，再 fallback 到 repo.findById）。
+    const fieldStepsWithOcc = fieldSteps.map(step => ({
+      ...step,
+      expectedOccVersion: currentOccVersion,
+    }))
+
     const service = createTimeboxMutationService()
     const res = await service.execute(
       {
@@ -274,7 +313,7 @@ export async function updateTimebox(
         domainId: 'timebox',
         objectType: 'timebox',
         targetId: timeboxId as USOM_ID,
-        steps: fieldSteps,
+        steps: fieldStepsWithOcc,
       },
       MVP_USER_ID as USOM_ID,
     )
@@ -283,10 +322,14 @@ export async function updateTimebox(
     // 纯 field steps 下 res.object 为 undefined（execute 仅在 state step 设 lastObject），
     // 兜底用 findById 读回更新后的时间盒。
     if (res.object) return { status: 'ok', timebox: res.object as Timebox }
-    const tb = await new TimeboxRepository().findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
+    const tb = await tbRepo.findById(timeboxId as USOM_ID, MVP_USER_ID as USOM_ID)
     if (!tb) throw new Error(`Timebox ${timeboxId} not found`)
     return { status: 'ok', timebox: tb }
   } catch (err) {
+    // [TD-003] T4-fix：ConflictError 必须原样抛——T5 UI drawer matcher
+    //   `err.name === 'ConflictError'` 才能命中，触发 reload + toast。
+    //   若用 generic `new Error(err.message)` 会丢 name + currentOccVersion。
+    if (err instanceof ConflictError) throw err
     throw new Error(err instanceof Error ? err.message : '更新时间盒失败')
   }
 }

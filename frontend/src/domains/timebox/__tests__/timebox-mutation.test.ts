@@ -67,6 +67,9 @@ describe('[023] A2 timebox server actions', () => {
   })
 
   it('updateTimebox 字段写 → 直调 mutation service.execute（不经 submitDynamicIntent）', async () => {
+    // [TD-003] T4: updateTimebox 入口先读 current occVersion（OCC 透传前置）。
+    // 这里 stub 一个 occVersion=1 的 row，避免 not found 报错。
+    mockFindById.mockResolvedValue({ id: 'tb-1', userId: '00000000-0000-0000-0000-000000000001', occVersion: 1 } as any)
     // execute 返回 object，跳过 findById 兜底
     mockExecute.mockResolvedValue({ success: true, object: { id: 'tb-1', title: '写作', status: 'planned' } })
     const r = await updateTimebox('tb-1', { title: '写作', activityArchetypeId: 'arch-1' })
@@ -74,8 +77,8 @@ describe('[023] A2 timebox server actions', () => {
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
       domainId: 'timebox', objectType: 'timebox', targetId: 'tb-1',
       steps: [
-        { kind: 'field', field: 'title', value: '写作' },
-        { kind: 'field', field: 'activityArchetypeId', value: 'arch-1' },
+        { kind: 'field', field: 'title', value: '写作', expectedOccVersion: 1 },
+        { kind: 'field', field: 'activityArchetypeId', value: 'arch-1', expectedOccVersion: 1 },
       ],
     }), expect.anything())
     expect(submitDynamicIntent).not.toHaveBeenCalled()

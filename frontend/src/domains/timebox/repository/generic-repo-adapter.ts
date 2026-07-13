@@ -18,12 +18,15 @@ import type { DbClient } from '@/lib/db'
  * Timebox 域 GenericRepo 适配器工厂参数。
  * @property timeboxRepo - 时间盒仓储实例
  * @property appointmentRepo - 约定仓储实例（[023.12] T5 3 态收敛）
+ *
+ * [TD-003] T2: timeboxRepo.updateFields 多 `expectedOccVersion: number` 必填参数；
+ * appointmentRepo.updateFields 保持 4 参（Appointment 暂未实施 OCC，TD-037 P6 deferred）。
  */
 interface TimeboxRepoPair {
   timeboxRepo: {
     findById(id: USOM_ID, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown> | null>
     save(obj: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<void>
-    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
+    updateFields(id: USOM_ID, fields: Record<string, unknown>, userId: USOM_ID, expectedOccVersion: number, tx?: DbClient): Promise<Record<string, unknown>>
     updateStatus(id: USOM_ID, toStatus: string, userId: USOM_ID, tx?: DbClient): Promise<Record<string, unknown>>
   }
   appointmentRepo: {
@@ -66,8 +69,19 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
         await repos.timeboxRepo.save(updated, userId, tx)
         return updated
       },
-      async updateFields(id, fields, userId, tx) {
-        return repos.timeboxRepo.updateFields(id, fields, userId, tx)
+      async updateFields(id, fields, userId, expectedOccVersion, tx) {
+        // [TD-003] T3：消除硬码 0 占位符。GenericRepo 接口把 expectedOccVersion
+        // 标为可选（兼容 habits/tasks/okrs adapter），但 timebox 域 OCC 已实装——
+        // undefined 时 **throw**（fail-fast），不再静默回退到 0。caller 必须
+        // 主动透传：field-executor.executeBatch 会用 step.expectedOccVersion 或
+        // repo.findById 读 current 兜底（详见 [TD-003] T3 executor 注释）。
+        if (typeof expectedOccVersion !== 'number') {
+          throw new Error(
+            `timebox GenericRepo.updateFields 必须传 expectedOccVersion: number，`
+            + `收到 ${typeof expectedOccVersion}。caller 路径走 field-executor.executeBatch 或显式传值`,
+          )
+        }
+        return repos.timeboxRepo.updateFields(id, fields, userId, expectedOccVersion, tx)
       },
     },
     // [023.12] T5: 约定独立 GenericRepo 键，updateStatus 派发到 3 态路径
@@ -111,7 +125,8 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
         }
         return await repos.appointmentRepo.findById(id, userId, tx) ?? existing
       },
-      async updateFields(id, fields, userId, tx) {
+      async updateFields(id, fields, userId, _expectedOccVersion, tx) {
+        // [TD-003] T2: appointment 域暂未实施 OCC，_expectedOccVersion 忽略（TD-037 P6 deferred）
         return repos.appointmentRepo.updateFields(id, fields, userId, tx)
       },
     },

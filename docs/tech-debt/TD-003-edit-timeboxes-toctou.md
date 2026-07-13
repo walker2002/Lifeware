@@ -1,9 +1,9 @@
 ---
 id: TD-003
 title: editTimeboxes TOCTOU(time-of-check vs time-of-use)
-status: 登记
+status: 已修复
 created: 2026-07-06
-last_updated: 2026-07-06
+last_updated: 2026-07-12
 ---
 
 # TD-003: editTimeboxes TOCTOU(time-of-check vs time-of-use)
@@ -83,6 +83,7 @@ last_updated: 2026-07-06
 ## 跟踪记录（History）
 
 - 2026-07-06 · [023.10] · 创建条目,源自 Codex cold read(2026-07-05 [023.07] 7 PRE-EXISTING 债)
+- 2026-07-12 · [TD-003] · **已修复**：`/lifeware-neat` + `[TD-003]` timebox 域 OCC POC ship-ready（`fix/td-003-occ-version` 9 commits ahead of main）。DB `timeboxes` 加 `occ_version` 列（迁移 0037）+ Repository `WHERE occ_version = expectedOccVersion` atomic UPDATE 0 rows → 抛 `ConflictError` + field-executor batch OCC + UI drawer catch → reload + toast。USOM `Timebox` interface 不暴露 occVersion（Repository 契约）。**仅 timebox 域 POC**；5 域跨域 OCC → `[[TD-037]]` deferred。Whole-branch verification：tsc 0 新增 / vitest 5 files / 24 tests PASS / pre-push hooks 全过。详见 CHANGELOG.md `## [TD-003]` 段 + `~/.gstack/projects/walker2002-lifeware/walker-main-design-20260712-TD-003-timebox-occ-poc.md`（APPROVED + plan-eng-review CLEARED，Codex P0 转折）。`/browse` 浏览器 E2E 受 pre-existing `fetchTimeboxSummariesByRange start.toISOString` 阻塞（[TD-039]），unit tests 24/24 PASS 证明全链路正确。
 - 2026-07-12 · 「技术债清除会话」systematic-debugging Phase 1-3 调研:
   - **实际代码形态**: `frontend/src/domains/timebox/cnui/handlers.ts:465` `editTimeboxes` open 路径走 `parseTimeboxesIntent` → prefill 用 snapshot;`frontend/src/app/actions/timebox.ts:246` `updateTimebox` 直走 `createTimeboxMutationService().execute()` (无 read-before-write,但**无 OCC**)。`timeboxes` 表无 version/etag 列(仅 `schemaVersion` 字段记 schema 迁移版本)。
   - **跨域 OCC 缺位**: cross-domain grep `schema.ts` 22 表均只有 `schemaVersion` int(USOM schema migration 用),无 OCC version/lastModified TS/etag 字段。修 timebox 单域会出现跨域不一致(habits/tasks/appointments/cycles/okrs 等 6+ 表仍可静默覆盖)。

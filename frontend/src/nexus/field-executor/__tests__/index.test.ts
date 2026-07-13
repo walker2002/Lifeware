@@ -109,6 +109,7 @@ describe('Field Executor — FactField 字段写', () => {
       'task-1',
       { priority: 'high' },
       'user-1',
+      0, // [TD-003] T2: expectedOccVersion
       undefined,
     )
   })
@@ -212,6 +213,7 @@ describe('Field Executor — FactField 字段写', () => {
       'task-1',
       { priority: 'high' },
       'user-1',
+      0, // [TD-003] T2: expectedOccVersion
       fakeTx,
     )
   })

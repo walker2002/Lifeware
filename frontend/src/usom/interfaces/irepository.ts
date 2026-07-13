@@ -665,12 +665,52 @@ export interface ITimeboxRepository {
   save(timebox: Timebox, userId: USOM_ID): Promise<void>
 
   /**
-   * 归档时间盒
+   * 局部字段更新（FactField 字段写的统一通道）。
+   *
+   * 单条 UPDATE，禁止读后写：直接 update().set(fields).where(id 且 userId
+   * 且 occ_version=expectedOccVersion) 一次完成。occ_version 谓词使 OCC 原子化：
+   * - 0 rows affected → 抛 ConflictError(currentOccVersion, attemptedOccVersion)
+   * - 1 row → occVersion 自动 +1，返回更新后的 Timebox
+   *
+   * 字段写无 OCC 走失败路径：caller 必须从某处拿到 occVersion（现为 action 层
+   * 额外 read / Task 3 batch OCC 内的 prev row occVersion）。
+   *
+   * 多租户 T-02：where 必含 userId 过滤。
+   *
+   * [TD-003] T2：OCC 必填；Appointment 域（IAppointmentRepository 不存在，
+   * 直接用 class）暂未实施 OCC，调用方临时传 0 → 必抛 ConflictError（acceptable，
+   * 见 TD-037 P6 deferred）。
+   *
+   * @param id - 时间盒 ID
+   * @param fields - 待更新字段（驼峰键，与 schema 列属性名一致）
+   * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（用于 OCC 谓词匹配）
+   * @param tx - 可选事务句柄（缺省回退到 db 单例）
+   * @returns 更新后的 Timebox（occVersion 已 +1）
+   * @throws ConflictError 当 0 rows affected（occVersion stale 或行不存在）
+   */
+  updateFields(
+    id: USOM_ID,
+    fields: Record<string, unknown>,
+    userId: USOM_ID,
+    expectedOccVersion: number,
+    tx?: DbClient,
+  ): Promise<Timebox>
+
+  /**
+   * 归档时间盒（[TD-003] whole-branch review I-1：OCC 必填）
+   *
    * @param id - 时间盒 ID
    * @param userId - 用户 ID
+   * @param expectedOccVersion - caller 认为的当前 occ_version（OCC 必填）
    * @param executionRecord - 执行记录（可选）
    */
-  archive(id: USOM_ID, userId: USOM_ID, executionRecord?: import('../types/objects').ExecutionRecord): Promise<void>
+  archive(
+    id: USOM_ID,
+    userId: USOM_ID,
+    expectedOccVersion: number,
+    executionRecord?: import('../types/objects').ExecutionRecord,
+  ): Promise<void>
 }
 
 // ─── Objective ─────────────────────────────────────────────────
