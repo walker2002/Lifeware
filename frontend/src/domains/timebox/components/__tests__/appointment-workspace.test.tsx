@@ -59,6 +59,7 @@ vi.mock('@/app/actions/intent', () => ({
 }))
 
 import { AppointmentWorkspace } from '@/domains/timebox/components/appointment-workspace'
+import * as appointmentWindow from '@/domains/timebox/lib/appointment-window'
 import {
   createAppointment,
   deleteAppointment,
@@ -172,6 +173,22 @@ describe('[026] AppointmentWorkspace', () => {
     await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByText('新建后看到的')).toBeInTheDocument())
     expect(screen.queryByText('故宫游览')).toBeInTheDocument()
+  })
+
+  it('reload 使用 canonical helper 返回的查询窗口', async () => {
+    const helperWindow = {
+      start: '2025-01-02T03:04:05.000Z',
+      end: '2027-06-07T08:09:10.000Z',
+    }
+    vi.spyOn(appointmentWindow, 'getAppointmentPageWindow').mockReturnValueOnce(helperWindow)
+
+    render(<AppointmentWorkspace initialItems={[baseItem]} />)
+    await userEvent.setup().click(screen.getByLabelText(`完成约定：${baseItem.title}`))
+
+    await waitFor(() => expect(mockGetAppointmentsByRange).toHaveBeenCalledWith(
+      helperWindow.start,
+      helperWindow.end,
+    ))
   })
 
   it('reload 失败时显示错误 toast（不残留脏状态）', async () => {

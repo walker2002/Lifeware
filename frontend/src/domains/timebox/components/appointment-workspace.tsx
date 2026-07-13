@@ -71,6 +71,7 @@ import { AppointmentDayView } from './appointment-day-view'
 import { AppointmentMonthView } from './appointment-month-view'
 import { filterAppointments, type AppointmentFilterStatus } from '@/domains/timebox/lib/appointment-filter'
 import { ymdKey } from '@/domains/timebox/lib/appointment-date-utils'
+import { getAppointmentPageWindow } from '@/domains/timebox/lib/appointment-window'
 import type { AppointmentSummary } from '@/usom/types/summaries'
 
 /** 新建约定 Drawer 默认草稿（明日 9:00 + 1h，与 A2.5 handler 空 draft 同形） */
@@ -132,17 +133,13 @@ export function AppointmentWorkspace({ initialItems }: { initialItems: Appointme
   const selectedKey = ymdKey(selectedDate)
   const dayAppointments = byDate.get(selectedKey) ?? []
 
-  // 重新拉取窗口内约定（与 /appointments/page.tsx 同步：-90d / +90d —— 7→90 扩窗
-  //   避免 day view 选历史日时 reload 把历史数据过滤丢；与 page.tsx 初始加载对齐）
+  // 重新拉取 canonical 窗口内约定，确保 page 首载与 workspace reload 范围一致。
   const reload = useCallback(() => {
     startReload(async () => {
-      const start = new Date()
-      start.setDate(start.getDate() - 90)  // [026.02] T9: 7→90 扩窗
-      const end = new Date()
-      end.setDate(end.getDate() + 90)
+      const { start, end } = getAppointmentPageWindow()
       try {
         // [TD-039] 跨 RSC boundary 传 ISO string，避免 plain Date 转 ISO 时区漂移
-        const list = await getAppointmentsByRange(start.toISOString(), end.toISOString())
+        const list = await getAppointmentsByRange(start, end)
         setItems(list)
       } catch (e) {
         console.error('[AppointmentWorkspace] reload failed', e)
