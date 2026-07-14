@@ -4,7 +4,7 @@
 - **主题**：把 mapper ↔ USOM 字段对齐从「人肉 review」升级为「AST 静态守护 + 全 mapper 覆盖」，并清掉 Timebox 半完成 rename 的 4 TS errors + 1 silent 运行时 bug
 - **范围**：
   - TD-041：`frontend/src/lib/db/repositories/mappers.ts` Timebox 段（type + 2 个 mapper 函数 + consumer audit）
-  - TD-042：lint 脚本（17 对 mapper 全覆盖）+ pre-push / prebuild 集成 + 同类 drift 同步修
+  - TD-042：lint 脚本（**19 对 mapper 全覆盖**）+ pre-push / prebuild 集成 + 同类 drift 同步修
   - **不联动** TD-037 5 域 cross-domain OCC（独立债）
 - **SSOT**（设计源头）：
   - [[TD-041-usom-timebox-rename-mapper-migration-debt]]
@@ -60,7 +60,7 @@ type TimeboxRow = {
 
 ### 1.3 同类 drift 预估
 
-lint 脚本会扫描全 17 对 mapper（详见 §3.A），预期发现：
+lint 脚本会扫描全 19 对 mapper（详见 §3.A），预期发现：
 - Timebox（4 TS errors + 1 silent runtime，TD-041 主犯）
 - Appointment 1-2 处（`domains/timebox/repository/mappers/appointment.ts`，依 [023.05-2] 拆出时可能漏改）
 - Task / Habit / Objective / KeyResult 等可能的 1-3 处（待 lint 实际报）
@@ -77,7 +77,7 @@ lint 脚本会扫描全 17 对 mapper（详见 §3.A），预期发现：
 | D1 | 治理范围 | 出 spec+plan，独立 ship | 不联动 TD-037，TD-041 baseline TS 4 errors 不应再漂 |
 | D2 | TD-041 修复 | **方案 A**：mapper 同步 USOM rename | 治本；B（USOM 加回旧名）留 2 套名字污点；C（仅 runtime 改）不解决 tsc baseline |
 | D3 | TD-042 守护 | **方案 A**：AST lint 脚本 + pre-push hook | B（vitest round-trip）不报字段名；C（最小一次性）下次 drift 仍漏 |
-| D4 | Lint 覆盖范围 | **全 17 对 mapper**（修正：原估 9，实 17） | TD-037 扩展时免费；用户接受本 PR 全修 |
+| D4 | Lint 覆盖范围 | **全 19 对 mapper**（修正：原估 9 → 17 → 实 19） | TD-037 扩展时免费；用户接受本 PR 全修 |
 | D5 | Hook 强制级别 | **本次转全错（exit 1 严格）** | 治本；初期警告会留中间态 |
 | D6 | Lint 工具 | **ts-morph** | TS 团队维护，能解析类型声明；regex 太脆弱；compiler API 太冗长 |
 | D7 | Hook 集成方式 | **混合 (c)**：prebuild 链追加 + 新装 husky pre-push | 双重守护；predev 不加（不阻 dev server 启动） |
@@ -94,7 +94,7 @@ lint 脚本会扫描全 17 对 mapper（详见 §3.A），预期发现：
    │  (DB schema)    │         │  *RowToUSOM        │         │  (objects.ts)   │
    │  approved_at    │         │  USOMToRow         │         │  approvedAt     │
    │  finished_at    │         │                    │         │  finishedAt     │
-   │  logged_at      │         │  (17 对 mapper)    │         │  loggedAt       │
+   │  logged_at      │         │  (19 对 mapper)    │         │  loggedAt       │
    └─────────────────┘         └────────────────────┘         └─────────────────┘
                                           ↑
                                           │  pre-push hook 验证
@@ -118,7 +118,7 @@ lint 脚本会扫描全 17 对 mapper（详见 §3.A），预期发现：
                                 └──────────────────────────┘
 ```
 
-### 3.2 Mapper 覆盖清单（17 对 = 34 函数）
+### 3.2 Mapper 覆盖清单（19 对 = 38 函数）
 
 **中心 `frontend/src/lib/db/repositories/mappers.ts`（16 对）**：
 1. user / userCalibration
@@ -222,7 +222,7 @@ loggedAt: toDate(timebox.loggedAt),
   - `src/lib/db/repositories/mappers.ts`
   - `src/domains/timebox/repository/mappers/appointment.ts`
 - USOM 类型：
-  - `src/usom/types/objects.ts`（26 个 interface）
+  - `src/usom/types/objects.ts`（30 个总 interface，其中 19 个有 mapper）
   - `src/usom/types/primitives.ts`（如 `Timestamp` 别名解析需要）
 
 **核心流程**：
@@ -309,7 +309,7 @@ loggedAt: toDate(timebox.loggedAt),
 3. **T3**：consumer audit `grep` → 同步改 `timebox.startedAt/endedAt/overtimeAt` 命中点
 4. **T4**：写 lint meta-test（红：故意构造 drift fixture → lint exit 1）
 5. **T5**：装 `ts-morph` + 写 `scripts/lint/mapper-usom-alignment.ts`（绿：能抓 drift）
-6. **T6**：全 17 对跑 lint → 抓所有 drift → 逐对修 → 0 drift
+6. **T6**：全 19 对跑 lint → 抓所有 drift → 逐对修 → 0 drift
 7. **T7**：装 husky + `.husky/pre-push` + `prebuild` 链追加
 8. **T8**：TS 全项目 grep 验证 0 baseline errors
 9. **T9**：vitest 跑全 0 净回归
@@ -325,14 +325,14 @@ loggedAt: toDate(timebox.loggedAt),
 |---|---|---|
 | 1. **TD-041 回归测试** | mock 旧名 row → 验证 mapper 返回 `approvedAt/finishedAt` 真值 | `repositories/__tests__/timebox-mapper-rename.test.ts` 新增 |
 | 2. **Lint 自检（meta）** | 故意构造 drift fixture → 跑 lint → 验证 exit 1 + 报对字段 | `scripts/lint/__tests__/mapper-usom-alignment.test.ts` 新增 |
-| 3. **Lint baseline** | 全 17 对 + 26 USOM interface 实跑 → 0 drift | 直接调 lint 脚本（无 .test.ts） |
+| 3. **Lint baseline** | 全 19 对 + 19 个对应 USOM interface 实跑 → 0 drift | 直接调 lint 脚本（无 .test.ts） |
 | 4. **Consumer audit 回归** | `timebox.approvedAt/finishedAt` 在 action/UI 真实可读 | 复用 `timebox-card.test.tsx` / `timebox-timeline.test.tsx` |
 | 5. **Hook 集成测试** | mock pre-push → 跑 lint → 模拟 drift → 验证 push 被阻 | shell 脚本（不入 vitest） |
 
 **TDD 顺序**：
 1. 先写 TD-041 回归测试（红）→ 改 mapper（绿）
 2. 先写 lint 自检（红：构造 drift）→ 写 lint 脚本（绿：能抓 drift）
-3. 全 17 对跑 lint → 抓所有 drift → 修 → 0 drift
+3. 全 19 对跑 lint → 抓所有 drift → 修 → 0 drift
 4. Consumer audit grep → 同步改名 → 跑相关 test 验真
 5. Husky pre-push 装上 → mock 验阻
 
@@ -359,7 +359,7 @@ loggedAt: toDate(timebox.loggedAt),
 | Lint 误报（误把 1 个真 drift 当正常） | 初次 ship 全人工 review lint 输出 + 必要时小调整（不退 lint 严格性） |
 | Consumer 改名漏掉运行时调用 | grep 5 路 + 在关键 action / hook / UI 加 1 防御 read 防御（不入生产） |
 | Pre-push husky 启用后 dev 体验摩擦 | 文档说明 + lint 误报入口（不是直接 disable） |
-| Lint 性能（17 对 mapper + 26 interface 解析） | ts-morph 单例 + 缓存，预期 < 3s |
+| Lint 性能（19 对 mapper + 19 个对应 USOM interface 解析） | ts-morph 单例 + 缓存，预期 < 3s |
 | `appointmentRowToUSOM` lint 报大量 drift | 接受 D4 决策：全修，PR 略大 |
 
 ---
@@ -372,7 +372,7 @@ loggedAt: toDate(timebox.loggedAt),
 - ✅ `cd frontend && npx vitest run` 净回归数 ≤ 当前 baseline（不增）
 - ✅ Pre-push hook 装上后，故意 drift → push 被阻（手动 mock 验）
 - ✅ Prebuild 链追加后，`npm run build` 触发 lint 通过
-- ✅ 17 对 mapper ↔ USOM 字段 0 drift（lint baseline 0）
+- ✅ 19 对 mapper ↔ USOM 字段 0 drift（lint baseline 0）
 - ✅ TD-041 + TD-042 关闭 + README + CHANGELOG 同步
 
 ---
