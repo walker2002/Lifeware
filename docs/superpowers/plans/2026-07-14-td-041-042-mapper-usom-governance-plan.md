@@ -1023,3 +1023,23 @@ git push origin fix/td-041-042-mapper-usom-governance
 **2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
 
 **Which approach?**
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run (infra/tech-debt 治理，非产品变更) |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | 8 findings (1 作废 + 7 采纳) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean (with corrections) | 5 issues (1 作废 + 4 采纳) + cross-model tension 修正 |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not run (无 UI 改动) |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
+
+**CODEX:** outside voice 跑 1 次（codex ready，stream 中断后 fallback Claude subagent 完成）。8 findings：P0×1（lint injected 字段 FP，baseline 永远 0 不了）+ P1×4（USOM rename 误判[作废]/rowType 提取 getType().getText() 错/row type regex 根本错/写路径 phantom 传 drizzle）+ P2×3（husky 路径/T6 drift inventory/pre-push 被 --no-verify 绕过）。7 采纳，1 作废（P1 #1 "USOM breaking rename" 基于它自己也误读 stale JSDoc @property 为实际字段）。
+
+**CROSS-MODEL:** 关键 tension = spec/plan 前提错误。spec 初版 §1.1 称"USOM Timebox 已 rename 为 approvedAt/finishedAt + DB 列 T1b 已 rename"，outside voice 实读 `schema.ts`/`objects.ts` 证伪：DB `approved_at/finished_at` 属 **cycles 表**（schema.ts:70-91）非 timeboxes（schema.ts:354）；USOM `Timebox`（objects.ts:615-639）一直只有 `loggedAt?`，无 startedAt/overtimeAt/endedAt/approvedAt/finishedAt。**真实根因 = mapper 残留 3 phantom 字段**（比 spec 和 outside voice 都简单）。用户决策：原地修正 spec+plan（非重写）。修正已应用（commit `a7de791` spec + `a68dbeb` plan）。
+
+**VERDICT:** ENG CLEARED (with corrections) — spec/plan 已按 cross-model tension 修正；5 issues + 8 outside voice findings 全 resolved；TD-041 真实根因（删 phantom 非 rename，无 backfill）已固化；lint 守护设计采纳 ts-morph AST 提取 + injected 字段区分 + CI workflow 真门槛。ready to implement。
+
+NO UNRESOLVED DECISIONS
