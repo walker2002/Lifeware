@@ -19,37 +19,40 @@
 
 ### 1.1 现状
 
-[TD-003] T6 AM6 约定：USOM `Timebox` interface 字段 rename（`startedAt` → `approvedAt` / `endedAt` → `finishedAt`），DB 列 rename 推迟到 T1b 实施。
+> **⚠️ 修正记录（2026-07-14 plan-eng-review cross-model tension）**：spec 初版 §1.1 基于错误假设（"DB 列 rename + USOM rename 半完成"），经 outside voice + 实读 `schema.ts`/`objects.ts` 证伪。真实根因 = mapper 残留 3 个 phantom 字段。修复 = 删 phantom，**非 rename，非 backfill**。下方为修正后版本。
 
-T1b（migration 0034）**已 ship**：DB 列名 `approved_at` / `finished_at` 已落地（`schema.ts:82-84` 注释佐证）。
+USOM `Timebox` interface（`objects.ts:615-639`）实际字段：`id, status, title, startTime, endTime, taskIds, habitIds, isRecurring, recurrenceRule?, tags, activityArchetypeId?, occVersion, schemaVersion, createdAt, updatedAt, loggedAt?, executionRecord?, notes?`。**无** `startedAt/overtimeAt/endedAt`，也**无** `approvedAt/finishedAt`。（行 608-611 的 `@property` 是 stale JSDoc，实际 interface body 无此字段。`approvedAt/finishedAt` 是 **Cycle** interface `objects.ts:149-159` 的字段。）
 
-但 **mapper 函数体未同步迁移**：
+DB `timeboxes` 表（`schema.ts:354`）实际时间列只有 `loggedAt` + `occVersion`。**无** `started_at/overtime_at/ended_at` 列。（`schema.ts:81-85` 的 `approvedAt/finishedAt/reviewedAt` 属于 **cycles 表** `schema.ts:70-91`，非 timeboxes。）
 
-```ts
-// mappers.ts:374-376 (timeboxRowToUSOM 现状)
-startedAt: toISO(row.startedAt),   // ❌ row.startedAt 实际是 undefined（DB 列已 rename 为 approved_at）
-overtimeAt: toISO(row.overtimeAt), // ❌ phantom 字段（USOM/DB 都没了）
-endedAt: toISO(row.endedAt),       // ❌ row.endedAt 实际是 undefined
-loggedAt: toISO(row.loggedAt),
-```
-
-且 `TimeboxRow` type 定义（`mappers.ts:345-346`）声明的是 phantom 字段：
+但 mapper `TimeboxRow` type（`mappers.ts:345-346`）声明了 3 个 **phantom 字段**（DB 无列 + USOM 无字段）：
 
 ```ts
 type TimeboxRow = {
   ...
-  startedAt: Date | null; overtimeAt: Date | null;   // ❌ phantom
-  endedAt: Date | null; loggedAt: Date | null;
+  startedAt: Date | null; overtimeAt: Date | null;   // ❌ phantom（DB timeboxes 表无此列，USOM Timebox 无此字段）
+  endedAt: Date | null; loggedAt: Date | null;       // loggedAt ✅ 唯一真实字段
   ...
 };
 ```
 
-**两层 bug 叠加**：
-1. **TS 4 errors baseline**：`mappers.ts:374, 400-402` 报 TS2353 / TS2339，长期被忽略
-2. **Silent runtime bug**：drizzle 返回的 row 用 `approvedAt` / `finishedAt`（按列名 camelCase），但 mapper 读 `row.startedAt` 拿到 `undefined`，`toISO(undefined)` 安全返回 `undefined`，结果 USOM `Timebox.approvedAt` / `Timebox.finishedAt` 静默丢失
-3. **`overtimeAt` phantom**：USOM `Timebox` 已无 `overtimeAt`，DB 也无 `overtime_at` 列（语义迁到 `ExecutionRecord.deviationMinutes`），mapper 仍读写 phantom 字段
+mapper 函数体读写这 3 个 phantom：
 
-**对比基线**（mappers.ts:896-926 `cycleRowToUSOM`）已正确使用 `approvedAt` / `finishedAt` / `reviewedAt` —— 只有 Timebox 掉队。
+```ts
+// mappers.ts:374-376 (timeboxRowToUSOM)
+startedAt: toISO(row.startedAt),   // ❌ phantom：row.startedAt = undefined（DB 无此列）
+overtimeAt: toISO(row.overtimeAt), // ❌ phantom
+endedAt: toISO(row.endedAt),       // ❌ phantom
+loggedAt: toISO(row.loggedAt),     // ✅ 唯一真实字段
+```
+
+**根因（phantom 残留，非 rename）**：
+1. **TS 4 errors baseline**：`mappers.ts:374, 400-402` 报 TS2353/TS2339——mapper 试图把 `startedAt` 等写入 USOM `Timebox` 返回对象，但 interface 无此字段
+2. **读路径运行时**：`row.startedAt = undefined`（DB 无此列）→ `toISO(undefined) = undefined` → mapper 返回对象含 `startedAt: undefined` 等 phantom key。USOM interface 本就无此字段，**无 silent data loss**（USOM 不会消费这些 key）
+3. **写路径风险**：`timeboxUSOMToRow` 产 phantom key 传给 drizzle → drizzle typed query 拒绝/忽略（待 round-trip 测试验证，见 §3.3.4）
+4. **无 rename 发生**：spec 初版误判为 "startedAt→approvedAt rename 半完成"，实际 USOM Timebox 一直只有 `loggedAt?`。修复 = 删 3 个 phantom，不涉及 USOM 契约变更、不需要 backfill（DB 无数据）。
+
+**对比基线**（mappers.ts:896-926 `cycleRowToUSOM`）正确使用 Cycle 的 `approvedAt/finishedAt/reviewedAt`——Cycle 域干净，只有 Timebox mapper 残留 phantom。
 
 ### 1.2 根因
 
@@ -75,7 +78,7 @@ lint 脚本会扫描全 19 对 mapper（详见 §3.A），预期发现：
 | # | 决策点 | 选择 | 理由 |
 |---|---|---|---|
 | D1 | 治理范围 | 出 spec+plan，独立 ship | 不联动 TD-037，TD-041 baseline TS 4 errors 不应再漂 |
-| D2 | TD-041 修复 | **方案 A**：mapper 同步 USOM rename | 治本；B（USOM 加回旧名）留 2 套名字污点；C（仅 runtime 改）不解决 tsc baseline |
+| D2 | TD-041 修复 | **方案 A（修正）**：删 mapper 3 个 phantom 字段（startedAt/overtimeAt/endedAt） | 真实根因=phantom 残留非 rename；删 phantom 治 TS 4 errors + 写路径 phantom key；无 backfill（DB timeboxes 表无数据）；不涉及 USOM 契约变更 |
 | D3 | TD-042 守护 | **方案 A**：AST lint 脚本 + pre-push hook | B（vitest round-trip）不报字段名；C（最小一次性）下次 drift 仍漏 |
 | D4 | Lint 覆盖范围 | **全 19 对 mapper**（修正：原估 9 → 17 → 实 19） | TD-037 扩展时免费；用户接受本 PR 全修 |
 | D5 | Hook 强制级别 | **本次转全错（exit 1 严格）** | 治本；初期警告会留中间态 |
@@ -140,30 +143,12 @@ lint 脚本会扫描全 19 对 mapper（详见 §3.A），预期发现：
 
 > Appointment 独立文件的根因：[023.05-2] 拆约定域时 mapper 跟着搬走，没回到中心 mappers.ts。
 
-### 3.3 TD-041 修复细节
+### 3.3 TD-041 修复细节（修正：删 phantom，非 rename）
 
-#### 3.3.1 `TimeboxRow` type 修正
+#### 3.3.1 `TimeboxRow` type 删 phantom
 
 ```ts
-// mappers.ts:337-352 之前
-type TimeboxRow = {
-  id: string; userId: string; schemaVersion: number;
-  status: string; title: string;
-  startTime: Date; endTime: Date;          // ← 保留（DB 列 start_time/end_time 未改）
-  isRecurring: boolean; recurrenceRule: unknown;
-  tags: string[]; notes: string | null;
-  executionRecord: Record<string, unknown> | null;
-  createdAt: Date; updatedAt: Date;
-  startedAt: Date | null;                  // ❌ phantom
-  overtimeAt: Date | null;                 // ❌ phantom
-  endedAt: Date | null;                    // ❌ phantom
-  loggedAt: Date | null;
-  activityArchetypeId: string | null;
-  taskIds: string[] | null;
-  habitIds: string[] | null;
-};
-
-// mappers.ts:337-352 之后
+// mappers.ts:337-352 之前（含 3 个 phantom）
 type TimeboxRow = {
   id: string; userId: string; schemaVersion: number;
   status: string; title: string;
@@ -172,26 +157,40 @@ type TimeboxRow = {
   tags: string[]; notes: string | null;
   executionRecord: Record<string, unknown> | null;
   createdAt: Date; updatedAt: Date;
-  approvedAt: Date | null;                 // ✅ T1b 列名
-  finishedAt: Date | null;                 // ✅ T1b 列名
-  loggedAt: Date | null;
+  startedAt: Date | null;                  // ❌ phantom（DB timeboxes 表无 started_at 列）
+  overtimeAt: Date | null;                 // ❌ phantom（DB 无 overtime_at 列）
+  endedAt: Date | null;                    // ❌ phantom（DB 无 ended_at 列）
+  loggedAt: Date | null;                   // ✅ 唯一真实时间列
+  activityArchetypeId: string | null;
+  taskIds: string[] | null;
+  habitIds: string[] | null;
+};
+
+// mappers.ts:337-352 之后（删 3 phantom，不加 approvedAt/finishedAt——那些属 cycles 表）
+type TimeboxRow = {
+  id: string; userId: string; schemaVersion: number;
+  status: string; title: string;
+  startTime: Date; endTime: Date;
+  isRecurring: boolean; recurrenceRule: unknown;
+  tags: string[]; notes: string | null;
+  executionRecord: Record<string, unknown> | null;
+  createdAt: Date; updatedAt: Date;
+  loggedAt: Date | null;                   // ✅ 仅保留真实列
   activityArchetypeId: string | null;
   taskIds: string[] | null;
   habitIds: string[] | null;
 };
 ```
 
-#### 3.3.2 Mapper 函数体 rename
+#### 3.3.2 Mapper 函数体删 phantom 映射
 
 ```ts
-// timeboxRowToUSOM (mappers.ts:374-377) 之后
-approvedAt: toISO(row.approvedAt),
-finishedAt: toISO(row.finishedAt),
+// timeboxRowToUSOM (mappers.ts:374-377) 之后——删 3 行 phantom，仅留 loggedAt
+// [TD-041] 删 phantom startedAt/overtimeAt/endedAt（DB timeboxes 表无此列，USOM Timebox 无此字段）
 loggedAt: toISO(row.loggedAt),
 
-// timeboxUSOMToRow (mappers.ts:400-403) 之后
-approvedAt: toDate(timebox.approvedAt),
-finishedAt: toDate(timebox.finishedAt),
+// timeboxUSOMToRow (mappers.ts:400-403) 之后——删 3 行 phantom
+// [TD-041] 删 phantom startedAt/overtimeAt/endedAt
 loggedAt: toDate(timebox.loggedAt),
 ```
 
@@ -200,16 +199,16 @@ loggedAt: toDate(timebox.loggedAt),
 `grep -rn '\.startedAt\|\.endedAt\|\.overtimeAt' src/ --include='*.ts' --include='*.tsx'` 后过滤 `Timebox` 上下文，预期命中：
 - 域内 consumption（`domains/timebox/` action / hook / UI）
 - 1-2 个 test fixture
-- `state-machine/index.ts:316-321`（I-4 re-read 需确认不读这些字段）
+- `state-machine/index.ts:316-321`（I-4 re-read 不读这些字段，确认无引用）
 - 编排层（`nexus/orchestrator/`、`nexus/domain-mutation-service/`）
 
-**所有命中点同步改名为 `approvedAt/finishedAt`**，**无 deprecation alias**（避免重复 TD-041）。
+**所有命中点删除 `timebox.startedAt/endedAt/overtimeAt` 引用**（这些字段本就 phantom undefined，删除引用不改变运行时行为）。**无 deprecation alias**（避免重复 TD-041）。
 
 #### 3.3.4 验证策略
 
-- 写 1 个**回归测试**证明修复前确实 silent lost：mock 旧名 row → mapper 返回 `approvedAt: undefined`（红）
-- 改 mapper 后 → `approvedAt` 真值（绿）
-- 复用 `repositories/__tests__/mappers.test.ts` + 新增 `timebox-mapper-rename.test.ts`
+- 写 1 个**回归测试**证明修复前 mapper 返回对象含 phantom key（`startedAt: undefined`），修复后无此 key
+- 改 mapper 后 → 对象仅含 USOM Timebox interface 声明的字段
+- **新增写路径 round-trip 测试**（outside voice P1 #5）：验证 `timeboxUSOMToRow` 产出的对象不含 phantom key（drizzle typed query 不会因 phantom 列报错）——复用 `repositories/__tests__/mappers.test.ts` + 新增 `timebox-mapper-rename.test.ts`
 
 ### 3.4 TD-042 Lint 脚本设计
 
@@ -244,10 +243,13 @@ loggedAt: toDate(timebox.loggedAt),
 
 **关键边界处理**：
 - USOM optional `?` ↔ row `Date | null`：**对得上，不报**
-- Injected 字段（如 `timeboxRowToUSOM` 第二参数 `taskIds/habitIds` 来自 junction query）：**lint 不报**，但输出「injected 字段」提示
+- **Injected 字段（outside voice P0）**：如 `timeboxRowToUSOM` 第二参数 `taskIds/habitIds` 来自 junction query，**不在 row type 内**。lint **必须区分**：
+  - row type 字段 ↔ USOM 字段：双向 diff，必报
+  - USOM 字段中由第二参数 injected 的（如 taskIds/habitIds）：**不报**（通过函数签名第二参数识别，或 lint 配置 `INJECTED_FIELDS` 白名单）
+  - 否则每次 mapper 用 junction query 都会 usom_extra FP，lint baseline 永远 0 不了
 - 类型别名 `Timestamp` = `string`：解析时还原成 string 比对
 - 处理泛型 / `Omit<...>`（如 `aiSessionUSOMToRow(session: Omit<AISession, ...>)`）
-- Mapper 函数签名差异（部分带 userId 第二参数）：regex 提取 USOM 名字位置在第一参数
+- **rowType 提取（outside voice P1 #2/#3，与 Issue 2 双重印证）**：用 ts-morph `parameter.getTypeNode()`（声明类型节点）取 row type 名，**不用** `getType().getText()`（解析后类型文本，无法恢复别名名）；row type 字段用 `TypeAliasDeclaration.getType().getProperties()` 或 `InterfaceDeclaration.getProperties()`，**不用 regex** 提取
 
 **输出样例**（期望）：
 ```
@@ -286,19 +288,23 @@ loggedAt: toDate(timebox.loggedAt),
 3. **新装 husky + pre-push**（阻本地 push）：
    ```bash
    npm install --save-dev husky
-   npx husky install
+   npx husky init   # 在 frontend/ 子目录（与 package.json 同级）
    ```
-   `.husky/pre-push`（新文件）：
+   `.husky/pre-push`（新文件，位于 `frontend/.husky/pre-push`）：
    ```bash
    #!/usr/bin/env sh
    . "$(dirname -- "$0")/_/husky.sh"
 
-   cd frontend && npm run validate:mapper-usom-alignment
+   # [TD-042] mapper↔USOM 字段对齐 lint（exit 1 = 阻 push）
+   npm run validate:mapper-usom-alignment
    ```
+   > **husky 路径决策（outside voice P2 #6）**：`.husky/` 放 `frontend/` 子目录（与 package.json + prepare 脚本同级）。hook 内 `npm run` 已在 frontend cwd（husky 从 hook 所在目录起）。**不**放 repo root——root 无 package.json，`npm run` 失败。新人 clone 后 `cd frontend && npm install`（`prepare: husky` 自动 init）。
 
-4. **README 同步**：dev onboarding 段加 husky 启用步骤（避免新人摩擦）
+4. **CI workflow（outside voice P2 #8，必加）**：pre-push hook 可被 `git push --no-verify` 绕过 + CI 不跑 husky。加 gitee CI workflow `.gitee/workflows/lint.yml`（或 GitHub Actions `.github/workflows/lint.yml`，按实际平台）跑 `cd frontend && npm run validate:mapper-usom-alignment`，PR 必过。**这是真正的"严格阻 merge"门槛**，pre-push 只是本地便利。
 
-**为什么 predev 不加**：dev server 启动要快，不应被 mapper lint 阻（虽然 lint 应 < 5s，但 dev 启动 < 1s 期望 vs < 5s 是 5x 摩擦）。prebuild + pre-push 双重已足够。
+5. **README 同步**：dev onboarding 段加 husky 启用步骤（避免新人摩擦）
+
+**为什么 predev 不加**：dev server 启动要快，不应被 mapper lint 阻。prebuild + pre-push + CI 三重守护已足够。
 
 ---
 
@@ -357,10 +363,13 @@ loggedAt: toDate(timebox.loggedAt),
 |---|---|
 | ts-morph 装入项目变大（~5MB） | 仅 devDep，不入生产 bundle |
 | Lint 误报（误把 1 个真 drift 当正常） | 初次 ship 全人工 review lint 输出 + 必要时小调整（不退 lint 严格性） |
-| Consumer 改名漏掉运行时调用 | grep 5 路 + 在关键 action / hook / UI 加 1 防御 read 防御（不入生产） |
+| Consumer 删 phantom 引用漏掉运行时调用 | grep 5 路 + 在关键 action / hook / UI 加 1 防御 read 防御（不入生产） |
 | Pre-push husky 启用后 dev 体验摩擦 | 文档说明 + lint 误报入口（不是直接 disable） |
-| Lint 性能（19 对 mapper + 19 个对应 USOM interface 解析） | ts-morph 单例 + 缓存，预期 < 3s |
+| Lint 性能（19 对 mapper + 19 个对应 USOM interface 解析） | ts-morph 单例 + 缓存 + Task 5 微 benchmark 实测 |
 | `appointmentRowToUSOM` lint 报大量 drift | 接受 D4 决策：全修，PR 略大 |
+| **写路径 phantom key 传 drizzle**（outside voice P1 #5） | Task 2 加 round-trip 测试验证 `timeboxUSOMToRow` 产出对象不含 phantom key |
+| **lint injected 字段 FP**（outside voice P0） | lint 区分 row type 字段 vs USOM injected 字段（第二参数 / 白名单） |
+| **pre-push 被 --no-verify 绕过**（outside voice P2 #8） | 加 CI workflow 作真门槛，pre-push 仅本地便利 |
 
 ---
 
