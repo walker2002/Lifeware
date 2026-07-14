@@ -347,6 +347,11 @@ type TimeboxRow = {
   activityArchetypeId: string | null;
   taskIds: string[] | null;
   habitIds: string[] | null;
+  // [TD-003] I-4: OCC 乐观并发版本号。schema.ts:361 NOT NULL DEFAULT 1。
+  //   mapper 必须保留此字段——state-machine.execute 在 logged + executionRecord
+  //   分支做防御性 re-read (state-machine/index.ts:316-317) 依赖 mapper 携带
+  //   occVersion，否则 ?? -1 → < 0 → 抛 "[TD-003 I-4] Timebox xxx 找不到"。
+  occVersion: number;
 }
 
 export function timeboxRowToUSOM(row: TimeboxRow, taskIds?: USOM_ID[], habitIds?: USOM_ID[]): Timebox {
@@ -372,6 +377,10 @@ export function timeboxRowToUSOM(row: TimeboxRow, taskIds?: USOM_ID[], habitIds?
     loggedAt: toISO(row.loggedAt),
     executionRecord: row.executionRecord as unknown as Timebox['executionRecord'] ?? undefined,
     notes: row.notes ?? undefined,
+    // [TD-003] I-4: 保留 OCC 版本号——防御性 re-read (state-machine/index.ts:316-317)
+    //   依赖 mapper 携带 occVersion。缺省回退 1 与 schema.ts default('occ_version', 1) 对齐，
+    //   兼容 schema 加列前的旧 row（理论上已被 migration 0027 兜底）。
+    occVersion: row.occVersion ?? 1,
   }
 }
 

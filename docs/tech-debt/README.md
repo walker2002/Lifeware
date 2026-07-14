@@ -50,6 +50,9 @@ last_updated: 2026-07-13
 | TD-019 | STATUS_TRANSITION_ACTIONS 漂移：revert 漏注册 100% 阻断「回退」按钮 | ✅ | lifeware-timebox | [023.12] hot-fix → [023.13] 关闭 | 暂未指派 |
 | TD-023 | timebox 写入口绕过 mutation service：revertTimebox 直调 repo.updateFields 写列 (AM3 reuse) | 🟡 | lifeware-timebox | [023.13] | 暂未指派 |
 | TD-037 | 5 域 cross-domain OCC deferred (lifecycle writes + update() 路径) | 🟠 | cross-domain | [TD-003] | 暂未指派 |
+| TD-040 | handlers-edit-appointment parse-timezones flake（baseline RED） | 🟡 | lifeware-timebox | [TD-003] whole-branch review follow-up | 暂未指派 |
+| TD-041 | USOM Timebox rename 迁移债（mapper 用 row 列名，TS 4 errors baseline） | 🟠 | lifeware-timebox | [TD-003] follow-up | 暂未指派 |
+| TD-042 | mapper ↔ USOM Type 字段对齐缺 lint 守护（TD-003 I-4 防御半成品） | 🟡 | cross-domain | [TD-003] follow-up | 暂未指派 |
 
 ### 🛠 修复中
 
@@ -118,6 +121,8 @@ last_updated: 2026-07-13
 - [[TD-019]] · STATUS_TRANSITION_ACTIONS 漂移 · 🔴 Critical (hot-fix + A1/A2 已落地 [023.13])
 - [[TD-023]] · timebox 写入口绕过 mutation service (AM3 reuse updateFields) · 🟡 Medium
 - [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列） · 🟠 High
+- [[TD-040]] · handlers-edit-appointment parse-timezones flake（baseline RED） · 🟡 Medium
+- [[TD-041]] · USOM Timebox rename 迁移债（mapper 用 row 列名，TS 4 errors baseline） · 🟠 High
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status 4 处 JS literals 残留 (Site 0 root source) · 🟠 High · ✅ [026.02.4]
 - ~~[[TD-030]]~~ · [026.02.4] post-T2 review:timebox.ts createAppointment truthy-check 4 sites · 🟡 Medium · ✅ [026.02.4-r2] round 2
 
@@ -135,6 +140,7 @@ last_updated: 2026-07-13
 - [[TD-034]] · Task/Objective updateFields 同模式未验证（dateOnly 列 Drizzle 行为待实测） · ⚪ Trivial
 - [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理，新域必再踩） · 🟡 Medium
 - [[TD-037]] · 5 域 cross-domain OCC deferred (lifecycle writes + update() 路径) · 🟠 High
+- [[TD-042]] · mapper ↔ USOM Type 字段对齐缺 lint 守护（TD-003 I-4 防御半成品） · 🟡 Medium
 
 ### `infra`
 
@@ -157,6 +163,7 @@ last_updated: 2026-07-13
 - ~~[[TD-004]]~~ · "R4 timebox/okrs 写入口债" → ✅ 描述与代码脱节(2026-07-12)
 - [[TD-016]] · [023.12] 测试 fixture 漏改 → [023.13]
 - [[TD-033]] · TimeboxRepository.updateFields 同模式未修（startTime/endTime timestamp 列）
+- [[TD-041]] · USOM Timebox rename 迁移债（mapper 用 row 列名，TS 4 errors baseline）
 - ~~[[TD-028]]~~ · [026.02.3.1] post-review: 'running' status JS literals 残留 (Site 0 root source) · ✅ [026.02.4]
 - ~~[[TD-032]]~~ · AppointmentRepository.updateFields 缺 timestamp 归一化（editAppointment 保存 TypeError） · ✅ main hot-fix 2026-07-11
 - [[TD-037]] · 5 域 cross-domain OCC deferred (lifecycle writes + update() 路径) → [TD-003] P6 follow-up
@@ -169,6 +176,8 @@ last_updated: 2026-07-13
 - ~~[[TD-008]]~~ · "lifecycle-configs require 多键域债" · ✅ [022.01] 已治本
 - [[TD-018]] · [023.12] pre-existing 写入口连锁债 → [023.13]
 - [[TD-023]] · timebox 写入口绕过 mutation service → 架构治理修复时关闭
+- [[TD-040]] · handlers-edit-appointment parse-timezones flake（baseline RED）
+- [[TD-042]] · mapper ↔ USOM Type 字段对齐缺 lint 守护（TD-003 I-4 防御半成品）
 - [[TD-035]] · updateFields 通用归一化 helper 缺失（4 域分散治理） → 下次大重构顺手
 
 ### 🟢 Low（有精力再说）
@@ -233,7 +242,8 @@ last_updated: 2026-07-13
 | 第 24 批(🟠→✅ + 🟢🆕) | 2026-07-12 | TD-004 关闭 + TD-038 新建(2 条) | 「R4 timebox/okrs 写入口债」描述与代码脱节：5 路 grep 验证 0 实际缺口(timeboxes 表无 keyResultId 列 / timebox 域 0 okrsRepository 引用 / okrs 域 0 timeboxRepository 引用 / actions/timebox.ts 0 okr/keyResult repo 引用 / usom/ 0 keyResultId);用户洞察确认「timebox 不该直接关联 OKR,tasks/habits/appointments 才是 OKR 关联对象」;真实跨域写 [025] 已 ship (D1 单域内复用 mutation service 模式,非 R4 跨域事务);关闭 TD-004 + 重开为观察债 TD-038(跨域写边界预防性监控,产品决策触发时启 R4 design);**模式记录** = 第 7 条「描述与代码脱节」型债闭环(继 TD-007/008/009/010/011/012 后) |
 | 第 25 批(🟠🆕) | 2026-07-12 | TD-037 新建(1 条) | [TD-003] P6 follow-up:plan-eng-review Codex cold read 抓 writer boundary gap(5 域 lifecycle writes via SM bypass execute() + 5 域 update() 单字段写路径 OCC 缺位);[TD-003] P1 reversal 选择 1 域 POC ship,本债登记 5 域剩余 + ConflictError 跨域归属决策 + 复用 [TD-003] T3 field-executor batch OCC pattern;scope 5-7 人日待跨域 OCC 专题启 design session |
 | 第 26 批(🟠→✅) | 2026-07-13 | TD-039 关闭(1 条) | TZ-2.2 ship-then-/qa 抓漏 ISS-001 pre-existing TZ-2.3 债：`use-timebox.ts:53` `getDateRange` 用 `@date-fns/tz v1.4.1` `tz()` 返回 `TZDate`，Next.js 16 RSC boundary 序列化丢 class，server action 收到 plain object 后 `start.toISOString()` 抛 TypeError `/timeboxes` 100% 触发；systematic-debugging 4-phase + 方案 A 治本：`getDateRange` 出口 `.toISOString()` 转 ISO string + 3 server action (`getTimeboxesByRange` / `getAppointmentsByRange` / `fetchTimeboxSummariesByRange`) 类型契约 `Date → string` + 3 caller (`timeboxes-workspace` / `appointment-workspace` / `/app/appointments/page.tsx`) + 新增 `hooks/__tests__/use-timebox.test.ts` 9 cases 守 `{start: string, end: string}` 契约；7 files +155/-41；vitest touched 35/35 PASS（新增 9/9） + 0 净回归（baseline 15 文件 pre-existing 全保留） + tsc 净 -5 错误（225→220） + 视觉验证 dev :3002 `/timeboxes` 与 `/appointments` 均 HTTP 200 + 0 console error + Server Action POST 200 + 4 timebox 卡片真渲染 + 印证 [[feedback_post-ship-review-meta-pattern]] 第 N 次（TZ-2.2 ship-then-verify 漏 RSC boundary + TZ-2.3 引入未做跨域测试） |
+| 第 27 批(🟠🟡🟡) | 2026-07-14 | TD-040 + TD-041 + TD-042 新建(3 条) | [TD-003] whole-branch review I-4 systematic-debugging session 暴露的 pre-existing 债：(1) handlers-edit-appointment parse-timezones flake baseline RED（与 mapper 修复无关）；(2) mappers.ts 4 个 TS pre-existing 错误（USOM Timebox 已 rename 但 mapper 仍用 row.startedAt/overtimeAt/endedAt）；(3) defense-in-depth 加 re-read 时漏改 mapper + mock 缺 CI lint 守护，下次回归会再发；本次 scope 仅修 mapper + execution-record-persistence test mocks；3 条债待跨域 OCC 扩展（[TD-037]）时一并治理 |
 
 ---
 
-**最后更新**: 2026-07-13 · 共 35 条（本批：TD-037 新建 + TD-039 关闭）· 🔴0 / 🟠4 / 🟡4 / 🟢1(+搁置 2) / ⚪1 / ✅20
+**最后更新**: 2026-07-14 · 共 38 条（本批：TD-040 + TD-041 + TD-042 新建）· 🔴0 / 🟠5 / 🟡6 / 🟢1(+搁置 2) / ⚪1 / ✅20

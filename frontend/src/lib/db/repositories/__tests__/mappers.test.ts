@@ -109,6 +109,73 @@ describe('timebox mapper — activityArchetypeId ([023] A2)', () => {
   })
 })
 
+// ── [TD-003 I-4] Timebox mapper occVersion 双向映射 ─────────────
+// 根因：timeboxRowToUSOM mapper 之前没声明 occVersion 字段，导致任何走 mapper 的 re-read
+//   都拿不到当前 OCC 版本——state-machine.execute 在 logged + executionRecord 分支
+//   防御性 re-read (state-machine/index.ts:316-317) 永远拿到 undefined → ?? -1 →
+//   抛 "[TD-003 I-4] Timebox xxx 找不到" 错误，即便 row 真实存在。
+// 修复：mapper row→USOM 必须保留 occVersion（USOM Timebox 接口 line 631 已声明）。
+//   USOM→row 仍应**省略** occVersion（避免 save() 误覆盖；updateFields 走 SQL +1 路径）。
+describe('timebox mapper — occVersion ([TD-003] I-4 re-read fix)', () => {
+  const baseTimeboxRow = {
+    id: 'tb-occ',
+    userId: 'u-1',
+    schemaVersion: 1,
+    status: 'planned',
+    title: '写作',
+    startTime: new Date('2026-07-14T09:00:00Z'),
+    endTime: new Date('2026-07-14T10:00:00Z'),
+    isRecurring: false,
+    recurrenceRule: null,
+    tags: [],
+    notes: null,
+    executionRecord: null,
+    createdAt: new Date('2026-07-14T00:00:00Z'),
+    updatedAt: new Date('2026-07-14T00:00:00Z'),
+    startedAt: null,
+    overtimeAt: null,
+    endedAt: null,
+    loggedAt: null,
+    activityArchetypeId: null,
+    taskIds: null,
+    habitIds: null,
+    // [TD-003] schema.ts:361 — occ_version 列 NOT NULL DEFAULT 1
+    occVersion: 7,
+  }
+
+  it('row→USOM 应保留 occVersion（state-machine 防御性 re-read 依赖）', () => {
+    const tb = timeboxRowToUSOM({ ...baseTimeboxRow } as any)
+    expect(tb.occVersion).toBe(7)
+  })
+
+  it('row→USOM：occVersion 缺省时（防御性兜底）应回退到 1 与 schema default 一致', () => {
+    // 兼容历史 row 可能无 occVersion 列（schema 加列前写入的旧数据）
+    const rowWithoutOcc = { ...baseTimeboxRow } as any
+    delete rowWithoutOcc.occVersion
+    const tb = timeboxRowToUSOM(rowWithoutOcc)
+    expect(tb.occVersion).toBe(1)
+  })
+
+  it('USOM→row 应**省略** occVersion（避免 save() 误覆盖；OCC +1 走 updateFields SQL）', () => {
+    const usom = {
+      id: 'tb-occ',
+      status: 'planned',
+      title: 'x',
+      startTime: '2026-07-14T09:00:00Z' as any,
+      endTime: '2026-07-14T10:00:00Z' as any,
+      taskIds: [],
+      habitIds: [],
+      isRecurring: false,
+      tags: [],
+      createdAt: 'x' as any,
+      updatedAt: 'x' as any,
+      occVersion: 7, // USOM 端持有，但不应写入 row
+    } as any
+    const row = timeboxUSOMToRow(usom, 'u-1')
+    expect(row).not.toHaveProperty('occVersion')
+  })
+})
+
 // ── [023] A3.1.2: Task.activityArchetypeId 双向映射 ──────────────
 describe('task mapper — activityArchetypeId ([023] A3.1)', () => {
   // [R10] 极简 fixture：仅覆盖 mapper 关心的字段，其它用 as any 兜底

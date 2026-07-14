@@ -19,9 +19,15 @@ import type { ExecutionRecord } from '@/usom/types/objects'
 import { createGenericStateMachine, type GenericRepo } from '../index'
 
 // ─── Mock 仓储：模拟 updateFields 真实落库（set+回读） ──────
+// [TD-003] I-4：state-machine logged transition 防御性 re-read 依赖 mapper 携带 occVersion。
+//   mock 必须模拟真实 timeboxRowToUSOM 行为——即 store 中的对象需含 occVersion 字段，
+//   否则 re-read 返回的对象 occVersion undefined → ?? -1 → 抛 [TD-003 I-4] 测试失败。
+//   真实生产 mapper 在 [TD-003 I-4] 修复后已正确保留 occVersion（见 mappers.ts）。
 function makeMockRepo(existing: Record<string, unknown>): GenericRepo {
   const store = new Map<string, Record<string, unknown>>()
-  store.set(existing.id as string, existing)
+  // 注入 occVersion=1（与 schema.ts:361 NOT NULL DEFAULT 1 对齐），除非 caller 显式传
+  const withOcc: Record<string, unknown> = { occVersion: 1, ...existing }
+  store.set(withOcc['id'] as string, withOcc)
   return {
     findById: vi.fn(async (id: string) => store.get(id) ?? null),
     save: vi.fn(async (obj: Record<string, unknown>) => {
@@ -31,7 +37,7 @@ function makeMockRepo(existing: Record<string, unknown>): GenericRepo {
     create: vi.fn(async (fields: Record<string, unknown>) => {
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
-      const obj = { id, createdAt: now, updatedAt: now, ...fields }
+      const obj: Record<string, unknown> = { id, createdAt: now, updatedAt: now, occVersion: 1, ...fields }
       store.set(id, obj)
       return obj
     }),
@@ -45,7 +51,14 @@ function makeMockRepo(existing: Record<string, unknown>): GenericRepo {
     updateFields: vi.fn(async (id: string, fields: Record<string, unknown>) => {
       const obj = store.get(id)
       if (!obj) throw new Error('对象不存在')
-      const updated = { ...obj, ...fields, updatedAt: new Date().toISOString() }
+      // 真实 updateFields 路径走 SQL occ_version + 1，mock 同步模拟
+      const currentOcc = typeof obj.occVersion === 'number' ? obj.occVersion : 1
+      const updated: Record<string, unknown> = {
+        ...obj,
+        ...fields,
+        occVersion: currentOcc + 1,
+        updatedAt: new Date().toISOString(),
+      }
       store.set(id, updated)
       return updated
     }),
