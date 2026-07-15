@@ -15,6 +15,7 @@ import { db } from '@/lib/db'
 import * as s from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { LogicalDayRepository } from '../logical-day'
+import { formatDateLabel } from '@/lib/logical-day/resolver'
 
 const USER = '00000000-0000-0000-0000-000000000001' as const
 const repo = new LogicalDayRepository()
@@ -58,7 +59,7 @@ describe('[029] LogicalDayRepository', () => {
 
   it('findCurrentByDate (AC-5)', async () => {
     // 种一条 today label 的行
-    const ld = await repo.findOrCreateByDate(new Date().toISOString().slice(0, 10) as any, USER as any)
+    const ld = await repo.findOrCreateByDate(formatDateLabel(new Date(), 'Asia/Shanghai') as any, USER as any)
     const got = await repo.findCurrentByDate(USER as any, 'Asia/Shanghai')
     expect(got?.id).toBe(ld.id)
   })
