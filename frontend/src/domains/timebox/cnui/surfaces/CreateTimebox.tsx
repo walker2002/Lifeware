@@ -18,6 +18,8 @@ import { useState, useMemo } from 'react'
 import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
 import { ArchetypePicker } from '@/components/archetype/archetype-picker'
 import { assertNoInternalOverlap } from '../../lib/overlap'
+import { useUserTz } from '@/contexts/user-timezone-context'
+import { formatDateLabel } from '@/lib/logical-day/resolver'
 
 interface TimeboxDraft {
   id: string
@@ -25,6 +27,8 @@ interface TimeboxDraft {
   startTime: string
   endTime: string
   activityArchetypeId?: string
+  // [029] 逻辑日归属（显式优先于 date(startTime,tz) 默认）
+  logicalDayLabel?: string
 }
 
 interface CreateTimeboxProps {
@@ -40,6 +44,9 @@ interface CreateTimeboxProps {
 export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, isLoading, isDone }: CreateTimeboxProps) {
   const items = (dataModel.items as TimeboxDraft[]) ?? []
   const [page, setPage] = useState(0)
+  // [029] 逻辑日默认值 = today(user_tz)
+  const tz = useUserTz().tz
+  const todayLabel = formatDateLabel(new Date(), tz)
 
   // [023-01+] RC-A：所有 draft title 非空，否则禁用提交按钮
   const allTitlesFilled = items.length > 0 && items.every((it) => typeof it.title === 'string' && it.title.trim().length > 0)
@@ -102,6 +109,17 @@ export function CreateTimebox({ dataModel, onDataChange, onConfirm, onCancel, is
             <label htmlFor="ct-end" className="text-xs text-body">结束</label>
             <input id="ct-end" type="datetime-local" value={isoToLocalDatetimeInput(cur.endTime)} onChange={e => update({ endTime: localDatetimeInputToIso(e.target.value) })} className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink" />
           </div>
+        </div>
+        {/* [029] 逻辑日归属（显式，优先于默认派生）*/}
+        <div>
+          <label htmlFor="ct-day" className="text-xs text-body">归属日（逻辑日）</label>
+          <input
+            id="ct-day"
+            type="date"
+            value={cur.logicalDayLabel ?? todayLabel}
+            onChange={e => update({ logicalDayLabel: e.target.value })}
+            className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink"
+          />
         </div>
         {/* [023.04] 补 archetype 选择器（裸版无 h3 label） */}
         <div>

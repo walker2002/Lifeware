@@ -26,6 +26,8 @@ export function appointmentRowToUSOM(row: AppointmentRow): Appointment {
     durationMin: row.durationMin,
     people: (row.people as string[]) ?? [],
     activityArchetypeId: (row.activityArchetypeId ?? undefined) as USOM_ID | undefined,
+    // [029] 逻辑日归属（粘性，nullable）
+    logicalDayId: (row.logicalDayId ?? null) as USOM_ID | null,
     userId: row.userId as USOM_ID,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -46,6 +48,8 @@ export function appointmentUSOMToRow(it: Appointment, userId: USOM_ID): Appointm
     durationMin: it.durationMin,
     people: it.people as any,
     activityArchetypeId: (it.activityArchetypeId ?? null) as any,
+    // [029] 逻辑日归属（粘性，nullable）
+    logicalDayId: (it.logicalDayId ?? null) as any,
     status: it.status,
     completedAt: it.completedAt ? new Date(it.completedAt) as any : null,
     cancelledAt: it.cancelledAt ? new Date(it.cancelledAt) as any : null,

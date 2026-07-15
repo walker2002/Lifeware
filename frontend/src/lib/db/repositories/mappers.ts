@@ -345,6 +345,8 @@ type TimeboxRow = {
   startedAt: Date | null; overtimeAt: Date | null;
   endedAt: Date | null; loggedAt: Date | null;
   activityArchetypeId: string | null;
+  // [029] 逻辑日归属（schema.ts:363，nullable FK）
+  logicalDayId: string | null;
   taskIds: string[] | null;
   habitIds: string[] | null;
   // [TD-003] I-4: OCC 乐观并发版本号。schema.ts:361 NOT NULL DEFAULT 1。
@@ -369,6 +371,8 @@ export function timeboxRowToUSOM(row: TimeboxRow, taskIds?: USOM_ID[], habitIds?
     tags: row.tags ?? [],
     // [023] A2: 关联 Activity Archetype
     activityArchetypeId: row.activityArchetypeId ?? undefined,
+    // [029] 逻辑日归属（粘性，nullable）
+    logicalDayId: row.logicalDayId as USOM_ID | null,
     createdAt: row.createdAt.toISOString() as Timestamp,
     updatedAt: row.updatedAt.toISOString() as Timestamp,
     startedAt: toISO(row.startedAt),
@@ -404,6 +408,8 @@ export function timeboxUSOMToRow(timebox: Timebox, userId: USOM_ID) {
     // [023] A2: 关联 Activity Archetype + 软关联 taskIds/habitIds
     // [023] A2 QA hot-fix: taskIds/habitIds 字段 DB 列 NOT NULL DEFAULT '{}'，不能用 ?? null 把空数组变 NULL
     activityArchetypeId: timebox.activityArchetypeId ?? null,
+    // [029] 逻辑日归属（粘性，nullable）
+    logicalDayId: timebox.logicalDayId as USOM_ID | null,
     taskIds: timebox.taskIds ?? [],
     habitIds: timebox.habitIds ?? [],
   }

@@ -8,6 +8,24 @@
 
 ---
 
+## [029] 逻辑日与跨日期事件建模 — PR1 核心归属（2026-07-15）
+
+> 2026_07_15 — `feat/029-logical-day` 分支 PR1：核心归属（10 任务，11 commits）。逻辑日 = 用户选定日期桶（非派生区间，无重算/锁定）。`logical_days` 一等实体 + `timebox/appointment.logical_day_id` 归属 + D2 瓶口注入（adapter.create 显式短路 tz 读）+ D3 `v_schedule_slots` pgView 类型化（反制 v_running_timeboxes 僵尸化）+ 3 处透传（CreateTimeboxInput/confirmFields/drawer + CNUI 字段）+ backfill 幂等。PR2（habit LDM 列迁移 text→int + habit form 次日 + draft editor）后续 phase。
+
+- 迁移 `0038_029_logical_day.sql`（idx=38）：logical_days 表 + 事件 FK + 视图；habits 列留 PR2。
+- `generic-repo-adapter.resolveLogicalDayIdForCreate` 瓶口：显式 `logicalDayLabel`/`date` 短路 tz DB 读，否则按 startTime(user_tz) 派生。
+- `ScheduleSlotRepository.findByLogicalDay` 走 v_schedule_slots，slot_state 归一，3/3 集成测试。
+
+**关键决策 D2/D3**：
+- **D2** adapter 瓶口注入（覆盖保证，防「静默漏归属」统计错） vs 1B action 层多注入点。
+- **D3** pgView 类型化（typed → 消费好 → 不被闲置） vs 2A 裸 SQL（匹配 v_running_timeboxes 先例但僵尸）。
+
+**验收**：vitest [029] 相关全绿（mappers 17/17 + appointment 15/15 + logical-day repo 5/5 + resolver 5/5 + adapter 注入 5/5 + schedule-slot 3/3）；tsc 0 logicalDayId 新增错误；backfill 幂等 0 行。
+
+**遗留 PR2**：habit LDM 列迁移（text→int rename *_ldm）+ habit form 次日 + timebox-draft-editor +24h hack → LDM + ldm.ts 纯函数 + 迁移 0039。
+
+---
+
 ## [page-thin] page.tsx 退化为 thin wrapper — domain 自包含入口统一（2026-07-13）
 
 > 2026_07_13 — 9 任务重构（branch `refactor/page-thin-wrapper`）：把 `app/<route>/page.tsx` 从手写壳统一收敛为 codegen 生成的薄 wrapper；页面入口（含数据预取 + 容器）下移到 domain。manifest.view_routes.component 语义统一指向 domain 入口组件（去 `app/` 前缀），消除 codegen 循环 import 风险。6 个 page-thin 目标路由（`/tasks` `/okrs` `/timeboxes` `/timebox-templates` `/config/activity-archetypes` `/appointments`）全部 ship。

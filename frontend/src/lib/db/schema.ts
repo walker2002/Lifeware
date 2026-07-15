@@ -3,9 +3,9 @@
 // All tables follow the Repository Pattern (R-01~R-04) and Multi-Tenancy (T-01~T-04)
 
 import {
-  pgTable, uuid, text, integer, boolean, timestamp, date,
+  pgTable, uuid, text, integer, smallint, boolean, timestamp, date,
   jsonb, real, numeric, uniqueIndex, index,
-  check, primaryKey,
+  check, primaryKey, pgView,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { LLMConfig } from '../../usom/types/objects'
@@ -359,6 +359,8 @@ export const timeboxes = pgTable('timeboxes', {
   // expectedOccVersion 匹配；0 rows affected → ConflictError。注意与 schemaVersion
   //（USOM schema 迁移用）字段语义不同，列名加 occ_ 前缀防混淆。
   occVersion: integer('occ_version').notNull().default(1),
+  /** [029] 逻辑日归属（创建时设定，粘性）。null=存量未回填 */
+  logicalDayId: uuid('logical_day_id').references(() => logicalDays.id, { onDelete: 'set null' }),
 
   status: text('status', { enum: ['planned', 'logged', 'cancelled'] }).notNull(),
   title: text('title').notNull(),
@@ -386,6 +388,7 @@ export const timeboxes = pgTable('timeboxes', {
   index('idx_timeboxes_user_status').on(table.userId, table.status),
   index('idx_timeboxes_user_start').on(table.userId, table.startTime),
   index('idx_timeboxes_user_end').on(table.userId, table.endTime),
+  index('idx_timeboxes_user_logical_day').on(table.userId, table.logicalDayId),
 ])
 
 // ─── 4.7 appointments（[026] 约定，D2 reversal: 5 态存储 + 4 transition 时间戳；[023.05] PR2 rename 自 itineraries）──
@@ -400,6 +403,8 @@ export const appointments = pgTable('appointments', {
   people:       jsonb('people').notNull().$type<string[]>().default([]),
   // [026.01] archetype FK（nullable，archetype 删除时 appointment 保留）
   activityArchetypeId: uuid('activity_archetype_id').references(() => activityArchetypes.id, { onDelete: 'set null' }),
+  /** [029] 逻辑日归属（创建时设定，粘性）。null=存量未回填 */
+  logicalDayId: uuid('logical_day_id').references(() => logicalDays.id, { onDelete: 'set null' }),
   // [026] D2 reversal: 5 态全部存储（Cancelled 终态，expired/completed 终态）
   status:       text('status', { enum: ['scheduled', 'cancelled', 'completed'] }).notNull().default('scheduled'),
   // SM transition 时间戳（推进时盖）
@@ -414,9 +419,37 @@ export const appointments = pgTable('appointments', {
   index('idx_appointments_user_status').on(table.userId, table.status),
   // [026.01] archetype 反向查询索引
   index('idx_appointments_archetype').on(table.activityArchetypeId),
+  // [029] logical day 归属索引
+  index('idx_appointments_user_logical_day').on(table.userId, table.logicalDayId),
 ])
 // 不存 endTime 列（endTime = startTime + durationMin 派生）
 // 不加 FK 到 timeboxes（D2=C 读时合并，约定不物化为 timebox 行）
+
+// ─── 4.7b logical_days ([029] 逻辑日：用户选定日期桶 + 早计划/晚复盘数据) ──
+export const logicalDays = pgTable('logical_days', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  schemaVersion: integer('schema_version').notNull().default(1),
+  /** 逻辑日日历标签 YYYY-MM-DD（用户选定，非派生区间） */
+  dayLabel:      date('day_label').notNull(),
+
+  // 早计划输入（可选，UI 后做）
+  wakeTime:             timestamp('wake_time', { withTimezone: true }),
+  sleepDurationMinutes: integer('sleep_duration_minutes'),
+  /** 当日能量基准单值 1-10 */
+  energyBaseline:       integer('energy_baseline'),
+
+  // 晚轻复盘输入（可选，UI 后做）
+  reviewRating: smallint('review_rating'),
+  reviewNotes:  text('review_notes'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('uniq_logical_days_user_label').on(table.userId, table.dayLabel),
+  check('check_logical_days_energy', sql`${table.energyBaseline} IS NULL OR (${table.energyBaseline} BETWEEN 1 AND 10)`),
+  check('check_logical_days_rating', sql`${table.reviewRating} IS NULL OR (${table.reviewRating} BETWEEN 1 AND 5)`),
+])
 
 // ─── 4.8 reviews ──────────────────────────────────────────────
 export const reviews = pgTable('reviews', {
@@ -784,3 +817,49 @@ export const userAuditLog = pgTable('user_audit_log', {
   index('idx_user_audit_log_user_table').on(table.userId, table.tableName, table.createdAt.desc()),
   index('idx_user_audit_log_user_time').on(table.userId, table.createdAt.desc()),
 ])
+
+// ─── 8. [029] v_schedule_slots 视图（pgView 类型化访问） ────────────
+// [029] D3：view 用 Drizzle pgView 声明（列类型化），反制 v_running_timeboxes
+// 僵尸化。底层 view DDL 见 migrations/0038_029_logical_day.sql。
+// IRON RULE（spec §3.4 + 视图 COMMENT）：统计/聚合必须查本视图，禁裸查
+// timeboxes/appointments。appointment.end_time 派生不可索引，范围查询按
+// logical_day_id 过滤（两表均建索引，谓词下推）。
+export const vScheduleSlots = pgView('v_schedule_slots', {
+  id:                  uuid('id').notNull(),
+  userId:              uuid('user_id').notNull(),
+  logicalDayId:        uuid('logical_day_id'),
+  title:               text('title').notNull(),
+  startTime:           timestamp('start_time', { withTimezone: true }).notNull(),
+  endTime:             timestamp('end_time', { withTimezone: true }).notNull(),
+  activityArchetypeId: uuid('activity_archetype_id'),
+  sourceType:          text('source_type').notNull(),
+  sourceStatus:        text('source_status').notNull(),
+  slotState:           text('slot_state').notNull(),
+  people:              jsonb('people'),
+  tags:                jsonb('tags'),
+}).as(sql`
+  SELECT id, user_id, logical_day_id, title, start_time, end_time,
+         activity_archetype_id, source_type, source_status, slot_state, people, tags
+  FROM (
+    SELECT id, user_id, logical_day_id, title, start_time, end_time,
+           activity_archetype_id, tags,
+           'timebox'::text    AS source_type,
+           status             AS source_status,
+           CASE status WHEN 'logged'    THEN 'completed'
+                       WHEN 'cancelled' THEN 'cancelled'
+                       ELSE 'scheduled' END AS slot_state,
+           NULL::jsonb AS people
+    FROM timeboxes
+    UNION ALL
+    SELECT id, user_id, logical_day_id, title, start_time,
+           start_time + (duration_min * interval '1 minute') AS end_time,
+           activity_archetype_id, NULL::jsonb AS tags,
+           'appointment'::text AS source_type,
+           status              AS source_status,
+           CASE status WHEN 'completed' THEN 'completed'
+                       WHEN 'cancelled' THEN 'cancelled'
+                       ELSE 'scheduled' END AS slot_state,
+           people
+    FROM appointments
+  ) s
+`)

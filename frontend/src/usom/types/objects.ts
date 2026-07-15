@@ -625,6 +625,8 @@ export interface Timebox {
   tags: Tag[]
   /** [023] A2: 关联 Activity Archetype（nullable，logTimebox 时带入能量消耗源） */
   activityArchetypeId?: USOM_ID
+  /** [029] 逻辑日归属（粘性） */
+  logicalDayId?: USOM_ID | null
   /** [TD-003] T1: OCC 乐观并发版本号。Repository.updateFields WHERE 谓词用；
    *  0 rows affected → ConflictError(currentOccVersion, attemptedOccVersion)。
    *  USOM ↔ schema timeboxes.occ_version 列同步。 */
@@ -659,12 +661,37 @@ export interface Appointment {
   people:         string[]                // 关系人（纯文本，D1=A）
   /** [026.01] 关联 Activity Archetype（nullable，对齐 timebox.activityArchetypeId） */
   activityArchetypeId?: USOM_ID
+  /** [029] 逻辑日归属（粘性） */
+  logicalDayId?: USOM_ID | null
   userId:         USOM_ID
   createdAt:      Timestamp
   updatedAt:      Timestamp
   completedAt:    Timestamp | null         // [027] SM transition →completed 时盖
   cancelledAt:    Timestamp | null         // SM transition →cancelled 时盖
   schemaVersion:  number
+}
+
+// ─── 3.10b LogicalDay ──────────────────────────────────────────
+/**
+ * [029] 逻辑日 —— 用户选定的日期桶（非派生区间）。
+ * 早计划/晚复盘数据列本期建好，填写 UI 为后续 phase。
+ */
+export interface LogicalDay {
+  id:        USOM_ID
+  userId:    USOM_ID
+  /** 日历标签 YYYY-MM-DD（用户选定） */
+  dayLabel:  DateOnly
+  /** 起床时间（早计划可选输入） */
+  wakeTime:             Timestamp | null
+  sleepDurationMinutes: number | null
+  /** 当日能量基准单值 1-10 */
+  energyBaseline:       number | null
+  /** 自评 1-5 星（晚复盘可选） */
+  reviewRating: number | null
+  reviewNotes:  string | null
+  createdAt:     Timestamp
+  updatedAt:     Timestamp
+  schemaVersion: number
 }
 
 // ─── 3.11 Review ──────────────────────────────────────────────

@@ -93,6 +93,8 @@ export interface CreateTimeboxInput {
   // [026.02.4-r2] I-1: widen to string | null — 3-state semantics 对齐 edit path
   //   undefined=skip(保留), null=clear(显式清除), string=set
   activityArchetypeId?: string | null
+  // [029] 显式 logical_day 归属（粘性，优先于 date(startTime,tz) 默认）
+  logicalDayLabel?: string // YYYY-MM-DD
   taskIds?: string[] // [023] A2 OV#P1：T1 schema timeboxes 加 task_ids/habit_ids 列（USOM 类型已声明，D7 LinkPicker 数据落库依赖）
   habitIds?: string[]
   notes?: string
@@ -111,6 +113,8 @@ export async function createTimebox(
     title: input.title,
     startTime: input.startTime,
     endTime: input.endTime,
+    // [029] 显式 logical_day 归属（在场时短路 tz 读，D2 注入点用）
+    ...(input.logicalDayLabel ? { logicalDayLabel: input.logicalDayLabel } : {}),
     // [026.02.4-r2] I-1: 3-state mapper (undefined=skip, null=clear, string=set)
     // 原 ?(input.activityArchetypeId ? {...} : {}) 用真值判断，会把 null 折叠成「skip」
     // ——picker 清除的语义永远不达 DB。改为显式 !== undefined 区分 null vs undefined。

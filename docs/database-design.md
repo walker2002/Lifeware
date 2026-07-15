@@ -1871,7 +1871,41 @@ Session 归档时自动生成的摘要记录，用于跨会话记忆。
 
 ---
 
-*文档版本：2026_07_12*
+## 十五、logical_days 表（[029] 逻辑日）
+
+**用途**：用户选定的日期桶（非派生区间，无重算/锁定）。早计划/晚复盘数据列。timebox/appointment 通过 `logical_day_id` 归属。
+
+**列（schema.ts:429-455）**：
+- `id uuid pk defaultRandom`
+- `user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE`（T-01~T-04）
+- `schema_version int default 1`
+- `day_label date NOT NULL`（YYYY-MM-DD，用户选定）
+- `wake_time timestamptz NULL`（早计划可选）
+- `sleep_duration_minutes int NULL`（早计划可选）
+- `energy_baseline int NULL CHECK 1..10`（当日能量基准，单值）
+- `review_rating smallint NULL CHECK 1..5`（晚轻复盘自评 1-5 星）
+- `review_notes text NULL`（收获/心得/感悟）
+- `created_at`/`updated_at timestamptz defaultNow NOT NULL`
+
+**约束**：
+- `UNIQUE (user_id, day_label)` — 一日一行
+- `idx_logical_days_user_label` ON (user_id, day_label)
+
+**timeboxes.logical_day_id / appointments.logical_day_id**：
+- `uuid NULL REFERENCES logical_days(id) ON DELETE SET NULL`
+- 索引 `(user_id, logical_day_id)` — 范围查询按 logical_day_id 谓词下推
+
+**v_schedule_slots 视图**（schema.ts:790+，pgView 类型化）：
+- UNION ALL timeboxes + appointments，slot_state 归一 3 态（`logged→completed`, `cancelled→cancelled`, 其他→`scheduled`）
+- appointment.end_time 派生（start_time + duration_min）
+- **IRON RULE**：统计/聚合必须查本视图，禁裸查两表；范围查询按 logical_day_id 过滤
+- 视图 COMMENT + pgView `.as(sql)` 双重声明反制 v_running_timeboxes 僵尸化
+
+**LDM（Logical-Day relative Minutes，PR2 待做）**：相对时间（habit 模板/draft editor）统一存「逻辑日 0 点起的分钟数」int。≥1440 = 次日。timebox/appointment 持久化绝对 timestamptz 不变。
+
+---
+
+*文档版本：2026_07_14*
 *关联上游文档：docs/usom-design.md*
 
 *变更：[027-B] (2026_07_11) — §7.8 timebox_templates.rows JSONB 内 `TemplateRow` 形状重构（`{start,end}` → `{defaultStart, defaultDuration, earliestStart?, latestStart?, shortestDuration?, activityArchetypeId?}`）+ 仓储 `rowToTemplate` 读时 lazy 自愈旧形状（无需 DDL：`[027-B] TemplateRow 行 schema（无 DDL，JSONB 内自描述）`段已记录自愈逻辑）*

@@ -306,3 +306,23 @@ describe('habit mapper — activityArchetypeId ([023] A3.1)', () => {
     expect(row.activityArchetypeId).toBeNull()
   })
 })
+
+// ── [029] logicalDayId 双向映射（timebox） ─────────────────────
+describe('[029] timebox mapper — logicalDayId', () => {
+  const row = {
+    id: 'tb-1', userId: 'u-1', schemaVersion: 1, occVersion: 1,
+    status: 'planned' as any, title: 't',
+    startTime: new Date('2026-07-14T09:00:00Z'),
+    endTime: new Date('2026-07-14T10:00:00Z'),
+    isRecurring: false, tags: [] as any, taskIds: [] as any, habitIds: [] as any,
+    createdAt: new Date(), updatedAt: new Date(),
+  } as any
+  it('row 有 logicalDayId → USOM 带上', () => {
+    const tb = timeboxRowToUSOM({ ...row, logicalDayId: 'ld-1' } as any)
+    expect(tb.logicalDayId).toBe('ld-1')
+  })
+  it('row logicalDayId null → USOM null', () => {
+    const tb = timeboxRowToUSOM({ ...row, logicalDayId: null } as any)
+    expect(tb.logicalDayId).toBeNull()
+  })
+})
