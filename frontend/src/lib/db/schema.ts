@@ -5,7 +5,7 @@
 import {
   pgTable, uuid, text, integer, smallint, boolean, timestamp, date,
   jsonb, real, numeric, uniqueIndex, index,
-  check, primaryKey,
+  check, primaryKey, pgView,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { LLMConfig } from '../../usom/types/objects'
@@ -817,3 +817,49 @@ export const userAuditLog = pgTable('user_audit_log', {
   index('idx_user_audit_log_user_table').on(table.userId, table.tableName, table.createdAt.desc()),
   index('idx_user_audit_log_user_time').on(table.userId, table.createdAt.desc()),
 ])
+
+// ─── 8. [029] v_schedule_slots 视图（pgView 类型化访问） ────────────
+// [029] D3：view 用 Drizzle pgView 声明（列类型化），反制 v_running_timeboxes
+// 僵尸化。底层 view DDL 见 migrations/0038_029_logical_day.sql。
+// IRON RULE（spec §3.4 + 视图 COMMENT）：统计/聚合必须查本视图，禁裸查
+// timeboxes/appointments。appointment.end_time 派生不可索引，范围查询按
+// logical_day_id 过滤（两表均建索引，谓词下推）。
+export const vScheduleSlots = pgView('v_schedule_slots', {
+  id:                  uuid('id').notNull(),
+  userId:              uuid('user_id').notNull(),
+  logicalDayId:        uuid('logical_day_id'),
+  title:               text('title').notNull(),
+  startTime:           timestamp('start_time', { withTimezone: true }).notNull(),
+  endTime:             timestamp('end_time', { withTimezone: true }).notNull(),
+  activityArchetypeId: uuid('activity_archetype_id'),
+  sourceType:          text('source_type').notNull(),
+  sourceStatus:        text('source_status').notNull(),
+  slotState:           text('slot_state').notNull(),
+  people:              jsonb('people'),
+  tags:                jsonb('tags'),
+}).as(sql`
+  SELECT id, user_id, logical_day_id, title, start_time, end_time,
+         activity_archetype_id, source_type, source_status, slot_state, people, tags
+  FROM (
+    SELECT id, user_id, logical_day_id, title, start_time, end_time,
+           activity_archetype_id, tags,
+           'timebox'::text    AS source_type,
+           status             AS source_status,
+           CASE status WHEN 'logged'    THEN 'completed'
+                       WHEN 'cancelled' THEN 'cancelled'
+                       ELSE 'scheduled' END AS slot_state,
+           NULL::jsonb AS people
+    FROM timeboxes
+    UNION ALL
+    SELECT id, user_id, logical_day_id, title, start_time,
+           start_time + (duration_min * interval '1 minute') AS end_time,
+           activity_archetype_id, NULL::jsonb AS tags,
+           'appointment'::text AS source_type,
+           status              AS source_status,
+           CASE status WHEN 'completed' THEN 'completed'
+                       WHEN 'cancelled' THEN 'cancelled'
+                       ELSE 'scheduled' END AS slot_state,
+           people
+    FROM appointments
+  ) s
+`)
