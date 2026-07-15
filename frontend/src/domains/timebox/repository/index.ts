@@ -9,6 +9,8 @@
  */
 
 export { AppointmentRepository } from './appointment'
+export { LogicalDayRepository } from './logical-day'
+export { logicalDayRowToUSOM, logicalDayUSOMToRow } from './mappers/logical-day'
 
 import { eq, and, gte, lte, sql } from 'drizzle-orm'
 import { db, type DbClient } from '@/lib/db'
