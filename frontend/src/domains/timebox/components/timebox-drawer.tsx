@@ -63,6 +63,8 @@ import { getArchetypeById } from '@/app/actions/activity-archetype'
 import { ConflictError } from '@/domains/timebox/errors/occ-conflict-error'
 import type { Timebox } from '@/usom/types/objects'
 import type { ActivityArchetype } from '@/usom/activity-archetype/types'
+import { useUserTz } from '@/contexts/user-timezone-context'
+import { formatDateLabel } from '@/lib/logical-day/resolver'
 
 export type DrawerMode = 'create' | 'edit' | 'template-batch'
 
@@ -87,6 +89,9 @@ function toLocalInput(d: Date): string {
 }
 
 export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: TimeboxDrawerProps) {
+  // [029] 页面选定日期 = logical_day 归属（drawer 路径 AC-2 显式归属通道）
+  const tz = useUserTz().tz
+  const logicalDayLabel = formatDateLabel(date, tz)
   const [title, setTitle] = useState(editTarget?.title ?? '')
   // [023] A2 final review hot-fix: editTarget 来自 getTimeboxById（runtime USOM 携带 activityArchetypeId），
   // 但 usom/types/objects.ts Timebox 接口本轮未声明该字段（intentional, local change），
@@ -247,6 +252,8 @@ export function TimeboxDrawer({ mode, editTarget, date, onClose, onSaved }: Time
           startTime: startIso,
           endTime: endIso,
           activityArchetypeId,
+          // [029] 显式 logical_day 归属（页面选定日 → adapter 短路 tz 读）
+          logicalDayLabel,
           notes: notes || undefined,
         }
         const r = await createTimebox(input, confirmed)

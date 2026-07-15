@@ -13,6 +13,33 @@
 import type { GenericRepo } from '@/nexus/core/state-machine'
 import type { USOM_ID } from '@/usom/types/primitives'
 import type { DbClient } from '@/lib/db'
+import { resolveLogicalDayLabel } from '@/lib/logical-day/resolver'
+import { LogicalDayRepository } from './logical-day'
+import { getEffectiveTimezone } from '@/lib/timezone-config'
+
+/**
+ * [029] 解析 logical_day_id 归属（D2 瓶口注入点）。
+ * 显式 fields.logicalDayLabel > fields.date；否则按 startTime(user_tz) 派生。
+ * 显式在场时短路 tz DB 读。无 startTime 返回 null。
+ */
+export async function resolveLogicalDayIdForCreate(
+  fields: Record<string, unknown>,
+  userId: USOM_ID,
+  startTime: string | undefined,
+  tx: DbClient,
+): Promise<USOM_ID | null> {
+  if (!startTime) return null
+  const explicit = (fields.logicalDayLabel as string | undefined) || (fields.date as string | undefined)
+  let label: string
+  if (explicit && explicit.length > 0) {
+    label = explicit
+  } else {
+    const tz = await getEffectiveTimezone(userId)
+    label = resolveLogicalDayLabel({ startTime: startTime as any, explicitLabel: null, tz })
+  }
+  const ld = await new LogicalDayRepository().findOrCreateByDate(label as any, userId, tx)
+  return ld.id
+}
 
 /**
  * Timebox 域 GenericRepo 适配器工厂参数。
@@ -57,7 +84,10 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
-        const obj = { id, ...fields, createdAt: now, updatedAt: now }
+        const logicalDayId = await resolveLogicalDayIdForCreate(fields, userId, fields.startTime as string, tx)
+        // 剥离临时字段（logicalDayLabel 是注入用的，date 是 CNUI HH:MM→ISO 用的，都非 DB 列）
+        const { logicalDayLabel: _lbl, date: _date, ...rest } = fields as any
+        const obj = { id, ...rest, logicalDayId: logicalDayId ?? null, createdAt: now, updatedAt: now }
         await repos.timeboxRepo.save(obj, userId, tx)
         return obj
       },
@@ -97,10 +127,14 @@ export function createTimeboxGenericRepo(repos: TimeboxRepoPair): Record<string,
       async create(fields, userId, tx) {
         const id = crypto.randomUUID() as USOM_ID
         const now = new Date().toISOString()
+        const logicalDayId = await resolveLogicalDayIdForCreate(fields, userId, fields.startTime as string, tx)
+        // 剥离临时字段
+        const { logicalDayLabel: _lbl, date: _date, ...rest } = fields as any
         // [023.12] T5: create 时 status=scheduled（DB default），completedAt/cancelledAt 全 null
         // （inProgressAt/expiredAt 列 T1b drop；这里不引用）
         const obj = {
-          id, ...fields, status: 'scheduled',
+          id, ...rest, logicalDayId: logicalDayId ?? null,
+          status: 'scheduled',
           completedAt: null, cancelledAt: null,
           createdAt: now, updatedAt: now,
         }
