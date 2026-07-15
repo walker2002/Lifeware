@@ -222,3 +222,17 @@ describe('Appointment mapper with activityArchetypeId [026.01]', () => {
     expect(row.activityArchetypeId).toBeNull()
   })
 })
+
+// ── [029] logicalDayId 双向映射（appointment） ───────────────────
+describe('Appointment mapper with logicalDayId [029]', () => {
+  it('appointmentRowToUSOM includes logicalDayId when present', () => {
+    const row = makeRow({ logicalDayId: 'ld-123' as any })
+    const usom = appointmentRowToUSOM(row)
+    expect(usom.logicalDayId).toBe('ld-123')
+  })
+  it('appointmentRowToUSOM logicalDayId null → USOM null', () => {
+    const row = makeRow({ logicalDayId: null as any })
+    const usom = appointmentRowToUSOM(row)
+    expect(usom.logicalDayId).toBeNull()
+  })
+})
