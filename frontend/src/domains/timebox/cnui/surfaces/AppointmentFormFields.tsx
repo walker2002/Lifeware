@@ -13,6 +13,8 @@
 
 import { isoToLocalDatetimeInput, localDatetimeInputToIso } from './time-input-helpers'
 import { ArchetypePicker } from '@/components/archetype/archetype-picker'
+import { useUserTz } from '@/contexts/user-timezone-context'
+import { formatDateLabel } from '@/lib/logical-day/resolver'
 
 /**
  * 约定 draft 形态（与 ai-parser 的 AppointmentDraft 对齐，扩展 id/detail/archetype）。
@@ -27,6 +29,8 @@ export interface AppointmentDraftFields {
   people: string[]
   /** [026.01] 关联 Activity Archetype（[026.02.4] 3-state: undefined=skip, null=clear, string=set；ArchetypePicker variant="card" 渲染） */
   activityArchetypeId?: string | null
+  // [029] 逻辑日归属（显式优先于 date(startTime,tz) 默认）
+  logicalDayLabel?: string
 }
 
 export interface AppointmentFormFieldsProps {
@@ -48,6 +52,9 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
   const idPrefix = `app-ff-${draft.id}`
   const peopleArr = draft.people ?? []  // [026.02.3] 防御深度（defense in depth）
   const detailVal = draft.detail ?? '' // [026.02.3] 同上
+  // [029] 逻辑日默认 = today(user_tz)
+  const tz = useUserTz().tz
+  const todayLabel = formatDateLabel(new Date(), tz)
   return (
     <div className="rounded-md border border-hairline bg-canvas p-3 space-y-2">
       <div>
@@ -85,6 +92,18 @@ export function AppointmentFormFields({ draft, onChange, disabled }: Appointment
             className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink disabled:opacity-50"
           />
         </div>
+      </div>
+      {/* [029] 逻辑日归属（显式，优先于默认派生）*/}
+      <div>
+        <label htmlFor={`${idPrefix}-day`} className="text-xs text-body">归属日（逻辑日）</label>
+        <input
+          id={`${idPrefix}-day`}
+          type="date"
+          value={draft.logicalDayLabel ?? todayLabel}
+          onChange={e => onChange({ logicalDayLabel: e.target.value })}
+          disabled={disabled}
+          className="mt-0.5 h-7 w-full rounded border border-hairline bg-canvas px-2 text-sm text-ink disabled:opacity-50"
+        />
       </div>
       <div>
         <label htmlFor={`${idPrefix}-people`} className="text-xs text-body">关系人（逗号分隔）</label>
